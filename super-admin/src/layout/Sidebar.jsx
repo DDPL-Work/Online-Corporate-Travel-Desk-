@@ -22,6 +22,8 @@ import {
   FaServer,
   FaUser,
   FaSignOutAlt,
+  FaPercent,
+  FaChartLine,
 } from "react-icons/fa";
 
 import {
@@ -137,6 +139,18 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/credit-status-alerts",
           label: "Credit Alerts",
           icon: <FaBell />,
+        },
+      ],
+    },
+
+    {
+      label: "Pricing & Yield",
+      icon: <FaChartLine />,
+      subItems: [
+        {
+          to: "/global-markup-engine",
+          label: "Markup Engine",
+          icon: <FaPercent />,
         },
       ],
     },

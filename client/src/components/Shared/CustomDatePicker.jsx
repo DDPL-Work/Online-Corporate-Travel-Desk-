@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
-import { MdOutlineCalendarMonth } from "react-icons/md";
+import { MdOutlineCalendarMonth, MdClose } from "react-icons/md";
 import { C } from "./color";
 
 /**
@@ -10,7 +10,7 @@ import { C } from "./color";
  * @param {string} label - Optional label
  * @param {string} placeholder - Optional placeholder
  */
-export default function CustomDatePicker({ value, onChange, label, placeholder = "Select Date", maxDate }) {
+export default function CustomDatePicker({ value, onChange, label, placeholder = "Select Date", maxDate, minDate }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState("days"); // 'days', 'months', 'years'
   const [viewDate, setViewDate] = useState(value ? new Date(value) : new Date());
@@ -48,6 +48,8 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
 
   const maxYear = maxDate ? parseInt(maxDate.split("-")[0]) : Infinity;
   const maxMonth = maxDate ? parseInt(maxDate.split("-")[1]) - 1 : Infinity;
+  const minYear = minDate ? parseInt(minDate.split("-")[0]) : -Infinity;
+  const minMonth = minDate ? parseInt(minDate.split("-")[1]) - 1 : -Infinity;
 
   const renderHeader = () => {
     const monthName = viewDate.toLocaleString("default", { month: "short" }).toUpperCase();
@@ -55,15 +57,17 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
 
     let title = "";
     let isUp = false;
+    
+    const offset = year - 2001;
+    const blockStartYear = 2001 + Math.floor(offset / 24) * 24;
+
     if (viewMode === "days") {
       title = `${viewDate.toLocaleString("default", { month: "long" }).toUpperCase()} ${year}`;
     } else if (viewMode === "months") {
       title = `${year}`;
       isUp = true;
     } else {
-      const offset = year - 2001;
-      const startYear = 2001 + Math.floor(offset / 24) * 24;
-      title = `${startYear} – ${startYear + 23}`;
+      title = `${blockStartYear} – ${blockStartYear + 23}`;
       isUp = true;
     }
 
@@ -87,14 +91,16 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
           <button 
             onClick={(e) => { e.preventDefault(); handleMonthChange(viewMode === "years" ? -24 : -1); }}
             className="p-1 rounded hover:bg-slate-50 transition-all text-slate-500 hover:text-slate-800"
+            disabled={viewMode === "years" ? (blockStartYear - 1 < minYear && minYear !== -Infinity) : (year < minYear || (year === minYear && viewDate.getMonth() <= minMonth))}
+            style={{ opacity: (viewMode === "years" ? (blockStartYear - 1 < minYear && minYear !== -Infinity) : (year < minYear || (year === minYear && viewDate.getMonth() <= minMonth))) ? 0.3 : 1 }}
           >
             <FiChevronLeft size={18} />
           </button>
           <button 
             onClick={(e) => { e.preventDefault(); handleMonthChange(viewMode === "years" ? 24 : 1); }}
             className="p-1 rounded hover:bg-slate-50 transition-all text-slate-500 hover:text-slate-800"
-            disabled={viewMode === "years" ? (year + 24 > maxYear && maxYear !== Infinity) : (year > maxYear || (year === maxYear && viewDate.getMonth() >= maxMonth))}
-            style={{ opacity: (viewMode === "years" ? (year + 24 > maxYear && maxYear !== Infinity) : (year > maxYear || (year === maxYear && viewDate.getMonth() >= maxMonth))) ? 0.3 : 1 }}
+            disabled={viewMode === "years" ? (blockStartYear + 24 > maxYear && maxYear !== Infinity) : (year > maxYear || (year === maxYear && viewDate.getMonth() >= maxMonth))}
+            style={{ opacity: (viewMode === "years" ? (blockStartYear + 24 > maxYear && maxYear !== Infinity) : (year > maxYear || (year === maxYear && viewDate.getMonth() >= maxMonth))) ? 0.3 : 1 }}
           >
             <FiChevronRight size={18} />
           </button>
@@ -120,7 +126,7 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
     // Previous month padding
     for (let i = 0; i < firstDay; i++) {
       days.push(
-        <div key={`pad-${i}`} className="h-10 w-full flex items-center justify-center text-[13px] text-slate-300">
+        <div key={`pad-${i}`} className="h-8 w-full flex items-center justify-center text-[12px] text-slate-300">
           {prevMonthDays - firstDay + i + 1}
         </div>
       );
@@ -131,15 +137,17 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const isSelected = value === dateStr;
       const isFuture = maxDate && dateStr > maxDate;
+      const isPast = minDate && dateStr < minDate;
+      const isDisabled = isFuture || isPast;
       
       days.push(
         <div
           key={dateStr}
-          onClick={() => { if (!isFuture) handleDateClick(dateStr); }}
-          className={`h-10 w-full flex items-center justify-center ${isFuture ? "cursor-not-allowed opacity-30" : "cursor-pointer"}`}
+          onClick={() => { if (!isDisabled) handleDateClick(dateStr); }}
+          className={`h-8 w-full flex items-center justify-center ${isDisabled ? "cursor-not-allowed opacity-30" : "cursor-pointer"}`}
         >
-          <div className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all
-            ${isSelected ? "bg-[#C6CDE9] text-slate-900 font-bold" : (isFuture ? "text-slate-400 font-medium" : "text-slate-700 hover:bg-slate-100 font-medium")}
+          <div className={`w-7 h-7 flex items-center justify-center rounded-full text-[12px] transition-all
+            ${isSelected ? "bg-[#C6CDE9] text-slate-900 font-bold" : (isDisabled ? "text-slate-400 font-medium" : "text-slate-700 hover:bg-slate-100 font-medium")}
           `}>
             {d}
           </div>
@@ -152,7 +160,7 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
     const paddingEnd = Math.ceil(totalCells / 7) * 7 - totalCells;
     for (let i = 1; i <= paddingEnd; i++) {
       days.push(
-        <div key={`pad-end-${i}`} className="h-10 w-full flex items-center justify-center text-[13px] text-slate-300">
+        <div key={`pad-end-${i}`} className="h-8 w-full flex items-center justify-center text-[12px] text-slate-300">
           {i}
         </div>
       );
@@ -160,17 +168,14 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
 
     return (
       <div className="w-full">
-        <div className="grid grid-cols-7 gap-1 border-b border-slate-100 pb-2 mb-4">
+        <div className="grid grid-cols-7 gap-1 border-b border-slate-100 pb-1 mb-2">
           {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-            <div key={`${d}-${i}`} className="h-6 w-full flex items-center justify-center text-[12px] font-bold text-slate-400">
+            <div key={`${d}-${i}`} className="h-5 w-full flex items-center justify-center text-[11px] font-bold text-slate-400">
               {d}
             </div>
           ))}
         </div>
-        <div className="text-[13px] font-bold text-slate-400 mb-2 px-2 uppercase tracking-wide">
-          {monthName}
-        </div>
-        <div className="grid grid-cols-7 gap-y-1 gap-x-1">
+        <div className="grid grid-cols-7 gap-y-1 gap-x-1 mt-2">
           {days}
         </div>
       </div>
@@ -189,19 +194,21 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
           {months.map((m, idx) => {
             const isSelected = currentMonth === idx;
             const isFuture = year > maxYear || (year === maxYear && idx > maxMonth);
+            const isPast = year < minYear || (year === minYear && idx < minMonth);
+            const isDisabled = isFuture || isPast;
             return (
               <div
                 key={m}
                 onClick={() => {
-                  if (!isFuture) {
+                  if (!isDisabled) {
                     setViewDate(new Date(year, idx, 1));
                     setViewMode("days");
                   }
                 }}
-                className={`flex items-center justify-center ${isFuture ? "cursor-not-allowed opacity-30" : "cursor-pointer"}`}
+                className={`flex items-center justify-center ${isDisabled ? "cursor-not-allowed opacity-30" : "cursor-pointer"}`}
               >
                 <div className={`px-3 py-1.5 rounded-full text-[13px] transition-all
-                  ${isSelected ? "bg-[#C6CDE9] text-slate-900 font-bold" : (isFuture ? "text-slate-400 font-medium" : "text-slate-700 hover:bg-slate-100 font-medium")}
+                  ${isSelected ? "bg-[#C6CDE9] text-slate-900 font-bold" : (isDisabled ? "text-slate-400 font-medium" : "text-slate-700 hover:bg-slate-100 font-medium")}
                 `}>
                   {m}
                 </div>
@@ -225,19 +232,21 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
           {years.map((y) => {
             const isSelected = currentYear === y;
             const isFuture = maxYear !== Infinity && y > maxYear;
+            const isPast = minYear !== -Infinity && y < minYear;
+            const isDisabled = isFuture || isPast;
             return (
               <div
                 key={y}
                 onClick={() => {
-                  if (!isFuture) {
+                  if (!isDisabled) {
                     setViewDate(new Date(y, viewDate.getMonth(), 1));
                     setViewMode("months");
                   }
                 }}
-                className={`flex items-center justify-center ${isFuture ? "cursor-not-allowed opacity-30" : "cursor-pointer"}`}
+                className={`flex items-center justify-center ${isDisabled ? "cursor-not-allowed opacity-30" : "cursor-pointer"}`}
               >
                 <div className={`px-3 py-1.5 rounded-full text-[13px] transition-all
-                  ${isSelected ? "bg-[#C6CDE9] text-slate-900 font-bold" : (isFuture ? "text-slate-400 font-medium" : "text-slate-700 hover:bg-slate-100 font-medium")}
+                  ${isSelected ? "bg-[#C6CDE9] text-slate-900 font-bold" : (isDisabled ? "text-slate-400 font-medium" : "text-slate-700 hover:bg-slate-100 font-medium")}
                 `}>
                   {y}
                 </div>
@@ -274,14 +283,28 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
         <span className={!value ? "text-slate-400" : "font-medium"} style={{ color: value ? C.nearBlack : C.muted }}>
           {formattedValue || placeholder}
         </span>
-        <MdOutlineCalendarMonth size={14} style={{ color: C.muted }} />
+        <div className="flex items-center gap-1.5">
+          {value && (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onChange) onChange(null);
+                setIsOpen(false);
+              }}
+              className="p-0.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors"
+            >
+              <MdClose size={14} />
+            </div>
+          )}
+          <MdOutlineCalendarMonth size={14} style={{ color: C.muted }} />
+        </div>
       </button>
 
       {isOpen && (
-        <div className="absolute z-[200] mt-3 left-0 bg-white border border-slate-100 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.2)] p-6 w-[320px] animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute z-[200] mt-3 left-0 bg-white border border-slate-100 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.15)] p-4 w-[280px] animate-in fade-in zoom-in-95 duration-200">
           {renderHeader()}
           
-          <div className="min-h-[240px]">
+          <div className="min-h-[200px]">
             {viewMode === "days" && renderDays()}
             {viewMode === "months" && renderMonths()}
             {viewMode === "years" && renderYears()}

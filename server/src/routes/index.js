@@ -40,6 +40,7 @@ const reissueOpsRoutes = require("../modules/servicing/reissue/routes/reissue.op
 const notificationRoutes = require("./notificationRoutes");
 const blogRoutes = require("./blog.routes");
 const contactLeadRoutes = require("./contactLead.routes");
+const markupRoutes = require("./markup.routes");
 
 // ------------------ ✅ IMPORTANT FIX ------------------
 // ✅ SSO MUST BE MOUNTED BEFORE /auth (to avoid JWT blocking)
@@ -85,6 +86,7 @@ router.use("/ssr-policies", ssrPolicyRoutes);
 router.use("/landing-page", landingPageRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/contact-leads", contactLeadRoutes);
+router.use("/markup", markupRoutes);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {

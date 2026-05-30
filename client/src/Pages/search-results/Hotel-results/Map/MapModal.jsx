@@ -21,6 +21,7 @@ import {
 } from "react-icons/md";
 import L from "leaflet";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import api from "../../../../API/axios";
 
 /* ── Price Marker Icon ── */
@@ -166,11 +167,14 @@ const dedupeMapHotels = (existing = [], incoming = []) => {
 
 /* ── Hotel Card (left panel) ── */
 const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onClick }) => (
-  <div
+  <a
+    href="/one-hotel-details"
+    target="_blank"
+    rel="opener"
     onClick={onClick}
     onMouseEnter={onEnter}
     onMouseLeave={onLeave}
-    className={`group relative bg-white rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden ${
+    className={`block group relative bg-white rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden ${
       isActive
         ? "border-[#0d7fe8] shadow-[0_4px_20px_rgba(13,127,232,0.18)]"
         : "border-slate-200 hover:border-[#0d7fe8] hover:shadow-md"
@@ -231,7 +235,7 @@ const HotelListCard = ({ hotel, isActive, onEnter, onLeave, onClick }) => (
         </div>
       </div>
     </div>
-  </div>
+  </a>
 );
 
 /* ── Main Modal ── */
@@ -245,6 +249,7 @@ const MapModal = ({
   handleLoadMore = () => {},
 }) => {
   const navigate = useNavigate();
+  const { searchPayload, traceId, hotels: rawHotelsFromRedux } = useSelector((state) => state.hotel);
   const [hoveredHotel, setHoveredHotel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMarker, setSearchMarker] = useState(null);
@@ -438,11 +443,21 @@ const MapModal = ({
                     <HotelListCard
                       hotel={hotel}
                       onClick={() => {
-                        navigate("/one-hotel-details", {
-                          state: {
-                            hotelCode: hotel.id,
-                          },
-                        });
+                        const rawHotel = rawHotelsFromRedux?.find((h) => h.HotelCode === hotel.id || h.id === hotel.id || h.hotelCode === hotel.id) || null;
+                        const stateObj = { 
+                          hotelCode: hotel.id,
+                          traceId: rawHotel?.TraceId || rawHotel?.traceId || searchPayload?.TraceId || traceId,
+                          searchPayload,
+                          hotelFromSearch: rawHotel
+                        };
+                        localStorage.setItem("hotelDetailsState", JSON.stringify(stateObj));
+                        
+                        const token = sessionStorage.getItem("token");
+                        if (token) {
+                          localStorage.setItem("tab_sync_token", token);
+                          localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
+                          localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                        }
                       }}
                       isActive={hoveredHotel === hotel.id}
                       onEnter={() => setHoveredHotel(hotel.id)}

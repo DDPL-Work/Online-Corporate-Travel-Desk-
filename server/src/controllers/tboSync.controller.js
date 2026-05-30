@@ -2,9 +2,13 @@ const TBOCity = require("../models/TBOCity");
 const TBOHotel = require("../models/TBOHotel");
 const TBOHotelDetails = require("../models/TBOHotelDetails");
 const TBOSyncProgress = require("../models/TBOSyncProgress");
+const Airline = require("../models/Airline");
+const Airport = require("../models/Airport");
 const hotelService = require("../services/tektravels/hotel.service");
 const logger = require("../utils/logger");
 const asyncHandler = require("../utils/asyncHandler");
+const path = require("path");
+const fs = require("fs");
 
 // Global sync states
 let citySyncState = {
@@ -803,4 +807,197 @@ exports.processMasterSync = async () => {
 exports.triggerMasterSync = asyncHandler(async (req, res) => {
     this.processMasterSync();
     res.status(202).json({ success: true, message: "Master sync chain started" });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AIRLINE SEED
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/tbo-sync/seed-airlines
+ * Reads airlines_iata_only.json from the convert folder and bulk-upserts
+ * every record into the Airline collection. Safe to run multiple times
+ * (uses iata + icao as the unique key via upsert).
+ */
+exports.seedAirlines = asyncHandler(async (req, res) => {
+    const jsonPath = path.resolve(
+        __dirname,
+        "../../convert/airlines_iata_only.json"
+    );
+
+    if (!fs.existsSync(jsonPath)) {
+        return res.status(404).json({
+            success: false,
+            message: `airlines_iata_only.json not found at ${jsonPath}`,
+        });
+    }
+
+    const raw = fs.readFileSync(jsonPath, "utf-8");
+    const airlines = JSON.parse(raw);
+
+    if (!Array.isArray(airlines) || airlines.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "JSON file is empty or not a valid array",
+        });
+    }
+
+    logger.info(`[AIRLINE SEED] Starting seed for ${airlines.length} airlines...`);
+
+    // Build bulk operations — upsert on iata + icao
+    const ops = airlines.map((a) => ({
+        updateOne: {
+            filter: { iata: (a.iata || "").trim().toUpperCase(), icao: a.icao ? a.icao.trim().toUpperCase() : null },
+            update: {
+                $set: {
+                    sourceId: a.id ? String(a.id) : null,
+                    name: (a.name || "").trim(),
+                    alias: a.alias ? String(a.alias).trim() : null,
+                    iata: (a.iata || "").trim().toUpperCase(),
+                    icao: a.icao ? a.icao.trim().toUpperCase() : null,
+                    callsign: a.callsign ? String(a.callsign).trim() : null,
+                    country: a.country ? String(a.country).trim() : null,
+                },
+            },
+            upsert: true,
+        },
+    }));
+
+    const BATCH_SIZE = 500;
+    let inserted = 0;
+    let updated = 0;
+    let errors = [];
+
+    for (let i = 0; i < ops.length; i += BATCH_SIZE) {
+        const batch = ops.slice(i, i + BATCH_SIZE);
+        try {
+            const result = await Airline.bulkWrite(batch, { ordered: false });
+            inserted += result.upsertedCount || 0;
+            updated += result.modifiedCount || 0;
+        } catch (err) {
+            logger.error(`[AIRLINE SEED] Batch error at offset ${i}: ${err.message}`);
+            errors.push({ offset: i, message: err.message });
+        }
+    }
+
+    logger.info(`[AIRLINE SEED] Done — inserted: ${inserted}, updated: ${updated}, errors: ${errors.length}`);
+
+    return res.status(200).json({
+        success: true,
+        message: "Airline seed complete",
+        stats: {
+            total: airlines.length,
+            inserted,
+            updated,
+            errorBatches: errors.length,
+        },
+        errors: errors.length > 0 ? errors : undefined,
+    });
+});
+
+/**
+ * GET /api/tbo-sync/seed-airlines/status
+ * Returns the current count of airlines stored in the DB.
+ */
+exports.getSeedAirlinesStatus = asyncHandler(async (req, res) => {
+    const total = await Airline.countDocuments();
+    const active = await Airline.countDocuments({ active: true });
+    return res.status(200).json({
+        success: true,
+        data: {
+            totalAirlines: total,
+            activeAirlines: active,
+            inactiveAirlines: total - active,
+        },
+    });
+});
+
+/**
+ * POST /api/tbo-sync/seed-airports
+ * Seeds the airportDatabase.js file into the Airport collection.
+ * Skips existing airports by matching their iata_code.
+ */
+exports.seedAirports = asyncHandler(async (req, res) => {
+    logger.info("[AIRPORT SEED] Starting seed for airports from local file...");
+
+    const filePath = path.join(__dirname, "../../convert/airportDatabase.js");
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+            success: false,
+            message: "Airport database file not found.",
+        });
+    }
+
+    try {
+        const fileContent = fs.readFileSync(filePath, "utf-8");
+        // Strip the export declaration
+        const arrayString = fileContent.replace("export const airportDatabase =", "").trim().replace(/;$/, "");
+        
+        // Parse the JS array safely
+        const airportData = eval(`(${arrayString})`);
+
+        if (!Array.isArray(airportData) || airportData.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Airport data is empty or invalid.",
+            });
+        }
+
+        const BATCH_SIZE = 500;
+        let inserted = 0;
+        let skipped = 0;
+        let errors = [];
+
+        logger.info(`[AIRPORT SEED] Found ${airportData.length} airports in file. Processing in batches of ${BATCH_SIZE}...`);
+
+        for (let i = 0; i < airportData.length; i += BATCH_SIZE) {
+            const batch = airportData.slice(i, i + BATCH_SIZE);
+            const operations = batch.map((airport) => ({
+                updateOne: {
+                    filter: { iata_code: airport.iata_code },
+                    update: {
+                        $setOnInsert: {
+                            name: airport.name,
+                            city: airport.city,
+                            country: airport.country,
+                            iata_code: airport.iata_code,
+                        },
+                    },
+                    upsert: true,
+                },
+            }));
+
+            try {
+                const result = await Airport.bulkWrite(operations, { ordered: false });
+                inserted += result.upsertedCount;
+                // Since we only use $setOnInsert, any existing document won't be modified.
+                skipped += batch.length - result.upsertedCount; 
+            } catch (error) {
+                logger.error(`[AIRPORT SEED] Batch error at index ${i}:`, error.message);
+                errors.push({ batchStart: i, message: error.message });
+            }
+        }
+
+        logger.info(`[AIRPORT SEED] Done — inserted: ${inserted}, skipped: ${skipped}, errors: ${errors.length}`);
+
+        return res.status(200).json({
+            success: true,
+            message: "Airport seeding completed",
+            stats: {
+                totalInFile: airportData.length,
+                inserted,
+                skipped,
+                errorBatches: errors.length,
+            },
+            errors: errors.length > 0 ? errors : undefined,
+        });
+
+    } catch (error) {
+        logger.error("[AIRPORT SEED] Error reading or parsing airport database:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to parse airport database.",
+            error: error.message,
+        });
+    }
 });
