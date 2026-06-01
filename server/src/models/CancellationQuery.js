@@ -38,6 +38,42 @@ const logSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const assignmentHistorySchema = new mongoose.Schema(
+  {
+    from: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "OpsMember",
+      default: null,
+    },
+    to: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "OpsMember",
+      default: null,
+    },
+    method: {
+      type: String,
+      enum: ["AUTO", "MANUAL"],
+      default: "AUTO",
+    },
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: "assignmentHistory.assignedByModel",
+      default: null,
+    },
+    assignedByModel: {
+      type: String,
+      enum: ["User", "OpsMember", "SuperAdmin"],
+      default: "User",
+    },
+    reason: String,
+    assignedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 /* ─────────────────────────────
    MAIN SCHEMA
 ───────────────────────────── */
@@ -95,6 +131,12 @@ const cancellationQuerySchema = new mongoose.Schema(
       employeeId: String,
       employeeName: String,
       employeeEmail: String,
+    },
+
+    corporateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Corporate",
+      index: true,
     },
 
     /* BOOKING SNAPSHOT */
@@ -166,6 +208,32 @@ const cancellationQuerySchema = new mongoose.Schema(
       type: [logSchema],
       default: [],
     },
+
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "OpsMember",
+      default: null,
+      index: true,
+    },
+    assignedAt: Date,
+    assignmentMethod: {
+      type: String,
+      enum: ["AUTO", "MANUAL"],
+      default: null,
+    },
+    assignmentHistory: {
+      type: [assignmentHistorySchema],
+      default: [],
+    },
+    autoAssignmentAttempted: {
+      type: Boolean,
+      default: false,
+    },
+    assignmentFailureReason: {
+      type: String,
+      default: null,
+    },
+    assignmentReleasedAt: Date,
   },
   {
     timestamps: true,

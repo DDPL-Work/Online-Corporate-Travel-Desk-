@@ -79,6 +79,7 @@ const getTboBookingId = (booking) => getAllTboBookingIds(booking)[0] || null;
 ====================================================== */
 const tboService = require("../services/tektravels/flight.service");
 const CancellationQuery = require("../models/CancellationQuery");
+const roundRobinAssignmentService = require("../modules/ops/services/roundRobinAssignment.service");
 
 const fetchTicketIdsFromTbo = async (pnr) => {
   if (!pnr) return [];
@@ -808,6 +809,7 @@ exports.createCancellationQuery = async (req, res) => {
 
       passengers,
       corporate,
+      corporateId: corporate?.companyId || req.user?.corporateId || undefined,
       bookingSnapshot,
       segments,
 
@@ -830,9 +832,37 @@ exports.createCancellationQuery = async (req, res) => {
     /* ─────────────────────────────
        ✅ SUCCESS RESPONSE
     ───────────────────────────── */
+    const assignmentResult = await roundRobinAssignmentService.autoAssignRequest({
+      request: query,
+      requestType: "cancellation",
+      assignedBy: req.user?._id || req.user?.id || null,
+      reason: "Automatic cancellation query assignment",
+    });
+
+    if (!assignmentResult) {
+      query.autoAssignmentAttempted = true;
+      query.assignmentFailureReason = "NO_ELIGIBLE_OPS";
+      query.logs.push({
+        action: "ASSIGNMENT_PENDING",
+        by: "SYSTEM",
+        message:
+          "No eligible OPS member with Manage Cancellations permission was available for auto-assignment",
+      });
+      await query.save();
+    } else {
+      query.logs.push({
+        action: "AUTO_ASSIGNED",
+        by: "SYSTEM",
+        message: `Cancellation query auto-assigned to ${assignmentResult.agent.name}`,
+      });
+      await query.save();
+    }
+
     return res.status(201).json({
       success: true,
-      message: "Cancellation query created successfully",
+      message: assignmentResult
+        ? "Cancellation query created and auto-assigned successfully"
+        : "Cancellation query created and awaiting OPS assignment",
       data: query,
     });
   } catch (error) {

@@ -50,8 +50,17 @@ class RoundRobinAssignmentService {
       ],
     };
 
+    if (requestType === "cancellation") {
+      query.lastLoginAt = { $ne: null };
+    }
+
+    const sort =
+      requestType === "cancellation"
+        ? { lastLoginAt: 1, createdAt: 1, name: 1 }
+        : { currentActiveAssignments: 1, lastAssignedAt: 1, name: 1 };
+
     const candidates = await OpsMember.find(query)
-      .sort({ currentActiveAssignments: 1, lastAssignedAt: 1, name: 1 })
+      .sort(sort)
       .session(session || null);
 
     return candidates.filter((member) => {
@@ -255,6 +264,11 @@ class RoundRobinAssignmentService {
       await session.commitTransaction();
 
       try {
+        const link =
+          requestType === "cancellation"
+            ? `/cancellation-queries`
+            : `/reissue/offline/${request._id}`;
+
         await sendNotification({
           recipient: agent._id,
           recipientRole: "ops-member",
@@ -264,7 +278,7 @@ class RoundRobinAssignmentService {
           message: `You have been auto-assigned a ${requestType} request.`,
           type: "ops_assignment",
           relatedId: request._id,
-          link: `/reissue/offline/${request._id}`,
+          link,
         });
       } catch (notificationError) {
         logger.warn("ops_assignment_notification_failed", {

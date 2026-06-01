@@ -38,6 +38,7 @@ import { CABIN_MAP } from "../../../utils/formatter";
 import { FareDetailsModal } from "./FareDetailsModal";
 import Swal from "sweetalert2";
 import LandingHeader from "../../../layout/LandingHeader";
+import { mergeLeadTravelerProfile } from "../../../utils/profileTraveler";
 
 import { clearFareDetails } from "../../../Redux/Slice/flightSearchSlice";
 
@@ -163,34 +164,21 @@ export default function MultiCityFlightBooking() {
       });
     }
 
-    // Pre-fill first traveler if user/profile is logged in
-    const sourceProfile = myProfile || user;
-    if (sourceProfile && initial[0]) {
-      const rawName = sourceProfile.name || sourceProfile.displayName || "";
-      let firstName = "";
-      let lastName = "";
-      
-      if (typeof sourceProfile.name === "object") {
-         firstName = (sourceProfile.name.firstName || "").toUpperCase();
-         lastName = (sourceProfile.name.lastName || "").toUpperCase();
-      } else {
-         const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
-         firstName = (names[0] || "").toUpperCase();
-         lastName = (names.slice(1).join(" ") || "").toUpperCase();
-      }
-
-      initial[0].firstName = firstName;
-      initial[0].lastName = lastName;
-      initial[0].email = sourceProfile.email || "";
-      initial[0].phoneWithCode = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
-      if (sourceProfile.dob || sourceProfile.dateOfBirth) {
-        const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth;
-        initial[0].dob = rawDob.split("T")[0];
-      }
-    }
-
     setTravelers(initial);
-  }, [user, myProfile, searchParams]);
+  }, [adultCount, childCount, infantCount]);
+
+  useEffect(() => {
+    const sourceProfile = myProfile || user;
+    if (!sourceProfile) return;
+
+    setTravelers((prev) =>
+      prev.map((traveler, index) =>
+        index === 0
+          ? mergeLeadTravelerProfile(traveler, sourceProfile)
+          : traveler,
+      ),
+    );
+  }, [myProfile, user]);
 
   useEffect(() => {
     const fetchGst = async () => {
