@@ -300,6 +300,7 @@ function HotelSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [waitingBookingId, setWaitingBookingId] = useState(null);
   const PAGE_SIZE = 10;
 
   const navigate = useNavigate();
@@ -424,13 +425,27 @@ function HotelSection() {
                 <td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
                 <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
-                <td className="px-6! py-5! text-left!">
+                <td className="px-6! py-5! text-left! relative">
                     <button 
-                      onClick={() => navigate(`/my-hotel-booking/${b._id}`)} 
+                      onClick={() => {
+                        const elapsed = (Date.now() - new Date(b.bookedDate).getTime()) / 1000;
+                        if (elapsed < 120) {
+                          setWaitingBookingId(b._id);
+                          setTimeout(() => setWaitingBookingId(null), 3000);
+                        } else {
+                          navigate(`/my-hotel-booking/${b._id}`);
+                        }
+                      }} 
                       className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
                     >
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
+                    {waitingBookingId === b._id && (
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 mr-16 w-48 bg-white border border-amber-200 shadow-xl rounded-xl p-3 z-[100] animate-in fade-in zoom-in-95 duration-200">
+                        <p className="text-xs text-amber-600 font-black mb-1">Please Wait</p>
+                        <p className="text-[10px] text-slate-500 leading-tight">Your voucher is being generated. Please wait 120 seconds after booking to view details.</p>
+                      </div>
+                    )}
                 </td>
               </tr>
             )) : (
