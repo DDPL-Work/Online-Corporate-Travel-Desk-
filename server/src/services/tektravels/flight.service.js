@@ -500,6 +500,18 @@ class FlightService {
       ({ data } = await doSearch());
     }
 
+    // 1️⃣ Apply Markups (Update pricing dynamically)
+    if (data?.Response && data?.Response?.ResponseStatus === 1 && params.corporateId && data?.Response?.Results) {
+      try {
+        const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+        data.Response.Results = await MarkupCalculatorService.applyFlightMarkup(data.Response.Results, params.corporateId);
+      } catch (error) {
+        logger.error("Failed to apply flight markups", { error: error.message });
+      }
+    }
+
+
+
     return data;
   }
 
@@ -522,10 +534,10 @@ class FlightService {
   }
 
   /* ---------------- FARE QUOTE ---------------- */
-  async getFareQuote(traceId, resultIndex) {
+  async getFareQuote(traceId, resultIndex, corporateId, snapshotId) {
     const env = this.getEnv();
 
-    return this.postLive(
+    const data = await this.postLive(
       "flightFareQuote",
       {
         TraceId: traceId,
@@ -533,6 +545,20 @@ class FlightService {
       },
       env,
     );
+
+    // 1️⃣ Apply markup to the latest fare quote response
+    if (data?.Response && data?.Response?.ResponseStatus === 1 && corporateId && data?.Response?.Results) {
+       try {
+          const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+          data.Response.Results = await MarkupCalculatorService.applyFlightMarkup(data.Response.Results, corporateId);
+       } catch(error) {
+          logger.error("Failed to apply markup to fare quote", { error: error.message });
+       }
+    }
+
+
+
+    return data;
   }
 
   /* ---------------- REAL SSR ---------------- */

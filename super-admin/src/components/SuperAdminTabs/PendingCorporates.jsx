@@ -4,7 +4,6 @@ import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiCl
 import { MdVerifiedUser, MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
-import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 import { fetchCorporates, fetchCorporateById } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
 import useExcelExporter from "../../services/export/useExcelExporter";
@@ -96,7 +95,6 @@ export default function PendingCorporates() {
 
   const [openViewModal, setOpenViewModal] = useState(false);
   const [selectedCorporate, setSelectedCorporate] = useState(null);
-  const [openFinancialApprove, setOpenFinancialApprove] = useState(false);
   
   const [search, setSearch] = useState("");
   const [selectedCorporateId, setSelectedCorporateId] = useState("all");
@@ -199,8 +197,9 @@ export default function PendingCorporates() {
   };
 
   const handleApprove = (corporate) => {
-    setSelectedCorporate(corporate);
-    setOpenFinancialApprove(true);
+    navigate(`/financial-approval/${corporate._id}`, {
+      state: { corporate, from: "/pending-corporates" },
+    });
   };
 
   return (
@@ -459,15 +458,6 @@ export default function PendingCorporates() {
           <ViewCorporateModal corporate={selectedCorporate} onClose={() => setOpenViewModal(false)} />
         )}
 
-        {openFinancialApprove && selectedCorporate && (
-          <FinancialApprovalModal
-            corporate={selectedCorporate}
-            onClose={() => {
-              setOpenFinancialApprove(false);
-              setSelectedCorporate(null);
-            }}
-          />
-        )}
       </div>
     </div>
   );

@@ -7,13 +7,14 @@ import {
   FiDollarSign,
   FiPlus,
   FiTrash2,
-  FiSettings
+  FiSettings,
+  FiList
 } from "react-icons/fi";
 import { FaPlane, FaHotel, FaRupeeSign, FaChevronUp, FaChevronDown } from "react-icons/fa";
 import { MdBusiness } from "react-icons/md";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports } from "../../Redux/Actions/markup.thunks";
+import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports, saveCorporateMarkup, getAllCorporateMarkups } from "../../Redux/Actions/markup.thunks";
 import { airlineLogo } from "../../utils/formatter";
 
 const C = {
@@ -66,165 +67,338 @@ export default function CorporateMarkupConfiguration() {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState("");
   
-  const [markupMethod, setMarkupMethod] = useState("percentage"); // 'fixed' | 'percentage'
-  const [showMarkupMethodDropdown, setShowMarkupMethodDropdown] = useState(false);
-  const [markupValue, setMarkupValue] = useState("");
-  
-  // Specific Form States
-  const [airlineSearchTerm, setAirlineSearchTerm] = useState("");
-  const [showAirlineDropdown, setShowAirlineDropdown] = useState(false);
-  const [airline, setAirline] = useState("");
-  
-  const [countrySearchTerm, setCountrySearchTerm] = useState("");
-  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
-  const [country, setCountry] = useState("");
+  const [categoryRulesMap, setCategoryRulesMap] = useState({});
+  const [activeDropdown, setActiveDropdown] = useState(null); // { type: 'airline', index: 0 }
 
-  const [citySearchTerm, setCitySearchTerm] = useState("");
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [city, setCity] = useState("");
+  const getDefaultRuleForCategory = (cat) => {
+    const base = { value: "", method: "percentage" };
+    switch (cat) {
+      case "Airline Wise": return { ...base, airline: "", airlineSearchTerm: "" };
+      case "Cabin Wise": return { ...base, cabinClass: "" };
+      case "Sector Wise": return { ...base, origin: "", originSearchTerm: "", destination: "", destinationSearchTerm: "" };
+      case "Country Wise": return { ...base, country: "", countrySearchTerm: "" };
+      case "City Wise": return { ...base, city: "", citySearchTerm: "" };
+      case "Hotel Wise": return { ...base, hotelCityCode: "", hotelCitySearchTerm: "", hotel: "", hotelSearchTerm: "" };
+      case "Star Rating Wise": return { ...base, starRating: "" };
+      case "Fare Slab Based": return { fareSlabs: [{ from: "", to: "", value: "", method: "fixed" }] };
+      default: return { ...base };
+    }
+  };
 
-  const [hotelSearchTerm, setHotelSearchTerm] = useState("");
-  const [showHotelDropdown, setShowHotelDropdown] = useState(false);
-  const [hotel, setHotel] = useState("");
+  useEffect(() => {
+    if (location.state?.editMode && location.state?.editRule && location.state?.markupDoc) {
+      const { editRule, markupDoc } = location.state;
+      setActiveTab(markupDoc.productType);
+      setSelectedCategories([editRule.category]);
+      setActiveCategory(editRule.category);
+      
+      let initialRule = { ...getDefaultRuleForCategory(editRule.category) };
+      
+      if (editRule.category !== "Fare Slab Based") {
+        initialRule.value = editRule.markupValue;
+        initialRule.method = editRule.markupMethod;
+      } else {
+        initialRule.fareSlabs = editRule.fareSlabs || [];
+      }
+      
+      const c = editRule.criteria || {};
+      if (c.airline) { initialRule.airline = c.airline; initialRule.airlineSearchTerm = c.airline; }
+      if (c.cabinClass) initialRule.cabinClass = c.cabinClass;
+      if (c.origin) { initialRule.origin = c.origin; initialRule.originSearchTerm = c.origin; }
+      if (c.destination) { initialRule.destination = c.destination; initialRule.destinationSearchTerm = c.destination; }
+      if (c.country) { initialRule.country = c.country; initialRule.countrySearchTerm = c.country; }
+      if (c.city) { initialRule.city = c.city; initialRule.citySearchTerm = c.city; }
+      if (c.hotelCityCode) { initialRule.hotelCityCode = c.hotelCityCode; initialRule.hotelCitySearchTerm = c.hotelCityCode; }
+      if (c.hotel) { initialRule.hotel = c.hotel; initialRule.hotelSearchTerm = c.hotel; }
+      if (c.starRating) initialRule.starRating = c.starRating;
 
-  const [hotelCitySearchTerm, setHotelCitySearchTerm] = useState("");
-  const [showHotelCityDropdown, setShowHotelCityDropdown] = useState(false);
-  const [hotelCityCode, setHotelCityCode] = useState("");
+      setCategoryRulesMap({
+        [editRule.category]: [initialRule]
+      });
+    }
+  }, [location.state]);
 
-  const [starRating, setStarRating] = useState("");
-  const [showStarRatingDropdown, setShowStarRatingDropdown] = useState(false);
+  // Get the currently focused rule's active search terms based on activeDropdown
+  const activeRule = (activeDropdown && activeCategory) ? categoryRulesMap[activeCategory]?.[activeDropdown.index] : null;
 
-  const [cabin, setCabin] = useState("Economy");
-  const [showCabinDropdown, setShowCabinDropdown] = useState(false);
-
-  const [originSearchTerm, setOriginSearchTerm] = useState("");
-  const [showOriginDropdown, setShowOriginDropdown] = useState(false);
-  const [origin, setOrigin] = useState("");
-
-  const [destinationSearchTerm, setDestinationSearchTerm] = useState("");
-  const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
-  const [destination, setDestination] = useState("");
-
-  const [fareSlabs, setFareSlabs] = useState([{ from: "", to: "", value: "", method: "fixed" }]);
-  const [activeFareSlabDropdown, setActiveFareSlabDropdown] = useState(null);
-  
   // Debounced Airline Search
   useEffect(() => {
-    if (activeCategory === "Airline Wise") {
+    if (activeCategory === "Airline Wise" && activeRule?.airlineSearchTerm !== undefined && activeDropdown?.type === 'airline') {
       const delayFn = setTimeout(() => {
-        dispatch(fetchAirlines({ search: airlineSearchTerm, limit: 100 }));
+        dispatch(fetchAirlines({ search: activeRule.airlineSearchTerm, limit: 100 }));
       }, 500);
       return () => clearTimeout(delayFn);
     }
-  }, [airlineSearchTerm, activeCategory, dispatch]);
+  }, [activeRule?.airlineSearchTerm, activeCategory, activeDropdown, dispatch]);
 
   // Debounced Origin Search
   useEffect(() => {
-    if (activeCategory === "Sector Wise" && showOriginDropdown) {
+    if (activeCategory === "Sector Wise" && activeRule?.originSearchTerm !== undefined && activeDropdown?.type === 'origin') {
       const delayFn = setTimeout(() => {
-        dispatch(fetchAirports({ search: originSearchTerm, limit: 100 }));
+        dispatch(fetchAirports({ search: activeRule.originSearchTerm, limit: 100 }));
       }, 500);
       return () => clearTimeout(delayFn);
     }
-  }, [originSearchTerm, activeCategory, showOriginDropdown, dispatch]);
+  }, [activeRule?.originSearchTerm, activeCategory, activeDropdown, dispatch]);
 
   // Debounced Destination Search
   useEffect(() => {
-    if (activeCategory === "Sector Wise" && showDestinationDropdown) {
+    if (activeCategory === "Sector Wise" && activeRule?.destinationSearchTerm !== undefined && activeDropdown?.type === 'destination') {
       const delayFn = setTimeout(() => {
-        dispatch(fetchAirports({ search: destinationSearchTerm, limit: 100 }));
+        dispatch(fetchAirports({ search: activeRule.destinationSearchTerm, limit: 100 }));
       }, 500);
       return () => clearTimeout(delayFn);
     }
-  }, [destinationSearchTerm, activeCategory, showDestinationDropdown, dispatch]);
+  }, [activeRule?.destinationSearchTerm, activeCategory, activeDropdown, dispatch]);
 
   // Debounced Country Search
   useEffect(() => {
-    if (activeCategory === "Country Wise") {
+    if (activeCategory === "Country Wise" && activeRule?.countrySearchTerm !== undefined && activeDropdown?.type === 'country') {
       const delayFn = setTimeout(() => {
-        dispatch(fetchCountries({ search: countrySearchTerm, limit: 100 }));
+        dispatch(fetchCountries({ search: activeRule.countrySearchTerm, limit: 100 }));
       }, 500);
       return () => clearTimeout(delayFn);
     }
-  }, [countrySearchTerm, activeCategory, dispatch]);
+  }, [activeRule?.countrySearchTerm, activeCategory, activeDropdown, dispatch]);
 
   // Debounced City Search
   useEffect(() => {
-    if (activeCategory === "City Wise") {
+    if (activeCategory === "City Wise" && activeRule?.citySearchTerm !== undefined && activeDropdown?.type === 'city') {
       const delayFn = setTimeout(() => {
-        dispatch(fetchCities({ search: citySearchTerm, limit: 100 }));
+        dispatch(fetchCities({ search: activeRule.citySearchTerm, limit: 100 }));
       }, 500);
       return () => clearTimeout(delayFn);
     }
-  }, [citySearchTerm, activeCategory, dispatch]);
-
-  // Debounced Hotel Search
-  useEffect(() => {
-    if (activeCategory === "Hotel Wise") {
-      const delayFn = setTimeout(() => {
-        dispatch(fetchHotels({ search: hotelSearchTerm, cityCode: hotelCityCode, limit: 100 }));
-      }, 500);
-      return () => clearTimeout(delayFn);
-    }
-  }, [hotelSearchTerm, hotelCityCode, activeCategory, dispatch]);
+  }, [activeRule?.citySearchTerm, activeCategory, activeDropdown, dispatch]);
 
   // Debounced Hotel City Search
   useEffect(() => {
-    if (activeCategory === "Hotel Wise") {
+    if (activeCategory === "Hotel Wise" && activeRule?.hotelCitySearchTerm !== undefined && activeDropdown?.type === 'hotelCity') {
       const delayFn = setTimeout(() => {
-        dispatch(fetchCities({ search: hotelCitySearchTerm, limit: 100 }));
+        dispatch(fetchCities({ search: activeRule.hotelCitySearchTerm, limit: 100 }));
       }, 500);
       return () => clearTimeout(delayFn);
     }
-  }, [hotelCitySearchTerm, activeCategory, dispatch]);
+  }, [activeRule?.hotelCitySearchTerm, activeCategory, activeDropdown, dispatch]);
+
+  // Debounced Hotel Search
+  useEffect(() => {
+    if (activeCategory === "Hotel Wise" && activeRule?.hotelSearchTerm !== undefined && activeDropdown?.type === 'hotel') {
+      const delayFn = setTimeout(() => {
+        dispatch(fetchHotels({ search: activeRule.hotelSearchTerm, cityCode: activeRule.hotelCityCode, limit: 100 }));
+      }, 500);
+      return () => clearTimeout(delayFn);
+    }
+  }, [activeRule?.hotelSearchTerm, activeRule?.hotelCityCode, activeCategory, activeDropdown, dispatch]);
 
   useEffect(() => {
-    // Reset selections when tab changes
-    setSelectedCategories([]);
-    setActiveCategory("");
-    setMarkupMethod("percentage");
-    setMarkupValue("");
-  }, [activeTab]);
+    // Reset selections when tab changes ONLY if not in edit mode
+    if (!location.state?.editMode) {
+      setSelectedCategories([]);
+      setActiveCategory("");
+      setCategoryRulesMap({});
+    }
+  }, [activeTab, location.state]);
 
   const toggleCategory = (cat) => {
     setSelectedCategories(prev => {
       const isSelected = prev.includes(cat);
       const next = isSelected ? prev.filter(c => c !== cat) : [...prev, cat];
-      // If unchecking the active one, set active to last remaining
-      if (isSelected && cat === activeCategory) {
+      
+      if (!isSelected) {
+        // Newly checked → make it active and initialize default rule if none exists
+        setActiveCategory(cat);
+        setCategoryRulesMap(prevMap => {
+          if (!prevMap[cat] || prevMap[cat].length === 0) {
+            return { ...prevMap, [cat]: [getDefaultRuleForCategory(cat)] };
+          }
+          return prevMap;
+        });
+      } else if (cat === activeCategory) {
+        // Unchecked active → set active to last remaining
         const remaining = next;
         setActiveCategory(remaining.length > 0 ? remaining[remaining.length - 1] : "");
-      } else if (!isSelected) {
-        // Newly checked → make it active
-        setActiveCategory(cat);
       }
       return next;
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedCategories.length === 0) {
-      toast.error("Please select at least one category");
+      toast.error("Please configure at least one rule");
       return;
     }
-    const hasFareSlab = selectedCategories.includes("Fare Slab Based");
-    if (!markupValue && !hasFareSlab) {
-      toast.error("Please enter a markup value");
+
+    const finalRules = [];
+
+    // Loop through all selected categories to collect and validate rules
+    for (const cat of selectedCategories) {
+      const rulesForCat = categoryRulesMap[cat];
+      if (!rulesForCat || rulesForCat.length === 0) continue;
+
+      for (const rule of rulesForCat) {
+        if (cat !== "Fare Slab Based") {
+          const val = rule.value;
+          if (!val) {
+            toast.error(`Please enter a markup value for all rows in ${cat}`);
+            return;
+          }
+          if (Number(val) < 0) {
+            toast.error(`Markup cannot be negative in ${cat}`);
+            return;
+          }
+        }
+
+        const criteria = {};
+        if (cat === "Airline Wise") criteria.airline = rule.airline;
+        if (cat === "Cabin Wise") criteria.cabinClass = rule.cabinClass;
+        if (cat === "Sector Wise") {
+          criteria.origin = rule.origin;
+          criteria.destination = rule.destination;
+        }
+        if (cat === "Country Wise") criteria.country = rule.country;
+        if (cat === "City Wise") criteria.city = rule.city;
+        if (cat === "Hotel Wise") {
+          criteria.hotelCityCode = rule.hotelCityCode;
+          criteria.hotel = rule.hotel;
+        }
+        if (cat === "Star Rating Wise") criteria.starRating = rule.starRating;
+
+        finalRules.push({
+          category: cat,
+          markupMethod: rule.method || "percentage",
+          markupValue: Number(rule.value) || 0,
+          criteria,
+          fareSlabs: cat === "Fare Slab Based" ? [...(rule.fareSlabs || [])] : []
+        });
+      }
+    }
+
+    if (finalRules.length === 0) {
+      toast.error("No valid rules to save. Please fill out the markup values.");
       return;
     }
-    if (Number(markupValue) < 0) {
-      toast.error("Markup cannot be negative");
-      return;
+
+    let payloadRules = finalRules;
+    
+    try {
+      let existingRulesForProductType = [];
+      if (!location.state?.editMode) {
+        // Fetch existing rules so we can append
+        const markupsAction = await dispatch(getAllCorporateMarkups(corporate._id));
+        if (markupsAction.payload && markupsAction.payload.data) {
+          const existingDoc = markupsAction.payload.data.find(m => m.productType === activeTab);
+          if (existingDoc && existingDoc.rules) {
+            existingRulesForProductType = existingDoc.rules;
+          }
+        }
+      }
+
+      if (location.state?.editMode && location.state?.markupDoc) {
+        const allOriginalRules = [...location.state.markupDoc.rules];
+        allOriginalRules.splice(location.state.editIndex, 1, ...finalRules);
+        payloadRules = allOriginalRules;
+      }
+
+      // Check for duplicates
+      const seenSignatures = new Set();
+      let hasDuplicate = false;
+
+      const checkRule = (rule) => {
+        const criteriaString = JSON.stringify(rule.criteria || {});
+        const ruleSignature = `${rule.category}-${criteriaString}`;
+        if (seenSignatures.has(ruleSignature)) {
+          return true;
+        }
+        seenSignatures.add(ruleSignature);
+        return false;
+      };
+
+      // Populate set with existing rules (only if not in edit mode)
+      if (!location.state?.editMode) {
+        for (const rule of existingRulesForProductType) {
+          checkRule(rule);
+        }
+      }
+
+      // Check new payloadRules
+      for (const rule of finalRules) {
+        if (checkRule(rule)) {
+          hasDuplicate = true;
+          break;
+        }
+      }
+
+      if (hasDuplicate) {
+        toast.error("Duplicate rule detected! A rule for this category and criteria already exists.");
+        return;
+      }
+
+      // If not in edit mode, append to existing rules
+      if (!location.state?.editMode) {
+        payloadRules = [...existingRulesForProductType, ...payloadRules];
+      }
+
+      const payload = {
+        corporateId: corporate._id,
+        productType: activeTab, // 'flight' or 'hotel'
+        rules: payloadRules,
+        isActive: true
+      };
+
+      console.log("Sending payload to backend:", payload);
+      
+      const resultAction = await dispatch(saveCorporateMarkup(payload));
+      
+      if (resultAction.error) {
+        throw new Error(resultAction.payload || "Failed to save markup configuration");
+      }
+      
+      toast.success("Markup configuration saved successfully!");
+      if (!location.state?.editMode) {
+        // Optionally navigate to list or clear forms
+        navigate(`/corporate-markup-list/${corporate._id}`, { state: { corporate } });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || err || "Failed to save markup configuration");
     }
-    toast.success("Markup configuration saved successfully!");
   };
 
 
 
   const selectedCategory = activeCategory;
 
+    const updateRule = (index, field, value) => {
+    setCategoryRulesMap(prev => {
+      const rules = [...(prev[activeCategory] || [])];
+      rules[index] = { ...rules[index], [field]: value };
+      return { ...prev, [activeCategory]: rules };
+    });
+  };
+
+  const removeRule = (index) => {
+    setCategoryRulesMap(prev => {
+      const rules = [...(prev[activeCategory] || [])];
+      rules.splice(index, 1);
+      return { ...prev, [activeCategory]: rules };
+    });
+  };
+
+  const addRule = () => {
+    setCategoryRulesMap(prev => {
+      const rules = [...(prev[activeCategory] || [])];
+      rules.push(getDefaultRuleForCategory(activeCategory));
+      return { ...prev, [activeCategory]: rules };
+    });
+  };
+
   const renderDynamicFields = () => {
-    if (selectedCategory === "Fare Slab Based") {
+    const rules = categoryRulesMap[activeCategory] || [];
+
+    if (activeCategory === "Fare Slab Based") {
+      const rule = rules[0] || { fareSlabs: [] };
+      const fareSlabs = rule.fareSlabs || [];
       return (
         <div className="space-y-4">
           <div className="space-y-2">
@@ -240,7 +414,7 @@ export default function CorporateMarkupConfiguration() {
                     onChange={(e) => {
                       const newSlabs = [...fareSlabs];
                       newSlabs[index].from = e.target.value;
-                      setFareSlabs(newSlabs);
+                      updateRule(0, 'fareSlabs', newSlabs);
                     }}
                   />
                 </div>
@@ -253,7 +427,7 @@ export default function CorporateMarkupConfiguration() {
                     onChange={(e) => {
                       const newSlabs = [...fareSlabs];
                       newSlabs[index].to = e.target.value;
-                      setFareSlabs(newSlabs);
+                      updateRule(0, 'fareSlabs', newSlabs);
                     }}
                   />
                 </div>
@@ -262,22 +436,22 @@ export default function CorporateMarkupConfiguration() {
                     type="text"
                     readOnly
                     value={slab.method === "percentage" ? "Percentage (%)" : "Fixed Amount (₹)"}
-                    onFocus={() => setActiveFareSlabDropdown(index)}
-                    onBlur={() => setTimeout(() => { if (activeFareSlabDropdown === index) setActiveFareSlabDropdown(null); }, 200)}
+                    onFocus={() => setActiveDropdown({ type: 'fareSlabMethod', index })}
+                    onBlur={() => setTimeout(() => { if (activeDropdown?.type === 'fareSlabMethod' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
-                    {activeFareSlabDropdown === index ? <FaChevronUp /> : <FaChevronDown />}
+                    {activeDropdown?.type === 'fareSlabMethod' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
                   </div>
-                  {activeFareSlabDropdown === index && (
+                  {activeDropdown?.type === 'fareSlabMethod' && activeDropdown?.index === index && (
                     <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
                       <li
                         className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 flex items-center gap-2"
                         onClick={() => {
                           const newSlabs = [...fareSlabs];
                           newSlabs[index].method = "percentage";
-                          setFareSlabs(newSlabs);
-                          setActiveFareSlabDropdown(null);
+                          updateRule(0, 'fareSlabs', newSlabs);
+                          setActiveDropdown(null);
                         }}
                       >
                         <FiPercent className="text-slate-400" /> Percentage (%)
@@ -287,8 +461,8 @@ export default function CorporateMarkupConfiguration() {
                         onClick={() => {
                           const newSlabs = [...fareSlabs];
                           newSlabs[index].method = "fixed";
-                          setFareSlabs(newSlabs);
-                          setActiveFareSlabDropdown(null);
+                          updateRule(0, 'fareSlabs', newSlabs);
+                          setActiveDropdown(null);
                         }}
                       >
                         <FaRupeeSign className="text-slate-400" /> Fixed Amount (₹)
@@ -305,14 +479,14 @@ export default function CorporateMarkupConfiguration() {
                     onChange={(e) => {
                       const newSlabs = [...fareSlabs];
                       newSlabs[index].value = e.target.value;
-                      setFareSlabs(newSlabs);
+                      updateRule(0, 'fareSlabs', newSlabs);
                     }}
                   />
                 </div>
                 <button
                   onClick={() => {
                     const newSlabs = fareSlabs.filter((_, i) => i !== index);
-                    setFareSlabs(newSlabs);
+                    updateRule(0, 'fareSlabs', newSlabs);
                   }}
                   className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"
                 >
@@ -321,7 +495,7 @@ export default function CorporateMarkupConfiguration() {
               </div>
             ))}
             <button
-              onClick={() => setFareSlabs([...fareSlabs, { from: "", to: "", value: "", method: "fixed" }])}
+              onClick={() => updateRule(0, 'fareSlabs', [...fareSlabs, { from: "", to: "", value: "", method: "fixed" }])}
               className="flex items-center gap-2 text-sm font-bold text-[#003399] hover:text-[#002266] px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
             >
               <FiPlus /> Add New Slab
@@ -331,488 +505,8 @@ export default function CorporateMarkupConfiguration() {
       );
     }
 
-    // Category-specific top field
-    const renderCategorySpecificField = () => {
-      switch (selectedCategory) {
-        case "Airline Wise":
-          return (
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Search & Select Airline
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={airlineSearchTerm}
-                  onFocus={() => setShowAirlineDropdown(true)}
-                  onBlur={() => {
-                    // Small delay to allow click on dropdown items to register
-                    setTimeout(() => setShowAirlineDropdown(false), 200);
-                  }}
-                  onChange={(e) => {
-                    setAirlineSearchTerm(e.target.value);
-                    setAirline(e.target.value); // Temporarily hold value while typing
-                    setShowAirlineDropdown(true);
-                  }}
-                  placeholder="e.g. Indigo or 6E..."
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                />
-                
-                {/* Custom Dropdown for Airlines */}
-                {showAirlineDropdown && airlines && airlines.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                    {airlines.map((a) => {
-                      const displayStr = `${a.iata} - ${a.name}`;
-                      return (
-                        <li
-                          key={a._id}
-                          className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-3"
-                          onClick={() => {
-                            setAirlineSearchTerm(displayStr);
-                            setAirline(displayStr);
-                            setShowAirlineDropdown(false);
-                          }}
-                        >
-                          <img 
-                            src={airlineLogo(a.iata)} 
-                            alt={a.iata} 
-                            className="w-8 h-8 object-contain rounded bg-slate-50 border border-slate-100" 
-                            onError={(e) => {
-                              e.target.src = "https://via.placeholder.com/32?text=NA";
-                            }}
-                          />
-                          <span className="truncate">{displayStr}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                {airlinesLoading && (
-                  <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>
-                )}
-              </div>
-            </div>
-          );
-        case "Cabin Wise":
-          return (
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Cabin Class</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  readOnly
-                  value={cabin === "First" ? "First Class" : cabin}
-                  onFocus={() => setShowCabinDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowCabinDropdown(false), 200)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
-                  {showCabinDropdown ? <FaChevronUp /> : <FaChevronDown />}
-                </div>
-                {showCabinDropdown && (
-                  <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
-                    {[
-                      { value: "Economy", label: "Economy" },
-                      { value: "Premium Economy", label: "Premium Economy" },
-                      { value: "Business", label: "Business" },
-                      { value: "First", label: "First Class" }
-                    ].map((c) => (
-                      <li
-                        key={c.value}
-                        className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                        onClick={() => {
-                          setCabin(c.value);
-                          setShowCabinDropdown(false);
-                        }}
-                      >
-                        {c.label}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          );
-        case "Domestic Flights":
-        case "International Flights":
-          return (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Flight Type</label>
-              <div className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 text-slate-600">
-                {selectedCategory}
-              </div>
-            </div>
-          );
-        case "Sector Wise":
-          return (
-            <div className="grid grid-cols-2 gap-4">
-              {/* Origin */}
-              <div className="space-y-2 relative">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Origin</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={originSearchTerm}
-                    onFocus={() => setShowOriginDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowOriginDropdown(false), 200)}
-                    onChange={(e) => {
-                      setOriginSearchTerm(e.target.value);
-                      setOrigin(e.target.value);
-                      setShowOriginDropdown(true);
-                    }}
-                    placeholder="Search by airport name or code..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                  />
-                  {showOriginDropdown && airports && airports.length > 0 && (
-                    <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                      {airports.map((a) => {
-                        const displayStr = `${a.iata_code} - ${a.name} (${a.city})`;
-                        return (
-                          <li
-                            key={a.iata_code}
-                            className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
-                            onClick={() => {
-                              setOriginSearchTerm(displayStr);
-                              setOrigin(displayStr);
-                              setShowOriginDropdown(false);
-                            }}
-                          >
-                            <span className="font-semibold">{a.iata_code} - {a.city}</span>
-                            <span className="text-xs text-slate-500">{a.name}, {a.country}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {airportsLoading && showOriginDropdown && <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>}
-                </div>
-              </div>
-
-              {/* Destination */}
-              <div className="space-y-2 relative">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Destination</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={destinationSearchTerm}
-                    onFocus={() => setShowDestinationDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowDestinationDropdown(false), 200)}
-                    onChange={(e) => {
-                      setDestinationSearchTerm(e.target.value);
-                      setDestination(e.target.value);
-                      setShowDestinationDropdown(true);
-                    }}
-                    placeholder="Search by airport name or code..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                  />
-                  {showDestinationDropdown && airports && airports.length > 0 && (
-                    <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                      {airports.map((a) => {
-                        const displayStr = `${a.iata_code} - ${a.name} (${a.city})`;
-                        return (
-                          <li
-                            key={a.iata_code}
-                            className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
-                            onClick={() => {
-                              setDestinationSearchTerm(displayStr);
-                              setDestination(displayStr);
-                              setShowDestinationDropdown(false);
-                            }}
-                          >
-                            <span className="font-semibold">{a.iata_code} - {a.city}</span>
-                            <span className="text-xs text-slate-500">{a.name}, {a.country}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {airportsLoading && showDestinationDropdown && <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>}
-                </div>
-              </div>
-            </div>
-          );
-        case "Supplier Wise":
-          return (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Supplier</label>
-              <select className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white">
-                <option value="">-- Select Supplier --</option>
-                <option value="amadeus">Amadeus</option>
-                <option value="sabre">Sabre</option>
-                <option value="galileo">Galileo</option>
-                <option value="travelport">Travelport</option>
-              </select>
-            </div>
-          );
-        case "Passenger Type Wise":
-          return (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Passenger Type</label>
-              <select className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white">
-                <option value="">-- Select Type --</option>
-                <option value="ADT">Adult (ADT)</option>
-                <option value="CHD">Child (CHD)</option>
-                <option value="INF">Infant (INF)</option>
-              </select>
-            </div>
-          );
-        case "Convenience Fee":
-          return (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fee Label</label>
-              <input
-                type="text"
-                placeholder="e.g. Booking Convenience Fee"
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-              />
-            </div>
-          );
-        case "Country Wise":
-          return (
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Country</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={countrySearchTerm}
-                  onFocus={() => setShowCountryDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowCountryDropdown(false), 200)}
-                  onChange={(e) => {
-                    setCountrySearchTerm(e.target.value);
-                    setCountry(e.target.value);
-                    setShowCountryDropdown(true);
-                  }}
-                  placeholder="Search by country name or code..."
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                />
-                {showCountryDropdown && countries && countries.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                    {countries.map((c) => {
-                      const displayStr = `${c.Code} - ${c.Name}`;
-                      return (
-                        <li
-                          key={c._id || c.Code}
-                          className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                          onClick={() => {
-                            setCountrySearchTerm(displayStr);
-                            setCountry(displayStr);
-                            setShowCountryDropdown(false);
-                          }}
-                        >
-                          {displayStr}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {countriesLoading && <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>}
-              </div>
-            </div>
-          );
-        case "City Wise":
-          return (
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">City Name</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={citySearchTerm}
-                  onFocus={() => setShowCityDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
-                  onChange={(e) => {
-                    setCitySearchTerm(e.target.value);
-                    setCity(e.target.value);
-                    setShowCityDropdown(true);
-                  }}
-                  placeholder="Search by city name or code..."
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                />
-                {showCityDropdown && cities && cities.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                    {cities.map((c) => {
-                      const displayStr = `${c.cityName} (${c.cityCode}) - ${c.countryName}`;
-                      return (
-                        <li
-                          key={c._id || c.cityCode}
-                          className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                          onClick={() => {
-                            setCitySearchTerm(displayStr);
-                            setCity(displayStr);
-                            setShowCityDropdown(false);
-                          }}
-                        >
-                          {displayStr}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {citiesLoading && <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>}
-              </div>
-            </div>
-          );
-        case "Hotel Wise":
-          return (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 relative">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select City</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={hotelCitySearchTerm}
-                    onFocus={() => setShowHotelCityDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowHotelCityDropdown(false), 200)}
-                    onChange={(e) => {
-                      setHotelCitySearchTerm(e.target.value);
-                      setShowHotelCityDropdown(true);
-                    }}
-                    placeholder="Search by city name..."
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                  />
-                  {showHotelCityDropdown && cities && cities.length > 0 && (
-                    <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                      {cities.map((c) => {
-                        const displayStr = `${c.cityName} (${c.cityCode})`;
-                        return (
-                          <li
-                            key={`hc-${c._id || c.cityCode}`}
-                            className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                            onClick={() => {
-                              setHotelCitySearchTerm(displayStr);
-                              setHotelCityCode(c.cityCode);
-                              setShowHotelCityDropdown(false);
-                            }}
-                          >
-                            {displayStr}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {citiesLoading && <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>}
-                </div>
-              </div>
-              <div className="space-y-2 relative">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Hotel Name / Code</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={hotelSearchTerm}
-                    onFocus={() => setShowHotelDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowHotelDropdown(false), 200)}
-                    onChange={(e) => {
-                      setHotelSearchTerm(e.target.value);
-                      setHotel(e.target.value);
-                      setShowHotelDropdown(true);
-                    }}
-                    placeholder={hotelCityCode ? "Search by hotel name or code..." : "Select a city first..."}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                  />
-                  {showHotelDropdown && hotels && hotels.length > 0 && (
-                    <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                      {hotels.map((h) => {
-                        const displayStr = `${h.hotelCode} - ${h.hotelName} (${h.cityName})`;
-                        return (
-                          <li
-                            key={h._id || h.hotelCode}
-                            className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
-                            onClick={() => {
-                              setHotelSearchTerm(displayStr);
-                              setHotel(displayStr);
-                              setShowHotelDropdown(false);
-                            }}
-                          >
-                            <span className="font-semibold">{h.hotelName}</span>
-                            <span className="text-xs text-slate-500">{h.hotelCode} • {h.cityName}, {h.countryCode} • {h.starRating} Stars</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {hotelsLoading && <div className="absolute right-3 top-3 text-xs text-slate-400">Loading...</div>}
-                </div>
-              </div>
-            </div>
-          );
-        case "Room Category Wise":
-          return (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Room Category</label>
-              <select className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white">
-                <option value="">-- Select Room Category --</option>
-                <option value="standard">Standard</option>
-                <option value="deluxe">Deluxe</option>
-                <option value="suite">Suite</option>
-                <option value="executive">Executive</option>
-                <option value="presidential">Presidential Suite</option>
-              </select>
-            </div>
-          );
-        case "Star Rating Wise":
-          return (
-            <div className="space-y-2 relative">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Star Rating</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  readOnly
-                  value={starRating ? `${starRating} Star` : ""}
-                  onFocus={() => setShowStarRatingDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowStarRatingDropdown(false), 200)}
-                  placeholder="-- Select Star Rating --"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
-                  {showStarRatingDropdown ? <FaChevronUp /> : <FaChevronDown />}
-                </div>
-                {showStarRatingDropdown && (
-                  <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                    {[1, 2, 3, 4, 5].map((stars) => (
-                      <li
-                        key={`star-${stars}`}
-                        className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-2"
-                        onClick={() => {
-                          setStarRating(stars);
-                          setShowStarRatingDropdown(false);
-                        }}
-                      >
-                        <span className="text-amber-400">{"★".repeat(stars)}</span>
-                        <span className="text-slate-300">{"★".repeat(5 - stars)}</span>
-                        <span className="ml-2">{stars} Star</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          );
-        case "Seasonal Markup":
-          return (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Season From</label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Season To</label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
-                />
-              </div>
-            </div>
-          );
-        default:
-          return null;
-      }
-    };
-
     const getCategoryColSpan = () => {
-      if (["Hotel Wise", "Sector Wise", "Seasonal Markup", "Fare Slab Based"].includes(selectedCategory)) {
+      if (["Hotel Wise", "Sector Wise", "Seasonal Markup", "Fare Slab Based"].includes(activeCategory)) {
         return "md:col-span-6";
       }
       return "md:col-span-4";
@@ -822,77 +516,492 @@ export default function CorporateMarkupConfiguration() {
 
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start md:items-end">
-          
-          {/* Category-specific field (changes per tab) */}
-          <div className={`col-span-1 ${getCategoryColSpan()}`}>
-            {renderCategorySpecificField()}
-          </div>
+        {rules.map((rule, index) => (
+          <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start md:items-end relative bg-slate-50 p-4 rounded-xl border border-slate-200">
+            {rules.length > 1 && (
+              <button 
+                onClick={() => removeRule(index)}
+                className="absolute -right-3 -top-3 w-8 h-8 bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-full flex items-center justify-center shadow-sm z-10"
+                title="Remove Rule"
+              >
+                <FiTrash2 size={14} />
+              </button>
+            )}
 
-          {/* Markup Method (Now a Custom Dropdown) */}
-          <div className={`col-span-1 ${methodValueColSpan} space-y-2 relative`}>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Markup Method</label>
-            <div className="relative">
-              <input
-                type="text"
-                readOnly
-                value={markupMethod === 'percentage' ? 'Percentage (%)' : 'Fixed Amount (₹)'}
-                onFocus={() => setShowMarkupMethodDropdown(true)}
-                onBlur={() => setTimeout(() => setShowMarkupMethodDropdown(false), 200)}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
-                {showMarkupMethodDropdown ? <FaChevronUp /> : <FaChevronDown />}
-              </div>
-              {showMarkupMethodDropdown && (
-                <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
-                  <li
-                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 flex items-center gap-2"
-                    onClick={() => {
-                      setMarkupMethod("percentage");
-                      setShowMarkupMethodDropdown(false);
-                    }}
-                  >
-                    <FiPercent className="text-slate-400" /> Percentage (%)
-                  </li>
-                  <li
-                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium flex items-center gap-2"
-                    onClick={() => {
-                      setMarkupMethod("fixed");
-                      setShowMarkupMethodDropdown(false);
-                    }}
-                  >
-                    <FaRupeeSign className="text-slate-400" /> Fixed Amount (₹)
-                  </li>
-                </ul>
-              )}
+            {/* Category-specific field */}
+            <div className={`col-span-1 ${getCategoryColSpan()}`}>
+              {(() => {
+                switch (activeCategory) {
+                  case "Airline Wise":
+                    return (
+                      <div className="space-y-2 relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                          Search & Select Airline
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={rule.airlineSearchTerm || ""}
+                            onFocus={() => setActiveDropdown({ type: 'airline', index })}
+                            onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'airline' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                            onChange={(e) => {
+                              updateRule(index, 'airlineSearchTerm', e.target.value);
+                              updateRule(index, 'airline', e.target.value); // Temporarily hold value
+                              setActiveDropdown({ type: 'airline', index });
+                            }}
+                            placeholder="e.g. Indigo or 6E..."
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                          />
+                          {activeDropdown?.type === 'airline' && activeDropdown?.index === index && airlines && airlines.length > 0 && (
+                            <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                              {airlines.map((a) => {
+                                const displayStr = `${a.iata} - ${a.name}`;
+                                return (
+                                  <li
+                                    key={a._id}
+                                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-3"
+                                    onClick={() => {
+                                      updateRule(index, 'airlineSearchTerm', displayStr);
+                                      updateRule(index, 'airline', a.iata);
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    <img 
+                                      src={airlineLogo(a.iata)} 
+                                      alt={a.iata} 
+                                      className="w-8 h-8 object-contain rounded bg-slate-50 border border-slate-100" 
+                                      onError={(e) => { e.target.src = "https://via.placeholder.com/32?text=NA"; }}
+                                    />
+                                    <span className="truncate">{displayStr}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  case "Cabin Wise":
+                    return (
+                      <div className="space-y-2 relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Cabin Class</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            value={
+                              rule.cabinClass === 2 ? "Economy" :
+                              rule.cabinClass === 3 ? "Premium Economy" :
+                              rule.cabinClass === 4 ? "Business" :
+                              rule.cabinClass === 5 ? "Premium Business" :
+                              rule.cabinClass === 6 ? "First Class" : ""
+                            }
+                            onFocus={() => setActiveDropdown({ type: 'cabin', index })}
+                            onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'cabin' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
+                            placeholder="Select Cabin..."
+                          />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                            {activeDropdown?.type === 'cabin' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                          </div>
+                          {activeDropdown?.type === 'cabin' && activeDropdown?.index === index && (
+                            <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
+                              {[
+                                { value: 2, label: "Economy" },
+                                { value: 3, label: "Premium Economy" },
+                                { value: 4, label: "Business" },
+                                { value: 5, label: "Premium Business" },
+                                { value: 6, label: "First Class" }
+                              ].map((c) => (
+                                <li
+                                  key={c.value}
+                                  className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                  onClick={() => {
+                                    updateRule(index, 'cabinClass', c.value);
+                                    setActiveDropdown(null);
+                                  }}
+                                >
+                                  {c.label}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  case "Sector Wise":
+                    return (
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Origin */}
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Origin</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={rule.originSearchTerm || ""}
+                              onFocus={() => setActiveDropdown({ type: 'origin', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'origin' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              onChange={(e) => {
+                                updateRule(index, 'originSearchTerm', e.target.value);
+                                updateRule(index, 'origin', e.target.value);
+                                setActiveDropdown({ type: 'origin', index });
+                              }}
+                              placeholder="Search airport..."
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                            />
+                            {activeDropdown?.type === 'origin' && activeDropdown?.index === index && airports && airports.length > 0 && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                                {airports.map((a) => {
+                                  const displayStr = `${a.iata_code} - ${a.name} (${a.city})`;
+                                  return (
+                                    <li
+                                      key={a.iata_code}
+                                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
+                                      onClick={() => {
+                                        updateRule(index, 'originSearchTerm', displayStr);
+                                        updateRule(index, 'origin', a.iata_code);
+                                        setActiveDropdown(null);
+                                      }}
+                                    >
+                                      <span className="font-semibold">{a.iata_code} - {a.city}</span>
+                                      <span className="text-xs text-slate-500">{a.name}, {a.country}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                        {/* Destination */}
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Destination</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={rule.destinationSearchTerm || ""}
+                              onFocus={() => setActiveDropdown({ type: 'destination', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'destination' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              onChange={(e) => {
+                                updateRule(index, 'destinationSearchTerm', e.target.value);
+                                updateRule(index, 'destination', e.target.value);
+                                setActiveDropdown({ type: 'destination', index });
+                              }}
+                              placeholder="Search airport..."
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                            />
+                            {activeDropdown?.type === 'destination' && activeDropdown?.index === index && airports && airports.length > 0 && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                                {airports.map((a) => {
+                                  const displayStr = `${a.iata_code} - ${a.name} (${a.city})`;
+                                  return (
+                                    <li
+                                      key={a.iata_code}
+                                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
+                                      onClick={() => {
+                                        updateRule(index, 'destinationSearchTerm', displayStr);
+                                        updateRule(index, 'destination', a.iata_code);
+                                        setActiveDropdown(null);
+                                      }}
+                                    >
+                                      <span className="font-semibold">{a.iata_code} - {a.city}</span>
+                                      <span className="text-xs text-slate-500">{a.name}, {a.country}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  case "Country Wise":
+                    return (
+                      <div className="space-y-2 relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select Country</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={rule.countrySearchTerm || ""}
+                            onFocus={() => setActiveDropdown({ type: 'country', index })}
+                            onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'country' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                            onChange={(e) => {
+                              updateRule(index, 'countrySearchTerm', e.target.value);
+                              updateRule(index, 'country', e.target.value);
+                              setActiveDropdown({ type: 'country', index });
+                            }}
+                            placeholder="Search by country name or code..."
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                          />
+                          {activeDropdown?.type === 'country' && activeDropdown?.index === index && countries && countries.length > 0 && (
+                            <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                              {countries.map((c) => {
+                                const displayStr = `${c.Code} - ${c.Name}`;
+                                return (
+                                  <li
+                                    key={c._id || c.Code}
+                                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                    onClick={() => {
+                                      updateRule(index, 'countrySearchTerm', displayStr);
+                                      updateRule(index, 'country', c.Code);
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    {displayStr}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  case "City Wise":
+                    return (
+                      <div className="space-y-2 relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">City Name</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={rule.citySearchTerm || ""}
+                            onFocus={() => setActiveDropdown({ type: 'city', index })}
+                            onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'city' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                            onChange={(e) => {
+                              updateRule(index, 'citySearchTerm', e.target.value);
+                              updateRule(index, 'city', e.target.value);
+                              setActiveDropdown({ type: 'city', index });
+                            }}
+                            placeholder="Search by city name or code..."
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                          />
+                          {activeDropdown?.type === 'city' && activeDropdown?.index === index && cities && cities.length > 0 && (
+                            <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                              {cities.map((c) => {
+                                const displayStr = `${c.cityName} (${c.cityCode}) - ${c.countryName}`;
+                                return (
+                                  <li
+                                    key={c._id || c.cityCode}
+                                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                    onClick={() => {
+                                      updateRule(index, 'citySearchTerm', displayStr);
+                                      updateRule(index, 'city', c.cityCode);
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    {displayStr}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  case "Hotel Wise":
+                    return (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Select City</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={rule.hotelCitySearchTerm || ""}
+                              onFocus={() => setActiveDropdown({ type: 'hotelCity', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'hotelCity' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              onChange={(e) => {
+                                updateRule(index, 'hotelCitySearchTerm', e.target.value);
+                                setActiveDropdown({ type: 'hotelCity', index });
+                              }}
+                              placeholder="Search by city name..."
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                            />
+                            {activeDropdown?.type === 'hotelCity' && activeDropdown?.index === index && cities && cities.length > 0 && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                                {cities.map((c) => {
+                                  const displayStr = `${c.cityName} (${c.cityCode})`;
+                                  return (
+                                    <li
+                                      key={`hc-${c._id || c.cityCode}`}
+                                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                      onClick={() => {
+                                        updateRule(index, 'hotelCitySearchTerm', displayStr);
+                                        updateRule(index, 'hotelCityCode', c.cityCode);
+                                        setActiveDropdown(null);
+                                      }}
+                                    >
+                                      {displayStr}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Hotel Name / Code</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={rule.hotelSearchTerm || ""}
+                              onFocus={() => setActiveDropdown({ type: 'hotel', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'hotel' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              onChange={(e) => {
+                                updateRule(index, 'hotelSearchTerm', e.target.value);
+                                updateRule(index, 'hotel', e.target.value);
+                                setActiveDropdown({ type: 'hotel', index });
+                              }}
+                              placeholder={rule.hotelCityCode ? "Search by hotel name or code..." : "Select a city first..."}
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                            />
+                            {activeDropdown?.type === 'hotel' && activeDropdown?.index === index && hotels && hotels.length > 0 && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                                {hotels.map((h) => {
+                                  const displayStr = `${h.hotelCode} - ${h.hotelName} (${h.cityName})`;
+                                  return (
+                                    <li
+                                      key={h._id || h.hotelCode}
+                                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
+                                      onClick={() => {
+                                        updateRule(index, 'hotelSearchTerm', displayStr);
+                                        updateRule(index, 'hotel', h.hotelCode);
+                                        setActiveDropdown(null);
+                                      }}
+                                    >
+                                      <span className="font-semibold">{h.hotelName}</span>
+                                      <span className="text-xs text-slate-500">{h.hotelCode} • {h.cityName}, {h.countryCode} • {h.starRating} Stars</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  case "Star Rating Wise":
+                    return (
+                      <div className="space-y-2 relative">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Star Rating</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            value={rule.starRating ? `${rule.starRating} Star` : ""}
+                            onFocus={() => setActiveDropdown({ type: 'starRating', index })}
+                            onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'starRating' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                            placeholder="-- Select Star Rating --"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
+                          />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                            {activeDropdown?.type === 'starRating' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                          </div>
+                          {activeDropdown?.type === 'starRating' && activeDropdown?.index === index && (
+                            <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
+                              {[1, 2, 3, 4, 5].map((stars) => (
+                                <li
+                                  key={`star-${stars}`}
+                                  className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-2"
+                                  onClick={() => {
+                                    updateRule(index, 'starRating', stars);
+                                    setActiveDropdown(null);
+                                  }}
+                                >
+                                  <span className="text-amber-400">{"★".repeat(stars)}</span>
+                                  <span className="text-slate-300">{"★".repeat(5 - stars)}</span>
+                                  <span className="ml-2">{stars} Star</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  case "Domestic Flights":
+                  case "International Flights":
+                    return (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Flight Type</label>
+                        <div className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium bg-slate-50 text-slate-600">
+                          {activeCategory}
+                        </div>
+                      </div>
+                    );
+                  default:
+                    return null;
+                }
+              })()}
             </div>
-          </div>
 
-          {/* Markup Value */}
-          <div className={`col-span-1 ${methodValueColSpan} space-y-2`}>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Markup Value</label>
-            <div className="relative">
-              <input
-                type="number"
-                placeholder={`Enter ${markupMethod === 'percentage' ? 'percentage' : 'amount'}...`}
-                value={markupValue}
-                onChange={(e) => setMarkupValue(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-white"
-              />
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                {markupMethod === 'percentage' ? <FiPercent size={14} /> : <FaRupeeSign size={14} />}
+            {/* Markup Method */}
+            <div className={`col-span-1 ${methodValueColSpan} space-y-2 relative`}>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Markup Method</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  readOnly
+                  value={(rule.method || 'percentage') === 'percentage' ? 'Percentage (%)' : 'Fixed Amount (₹)'}
+                  onFocus={() => setActiveDropdown({ type: 'method', index })}
+                  onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'method' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                  {activeDropdown?.type === 'method' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                </div>
+                {activeDropdown?.type === 'method' && activeDropdown?.index === index && (
+                  <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
+                    <li
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 flex items-center gap-2"
+                      onClick={() => {
+                        updateRule(index, 'method', 'percentage');
+                        setActiveDropdown(null);
+                      }}
+                    >
+                      <FiPercent className="text-slate-400" /> Percentage (%)
+                    </li>
+                    <li
+                      className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium flex items-center gap-2"
+                      onClick={() => {
+                        updateRule(index, 'method', 'fixed');
+                        setActiveDropdown(null);
+                      }}
+                    >
+                      <FaRupeeSign className="text-slate-400" /> Fixed Amount (₹)
+                    </li>
+                  </ul>
+                )}
               </div>
             </div>
-          </div>
 
-        </div>
+            {/* Markup Value */}
+            <div className={`col-span-1 ${methodValueColSpan} space-y-2`}>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Markup Value</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  placeholder={`Enter ${(rule.method || 'percentage') === 'percentage' ? 'percentage' : 'amount'}...`}
+                  value={rule.value || ""}
+                  onChange={(e) => updateRule(index, 'value', e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-white"
+                />
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  {(rule.method || 'percentage') === 'percentage' ? <FiPercent size={14} /> : <FaRupeeSign size={14} />}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        ))}
+        
+        {!["Domestic Flights", "International Flights"].includes(activeCategory) && (
+          <button
+            onClick={addRule}
+            className="flex items-center gap-2 text-sm font-bold text-[#003399] hover:text-[#002266] px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors mt-2"
+          >
+            <FiPlus /> Add Another {activeCategory} Rule
+          </button>
+        )}
       </div>
     );
   };
-
-
-
   return (
     <div className="min-h-screen font-sans pb-32 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       {/* HEADER SECTION */}
@@ -935,6 +1044,12 @@ export default function CorporateMarkupConfiguration() {
             {corporate.corporateCode && (
               <p className="text-[11px] font-mono mt-0.5 text-white/50">Code: {corporate.corporateCode}</p>
             )}
+            <button
+              onClick={() => navigate(`/corporate-markup-list/${corporate._id}`, { state: { corporate } })}
+              className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-[10px] font-bold uppercase tracking-widest text-white flex items-center gap-2 transition-colors"
+            >
+              <FiList size={14} /> View Configured Markups
+            </button>
           </div>
         </div>
       </div>
@@ -1086,7 +1201,7 @@ export default function CorporateMarkupConfiguration() {
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Markup Value</p>
             <p className="text-sm font-black text-emerald-600 mt-0.5">
-              {selectedCategories.includes("Fare Slab Based") ? "Multiple Slabs" : markupValue ? `${markupMethod === 'percentage' ? markupValue + '%' : '₹' + markupValue}` : "Not Set"}
+              {selectedCategories.includes("Fare Slab Based") ? "Multiple Slabs" : Object.keys(categoryRulesMap).length > 0 ? `${Object.keys(categoryRulesMap).length} Rules` : "Not Set"}
             </p>
           </div>
         </div>
@@ -1094,8 +1209,7 @@ export default function CorporateMarkupConfiguration() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button 
             onClick={() => {
-              setMarkupValue("");
-              setMarkupMethod("percentage");
+              setCategoryMarkups({});
               setSelectedCategories([]);
             }}
             className="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"

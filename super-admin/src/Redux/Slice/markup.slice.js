@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports } from "../Actions/markup.thunks";
+import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports, saveCorporateMarkup, getAllCorporateMarkups, deleteCorporateMarkup } from "../Actions/markup.thunks";
 
 const initialState = {
   airlines: [],
@@ -21,6 +21,15 @@ const initialState = {
   airports: [],
   airportsLoading: false,
   airportsError: null,
+
+  saveMarkupLoading: false,
+  saveMarkupError: null,
+
+  configuredMarkups: [],
+  fetchMarkupsLoading: false,
+  fetchMarkupsError: null,
+
+  deleteMarkupLoading: false,
 };
 
 const markupSlice = createSlice({
@@ -113,6 +122,45 @@ const markupSlice = createSlice({
       .addCase(fetchAirports.rejected, (state, action) => {
         state.airportsLoading = false;
         state.airportsError = action.payload;
+      })
+      
+      // Save Corporate Markup
+      .addCase(saveCorporateMarkup.pending, (state) => {
+        state.saveMarkupLoading = true;
+        state.saveMarkupError = null;
+      })
+      .addCase(saveCorporateMarkup.fulfilled, (state) => {
+        state.saveMarkupLoading = false;
+      })
+      .addCase(saveCorporateMarkup.rejected, (state, action) => {
+        state.saveMarkupLoading = false;
+        state.saveMarkupError = action.payload;
+      })
+      
+      // Fetch Corporate Markups
+      .addCase(getAllCorporateMarkups.pending, (state) => {
+        state.fetchMarkupsLoading = true;
+        state.fetchMarkupsError = null;
+      })
+      .addCase(getAllCorporateMarkups.fulfilled, (state, action) => {
+        state.fetchMarkupsLoading = false;
+        state.configuredMarkups = action.payload?.data || [];
+      })
+      .addCase(getAllCorporateMarkups.rejected, (state, action) => {
+        state.fetchMarkupsLoading = false;
+        state.fetchMarkupsError = action.payload;
+      })
+
+      // Delete Corporate Markup
+      .addCase(deleteCorporateMarkup.pending, (state) => {
+        state.deleteMarkupLoading = true;
+      })
+      .addCase(deleteCorporateMarkup.fulfilled, (state, action) => {
+        state.deleteMarkupLoading = false;
+        // The thunk payload might not have the ID, so we re-fetch in the component
+      })
+      .addCase(deleteCorporateMarkup.rejected, (state) => {
+        state.deleteMarkupLoading = false;
       });
   },
 });

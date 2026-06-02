@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiClock, FiX, FiCreditCard, FiPercent, FiInbox, FiCalendar } from "react-icons/fi";
+import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiClock, FiX, FiCreditCard, FiPercent, FiInbox, FiCalendar, FiEye } from "react-icons/fi";
 import { MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { FaChartLine } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
@@ -306,6 +306,15 @@ export default function MarkupEngine() {
                       </td>
                       <td className="px-6 py-5 text-center">
                         <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              navigate(`/corporate-markup-list/${c._id}`, { state: { corporate: c } });
+                            }}
+                            className="px-4 py-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
+                            title="View Markups"
+                          >
+                            <FiEye size={14} /> View
+                          </button>
                           <button
                             onClick={() => {
                               navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });

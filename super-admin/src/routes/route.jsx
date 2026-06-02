@@ -10,7 +10,10 @@ import Unauthorized from "../Pages/Auth/Unauthorized";
 // Travel Company
 import OnboardedCorporates from "../components/SuperAdminTabs/OnboardedCorporates";
 import MarkupEngine from "../components/SuperAdminTabs/MarkupEngine";
+import ServiceFeeManagement from "../components/SuperAdminTabs/ServiceFeeManagement";
+import FinancialApprovalPage from "../components/SuperAdminTabs/FinancialApprovalPage";
 import CorporateMarkupConfiguration from "../components/SuperAdminTabs/CorporateMarkupConfiguration";
+import CorporateMarkupList from "../components/SuperAdminTabs/CorporateMarkupList";
 import BookingsSummary from "../components/SuperAdminTabs/BookingsSummary";
 import CorporateRevenue from "../components/SuperAdminTabs/CorporateRevenue";
 import CreditStatusAlerts from "../components/SuperAdminTabs/CreditStatusAlerts";
@@ -28,6 +31,7 @@ import OpsTeamManagement from "../components/SuperAdminTabs/OpsTeamManagement";
 import ProfileSettings from "../Pages/Auth/ProfileSettings";
 import BookedFlightDetailsPage from "../components/Shared/BookedFlightDetailsPage";
 import BookedHotelDetailsPage from "../components/Shared/BookedHotelDetailsPage";
+import TboCommissionsTaxes from "../components/SuperAdminTabs/TboCommissionsTaxes";
 
 import BlogListPage from '../components/Blog/AllBlogs'
 import BlogEditPage from '../components/Blog/BlogEditPage'
@@ -63,7 +67,10 @@ export const appRouter = createBrowserRouter([
         children: [
           { path: "/all-corporates", element: <OnboardedCorporates /> },
           { path: "/global-markup-engine", element: <MarkupEngine /> },
+          { path: "/service-fee-management", element: <ServiceFeeManagement /> },
+          { path: "/financial-approval/:id", element: <FinancialApprovalPage /> },
           { path: "/corporate-markup/:id", element: <CorporateMarkupConfiguration /> },
+          { path: "/corporate-markup-list/:id", element: <CorporateMarkupList /> },
           { path: "/financial-approvals", element: <Navigate to="/corporate-revenue" replace /> },
           { path: "/corporate-access-control", element: <CorporateAccessControl /> },
           { path: "/cancellation-queries", element: <CancellationQueries /> },
@@ -79,6 +86,7 @@ export const appRouter = createBrowserRouter([
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
           { path: "/credit-status", element: <Navigate to="/credit-status-alerts" replace /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },
+          { path: "/tbo-commissions-taxes", element: <TboCommissionsTaxes /> },
           { path: "/active-corporates", element: <Navigate to="/all-corporates" replace /> },
           { path: "/pending-corporates", element: <PendingCorporates /> },
           { path: "/pending-amendments", element: <PendingAmendments /> },

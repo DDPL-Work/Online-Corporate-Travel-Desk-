@@ -510,9 +510,21 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
     },
+    markupSnapshot: req.body.markupSnapshot || null,
     bookingSnapshot,
     // bookingSnapshot: req.body.bookingSnapshot,
   });
+
+  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
+     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
+     await MarkupRevenueService.trackRevenue({
+        bookingId: bookingRequest._id,
+        corporateId: corporate._id,
+        serviceType: "flight",
+        markupAmount: req.body.markupSnapshot.markupAmount,
+        ruleId: req.body.markupSnapshot.appliedRuleId
+     });
+  }
 
   /* ================= NOTIFICATION ================= */
   const _flightRequesterEmail = user.email;
@@ -956,8 +968,20 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
     },
+    markupSnapshot: req.body.markupSnapshot || null,
     bookingSnapshot,
   });
+
+  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
+     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
+     await MarkupRevenueService.trackRevenue({
+        bookingId: bookingRequest._id,
+        corporateId: corporate._id,
+        serviceType: "flight",
+        markupAmount: req.body.markupSnapshot.markupAmount,
+        ruleId: req.body.markupSnapshot.appliedRuleId
+     });
+  }
 
   /* ================= NOTIFICATION ================= */
   const _flightRequesterName = user.name?.firstName

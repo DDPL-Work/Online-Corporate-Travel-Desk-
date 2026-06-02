@@ -545,6 +545,7 @@ export default function RoundTripFlightBooking() {
         traceId,
         resultIndex: onwardIdx,
         journeyType: "onward",
+        snapshotId: rawFlightData?.onward?.SnapshotId,
       }),
     );
 
@@ -554,6 +555,7 @@ export default function RoundTripFlightBooking() {
           traceId,
           resultIndex: returnIdx,
           journeyType: "return",
+          snapshotId: rawFlightData?.return?.SnapshotId,
         }),
       );
     }

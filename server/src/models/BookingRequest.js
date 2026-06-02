@@ -147,6 +147,16 @@ const bookingRequestSchema = new mongoose.Schema(
       capturedAt: Date,
     },
 
+    markupSnapshot: {
+      supplierFare: Number,
+      markupAmount: Number,
+      finalFare: Number,
+      appliedRuleId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporateMarkup' },
+      markupVersion: String,
+      markupRefundable: { type: Boolean, default: false },
+      markupRefundPolicy: { type: String, enum: ["NONE", "FULL", "PROPORTIONAL"], default: "NONE" },
+    },
+
     priceAudit: {
       previousAmount: Number,
       newAmount: Number,

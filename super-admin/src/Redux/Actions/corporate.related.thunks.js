@@ -452,3 +452,24 @@ export const createCancellationQuery = createAsyncThunk(
     }
   },
 );
+
+/**
+ * 💰 FETCH TBO COMMISSIONS AND TAXES
+ */
+export const fetchTboCommissions = createAsyncThunk(
+  "corporateRelated/fetchTboCommissions",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const res = await api.get(
+        "/corporate-related/tbo-commissions",
+        getConfig(getState)
+      );
+      const payload = res.data || {};
+      return {
+        data: payload.data || [],
+      };
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);

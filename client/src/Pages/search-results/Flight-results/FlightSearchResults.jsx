@@ -626,7 +626,7 @@ export default function FlightSearchResults() {
     const adults   = tboStylePayload.AdultCount  ?? tboStylePayload.passengers?.adults   ?? 1;
     const children = tboStylePayload.ChildCount  ?? tboStylePayload.passengers?.children ?? 0;
     const infants  = tboStylePayload.InfantCount ?? tboStylePayload.passengers?.infants  ?? 0;
-    const CABIN_MAP = { 2: "economy", 3: "premium_economy", 4: "business", 6: "first_class" };
+    const CABIN_MAP = { 2: "economy", 3: "premium_economy", 4: "business", 5: "premium_business", 6: "first_class" };
     const cabinClassVal = tboStylePayload.Segments?.[0]?.FlightCabinClass ?? tboStylePayload.cabinClass ?? 2;
     const cabinClassStr = CABIN_MAP[Number(cabinClassVal)] || "economy";
 
@@ -643,7 +643,6 @@ export default function FlightSearchResults() {
           departureDate: (s.PreferredDepartureTime || s.departureDate || "").split("T")[0],
         })),
       };
-      await dispatch(searchFlightsMC(appPayload));
     } else {
       const seg0 = tboStylePayload.Segments?.[0] || {};
       const seg1 = tboStylePayload.Segments?.[1] || {};
@@ -658,7 +657,6 @@ export default function FlightSearchResults() {
           returnDate: (seg1.PreferredDepartureTime || seg1.departureDate || "").split("T")[0],
         } : {}),
       };
-      await dispatch(searchFlights(appPayload));
     }
 
     setCurrentSearchPayload(appPayload);
@@ -668,6 +666,12 @@ export default function FlightSearchResults() {
     setActiveTab("onward");
     setOnwardFilters(initialFilterState);
     setReturnFilters(initialFilterState);
+
+    if (jt === 3) {
+      await dispatch(searchFlightsMC(appPayload));
+    } else {
+      await dispatch(searchFlights(appPayload));
+    }
   };
 
   /* ---------------- FILTER LOGIC ---------------- */
@@ -1173,9 +1177,11 @@ export default function FlightSearchResults() {
               </div>
             )}
 
-            {/* Return Flight Tabs */}
-            {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
-              <div className="sticky top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
+            {!loading && (
+              <>
+                {/* Return Flight Tabs */}
+                {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
+                  <div className="sticky top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
                   {/* ONWARD ROUTE */}
                   <button
@@ -1370,6 +1376,8 @@ export default function FlightSearchResults() {
                 ? groupedOneWayFlights
                 : filteredFlights
               ).map((flight, idx) => renderFlightCard(flight, idx))
+            )}
+              </>
             )}
 
             {/* Bottom Padding for Sticky Summary */}

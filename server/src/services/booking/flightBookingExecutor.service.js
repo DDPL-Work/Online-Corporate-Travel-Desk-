@@ -21,6 +21,20 @@ const getFareResults = (fareQuote = {}) => {
   return [];
 };
 
+const stripMarkupFromFareResult = (fareResult) => {
+  if (!fareResult) return fareResult;
+  // Deep clone so we don't mutate the booking document in-memory
+  const cloned = JSON.parse(JSON.stringify(fareResult));
+  
+  if (cloned.Fare && cloned.Fare.supplierFare !== undefined) {
+    cloned.Fare.PublishedFare = cloned.Fare.supplierFare;
+    cloned.Fare.OfferedFare = cloned.Fare.supplierFare;
+    // We do NOT modify FareBreakdown because we never added markup to FareBreakdown in applyFlightMarkup.
+  }
+  
+  return cloned;
+};
+
 const hasValidSSR = (ssr) => {
   if (!ssr) return false;
 
@@ -173,7 +187,7 @@ const persistBookedState = async ({
 const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   const rawResultIndex = booking.flightRequest.resultIndex;
   const segments = booking.flightRequest.segments || [];
-  const fareResults = getFareResults(booking.flightRequest.fareQuote);
+  const fareResults = getFareResults(booking.flightRequest.fareQuote).map(stripMarkupFromFareResult);
 
   const gstDetailsPayload = booking.gstDetails ? {
     ...(typeof booking.gstDetails.toObject === "function" ? booking.gstDetails.toObject() : booking.gstDetails),

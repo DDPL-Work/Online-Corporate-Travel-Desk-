@@ -178,6 +178,16 @@ router.patch(
   corporateController.updateCancellationQueryStatus
 );
 
+// --------------------------------------------------
+// SUPER ADMIN : TBO COMMISSIONS & TAXES
+// --------------------------------------------------
+router.get(
+  "/tbo-commissions",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("View Finance"),
+  corporateController.getTboCommissionsAndTaxes
+);
+
 // Get Single Corporate
 router.get(
   "/:id",

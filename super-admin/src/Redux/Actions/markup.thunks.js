@@ -80,3 +80,47 @@ export const fetchAirports = createAsyncThunk(
     }
   }
 );
+
+export const saveCorporateMarkup = createAsyncThunk(
+  "markup/saveCorporateMarkup",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await axios.post("/markup/save", payload);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to save markup configuration"
+      );
+    }
+  }
+);
+
+export const getAllCorporateMarkups = createAsyncThunk(
+  "markup/getAllCorporateMarkups",
+  async (corporateId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`/markup/corporate/all?corporateId=${corporateId}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch markup configurations"
+      );
+    }
+  }
+);
+
+export const deleteCorporateMarkup = createAsyncThunk(
+  "markup/deleteCorporateMarkup",
+  async ({ corporateId, productType }, { rejectWithValue }) => {
+    try {
+      const response = await axios.delete(`/markup/corporate`, {
+        data: { corporateId, productType }
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to delete markup configuration"
+      );
+    }
+  }
+);

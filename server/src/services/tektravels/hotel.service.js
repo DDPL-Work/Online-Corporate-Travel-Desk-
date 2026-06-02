@@ -403,6 +403,16 @@ class HotelService {
         },
       );
 
+      // Apply Markups
+      if (data?.HotelSearchResult && params.corporateId) {
+         try {
+           const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+           data.HotelSearchResult = await MarkupCalculatorService.applyHotelMarkup(data.HotelSearchResult, params.corporateId);
+         } catch (err) {
+           logger.error("Failed to apply hotel markups", { error: err.message });
+         }
+      }
+
       // logger.info("[HOTEL SEARCH RESPONSE]", data);
 
       return data;

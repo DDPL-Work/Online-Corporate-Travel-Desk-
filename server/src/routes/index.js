@@ -87,6 +87,8 @@ router.use("/landing-page", landingPageRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/contact-leads", contactLeadRoutes);
 router.use("/markup", markupRoutes);
+const markupSimulatorRoutes = require("../modules/markup/routes/markupSimulator.routes");
+router.use("/markup-simulator", markupSimulatorRoutes);
 
 // ------------------ API Info ------------------
 router.get("/", (req, res) => {

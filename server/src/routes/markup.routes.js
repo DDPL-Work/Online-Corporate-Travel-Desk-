@@ -19,4 +19,20 @@ router.get("/hotels", markupCtrl.getHotels);
 // GET /api/markup/airports?search=del&limit=100
 router.get("/airports", markupCtrl.getAirports);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CRUD OPS FOR CORPORATE MARKUP
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/markup/save (Create or Update)
+router.post("/save", markupCtrl.saveCorporateMarkup);
+
+// GET /api/markup/corporate?corporateId=...&productType=flight
+router.get("/corporate", markupCtrl.getCorporateMarkup);
+
+// GET /api/markup/corporate/all?corporateId=...
+router.get("/corporate/all", markupCtrl.getAllCorporateMarkups);
+
+// DELETE /api/markup/corporate
+router.delete("/corporate", markupCtrl.deleteCorporateMarkup);
+
 module.exports = router;

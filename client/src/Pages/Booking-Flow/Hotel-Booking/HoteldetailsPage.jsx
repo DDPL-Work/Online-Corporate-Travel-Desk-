@@ -234,6 +234,7 @@ const HotelDetailsPage = () => {
         city: hotelFromSearch?.CityName,
         guestNationality: searchPayload?.GuestNationality || "",
         traceId: localState?.traceId || location.state?.traceId || "",
+        snapshotId: localState?.snapshotId || location.state?.snapshotId || "",
       },
     };
 

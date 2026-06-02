@@ -282,6 +282,7 @@ export default function OneFlightBooking() {
       getFareQuote({
         traceId: tId,
         resultIndex,
+        snapshotId: selectedFlight?.SnapshotId,
       }),
     );
   }, [

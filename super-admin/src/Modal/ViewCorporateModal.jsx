@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { FiX, FiExternalLink, FiCheckCircle, FiXCircle, FiInfo, FiUsers, FiDollarSign, FiFileText } from "react-icons/fi";
-import FinancialApprovalModal from "./FinancialApprovalModal";
 
 const C = {
   navy: "#003399",
@@ -17,8 +17,8 @@ const C = {
 };
 
 export default function ViewCorporateModal({ corporate, onClose }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   if (!corporate) return null;
 
@@ -37,6 +37,13 @@ export default function ViewCorporateModal({ corporate, onClose }) {
   const handleReject = () => {
     // In a real implementation, dispatch a rejection action here
     alert("Reject action not fully implemented. Wire to API.");
+  };
+
+  const handleApprove = () => {
+    navigate(`/financial-approval/${corporate._id}`, {
+      state: { corporate, from: "/pending-corporates" },
+    });
+    onClose();
   };
 
   const tabs = [
@@ -100,7 +107,7 @@ export default function ViewCorporateModal({ corporate, onClose }) {
                     <FiXCircle size={14} /> Reject
                   </button>
                   <button 
-                    onClick={() => setShowApprovalModal(true)}
+                    onClick={handleApprove}
                     className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-lg flex items-center gap-1.5"
                   >
                     <FiCheckCircle size={14} /> Approve
@@ -245,17 +252,6 @@ export default function ViewCorporateModal({ corporate, onClose }) {
           </div>
         </div>
       </div>
-      
-      {showApprovalModal && (
-        <FinancialApprovalModal
-          corporate={corporate}
-          onClose={() => {
-            setShowApprovalModal(false);
-            onClose();
-          }}
-        />
-      )}
-
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

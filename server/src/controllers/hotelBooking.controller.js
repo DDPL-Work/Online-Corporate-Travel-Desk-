@@ -319,8 +319,20 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
       ...pricingSnapshot,
       capturedAt: new Date(),
     },
+    markupSnapshot: req.body.markupSnapshot || null,
     bookingSnapshot,
   });
+
+  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
+     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
+     await MarkupRevenueService.trackRevenue({
+        bookingId: bookingRequest._id,
+        corporateId: corporate._id,
+        serviceType: "hotel",
+        markupAmount: req.body.markupSnapshot.markupAmount,
+        ruleId: req.body.markupSnapshot.appliedRuleId
+     });
+  }
 
   const isAutoApproved = requestStatus === "approved";
 
@@ -437,7 +449,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         IsVoucherBooking: true,
         GuestNationality: transformedHotelRequest.guestNationality,
         EndUserIp: process.env.TBO_END_USER_IP,
-        NetAmount: transformedHotelRequest.selectedRoom.totalFare, // Skip PreBook, use original fare
+        NetAmount: bookingRequest?.markupSnapshot?.supplierFare || transformedHotelRequest.selectedRoom.totalFare, // Skip PreBook, use original fare
         ClientReferenceId: bookingRequest.bookingReference,
         TraceId: hotelRequest.traceId || hotelRequest.TraceId,
         HotelRoomsDetails,
@@ -836,8 +848,20 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       ...pricingSnapshot,
       capturedAt: new Date(),
     },
+    markupSnapshot: req.body.markupSnapshot || null,
     bookingSnapshot,
   });
+
+  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
+     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
+     await MarkupRevenueService.trackRevenue({
+        bookingId: bookingRequest._id,
+        corporateId: corporate._id,
+        serviceType: "hotel",
+        markupAmount: req.body.markupSnapshot.markupAmount,
+        ruleId: req.body.markupSnapshot.appliedRuleId
+     });
+  }
 
   const isAutoApproved = requestStatus === "approved";
 

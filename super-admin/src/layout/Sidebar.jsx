@@ -140,17 +140,27 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           label: "Credit Alerts",
           icon: <FaBell />,
         },
+        {
+          to: "/tbo-commissions-taxes",
+          label: "TBO Commissions",
+          icon: <FaMoneyBillWave />,
+        },
       ],
     },
 
     {
-      label: "Pricing & Yield",
+      label: "Pricing & Markup",
       icon: <FaChartLine />,
       subItems: [
         {
           to: "/global-markup-engine",
           label: "Markup Engine",
           icon: <FaPercent />,
+        },
+        {
+          to: "/service-fee-management",
+          label: "Service Fees",
+          icon: <FaMoneyBillWave />,
         },
       ],
     },

@@ -224,6 +224,16 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       taxTdsDetails: mongoose.Schema.Types.Mixed,
     },
 
+    markupSnapshot: {
+      supplierFare: Number,
+      markupAmount: Number,
+      finalFare: Number,
+      appliedRuleId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporateMarkup' },
+      markupVersion: String,
+      markupRefundable: { type: Boolean, default: false },
+      markupRefundPolicy: { type: String, enum: ["NONE", "FULL", "PROPORTIONAL"], default: "NONE" },
+    },
+
     /* ================= EXECUTION ================= */
 
     executionStatus: {

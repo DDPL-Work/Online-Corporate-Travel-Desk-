@@ -1757,3 +1757,92 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     });
   }
 };
+
+// -----------------------------------------------------
+// TBO COMMISSIONS AND TAXES 
+// -----------------------------------------------------
+exports.getTboCommissionsAndTaxes = asyncHandler(async (req, res) => {
+  try {
+    const flightBookings = await BookingRequest.find({
+      bookingType: "flight",
+      executionStatus: { $in: ["ticketed", "cancelled_requested", "cancel_requested", "cancelled", "Ticketed", "Cancelled"] }
+    })
+      .populate("corporateId", "corporateName")
+      .lean();
+
+    const hotelBookings = await HotelBookingRequest.find({
+      bookingType: "hotel",
+      $or: [
+        { executionStatus: { $in: ["voucher_generated", "vouchered", "cancelled_requested", "cancel_requested", "cancelled", "Vouchered", "Cancelled"] } },
+        { "amendment.status": { $in: ["cancelled", "cancelled_requested", "cancel_requested", "Cancelled"] } },
+        { "cancellation.status": { $in: ["cancelled", "cancelled_requested", "cancel_requested", "Cancelled"] } }
+      ]
+    })
+      .populate("corporateId", "corporateName")
+      .lean();
+
+    const results = [];
+
+    const getBookingStatus = (booking) => {
+      const amnd = booking.cancellation?.status || booking.amendment?.status;
+      if (amnd && amnd.toLowerCase().includes("cancel")) return "Cancelled";
+      if (booking.executionStatus && booking.executionStatus.toLowerCase().includes("cancel")) return "Cancelled";
+      return "Confirmed";
+    };
+
+    flightBookings.forEach((booking) => {
+      const fare = booking?.bookingResult?.providerResponse?.Response?.FlightItinerary?.Fare || booking?.flightRequest?.fareQuote?.Results?.[0]?.Fare;
+
+      if (fare) {
+        results.push({
+          bookingId: booking._id,
+          orderId: booking.orderId,
+          bookingReference: booking.bookingReference,
+          bookingType: booking.bookingType,
+          corporateName: booking.corporateId?.corporateName || "Unknown",
+          createdAt: booking.createdAt,
+          status: getBookingStatus(booking),
+          fareDetails: fare
+        });
+      }
+    });
+
+    hotelBookings.forEach((booking) => {
+      const rooms = booking?.hotelRequest?.preBookResponse?.HotelResult?.[0]?.Rooms || [];
+      const allPriceBreakdowns = [];
+      rooms.forEach(room => {
+        if (room.PriceBreakUp) {
+          allPriceBreakdowns.push(...room.PriceBreakUp);
+        }
+      });
+
+      if (allPriceBreakdowns.length > 0) {
+        results.push({
+          bookingId: booking._id,
+          orderId: booking.orderId,
+          bookingReference: booking.bookingReference,
+          bookingType: booking.bookingType,
+          corporateName: booking.corporateId?.corporateName || "Unknown",
+          createdAt: booking.createdAt,
+          status: getBookingStatus(booking),
+          priceBreakdown: allPriceBreakdowns
+        });
+      }
+    });
+
+    results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return res.status(200).json({
+      success: true,
+      data: results
+    });
+
+  } catch (error) {
+    console.error("❌ getTboCommissionsAndTaxes:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch commissions and taxes",
+      error: error.message,
+    });
+  }
+});

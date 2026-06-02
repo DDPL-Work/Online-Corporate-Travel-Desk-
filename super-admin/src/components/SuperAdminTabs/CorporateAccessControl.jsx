@@ -11,7 +11,6 @@ import { toast } from "sonner";
 
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import EditCorporateModal from "../../Modal/EditCorporateModal";
-import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 import ToggleStatusModal from "../../Modal/ToggleStatusModal";
 import {
   fetchCorporates,
@@ -115,7 +114,6 @@ export default function CorporateAccessControl() {
   const [openEdit, setOpenEdit] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   
-  const [openFinancialApprove, setOpenFinancialApprove] = useState(false);
   const [openStatusModal, setOpenStatusModal] = useState(false);
   const [selectedCorporateForStatus, setSelectedCorporateForStatus] = useState(null);
   
@@ -225,8 +223,9 @@ export default function CorporateAccessControl() {
   };
 
   const handleApprove = (corporate) => {
-    setSelectedRow(corporate);
-    setOpenFinancialApprove(true);
+    navigate(`/financial-approval/${corporate._id}`, {
+      state: { corporate, from: "/corporate-access-control" },
+    });
   };
 
   return (
@@ -543,13 +542,6 @@ export default function CorporateAccessControl() {
             corporate={selectedRow}
             onClose={() => setOpenEdit(false)}
           />
-        )}
-        
-        {openFinancialApprove && selectedRow && (
-          <FinancialApprovalModal corporate={selectedRow} onClose={() => {
-            setOpenFinancialApprove(false);
-            dispatch(fetchCorporates());
-          }} />
         )}
         
         {openStatusModal && selectedCorporateForStatus && (

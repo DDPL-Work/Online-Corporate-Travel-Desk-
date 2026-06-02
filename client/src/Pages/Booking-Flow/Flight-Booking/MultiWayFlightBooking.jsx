@@ -262,6 +262,7 @@ export default function MultiCityFlightBooking() {
       getFareQuote({
         traceId: searchParams.traceId, // ✅ REDUX traceId
         resultIndex: selectedFlight.ResultIndex,
+        snapshotId: selectedFlight?.SnapshotId,
       }),
     );
   }, [

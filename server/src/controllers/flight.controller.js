@@ -8,6 +8,11 @@ const ApiError = require("../utils/ApiError");
  * 1️⃣ Flight Search
  * -------------------------------------------------- */
 exports.searchFlights = asyncHandler(async (req, res) => {
+  // Inject the user's corporateId into the search payload for markup logic
+  if (req.user && req.user.corporateId) {
+    req.body.corporateId = req.user.corporateId;
+  }
+  
   const data = await tboService.searchFlights(req.body);
   res
     .status(200)
@@ -18,9 +23,10 @@ exports.searchFlights = asyncHandler(async (req, res) => {
  * 2️⃣ Fare Quote (MANDATORY)
  * -------------------------------------------------- */
 exports.getFareQuote = asyncHandler(async (req, res) => {
-  const { traceId, resultIndex } = req.body;
+  const { traceId, resultIndex, snapshotId } = req.body;
+  const corporateId = req.user?.corporateId; // Extract for markup processing
 
-  const data = await tboService.getFareQuote(traceId, resultIndex);
+  const data = await tboService.getFareQuote(traceId, resultIndex, corporateId, snapshotId);
 
   res.status(200).json(new ApiResponse(200, data, "Fare quote successful"));
 });
