@@ -32,6 +32,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myUpcomingFlightsExportTemplate, myUpcomingHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -78,6 +80,8 @@ function FlightSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: flightBookings = [], loading } = useSelector((state) => state.bookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyBookings()); }, [dispatch]);
 
@@ -149,7 +153,31 @@ function FlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Upcoming Flight Ledger" subtitle={`${filtered.length} scheduled departures`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Upcoming Flight Ledger" 
+        subtitle={`${filtered.length} scheduled departures`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Upcoming Flight Ledger",
+          statCards: [
+            { label: "Upcoming Flights", value: filtered.length },
+            { label: "Confirmed", value: filtered.length },
+            { label: "Future Assets", value: filtered.length },
+            { label: "Reserved Capital", value: `₹${totalValue.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: myUpcomingFlightsExportTemplate,
+          filenamePrefix: "my_upcoming_flights"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -197,6 +225,8 @@ function HotelSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { completed: hotelBookings = [], loading } = useSelector((state) => state.hotelBookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyHotelBookings()); }, [dispatch]);
 
@@ -252,7 +282,31 @@ function HotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Upcoming Hotel Ledger" subtitle={`${filtered.length} scheduled stays`} onExport={() => {}} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Upcoming Hotel Ledger" 
+        subtitle={`${filtered.length} scheduled stays`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Upcoming Hotel Ledger",
+          statCards: [
+            { label: "Upcoming Hotels", value: filtered.length },
+            { label: "Confirmed", value: filtered.length },
+            { label: "Unique Destinations", value: new Set(filtered.map(b => b.city)).size },
+            { label: "Reserved Capital", value: `₹${totalValue.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: myUpcomingHotelsExportTemplate,
+          filenamePrefix: "my_upcoming_hotels"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

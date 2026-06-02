@@ -42,6 +42,8 @@ import {
 } from "../TravelAdminTabs/Shared/CommonComponents";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { pendingFlightsExportTemplate, pendingHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -92,6 +94,8 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const formatted = useMemo(() => (data || []).map(b => {
     const traveller = b.travellers?.length
@@ -187,7 +191,31 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Approval Queue" subtitle={`${filtered.length} pending decisions`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Approval Queue" 
+        subtitle={`${filtered.length} pending decisions`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Approval Queue",
+          statCards: [
+            { label: "Pending Flights", value: filtered.length },
+            { label: "Urgent Review", value: filtered.filter(r => !r.isTravelPassed).length },
+            { label: "Expired/Discarded", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Potential Outlay", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: pendingFlightsExportTemplate,
+          filenamePrefix: "pending_flights"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -225,13 +253,17 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
                    <span className="text-[11px] font-bold font-mono px-2 py-1 rounded" style={{ background: C.offWhite, color: C.navy }}>{b.employeeId}</span>
                 </td>
                 <td className="!px-6 !py-5">
-                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : <StatusBadge status={b.status} />}
+                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : b.status === "manager_approved" ? <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">WAITING FOR TRAVEL ADMIN APPROVAL</span> : <StatusBadge status={b.status} />}
                 </td>
                 <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
                 <td className="!px-6 !py-5 !text-center">
+                   {b.status !== "manager_approved" ? (
                     <button onClick={() => onSelect(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
                       <FiList size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
                     </button>
+                   ) : (
+                     <span className="text-[10px] font-bold text-slate-400 block mt-2">Action Locked</span>
+                   )}
                 </td>
               </tr>
             )) : (
@@ -260,6 +292,8 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const formatted = useMemo(() => (data || []).map(b => {
     const guest = b.travellers?.length
@@ -334,7 +368,31 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Approval Queue" subtitle={`${filtered.length} pending decisions`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Approval Queue" 
+        subtitle={`${filtered.length} pending decisions`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Approval Queue",
+          statCards: [
+            { label: "Pending Hotels", value: filtered.length },
+            { label: "Urgent Review", value: filtered.filter(r => !r.isTravelPassed).length },
+            { label: "Expired/Discarded", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Potential Outlay", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: pendingHotelsExportTemplate,
+          filenamePrefix: "pending_hotels"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -373,13 +431,17 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
                    <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
                 </td>
                 <td className="!px-6 !py-5">
-                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : <StatusBadge status={b.status} />}
+                   {b.isTravelPassed && b.status === "pending_approval" ? <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded border border-slate-200">EXPIRED</span> : b.status === "manager_approved" ? <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">WAITING FOR TRAVEL ADMIN APPROVAL</span> : <StatusBadge status={b.status} />}
                 </td>
                 <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
                 <td className="!px-6 !py-5 !text-center">
+                   {b.status !== "manager_approved" ? (
                     <button onClick={() => onSelect(b)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
                       <FiList size={16} className="text-[#E7C695] group-hover:scale-110 transition-transform" />
                     </button>
+                   ) : (
+                     <span className="text-[10px] font-bold text-slate-400 block mt-2">Action Locked</span>
+                   )}
                 </td>
               </tr>
             )) : (
@@ -437,7 +499,7 @@ export default function PendingTravelRequestsForManager() {
   const { user } = useSelector((state) => state.auth);
   const isVerified = user?.managerRequestStatus === "approved";
 
-  const handleAction = async (id, type, action, request) => {
+  const handleAction = async (id, type, action, request, comments = "") => {
     const isApprove = action === "approve";
     if (isApprove) {
       const estimatedCost = (() => {
@@ -473,22 +535,13 @@ export default function PendingTravelRequestsForManager() {
       }
     }
 
-    const result = await Swal.fire({
-      title: `${isApprove ? "Approve" : "Reject"} Request`,
-      input: isApprove ? null : "textarea",
-      icon: isApprove ? "question" : "warning",
-      showCancelButton: true,
-      confirmButtonColor: isApprove ? "#16a34a" : "#dc2626",
-    });
-
-    if (result.isConfirmed) {
-      dispatch(isApprove ? approveApproval({ id, comments: "", type }) : rejectApproval({ id, comments: result.value || "", type }))
-        .unwrap()
-        .then(() => {
-          Swal.fire("Success", `Request ${action}d successfully`, "success");
-        })
-        .catch((err) => Swal.fire("Error", err || "Update failed", "error"));
-    }
+    dispatch(isApprove ? approveApproval({ id, comments, type }) : rejectApproval({ id, comments, type }))
+      .unwrap()
+      .then(() => {
+        Swal.fire("Success", `Request ${action}d successfully`, "success");
+        setSelectedRequest(null);
+      })
+      .catch((err) => Swal.fire("Error", err || "Update failed", "error"));
   };
 
   const handleTransfer = async (secondApproverId, remark, type) => {

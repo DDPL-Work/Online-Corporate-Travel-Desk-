@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { FiChevronLeft, FiChevronRight, FiDownload } from "react-icons/fi";
+import { exportToCSV } from "../../../../utils/exportToCSV";
 
 const SCROLL_PX = 320;
 
@@ -63,8 +64,11 @@ export function TableActionBar({
   subtitle,
   exportLabel = "Export",
   onExport,
+  exportConfig,
   exportBgClass = "bg-[#0A4D68] hover:bg-[#083d52]",
   arrowBgClass = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600",
+  exportLoading = false,
+  exportDisabled = false,
   children,
 }) {
   const { hasOverflow, canScrollLeft, canScrollRight } = useScrollState(scrollRef);
@@ -73,6 +77,14 @@ export function TableActionBar({
     const el = scrollRef?.current;
     if (!el) return;
     el.scrollBy({ left: dir === "left" ? -SCROLL_PX : SCROLL_PX, behavior: "smooth" });
+  };
+
+  const handleExport = () => {
+    if (exportConfig) {
+      exportToCSV(exportConfig);
+    } else if (onExport) {
+      onExport();
+    }
   };
 
   return (
@@ -89,14 +101,19 @@ export function TableActionBar({
       <div className="flex flex-nowrap items-center gap-2 shrink-0">
         {children}
 
-        {onExport && (
+        {(onExport || exportConfig) && (
           <button
             type="button"
-            onClick={onExport}
-            className={`inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${exportBgClass}`}
+            onClick={handleExport}
+            disabled={exportDisabled || exportLoading}
+            className={`inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest shadow transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 ${exportBgClass}`}
           >
-            <FiDownload size={13} />
-            <span>{exportLabel}</span>
+            {exportLoading ? (
+               <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+               <FiDownload size={13} />
+            )}
+            <span>{exportLoading ? "Exporting..." : exportLabel}</span>
           </button>
         )}
 
@@ -132,8 +149,11 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
     toolbarRight,
     exportLabel = "Export",
     onExport,
+    exportConfig,
     exportBgClass = "bg-[#0A4D68] hover:bg-[#083d52]",
     arrowBgClass  = "bg-slate-50 border-slate-200 text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600",
+    exportLoading = false,
+    exportDisabled = false,
     tableMinWidth = "700px",
     wrapperClass  = "",
     showToolbar   = true,
@@ -159,9 +179,12 @@ const ResponsiveDataTable = forwardRef(function ResponsiveDataTable(
           title={title}
           subtitle={subtitle}
           onExport={onExport}
+          exportConfig={exportConfig}
           exportLabel={exportLabel}
           exportBgClass={exportBgClass}
           arrowBgClass={arrowBgClass}
+          exportLoading={exportLoading}
+          exportDisabled={exportDisabled}
         >
           {toolbarRight}
         </TableActionBar>

@@ -28,6 +28,8 @@ import {
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { cancelledFlightsExportTemplate, cancelledHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const mapCancelStatus = (status) => {
   if (status === "refunded") return "Refunded";
@@ -99,6 +101,8 @@ function CancelledFlightSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const dispatch = useDispatch();
   const { teamExecutedFlightRequests: flightBookings } = useSelector((state) => state.manager);
@@ -214,7 +218,32 @@ function CancelledFlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Cancellation Registry" subtitle={`${filtered.length} records processed`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Cancellation Registry" 
+        subtitle={`${filtered.length} records processed`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Cancelled Flights",
+          statCards: [
+            { label: "Cancelled Flights", value: filtered.length },
+            { label: "Refunded", value: filtered.filter(b => b.status === "Refunded").length },
+            { label: "Refund Pending", value: filtered.filter(b => b.status === "Refund Pending").length },
+            { label: "Total Refund Value", value: `₹${filtered.reduce((s, b) => s + (b.refundAmount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Status", value: cancelStatusFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: cancelledFlightsExportTemplate,
+          filenamePrefix: "cancelled_flights"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -284,6 +313,8 @@ function CancelledHotelSection() {
   const navigate = useNavigate();
   const PAGE_SIZE = 10;
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   const dispatch = useDispatch();
   const { teamExecutedHotelRequests: hotelBookings } = useSelector((state) => state.manager);
 
@@ -349,9 +380,9 @@ function CancelledHotelSection() {
           </LabeledField>
           <LabeledField label="Date Range" className="lg:col-span-4">
              <div className="flex items-center gap-2">
-                <input type="date" value={startDate} onChange={setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
-                <input type="date" value={endDate} onChange={setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
              </div>
           </LabeledField>
           <div className="flex items-end lg:col-span-2">
@@ -360,7 +391,32 @@ function CancelledHotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Cancellation Registry" subtitle={`${filtered.length} records processed`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Cancellation Registry" 
+        subtitle={`${filtered.length} records processed`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Cancelled Hotels",
+          statCards: [
+            { label: "Cancelled Hotels", value: filtered.length },
+            { label: "Refunded", value: filtered.filter(b => b.status === "Refunded").length },
+            { label: "Refund Pending", value: filtered.filter(b => b.status === "Refund Pending").length },
+            { label: "Total Refund Value", value: `₹${filtered.reduce((s, b) => s + (b.refundAmount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Status", value: cancelStatusFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: cancelledHotelsExportTemplate,
+          filenamePrefix: "cancelled_hotels"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   FiFilter,
   FiDownload,
@@ -37,6 +38,8 @@ import {
 } from "../../Redux/Slice/walletSlice";
 import { C } from "../Shared/color";
 import { useNavigate } from "react-router-dom";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 
 const StatusBadge = ({ status }) => {
   const config = {
@@ -242,42 +245,7 @@ export default function CorporateWallet() {
     .filter((tx) => tx.type === "debit")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filteredTransactions.length) return;
-    const headers = [
-      "Date",
-      "Description",
-      "Order ID",
-      "Type",
-      "Amount",
-      "Status",
-    ];
-    const rows = filteredTransactions.map((tx) => [
-      new Date(tx.createdAt).toLocaleDateString("en-IN"),
-      tx.description || "—",
-      tx.orderId || tx._id || tx.bookingId || "—",
-      tx.type || "—",
-      `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}`,
-      getTransactionStatus(tx),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;font-weight:700;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `wallet-ledger.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     if (rechargeOrder?.gateway === "phonepe" && rechargeOrder.redirectUrl) {
@@ -356,7 +324,7 @@ export default function CorporateWallet() {
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           {[
             ["booking", "Consumption Ledger", FiArrowUpRight],
-            ["recharge", "Infusion Ledger", FiArrowDownLeft],
+            ["recharge", "Wallet Recharge Ledger", FiArrowDownLeft],
           ].map(([k, lbl, Icon]) => (
             <button
               key={k}
@@ -389,14 +357,16 @@ export default function CorporateWallet() {
             iconBgCls="bg-emerald-50"
             iconColorCls="text-emerald-600"
           />
-          <StatCard
-            label="Total Capital Out"
-            value={`₹${totalDebit.toLocaleString()}`}
-            Icon={FiArrowUpRight}
-            borderCls="border-amber-500"
-            iconBgCls="bg-amber-50"
-            iconColorCls="text-amber-600"
-          />
+          {activeTab !== "recharge" && (
+            <StatCard
+              label="Total Capital Out"
+              value={`₹${totalDebit.toLocaleString()}`}
+              Icon={FiArrowUpRight}
+              borderCls="border-amber-500"
+              iconBgCls="bg-amber-50"
+              iconColorCls="text-amber-600"
+            />
+          )}
           <StatCard
             label="Ledger Entries"
             value={filteredTransactions.length}
@@ -480,14 +450,14 @@ export default function CorporateWallet() {
               <h2 className="text-xl font-black" style={{ color: C.navy }}>
                 {activeTab === "booking"
                   ? "Asset Consumption Ledger"
-                  : "Capital Infusion Ledger"}
+                  : "Wallet Recharge Ledger"}
               </h2>
               <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
                 {filteredTransactions.length} records processed
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 mr-2">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleScroll("left")}
                   className="p-2.5 rounded-xl border bg-white hover:bg-slate-50 text-slate-400 hover:text-navy transition-all active:scale-90"
@@ -505,17 +475,41 @@ export default function CorporateWallet() {
                   <FiChevronRight size={16} />
                 </button>
               </div>
-              <button
-                onClick={handleExport}
-                className="px-4 py-2.5 rounded-xl font-black text-[10px] flex items-center gap-2 border shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
-                style={{ borderColor: C.border, color: C.muted }}
-              >
-                <FiDownload size={14} /> Export XLS
-              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto" ref={ledgerScrollRef}>
+          <ResponsiveDataTable
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => exportExcel({
+              pageHeader: activeTab === "booking" ? "Asset Consumption Ledger" : "Wallet Recharge Ledger",
+              statCards: [
+                { label: "Available Asset", value: loading ? "..." : `${currency || "₹"} ${(balance || 0).toLocaleString()}` },
+                { label: "Total Capital In", value: `₹${totalCredit.toLocaleString()}` },
+                ...(activeTab !== "recharge" ? [{ label: "Total Capital Out", value: `₹${totalDebit.toLocaleString()}` }] : []),
+                { label: "Ledger Entries", value: filteredTransactions.length }
+              ],
+              appliedFilters: [
+                { label: "Universal Search", value: searchTerm || "None" },
+                { label: "Ledger Period", value: `${startDate || "Any"} to ${endDate || "Any"}` },
+                { label: "Execution Status", value: statusFilter }
+              ],
+              data: filteredTransactions,
+              columns: [
+                { header: "Date", value: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
+                { header: "Description", value: (tx) => tx.description || "—" },
+                { header: "Asset Reference", value: (tx) => tx.orderId || tx.reference || tx._id || tx.bookingId || "—" },
+                ...(activeTab === "recharge" ? [{ header: "Payment ID", value: (tx) => tx.paymentGateway?.paymentId || "—" }] : []),
+                { header: "Type", value: (tx) => tx.type || "—" },
+                { header: "Amount", value: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
+                { header: "Status", value: (tx) => getTransactionStatus(tx) }
+              ],
+              filenamePrefix: "wallet_ledger"
+            })}
+            wrapperClass="!border-none !shadow-none"
+          >
+            <div className="overflow-x-auto" ref={ledgerScrollRef}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -537,7 +531,7 @@ export default function CorporateWallet() {
                   const gatewayInfo =
                     tx.paymentGateway?.name || tx.type === "debit"
                       ? "Corporate Asset"
-                      : "Direct Infusion";
+                      : "Direct Recharge";
 
                   return (
                     <tr
@@ -655,7 +649,8 @@ export default function CorporateWallet() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </ResponsiveDataTable>
 
           <div className="p-6 border-t" style={{ borderColor: C.border }}>
             <Pagination
@@ -687,7 +682,7 @@ export default function CorporateWallet() {
                 <FiPlusCircle size={40} />
               </div>
               <h3 className="text-3xl font-black text-white tracking-tight leading-none mb-2">
-                Capital Infusion
+                Wallet Recharge
               </h3>
               <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.3em]">
                 Authorized Recharge Protocol
@@ -781,7 +776,7 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
     ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
     : "System Protocol";
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-300"
@@ -1013,7 +1008,8 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -35,6 +35,7 @@ import {
   getPnr,
   getUserName,
   getUserEmail,
+  getCorporateName,
   getRequestedDate,
   getStatus,
   resolvePayload,
@@ -236,6 +237,7 @@ export default function LegacyReissueDetailPage() {
     req?.corporate?.employeeName ||
     getUserName(req);
   const email = getUserEmail(req);
+  const corporateName = getCorporateName(req);
   const reason =
     req.reason ||
     req.remarks ||
@@ -250,12 +252,14 @@ export default function LegacyReissueDetailPage() {
     journeyType: resolveJourneyType(req),
     airline: resolveAirline(req),
     flightNumber:
+      req?.displayInfo?.flightNumber ||
       resolvePrimarySegment(req)?.flightNumber ||
       req?.selectedFlight?.flightNumber ||
       req?.bookingSnapshot?.flightNumber ||
       req?.preferredJourney?.flightNumber ||
       "N/A",
     route: (() => {
+      if (req?.displayInfo?.route) return req.displayInfo.route;
       const seg = resolvePrimarySegment(req);
       const lastSeg =
         (Array.isArray(req?.selectedSegments) && req.selectedSegments.length > 0
@@ -279,6 +283,7 @@ export default function LegacyReissueDetailPage() {
     arrival: resolveArrival(req),
     duration: resolveDuration(req),
     stops:
+      req?.displayInfo?.stops ??
       resolvePrimarySegment(req)?.stops ??
       req?.preferredJourney?.stops ??
       req?.selectedFlight?.stops ??
@@ -291,6 +296,7 @@ export default function LegacyReissueDetailPage() {
     refund: resolveRefund(req),
     totalEstimate: resolveTotalFare(req),
     currency:
+      req?.displayInfo?.currency ||
       req?.currency ||
       req?.reissuePricingSnapshot?.currency ||
       req?.preferredJourney?.currency ||
@@ -593,7 +599,7 @@ export default function LegacyReissueDetailPage() {
               </div>
 
               {/* Connector */}
-              <div className="flex flex-col items-center gap-1 min-w-[160px]">
+              <div className="flex flex-col items-center gap-1 min-w-40">
                 <span className="text-[10px] font-semibold text-gray-500">
                   {bookingInfo.duration || "Duration N/A"}
                 </span>
@@ -837,7 +843,7 @@ export default function LegacyReissueDetailPage() {
                       </td>
                     </tr>
                     <tr className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4 text-gray-500 font-medium">Airline Date Change Fee / Reissue Penalty</td>
+                      <td className="px-6 py-4 text-gray-500 font-medium">Airline Reissue Penalty</td>
                       <td className="px-6 py-4 text-right font-bold text-gray-800">
                         {formatCurrency(bookingInfo.reissueCharge, bookingInfo.currency)}
                       </td>
@@ -887,6 +893,9 @@ export default function LegacyReissueDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
             <InfoRow label="Employee Name" value={empName} />
             <InfoRow label="Email Address" value={email} />
+            {corporateName && corporateName !== "N/A" && (
+              <InfoRow label="Company Name" value={corporateName} />
+            )}
             <InfoRow label="Reissue Type" value={type} />
             <InfoRow label="Requested At" value={date} />
             {ref && <InfoRow label="Booking Ref" value={ref} mono />}
@@ -907,7 +916,7 @@ export default function LegacyReissueDetailPage() {
             </div>
 
             <div className="relative pl-1.5">
-              <div className="absolute left-[13px] top-3 bottom-3 w-[1.5px] bg-gradient-to-b from-[#A07840]/40 via-[#E8E0D0] to-transparent" />
+              <div className="absolute left-[13px] top-3 bottom-3 w-[1.5px] bg-linear-to-b from-[#A07840]/40 via-[#E8E0D0] to-transparent" />
               
               <div className="space-y-8">
                 {sortedSteps.map((step, idx) => (

@@ -51,6 +51,7 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 /* ─────────────────────────────────────────────────────────────────
    STATUS BADGE
@@ -182,6 +183,8 @@ const MyReissueRequests = () => {
     companyRequests,
     companyLoading,
   } = useSelector((s) => s.reissue);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   // If URL has ?scope=company (e.g. from sidebar), start on company tab
   const initialTab = searchParams.get("scope") === "company" ? "company" : "my";
@@ -346,48 +349,7 @@ const MyReissueRequests = () => {
     setFilter("All");
   };
 
-  const handleExport = () => {
-    if (!currentRequests.length) return;
-    const headers = [
-      "Request ID",
-      "PNR",
-      "Booking Ref",
-      "Employee",
-      "Route",
-      "Type",
-      "Reason",
-      "Date",
-      "Status",
-    ];
-    const rows = currentRequests.map((r) => [
-      getRequestId(r),
-      getPnr(r),
-      r.bookingReference || r.bookingRef || "N/A",
-      getUserName(r),
-      getRoute(r),
-      r.reissueType || r.type || "REISSUE",
-      r.reason || r.remarks || "N/A",
-      getRequestedDate(r),
-      getStatus(r),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reissue_requests.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+
 
   return (
     <div
@@ -568,8 +530,37 @@ const MyReissueRequests = () => {
             activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments"
           }
           subtitle={`${currentRequests.length} active records`}
-          onExport={handleExport}
           wrapperClass="!border-none !shadow-none"
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments",
+            statCards: [
+              { label: "Total Requests", value: stats.total },
+              { label: "Pending Review", value: stats.pending },
+              { label: "Processed", value: stats.approved },
+              { label: "Rejected", value: stats.rejected }
+            ],
+            appliedFilters: [
+              { label: "Search", value: searchQuery || "None" },
+              { label: "Status", value: filter },
+              { label: "Request Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            ],
+            data: currentRequests,
+            columns: [
+              { header: "Request ID", value: (r) => getRequestId(r) },
+              { header: "PNR", value: (r) => getPnr(r) },
+              { header: "Booking Ref", value: (r) => r.bookingReference || r.bookingRef || "N/A" },
+              { header: "Employee", value: (r) => getUserName(r) },
+              { header: "Route", value: (r) => getRoute(r) },
+              { header: "Type", value: (r) => r.reissueType || r.type || "REISSUE" },
+              { header: "Reason", value: (r) => r.reason || r.remarks || "N/A" },
+              { header: "Date", value: (r) => getRequestedDate(r) },
+              { header: "Status", value: (r) => getStatus(r) }
+            ],
+            filenamePrefix: "reissue_requests"
+          })}
           pagination={
             <Pagination
               currentPage={currentPage}

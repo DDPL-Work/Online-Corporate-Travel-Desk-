@@ -163,29 +163,37 @@ exports.getCompanyRequests = asyncHandler(async (req, res) => {
   }
 
   const query = { ...req.query, corporateId };
+  const page = Number(query.page || 1);
+  const limit = Number(query.limit || 20);
 
   // Lazy-require repositories to avoid circular deps
   const reissueRepository = require("../repositories/reissue.repository");
   const offlineReissueRepository = require("../repositories/offlineReissue.repository");
 
-  const mongoQuery = { corporateId };
-  if (query.status) mongoQuery.status = query.status;
+  // ── CRITICAL FIX: Exclude terminal/routed statuses from online query ──
+  // When an online reissue fails and falls back to offline, both repos have a record
+  // for the same booking. Excluding OFFLINE_REQUIRED/FAILED/CANCELLED from the online
+  // query prevents duplicate rows in the combined list.
+  const EXCLUDED_ONLINE_STATUSES = ["OFFLINE_REQUIRED", "FAILED", "CANCELLED"];
+
+  const onlineQuery = { corporateId };
+  if (query.status) {
+    onlineQuery.status = query.status;
+  } else {
+    onlineQuery.status = { $nin: EXCLUDED_ONLINE_STATUSES };
+  }
+
+  const offlineQuery = { corporateId };
+  if (query.status) offlineQuery.status = query.status;
 
   const [onlineRes, offlineRes] = await Promise.all([
-    reissueRepository.list(mongoQuery, {
-      page: Number(query.page || 1),
-      limit: Number(query.limit || 20),
-    }),
-    offlineReissueRepository.list(mongoQuery, {
-      page: Number(query.page || 1),
-      limit: Number(query.limit || 20),
-    }),
+    reissueRepository.list(onlineQuery, { page, limit }),
+    offlineReissueRepository.list(offlineQuery, { page, limit }),
   ]);
 
-  // ── CRITICAL: Use the correct transformer per record type ──────────────────
+  // ── Use the correct transformer per record type ──
   // Online records  → toReissueDto        (oldJourney / newJourney structure)
   // Offline records → toOfflineReissueDto (selectedSegments / preferredJourney / pricingSnapshot)
-  // Mixing transformers strips all flight/pricing fields from offline records.
   const onlineDtos  = (onlineRes.data  || []).map(toReissueDto);
   const offlineDtos = (offlineRes.data || []).map(toOfflineReissueDto);
 
@@ -193,20 +201,75 @@ exports.getCompanyRequests = asyncHandler(async (req, res) => {
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   );
 
+  // ── CRITICAL FIX: Deduplicate records for the same PNR or Request ID ──
+  // Since the combined list is sorted by createdAt desc, the first record we see
+  // for any PNR is the most recent (highest priority) and should be kept.
+  const seenPnrs = new Set();
+  const seenRequestIds = new Set();
+  const deduped = [];
+
+  for (const item of combined) {
+    const pnr = (item.displayInfo?.pnr || item.pnr || "").trim().toUpperCase();
+    const reqId = (item.requestId || item.id || item._id || "").toString().trim();
+    
+    let isDuplicate = false;
+    if (pnr && pnr !== "N/A" && seenPnrs.has(pnr)) {
+      isDuplicate = true;
+    }
+    if (reqId && seenRequestIds.has(reqId)) {
+      isDuplicate = true;
+    }
+
+    if (!isDuplicate) {
+      if (pnr && pnr !== "N/A") seenPnrs.add(pnr);
+      if (reqId) seenRequestIds.add(reqId);
+      deduped.push(item);
+    }
+  }
+
+  // ── CRITICAL FIX: Use real aggregate totals for pagination ──
+  const aggregateTotal = deduped.length;
+
   res.status(200).json(
     new ApiResponse(200, {
-      data: combined,
-      pagination: { total: combined.length, page: 1, pages: 1 },
+      data: deduped,
+      pagination: {
+        total: aggregateTotal,
+        page,
+        pages: Math.ceil(aggregateTotal / limit) || 1,
+        limit,
+      },
     }, "Company reissue requests fetched"),
   );
 });
 exports.getById = asyncHandler(async (req, res) => {
-  const request = await reissueWorkflowService.getById({
-    actor: req.user,
-    requestId: req.params.id,
-  });
+  // ── Try online repo first ──
+  let request;
+  try {
+    request = await reissueWorkflowService.getById({
+      actor: req.user,
+      requestId: req.params.id,
+    });
+  } catch (err) {
+    if (err.statusCode !== 404) throw err;
+    request = null;
+  }
+
+  if (request) {
+    return res.status(200).json(
+      new ApiResponse(200, toReissueDto(request), "Reissue request fetched"),
+    );
+  }
+
+  // ── Fallback: check offline repo ──
+  const offlineReissueRepository = require("../repositories/offlineReissue.repository");
+  const offlineRequest = await offlineReissueRepository.findByIdOrRequestId(req.params.id);
+
+  if (!offlineRequest) {
+    return res.status(404).json(new ApiResponse(404, null, "Reissue request not found"));
+  }
 
   res.status(200).json(
-    new ApiResponse(200, toReissueDto(request), "Reissue request fetched"),
+    new ApiResponse(200, toOfflineReissueDto(offlineRequest), "Reissue request fetched"),
   );
 });

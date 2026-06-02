@@ -24,7 +24,7 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const statuses = status === "pending_approval" ? ["pending_approval", "pending_second_approval"] : [status];
+  const statuses = status === "pending_approval" ? ["pending_approval", "pending_second_approval", "manager_approved"] : [status];
 
   const query = {
     corporateId: req.user.corporateId,
@@ -230,7 +230,7 @@ exports.approveRequest = asyncHandler(async (req, res) => {
   const bookingRequest = await BookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
-    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+    requestStatus: { $in: ["pending_approval", "manager_approved", "pending_second_approval"] },
   });
 
   if (!bookingRequest) {
@@ -275,6 +275,30 @@ exports.approveRequest = asyncHandler(async (req, res) => {
   }
   /* ========================================================================= */
 
+  if (req.user.role !== "travel-admin") {
+    // Manager or Second Approver approval
+    bookingRequest.managerApproval = {
+      isApproved: true,
+      approvedBy: req.user._id,
+      approvedAt: new Date(),
+      comments: comments,
+    };
+
+    bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
+    bookingRequest.requestStatus = "manager_approved";
+
+    await bookingRequest.save();
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Booking request approved by manager, pending travel-admin approval",
+      ),
+    );
+  }
+
+  // Travel Admin full approval
   bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
 
   bookingRequest.requestStatus = "approved";
@@ -358,6 +382,8 @@ exports.approveRequest = asyncHandler(async (req, res) => {
     approverName: _flightApproverName,
     approverRole: req.user.role,
     relatedId:    bookingRequest._id,
+    requesterId:  bookingRequest.requesterDetails?.userId || bookingRequest.userId,
+    requesterEmail: bookingRequest.requesterDetails?.email || _flightApproveUser?.email,
   });
 
 
@@ -386,7 +412,7 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
   const bookingRequest = await BookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
-    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+    requestStatus: { $in: ["pending_approval", "manager_approved", "pending_second_approval"] },
   });
 
   if (!bookingRequest) {
@@ -447,18 +473,18 @@ exports.rejectRequest = asyncHandler(async (req, res) => {
 
 // @desc    Transfer booking request
 // @route   POST /api/v1/approvals/:id/transfer
-// @access  Private (Travel Admin/Manager)
+// @access  Private (Travel Admin)
 exports.transferRequest = asyncHandler(async (req, res) => {
   const { secondApproverId, remark } = req.body;
 
-  if (!["travel-admin", "manager"].includes(req.user.role)) {
-    throw new ApiError(403, "Only admin/manager can transfer requests");
+  if (!["travel-admin"].includes(req.user.role)) {
+    throw new ApiError(403, "Only admin can transfer requests");
   }
 
   const bookingRequest = await BookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
-    requestStatus: "pending_approval",
+    requestStatus: { $in: ["pending_approval", "manager_approved"] },
   });
 
   if (!bookingRequest) {
@@ -561,7 +587,7 @@ exports.approveHotelRequest = asyncHandler(async (req, res) => {
   const bookingRequest = await HotelBookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
-    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+    requestStatus: { $in: ["pending_approval", "manager_approved", "pending_second_approval"] },
   });
 
   if (!bookingRequest) {
@@ -600,6 +626,29 @@ exports.approveHotelRequest = asyncHandler(async (req, res) => {
   }
   /* ========================================================================= */
 
+  if (req.user.role !== "travel-admin") {
+    // Manager or Second Approver approval
+    bookingRequest.managerApproval = {
+      isApproved: true,
+      approvedBy: req.user._id,
+      approvedAt: new Date(),
+      comments: comments,
+    };
+
+    bookingRequest.$locals.previousStatus = bookingRequest.requestStatus;
+    bookingRequest.requestStatus = "manager_approved";
+
+    await bookingRequest.save();
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        bookingRequest,
+        "Hotel booking request approved by manager, pending travel-admin approval",
+      ),
+    );
+  }
+
   bookingRequest.requestStatus = "approved";
   bookingRequest.approvedAt = new Date();
   bookingRequest.approvedBy = req.user._id;
@@ -620,6 +669,8 @@ exports.approveHotelRequest = asyncHandler(async (req, res) => {
     approverName: _hotelApproverName,
     approverRole: req.user.role,
     relatedId:    bookingRequest._id,
+    requesterId:  bookingRequest.requesterDetails?.userId || bookingRequest.userId,
+    requesterEmail: bookingRequest.requesterDetails?.email || _hotelApproveUser?.email,
   });
 
 
@@ -648,7 +699,7 @@ exports.rejectHotelRequest = asyncHandler(async (req, res) => {
   const bookingRequest = await HotelBookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
-    requestStatus: { $in: ["pending_approval", "pending_second_approval"] },
+    requestStatus: { $in: ["pending_approval", "manager_approved", "pending_second_approval"] },
   });
 
   if (!bookingRequest) {
@@ -718,7 +769,7 @@ exports.transferHotelRequest = asyncHandler(async (req, res) => {
   const bookingRequest = await HotelBookingRequest.findOne({
     _id: req.params.id,
     corporateId: req.user.corporateId,
-    requestStatus: "pending_approval",
+    requestStatus: { $in: ["pending_approval", "manager_approved"] },
   });
 
   if (!bookingRequest) {

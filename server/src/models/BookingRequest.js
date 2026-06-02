@@ -40,7 +40,7 @@ const bookingRequestSchema = new mongoose.Schema(
 
     requestStatus: {
       type: String,
-      enum: ["draft", "pending_approval", "pending_second_approval", "approved", "rejected", "expired"],
+      enum: ["draft", "pending_approval", "pending_second_approval", "manager_approved", "approved", "rejected", "expired"],
       default: "draft",
       index: true,
     },
@@ -60,6 +60,13 @@ const bookingRequestSchema = new mongoose.Schema(
     rejectedAt: Date,
 
     approverComments: String,
+
+    managerApproval: {
+      isApproved: { type: Boolean, default: false },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      approvedAt: Date,
+      comments: String,
+    },
 
     secondApprover: {
       userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -418,8 +425,9 @@ bookingRequestSchema.pre("save", function () {
 /* 2️⃣ Enforce status transitions */
 const ALLOWED_STATUS_TRANSITIONS = {
   draft: ["pending_approval", "approved"],
-  pending_approval: ["approved", "rejected", "pending_second_approval"],
-  pending_second_approval: ["approved", "rejected"],
+  pending_approval: ["approved", "rejected", "pending_second_approval", "manager_approved"],
+  pending_second_approval: ["approved", "rejected", "manager_approved"],
+  manager_approved: ["approved", "rejected"],
   approved: [],
   rejected: [],
   expired: [],

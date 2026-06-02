@@ -104,8 +104,22 @@ const resolveRecipients = async (event, data) => {
 
   switch (event) {
 
+    // ── TO REQUESTER ONLY ──
+    case EVENTS.BOOKING_APPROVED: {
+      const targetUserId = data.requesterId || data.employeeId || data.recipientId;
+      const targetEmail = data.requesterEmail || data.employeeEmail;
+
+      if (targetUserId) {
+        recipients.push({
+          userId: targetUserId,
+          email: targetEmail,
+          corporateId: data.corporateId,
+        });
+      }
+      break;
+    }
+
     // ── TO EMPLOYEE & OTHERS (CC) — corporate-internal only, no super admin ──
-    case EVENTS.BOOKING_APPROVED:
     case EVENTS.BOOKING_REJECTED:
     case EVENTS.BOOKING_CONFIRMED:
     case EVENTS.BOOKING_CANCELLED:

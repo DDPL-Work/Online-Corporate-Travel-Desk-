@@ -31,8 +31,16 @@ export const formatDuration = (minutes = 0) => {
 
 export const getCabinClassLabel = (value) => value || "Economy";
 
+/**
+ * Returns the CDN URL for an airline logo by IATA code.
+ * Uses kiwi.com's public airline image CDN (64×64 PNG).
+ * @param {string} code  - IATA airline code (e.g. "EY", "AI")
+ * @returns {string} logo URL
+ */
 export const airlineLogo = (code) =>
-  code ? `https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/${code}.svg` : "";
+  code
+    ? `https://images.kiwi.com/airlines/64x64/${code}.png`
+    : "https://via.placeholder.com/32";
 
 export const FLIGHT_STATUS_MAP = {
   ticketed: "Ticketed",

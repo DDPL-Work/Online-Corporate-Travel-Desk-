@@ -23,6 +23,8 @@ import { StatCard, IdCell, Th, LabeledField } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import CancellationQueryDetailsPage from "./CancellationQueryDetailsPage";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminOfflineCancellationQueriesExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*                                  HELPERS                                   */
@@ -176,6 +178,8 @@ const OfflineCancellationQueries = () => {
   const [activeTab, setActiveTab] = useState("my");
   const [search, setSearch] = useState("");
   const [selectedQueryId, setSelectedQueryId] = useState(null);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     dispatch(fetchCancellationQueries());
@@ -338,6 +342,25 @@ const OfflineCancellationQueries = () => {
             title="Governance Ledger"
             subtitle={`${filteredQueries.length} active queries tracked`}
             tableMinWidth="1000px"
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => exportExcel({
+              pageHeader: "Governance Ledger",
+              statCards: [
+                { label: "Total Submissions", value: stats.total },
+                { label: "Pending Review", value: stats.open },
+                { label: "Under Process", value: stats.inProgress },
+                { label: "Closed Queries", value: stats.resolved }
+              ],
+              appliedFilters: [
+                { label: "Search", value: search || "None" },
+                { label: "Tab Filter", value: activeTab }
+              ],
+              data: filteredQueries,
+              columns: adminOfflineCancellationQueriesExportTemplate,
+              filenamePrefix: "offline_cancellation_queries"
+            })}
           >
             <table className="w-full text-left border-collapse">
               <thead>

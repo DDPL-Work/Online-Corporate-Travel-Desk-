@@ -11,6 +11,7 @@ import {
   FiCheckCircle,
   FiAlertCircle,
   FiRefreshCw,
+  FiBriefcase,
   FiPackage,
   FiMapPin,
   FiTag,
@@ -1171,23 +1172,32 @@ function FareSummarySection({
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest mb-2">
                         Tax Breakup
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        {taxBreakup.map((taxItem, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-white border border-gray-100 rounded-lg px-3 py-2 flex justify-between gap-3"
-                          >
-                            <span className="text-[11px] font-semibold text-gray-500">
-                              {taxItem.key || taxItem.Key || `Tax ${idx + 1}`}
-                            </span>
-                            <span className="text-[11px] font-bold text-gray-900">
-                              {formatMoney(
-                                taxItem.value ?? taxItem.Value ?? 0,
-                                fbCurrency,
-                              )}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="flex flex-col border border-[#EAE4D9] rounded bg-[#FAF8F4] overflow-hidden mt-1">
+                        {/* Table Header */}
+                        <div className="flex justify-between items-center bg-[#EAE4D9] px-4 py-2">
+                          <span className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#1A1714]">Fee Type</span>
+                          <span className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#1A1714]">Amount</span>
+                        </div>
+
+                        {/* Rows */}
+                        <div className="flex flex-col divide-y divide-[#EAE4D9] bg-white">
+                          {taxBreakup.map((taxItem, idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between px-4 py-2 hover:bg-[#FAF8F4] transition-colors"
+                            >
+                              <span className="text-[12px] font-medium text-[#4A433A]">
+                                {taxItem.key || taxItem.Key || `Tax ${idx + 1}`}
+                              </span>
+                              <span className="text-[12px] font-bold text-[#1A1714]">
+                                {formatMoney(
+                                  taxItem.value ?? taxItem.Value ?? 0,
+                                  fbCurrency,
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1331,9 +1341,6 @@ function getCancellationChangeRequestIds(booking) {
 }
 
 function FareRulesSection({ bookingResult }) {
-  const [open, setOpen] = useState(true);
-  const [openCards, setOpenCards] = useState({});
-
   const rules = [];
 
   // ── Round-trip paths ──
@@ -1403,10 +1410,7 @@ function FareRulesSection({ bookingResult }) {
   return (
     <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
       {/* Section header */}
-      <button
-        className="w-full flex items-center justify-between mb-5"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <div className="w-full flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
           <span className="text-[#A07840]">
             <FiFileText size={14} />
@@ -1418,11 +1422,10 @@ function FareRulesSection({ bookingResult }) {
         <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
           As per Airline Policy
         </span>
-      </button>
+      </div>
 
-      {open && (
-        <>
-          {/* Rule cards grid */}
+      <>
+        {/* Rule cards grid */}
           {rules.map((r, i) => {
             const firstRule = r.rules[0];
             const airlineCode = firstRule?.Airline || "";
@@ -1468,22 +1471,13 @@ function FareRulesSection({ bookingResult }) {
               return [...paragraphs, ...liItems];
             };
 
-            const isCardOpen = openCards[i] || false;
-            const toggleCard = (e) => {
-              e.preventDefault();
-              setOpenCards((prev) => ({ ...prev, [i]: !prev[i] }));
-            };
-
             return (
               <div
                 key={i}
                 className="bg-white rounded-xl border border-[#E8E0D0] p-4"
               >
-                {/* Card header (Button) */}
-                <button
-                  className="w-full flex items-center justify-between mb-3 cursor-pointer outline-none"
-                  onClick={toggleCard}
-                >
+                {/* Card header */}
+                <div className="w-full flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[#A07840] text-xs">
                       {r.journeyType === "return" ? "↙" : "↗"}
@@ -1496,19 +1490,15 @@ function FareRulesSection({ bookingResult }) {
                     <span className="text-[11px] text-[#8B7355] font-medium">
                       {airlineCode} · {fareBasis}
                     </span>
-                    <span className="text-[#A07840]">
-                      {isCardOpen ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                    </span>
                   </div>
-                </button>
+                </div>
 
                 {/* Route */}
-                <p className={`text-[22px] font-bold text-gray-900 tracking-tight ${isCardOpen ? "mb-3" : "mb-0"}`}>
+                <p className="text-[22px] font-bold text-gray-900 tracking-tight mb-3">
                   {origin} → {destination}
                 </p>
 
-                {isCardOpen && (
-                  <div className="mt-4 pt-4 border-t border-[#E8E0D0]">
+                <div className="mt-4 pt-4 border-t border-[#E8E0D0]">
                     {/* Fare basis pill */}
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-[10px] font-bold uppercase tracking-widest text-[#8B7355]">
@@ -1582,7 +1572,6 @@ function FareRulesSection({ bookingResult }) {
                   })}
                 </div>
               </div>
-            )}
             </div>
             );
           })}
@@ -1602,7 +1591,6 @@ function FareRulesSection({ bookingResult }) {
             ))}
           </ul> */}
         </>
-      )}
     </div>
   );
 }
@@ -3054,6 +3042,11 @@ export default function BookedFlightDetails() {
   const [showPartialCancel, setShowPartialCancel] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [showReissueModal, setShowReissueModal] = useState(false);
+  const [activeTab, setActiveTab] = useState("flight_details");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   // ── Reissue eligibility ──
   const { eligibility, eligibilityLoading, bookingOfflineRequest } = useSelector((s) => s.reissue);
@@ -3225,12 +3218,17 @@ export default function BookedFlightDetails() {
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
         <div className="w-full px-4 lg:px-10 h-14 flex items-center justify-between">
-          <button
+        <div className=" flex items-center gap-4">
+            <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <FiArrowLeft size={16} /> Back
           </button>
+           <p className="text-[11px] font-bold uppercase tracking-widest bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  {isCancelled ? "Cancelled" : "Booked"} Flight Record
+                </p>
+        </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-500 font-mono">
@@ -3258,24 +3256,49 @@ export default function BookedFlightDetails() {
             )}
           </div>
         </div>
+        {/* Tabs Navigation */}
+        <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center gap-6 border-t border-[#EAE4D9]">
+          {[
+            { id: "flight_details", label: "Flight Details" },
+            { id: "passengers", label: "Passengers" },
+            { id: "cancellation", label: "Fare Rules & Policies" },
+            { id: "amendment", label: "Cancellations & Amendments" },
+            { id: "history", label: "History" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
+                activeTab === tab.id
+                  ? "text-[#1A1714]"
+                  : "text-[#A89F94] hover:text-[#7A7068]"
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <main className="w-full px-4 lg:px-10 py-8 pb-24 space-y-6">
-        {/* ── Header: "Your trip is confirmed" ── */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
-              {isCancelled ? "Cancelled" : "Booked"} Flight Record
-            </p>
-            <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
-              {isCancelled ? "Cancelled Flight Booking" : "Flight Booking Details"}
-            </h1>
-            <p className="text-sm text-gray-500  leading-relaxed">
-              Review itinerary, passenger, fare, ticketing, and cancellation
-              details for this corporate booking.
-            </p>
-          </div>
-        </div>
+        {activeTab === "flight_details" && (
+          <div className="space-y-6">
+            {/* ── Header: "Your trip is confirmed" ── */}
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+              
+                <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
+                  {isCancelled ? "Cancelled Flight Booking" : "Flight Booking Details"}
+                </h1>
+                <p className="text-sm text-gray-500  leading-relaxed">
+                  Review itinerary, passenger, fare, ticketing, and cancellation
+                  details for this corporate booking.
+                </p>
+              </div>
+            </div>
         {/* Flight cards */}
         {journeyTypes.map((jt) => (
           <FlightCard
@@ -3304,6 +3327,11 @@ export default function BookedFlightDetails() {
             </button>
           </div>
         )} */}
+          </div>
+        )}
+
+        {activeTab === "passengers" && (
+          <div className="space-y-6">
         {/* ── Passenger Section ── */}
         <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
           {/* Header */}
@@ -3519,6 +3547,13 @@ export default function BookedFlightDetails() {
             </div>
           </div>
         </div>
+          </div>
+        )}
+
+
+
+        {activeTab === "flight_details" && (
+          <div className="space-y-6">
         {/* SSR Section */}
         <SSRSection
           ssrSnapshot={ssrSnapshot}
@@ -3541,11 +3576,21 @@ export default function BookedFlightDetails() {
         )}
         {/* Invoice Section */}
         {/* <InvoiceSection bookingResult={bookingResult} isEmployee={isEmployee} /> */}
+          </div>
+        )}
+
+        {activeTab === "cancellation" && (
+          <div className="space-y-6">
         {/* Fare Rules */}
         <FareRulesSection bookingResult={bookingResult} />
 
+          </div>
+        )}
+
+        {activeTab === "amendment" && (
+          <div className="space-y-6">
         {/* Cancellation Details (Bottom) */}
-        {isCancelled && (() => {
+        {(isCancelled || booking.cancellation) && (() => {
           const cancellationRows = normalizeCancellationResponses(booking);
           let totalRefund = 0;
           let totalCharge = 0;
@@ -3734,11 +3779,9 @@ export default function BookedFlightDetails() {
             </div>
           );
         })()}
+
         {/* Amendment actions */}
-        {paymentSuccessful &&
-          executionStatus === "ticketed" &&
-          !isCancelled &&
-          !isTravelPassed && (
+        {paymentSuccessful && executionStatus === "ticketed" && !isCancelled && !isTravelPassed && !booking.cancellation ? (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -3813,7 +3856,7 @@ export default function BookedFlightDetails() {
                 undone.
               </p>
             </div>
-          )}
+          ) : null}
 
         {/* ── Sticky Download Button (bottom-right) ── */}
         {/* {paymentSuccessful && !isCancelled &&
@@ -3858,7 +3901,14 @@ export default function BookedFlightDetails() {
               )}
             </div>
           )} */}
+          </div>
+        )}
+
+        {activeTab === "history" && (
+          <div className="space-y-6">
         <BookingHistory booking={booking} />
+          </div>
+        )}
       </main>
 
       {/* Modals – keep your existing modal components */}

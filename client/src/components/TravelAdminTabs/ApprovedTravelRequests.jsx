@@ -37,6 +37,7 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled", "TICKET_GENERATED", "COMPLETED"]);
 const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled", "COMPLETED"]);
@@ -110,17 +111,7 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
     });
   }, [requests, search, empFilter, execFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Email", "Route", "Amount", "Status"];
-    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}`, `₹${r.estimatedCost.toLocaleString()}`, r.executionStatus]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `approved-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -148,7 +139,40 @@ function FlightApprovalsSection({ requests, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Fulfillment Queue" subtitle={`${filtered.length} missions awaiting ticketing`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Fulfillment Queue" 
+        subtitle={`${filtered.length} missions awaiting ticketing`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Fulfillment Queue",
+          statCards: [
+            { label: "Approved Flights", value: filtered.length },
+            { label: "Pending Ticketing", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Critical Failures", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Est. Spend", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Execution Status", value: execFilter },
+            { label: "From Date", value: dateFrom || "Any" },
+            { label: "To Date", value: dateTo || "Any" }
+          ],
+          data: filtered,
+          columns: [
+            { header: "Order ID", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Route", value: (r) => r.routes?.length > 0 ? `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}` : "—" },
+            { header: "Status", key: "executionStatus" },
+            { header: "Amount", value: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ],
+          filenamePrefix: "approved_flight_requests"
+        })} 
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -243,17 +267,7 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
     });
   }, [requests, search, empFilter, execFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order Reference", "Personnel", "Email", "Hotel", "Amount", "Status"];
-    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, r.hotelName, `₹${r.estimatedCost.toLocaleString()}`, r.executionStatus]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `approved-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -281,7 +295,40 @@ function HotelApprovalsSection({ requests, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Fulfillment Queue" subtitle={`${filtered.length} authorizations pending deployment`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Fulfillment Queue" 
+        subtitle={`${filtered.length} authorizations pending deployment`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Fulfillment Queue",
+          statCards: [
+            { label: "Approved Hotels", value: filtered.length },
+            { label: "Voucher Required", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Deployment Errors", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Est. Commitment", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Execution Status", value: execFilter },
+            { label: "From Date", value: dateFrom || "Any" },
+            { label: "To Date", value: dateTo || "Any" }
+          ],
+          data: filtered,
+          columns: [
+            { header: "Order Reference", key: "orderId" },
+            { header: "Personnel", key: "employee" },
+            { header: "Email Identifier", key: "employeeId" },
+            { header: "Hotel", key: "hotelName" },
+            { header: "Status", key: "executionStatus" },
+            { header: "Amount", value: (r) => `₹${r.estimatedCost.toLocaleString()}` },
+          ],
+          filenamePrefix: "approved_hotel_requests"
+        })} 
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

@@ -9,6 +9,8 @@ import Unauthorized from "../Pages/Auth/Unauthorized";
 
 // Travel Company
 import OnboardedCorporates from "../components/SuperAdminTabs/OnboardedCorporates";
+import MarkupEngine from "../components/SuperAdminTabs/MarkupEngine";
+import CorporateMarkupConfiguration from "../components/SuperAdminTabs/CorporateMarkupConfiguration";
 import BookingsSummary from "../components/SuperAdminTabs/BookingsSummary";
 import CorporateRevenue from "../components/SuperAdminTabs/CorporateRevenue";
 import CreditStatusAlerts from "../components/SuperAdminTabs/CreditStatusAlerts";
@@ -60,6 +62,8 @@ export const appRouter = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: "/all-corporates", element: <OnboardedCorporates /> },
+          { path: "/global-markup-engine", element: <MarkupEngine /> },
+          { path: "/corporate-markup/:id", element: <CorporateMarkupConfiguration /> },
           { path: "/financial-approvals", element: <Navigate to="/corporate-revenue" replace /> },
           { path: "/corporate-access-control", element: <CorporateAccessControl /> },
           { path: "/cancellation-queries", element: <CancellationQueries /> },

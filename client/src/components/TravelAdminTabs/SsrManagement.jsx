@@ -42,6 +42,8 @@ import Swal from "sweetalert2";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Th, LabeledField, SearchBar } from "./Shared/CommonComponents";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminSsrPoliciesExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const Avatar = ({ name = "", size = "md" }) => {
   const nameStr = typeof name === "string" ? name : String(name || "");
@@ -364,16 +366,32 @@ function PolicyList({
   onEdit,
   title,
   subtitle,
-  onExport,
+  searchQuery,
   onRefresh,
 }) {
+  const { exportExcel, isExporting } = useExcelExporter();
+
   if (listLoading) return <div className="grid gap-4">{[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-2xl border animate-pulse" />)}</div>;
 
   return (
     <ResponsiveDataTable 
       title={title} 
       subtitle={subtitle} 
-      onExport={onExport}
+      exportLabel="Export Excel"
+      exportLoading={isExporting}
+      exportDisabled={isExporting}
+      onExport={() => exportExcel({
+        pageHeader: title,
+        statCards: [
+          { label: "Active Policies", value: policies.length }
+        ],
+        appliedFilters: [
+          { label: "Search", value: searchQuery || "None" }
+        ],
+        data: policies,
+        columns: adminSsrPoliciesExportTemplate,
+        filenamePrefix: "ssr_policies"
+      })}
       wrapperClass="!border-none !shadow-none"
       toolbarRight={onRefresh && <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all" style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}><FiRefreshCw size={14} /> Sync Policies</button>}
     >
@@ -652,8 +670,9 @@ export default function SsrManagement() {
               onEdit={handleEdit}
               title="Active Governance Ledger"
               subtitle={`${filteredPolicies.length} custom policies in effect`}
+              searchQuery={search}
               onRefresh={() => dispatch(fetchAllSSRPolicies())}
-              onExport={() => {}}
+
             />
           </div>
         )}

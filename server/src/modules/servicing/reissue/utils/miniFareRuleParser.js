@@ -3,136 +3,132 @@ const parseNumeric = (value) => {
   return Number.isFinite(num) ? num : 0;
 };
 
-const toArray = (value) => {
+const toFlatArray = (value, seen = new WeakSet()) => {
   if (!value) return [];
   if (Array.isArray(value)) {
-    if (value.length === 1 && Array.isArray(value[0])) {
-      return value[0].filter(Boolean);
-    }
-    return value.filter(Boolean);
+    return value.flatMap((item) => toFlatArray(item, seen)).filter(Boolean);
   }
-  if (Array.isArray(value?.Rules)) return value.Rules.filter(Boolean);
-  return [];
+
+  if (typeof value !== "object") return [];
+  if (seen.has(value)) return [];
+  seen.add(value);
+
+  const directRules = [];
+  if (Array.isArray(value.Rules)) {
+    directRules.push(...toFlatArray(value.Rules, seen));
+  }
+  if (Array.isArray(value.MiniFareRules)) {
+    directRules.push(...toFlatArray(value.MiniFareRules, seen));
+  }
+  if (Array.isArray(value.MiniFarRules)) {
+    directRules.push(...toFlatArray(value.MiniFarRules, seen));
+  }
+
+  const looksLikeRule =
+    value.Type !== undefined ||
+    value.OnlineReissueAllowed !== undefined ||
+    value.OnlineRefundAllowed !== undefined ||
+    Array.isArray(value.PaxPenalties) ||
+    value.Details ||
+    value.Detail ||
+    value.Description;
+
+  if (looksLikeRule) {
+    directRules.push(value);
+  }
+
+  return directRules.filter(Boolean);
 };
 
 const inferType = (value) => {
   if (value === 0 || value === "0") return "Cancellation";
   if (value === 1 || value === "1") return "Reissue";
+
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) return "";
+  if (text.includes("cancel")) return "Cancellation";
+  if (text.includes("reissue") || text.includes("change") || text.includes("reschedule")) {
+    return "Reissue";
+  }
   return String(value || "").trim();
+};
+
+const parseAmountFromText = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return 0;
+
+  const percentMatch = text.match(/100\s*%/i);
+  if (percentMatch) return 0;
+
+  const normalizedText = text.replace(/,/g, "");
+  const match =
+    normalizedText.match(/(?:inr|rs\.?)\s*(\d+(?:\.\d+)?)/i) ||
+    normalizedText.match(/(\d+(?:\.\d+)?)/);
+  return match ? parseNumeric(match[1] || match[0]) : 0;
 };
 
 const buildRule = (rule = {}) => {
   const normalizedType = inferType(rule.Type);
-  const from = rule.From ?? rule.FromDuration ?? "";
-  const to = rule.To ?? rule.ToDuration ?? "";
-  const unit = rule.Unit || "";
-  const details = rule.Details ?? rule.Detail ?? rule.Description ?? "";
   const penalties = Array.isArray(rule.PaxPenalties) ? rule.PaxPenalties : [];
-  const airlineFee = penalties[0]?.AirlineFee;
+  const airlineFee = penalties
+    .map((penalty) => parseNumeric(penalty?.AirlineFee))
+    .find((amount) => amount > 0);
+
+  const amount =
+    airlineFee ||
+    parseNumeric(
+      rule.SupplierReissueCharges ||
+        rule.ReissueCharges ||
+        rule.ChangeFee ||
+        rule.AmendmentFee ||
+        rule.RescheduleFee,
+    ) ||
+    parseAmountFromText(rule.Details ?? rule.Detail ?? rule.Description ?? "");
 
   return {
-    journeyPoints: rule.JourneyPoints || [],
+    journeyPoints: Array.isArray(rule.JourneyPoints) ? rule.JourneyPoints : [],
     type: normalizedType,
-    from,
-    to,
-    unit,
-    details,
-    amount: airlineFee !== undefined ? parseNumeric(airlineFee) : parseNumeric(details),
+    from: rule.From ?? rule.FromDuration ?? "",
+    to: rule.To ?? rule.ToDuration ?? "",
+    unit: rule.Unit || "",
+    details: rule.Details ?? rule.Detail ?? rule.Description ?? "",
+    amount,
     currency: rule.Currency || penalties[0]?.Currency || "INR",
+    onlineReissueAllowed:
+      rule.OnlineReissueAllowed === undefined ? null : Boolean(rule.OnlineReissueAllowed),
+    onlineRefundAllowed:
+      rule.OnlineRefundAllowed === undefined ? null : Boolean(rule.OnlineRefundAllowed),
   };
 };
 
-/**
- * Checks the raw MiniFareRules structure from TBO to determine
- * if online reissue is explicitly allowed.
- *
- * Per TBO documentation, eligibility depends on:
- *   MiniFareRules[].Type === "Reissue" && MiniFareRules[].OnlineReissueAllowed === true
- *
- * The parser handles both nested array formats and flat array formats.
- */
-/**
- * Resolves whether online reissue is allowed from raw TBO MiniFareRules.
- *
- * CORRECT BUSINESS LOGIC (per TBO documentation):
- *   - For REISSUE eligibility → ONLY evaluate Type=="Reissue" + OnlineReissueAllowed
- *   - For CANCELLATION/REFUND → ONLY evaluate Type=="Cancellation" + OnlineRefundAllowed
- *
- * NEVER cross-check OnlineRefundAllowed to determine reissue eligibility.
- * That was a merge-corruption bug that caused valid online reissues to fall
- * back to offline when OnlineRefundAllowed=false.
- */
 function resolveOnlineReissueAllowed(rawMiniFareRules) {
-  // ── Direct boolean flag on parent object (legacy/flat format from some TBO responses) ──
   if (rawMiniFareRules?.OnlineReissueAllowed === true) return true;
   if (rawMiniFareRules?.OnlineReissueAllowed === false) return false;
 
-  // ── NOTE: Do NOT fall back to OnlineRefundAllowed here. ──
-  // OnlineRefundAllowed belongs to Type=Cancellation rules only.
-  // Using it as a reissue fallback was a bug that blocked valid online reissues.
+  const rules = toFlatArray(rawMiniFareRules);
+  const reissueRules = rules.filter((rule) => inferType(rule?.Type) === "Reissue");
+  if (!reissueRules.length) return true;
 
-  // ── Check individual rules: ONLY Type="Reissue" rules matter here ──
-  const rules = toArray(rawMiniFareRules);
-  if (rules.length > 0) {
-    // Check if any Reissue-type rule explicitly permits online reissue
-    const hasExplicitAllow = rules.some(
-      (r) =>
-        (r.Type === "Reissue" || r.Type === 1 || r.Type === "1") &&
-        r.OnlineReissueAllowed === true,
-    );
-    if (hasExplicitAllow) return true;
-
-    // Check if any Reissue-type rule explicitly denies online reissue
-    const hasExplicitDenial = rules.some(
-      (r) =>
-        (r.Type === "Reissue" || r.Type === 1 || r.Type === "1") &&
-        r.OnlineReissueAllowed === false,
-    );
-    if (hasExplicitDenial) return false;
-
-    // Rules exist but none are Type=Reissue — no restriction, allow by default
-  }
-
-  // Default: true when no rules exist (no restriction = allowed)
-  return rules.length === 0;
+  if (reissueRules.some((rule) => rule?.OnlineReissueAllowed === true)) return true;
+  if (reissueRules.some((rule) => rule?.OnlineReissueAllowed === false)) return false;
+  return true;
 }
 
-/**
- * Resolves whether online refund is allowed from raw TBO MiniFareRules.
- *
- * CORRECT BUSINESS LOGIC:
- *   - ONLY evaluate Type=="Cancellation" + OnlineRefundAllowed
- *   - Never uses OnlineReissueAllowed
- */
 function resolveOnlineRefundAllowed(rawMiniFareRules) {
-  // Direct boolean flag on parent object
   if (rawMiniFareRules?.OnlineRefundAllowed === true) return true;
   if (rawMiniFareRules?.OnlineRefundAllowed === false) return false;
 
-  const rules = toArray(rawMiniFareRules);
-  if (rules.length > 0) {
-    const hasExplicitAllow = rules.some(
-      (r) =>
-        (r.Type === "Cancellation" || r.Type === 0 || r.Type === "0") &&
-        r.OnlineRefundAllowed === true,
-    );
-    if (hasExplicitAllow) return true;
+  const rules = toFlatArray(rawMiniFareRules);
+  const refundRules = rules.filter((rule) => inferType(rule?.Type) === "Cancellation");
+  if (!refundRules.length) return true;
 
-    const hasExplicitDenial = rules.some(
-      (r) =>
-        (r.Type === "Cancellation" || r.Type === 0 || r.Type === "0") &&
-        r.OnlineRefundAllowed === false,
-    );
-    if (hasExplicitDenial) return false;
-  }
-
-  return rules.length === 0;
+  if (refundRules.some((rule) => rule?.OnlineRefundAllowed === true)) return true;
+  if (refundRules.some((rule) => rule?.OnlineRefundAllowed === false)) return false;
+  return true;
 }
 
 function parseMiniFareRules(rawMiniFareRules) {
-  const rules = toArray(rawMiniFareRules).map(buildRule);
-
-  // Correctly separated: reissue uses OnlineReissueAllowed, refund uses OnlineRefundAllowed
+  const rules = toFlatArray(rawMiniFareRules).map(buildRule);
   const onlineReissueAllowed = resolveOnlineReissueAllowed(rawMiniFareRules);
   const onlineRefundAllowed = resolveOnlineRefundAllowed(rawMiniFareRules);
 

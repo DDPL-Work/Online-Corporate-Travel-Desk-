@@ -71,7 +71,60 @@ function toOfflineReissueDto(doc) {
       }
     : item.selectedFlight || null;
 
+  // ── Build normalized cross-type display info for combined views ──
+  const displayOrigin =
+    item.preferredJourney?.origin ||
+    item.selectedSegments?.[0]?.origin ||
+    "";
+  const displayDestination =
+    item.preferredJourney?.destination ||
+    item.selectedSegments?.[0]?.destination ||
+    "";
+
+  const primarySegment =
+    item.selectedSegments?.[0] ||
+    item.preferredJourney?.segments?.[0] ||
+    item.preferredJourney ||
+    {};
+
+  const displayInfo = {
+    pnr: item.pnr || item.originalPnr || null,
+    route: displayOrigin && displayDestination ? `${displayOrigin} → ${displayDestination}` : null,
+    status: item.status,
+    userEmail: user?.email || null,
+    userName: user?.name || null,
+    corporateName: item.corporateId?.corporateName || item.metadata?.corporateName || null,
+    airline: primarySegment.airlineName || primarySegment.airlineCode || item.airline || null,
+    flightNumber: primarySegment.flightNumber || null,
+    departureTime: primarySegment.departureTime || null,
+    arrivalTime: primarySegment.arrivalTime || null,
+    duration: primarySegment.duration || item.preferredJourney?.duration || null,
+    stops: primarySegment.stops ?? item.preferredJourney?.stops ?? 0,
+    cabinClass: primarySegment.cabinClass || item.preferredJourney?.cabinClass || "Economy",
+    journeyType: item.preferredJourney?.journeyType || "One Way",
+    oldFare: item.reissuePricingSnapshot?.oldFare ?? item.preferredJourney?.oldFare ?? 0,
+    newFare:
+      item.reissuePricingSnapshot?.newFare ??
+      item.preferredJourney?.newFare ??
+      item.preferredJourney?.fare ??
+      0,
+    fareDifference: item.reissuePricingSnapshot?.fareDifference ?? item.fareDifference ?? 0,
+    reissueCharge: item.reissuePricingSnapshot?.reissueCharge ?? item.reissueCharges ?? 0,
+    refundEstimate:
+      item.reissuePricingSnapshot?.refundEstimate ??
+      item.preferredJourney?.refundEstimate ??
+      0,
+    totalEstimate:
+      item.reissuePricingSnapshot?.totalEstimate ??
+      item.preferredJourney?.totalEstimate ??
+      item.totalAdjustment ??
+      0,
+    currency: item.reissuePricingSnapshot?.currency || item.preferredJourney?.currency || "INR",
+  };
+
   return {
+    // ── Type discriminator for combined online+offline views ──
+    _type: "OFFLINE",
     id: item._id,
     requestId: item.requestId,
     bookingId: item.bookingId,
@@ -79,6 +132,7 @@ function toOfflineReissueDto(doc) {
     // Normalized user object — always { name: String, email: String } or null
     user,
     corporateId: item.corporateId,
+    corporateName: item.corporateId?.corporateName || item.metadata?.corporateName || null,
     pnr: item.pnr,
     originalPnr: item.originalPnr || item.pnr,
     airline: item.airline,
@@ -129,6 +183,7 @@ function toOfflineReissueDto(doc) {
       0,
     currency: item.reissuePricingSnapshot?.currency || item.preferredJourney?.currency || "INR",
     reissuePricingSnapshot: item.reissuePricingSnapshot || null,
+    normalizedPricing: item.normalizedPricing || null,
     preferredJourney: item.preferredJourney || item.selectedFlight || null,
     preferredFlight: selectedFlight,
     selectedFlight,
@@ -146,6 +201,8 @@ function toOfflineReissueDto(doc) {
     rejectedAt: item.rejectedAt,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    // ── Normalized display info for company control panel ──
+    displayInfo,
   };
 }
 

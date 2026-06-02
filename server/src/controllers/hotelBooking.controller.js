@@ -244,7 +244,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     const isChild =
       incomingPaxType === "child" ||
       incomingPaxType === "2" ||
-      (t.age != null && Number(t.age) < 12);
+      (t.age !== "" && t.age != null && !isNaN(t.age) && Number(t.age) < 18);
     const paxType = isChild ? "child" : index === 0 ? "lead" : "adult";
 
     return {
@@ -420,11 +420,12 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
             PassportExpDate: traveller.PassportExpDate || null,
           };
           const ages = room.childAge || [];
-          passenger.Age = ages[i]
-            ? parseInt(ages[i])
-            : traveller.age
+          passenger.Age =
+            traveller.age != null && traveller.age !== ""
               ? parseInt(traveller.age)
-              : 10;
+              : ages[i]
+                ? parseInt(ages[i])
+                : 10;
           passengers.push(passenger);
           childIdx++;
         }
@@ -748,7 +749,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     const isChild =
       incomingPaxType === "child" ||
       incomingPaxType === "2" ||
-      (t.age != null && Number(t.age) < 12);
+      (t.age !== "" && t.age != null && !isNaN(t.age) && Number(t.age) < 18);
     const paxType = isChild ? "child" : index === 0 ? "lead" : "adult";
 
     return {
@@ -888,6 +889,7 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 });
 
 
+
 // @desc    Get my hotel booking requests (pending + approved)
 // @route   GET /api/v1/hotel-bookings/my
 // @access  Private (Employee)
@@ -897,7 +899,7 @@ exports.getMyHotelRequests = asyncHandler(async (req, res) => {
 
   const requests = await HotelBookingRequest.find({
     userId,
-    requestStatus: { $in: ["pending_approval", "approved"] },
+    requestStatus: { $in: ["pending_approval", "pending_second_approval", "manager_approved", "approved"] },
     executionStatus: { $ne: "voucher_generated" }, // not completed yet
   })
     .populate("approvedBy", "name email role")
@@ -1922,11 +1924,16 @@ exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await HotelBookingRequest.find({
-    projectId,
+  const query = {
     corporateId: req.user.corporateId,
     executionStatus: "voucher_generated",
-  })
+  };
+
+  if (projectId !== "all") {
+    query.projectId = projectId;
+  }
+
+  const expenses = await HotelBookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });

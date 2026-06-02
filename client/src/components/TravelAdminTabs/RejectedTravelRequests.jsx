@@ -33,6 +33,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminRejectedFlightsExportTemplate, adminRejectedHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components                                              */
@@ -98,18 +100,7 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
-
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Email", "Route", "Rejected Date", "Reason", "Cost"];
-    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, `${r.routes[0]?.fromCode} → ${r.routes[r.routes.length-1]?.toCode}`, r.rejectedDate.toLocaleDateString(), r.reason, `₹${r.estimatedCost.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `rejected-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -141,7 +132,30 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Rejection Ledger" 
+        subtitle={`${filtered.length} denied authorizations`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Rejection Ledger",
+          statCards: [
+            { label: "Rejected Flights", value: filtered.length },
+            { label: "Est. Loss Value", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
+            { label: "Critical Rejections", value: filtered.filter(r => r.reason.length > 50).length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
+          data: filtered,
+          columns: adminRejectedFlightsExportTemplate,
+          filenamePrefix: "rejected_flight_requests"
+        })}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -231,18 +245,7 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
-
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order Reference", "Personnel", "Email", "Hotel", "Rejected Date", "Reason", "Cost"];
-    const rows = filtered.map(r => [r.orderId, r.employee, r.employeeId, r.hotelName, r.rejectedDate.toLocaleDateString(), r.reason, `₹${r.estimatedCost.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `rejected-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -274,7 +277,30 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} denied authorizations`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Rejection Ledger" 
+        subtitle={`${filtered.length} denied authorizations`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Rejection Ledger",
+          statCards: [
+            { label: "Rejected Hotels", value: filtered.length },
+            { label: "Est. Revenue Loss", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
+            { label: "Compliance Blocks", value: filtered.filter(r => r.reason.toLowerCase().includes('policy')).length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
+          data: filtered,
+          columns: adminRejectedHotelsExportTemplate,
+          filenamePrefix: "rejected_hotel_requests"
+        })}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

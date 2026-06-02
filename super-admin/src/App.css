@@ -41,6 +41,39 @@
   z-index: 2;
 }
 
+/* ❌ Close Button */
+.sonner-close-button {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  left: auto !important;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: none !important;
+  border-radius: 50% !important;
+  color: #fff !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.sonner-close-button:hover {
+  background: rgba(255, 255, 255, 0.4) !important;
+}
+
+.sonner-toast.warning .sonner-close-button {
+  color: #111827 !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+.sonner-toast.warning .sonner-close-button:hover {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
 /* ⏳ Progress Bar */
 .sonner-progress {
   position: absolute;

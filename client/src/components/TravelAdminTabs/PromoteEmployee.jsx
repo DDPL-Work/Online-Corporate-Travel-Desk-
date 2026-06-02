@@ -30,6 +30,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { FiRefreshCw, FiX } from "react-icons/fi";
 import { C } from "../Shared/color";
 import Swal from "sweetalert2";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminEmployeeDirectoryExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 // ── Dummy Data ────────────────────────────────────────────────────────────────
 const DUMMY_EMPLOYEES = [
@@ -174,17 +176,7 @@ export default function PromoteEmployee() {
     }
   }
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Name", "Email", "Role", "Status", "Department", "Joined"];
-    const rows = filtered.map(e => [`${e.name.firstName} ${e.name.lastName}`, e.email, e.role, e.status, e.department, e.joinedDate]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `employee-directory.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
@@ -251,7 +243,32 @@ export default function PromoteEmployee() {
         </div>
 
         {/* Directory Table */}
-        <ResponsiveDataTable title="Member Ledger" subtitle={`${filtered.length} personnel found`} onExport={handleExport} pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+        <ResponsiveDataTable 
+          title="Member Ledger" 
+          subtitle={`${filtered.length} personnel found`} 
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "Personnel Directory",
+            statCards: [
+              { label: "Active Personnel", value: stats.active },
+              { label: "Governance Team", value: stats.managers },
+              { label: "Suspended Accounts", value: stats.inactive },
+              { label: "Total Headcount", value: stats.total }
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Role Type", value: roleFilter },
+              { label: "Status", value: statusFilter },
+              { label: "Joined Range", value: `${joinedFrom || "Any"} to ${joinedTo || "Any"}` }
+            ],
+            data: filtered,
+            columns: adminEmployeeDirectoryExportTemplate,
+            filenamePrefix: "employee_directory"
+          })}
+          pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+        >
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: C.navy, color: C.white }}>

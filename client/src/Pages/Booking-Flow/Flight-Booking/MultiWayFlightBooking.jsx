@@ -64,7 +64,8 @@ export default function MultiCityFlightBooking() {
     !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   useEffect(() => {
-    if (user?.role === "employee" || user?.role === "manager") {
+    if (user?.role === "employee" || user?.role === "manager" || user?.role === "travel-admin" || user?.role === "finance_team") {
+      dispatch(getMyTravelAdmin());
       dispatch(fetchMySSRPolicy());
       dispatch(fetchMyProfile());
     }
@@ -182,6 +183,10 @@ export default function MultiCityFlightBooking() {
       initial[0].lastName = lastName;
       initial[0].email = sourceProfile.email || "";
       initial[0].phoneWithCode = sourceProfile.phone || sourceProfile.mobile || sourceProfile.phoneWithCode || "";
+      if (sourceProfile.dob || sourceProfile.dateOfBirth) {
+        const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth;
+        initial[0].dob = rawDob.split("T")[0];
+      }
     }
 
     setTravelers(initial);

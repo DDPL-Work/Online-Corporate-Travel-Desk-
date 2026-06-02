@@ -342,58 +342,7 @@ export default function LandingHeader() {
       <div className={`${isAuthenticated ? "flex" : "hidden md:flex"} items-center gap-4`}>
         {isAuthenticated && user ? (
           <div className="flex items-center gap-3">
-            <NotificationBell onOpen={() => setProfileDropdownOpen(false)} />
-
-            <div className="relative" ref={profileRef}>
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer font-bold text-sm transition-all"
-                onClick={() => {
-                  if (!profileDropdownOpen) {
-                    window.dispatchEvent(new Event("closeNotificationBell"));
-                  }
-                  setProfileDropdownOpen(!profileDropdownOpen);
-                }}
-                style={{
-                  background: GOLD,
-                  color: C.navy,
-                  border: `2px solid ${C.navyDeep}`,
-                }}
-              >
-                {user?.name?.firstName?.charAt(0)?.toUpperCase() || "E"}
-              </div>
-              {/* Click Dropdown */}
-              <div
-                className={`absolute right-0 top-full mt-2 w-48 rounded-xl shadow-xl transition-all overflow-hidden z-50 ${profileDropdownOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}
-                style={{
-                  background: C.white,
-                  border: `1px solid ${C.border}`,
-                }}
-              >
-                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                  <p className="text-sm font-bold text-gray-800 truncate leading-tight">
-                    {user?.name?.firstName} {user?.name?.lastName}
-                  </p>
-                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider mt-1">
-                    {user?.role?.replace("-", " ")}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setProfileDropdownOpen(false);
-                    navigate("/my-profile");
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 border-b border-gray-100 cursor-pointer"
-                >
-                  <FiUser size={15} /> My Profile
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-none cursor-pointer"
-                >
-                  <RiUserLine size={15} /> Sign Out
-                </button>
-              </div>
-            </div>
+            <NotificationBell />
           </div>
         ) : (
           <>
@@ -628,7 +577,7 @@ export default function LandingHeader() {
 
       {/* Inactive account modal */}
       {showInactiveModal && createPortal(
-        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-99999 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold">

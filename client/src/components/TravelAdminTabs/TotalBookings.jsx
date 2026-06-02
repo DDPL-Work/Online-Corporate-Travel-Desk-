@@ -34,6 +34,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { totalFlightsExportTemplate, totalHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0)
@@ -101,6 +103,7 @@ function FlightSection() {
   const { flightBookings, loading } = useSelector(
     (state) => state.adminBooking,
   );
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     dispatch(getAllFlightBookingsAdmin());
@@ -215,44 +218,7 @@ function FlightSection() {
   );
   const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = [
-      "Order ID",
-      "Personnel",
-      "Route",
-      "Booked Date",
-      "Status",
-      "PNR",
-      "Amount",
-    ];
-    const rows = filtered.map((b) => [
-      b.orderId,
-      b.travellerName,
-      b.routes?.map((l) => `${l.fromCode}→${l.toCode}`).join(" | ") || "—",
-      new Date(b.bookedDate).toLocaleDateString(),
-      b.status,
-      b.pnr,
-      `₹${b.amount.toLocaleString()}`,
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `flight-manifest.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  // We rely on exportConfig instead of a custom handleExport for uniform CSV functionality
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -368,7 +334,27 @@ function FlightSection() {
       <ResponsiveDataTable
         title="Flight Ledger"
         subtitle={`${filtered.length} active deployments`}
-        onExport={handleExport}
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Total Flight Bookings",
+          statCards: [
+            { label: "Flight Manifest", value: filtered.length },
+            { label: "Ticketed Assets", value: filtered.filter((b) => b.status === "Confirmed").length },
+            { label: "Pending Sync", value: filtered.filter((b) => b.status === "Pending").length },
+            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Manifest Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Status", value: statusFilter },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: totalFlightsExportTemplate,
+          filenamePrefix: "total_flight_bookings"
+        })}
         wrapperClass="!border-none !shadow-none"
         pagination={
           <Pagination
@@ -475,11 +461,13 @@ function HotelSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [waitingBookingId, setWaitingBookingId] = useState(null);
   const PAGE_SIZE = 10;
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { hotelBookings, loading } = useSelector((state) => state.adminBooking);
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
     dispatch(getAllHotelBookingsAdmin());
@@ -548,42 +536,7 @@ function HotelSection() {
   );
   const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = [
-      "Order ID",
-      "Personnel",
-      "Hotel",
-      "City",
-      "Status",
-      "Amount",
-    ];
-    const rows = filtered.map((b) => [
-      b.orderId,
-      b.guestName,
-      b.hotelName,
-      b.city,
-      b.status,
-      `₹${b.amount.toLocaleString()}`,
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `hotel-manifest.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  // We rely on exportConfig instead of a custom handleExport for uniform CSV functionality
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -683,7 +636,25 @@ function HotelSection() {
       <ResponsiveDataTable
         title="Hotel Ledger"
         subtitle={`${filtered.length} active stays`}
-        onExport={handleExport}
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Total Hotel Bookings",
+          statCards: [
+            { label: "Hotel Manifest", value: filtered.length },
+            { label: "Vouchered Assets", value: filtered.length },
+            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` },
+            { label: "Unique Properties", value: new Set(filtered.map((b) => b.hotelName)).size }
+          ],
+          appliedFilters: [
+            { label: "Manifest Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: totalHotelsExportTemplate,
+          filenamePrefix: "total_hotel_bookings"
+        })}
         wrapperClass="!border-none !shadow-none"
         pagination={
           <Pagination
@@ -754,18 +725,30 @@ function HotelSection() {
                   >
                     ₹{b.amount.toLocaleString()}
                   </td>
-                  <td className="!px-6 !py-5 !text-left">
+                  <td className="!px-6 !py-5 !text-left relative">
                     <button
-                      onClick={() =>
-                        navigate(`/employee-hotel-booking/${b._id}`)
-                      }
-                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                      onClick={() => {
+                        const elapsed = (Date.now() - new Date(b.bookedDate).getTime()) / 1000;
+                        if (elapsed < 120) {
+                          setWaitingBookingId(b._id);
+                          setTimeout(() => setWaitingBookingId(null), 3000);
+                        } else {
+                          navigate(`/employee-hotel-booking/${b._id}`);
+                        }
+                      }}
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group relative"
                     >
                       <FiArrowRight
                         size={18}
                         className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
                       />
                     </button>
+                    {waitingBookingId === b._id && (
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 mr-16 w-48 bg-white border border-amber-200 shadow-xl rounded-xl p-3 z-[100] animate-in fade-in zoom-in-95 duration-200">
+                        <p className="text-xs text-amber-600 font-black mb-1">Please Wait</p>
+                        <p className="text-[10px] text-slate-500 leading-tight">Your voucher is being generated. Please wait 120 seconds after booking to view details.</p>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

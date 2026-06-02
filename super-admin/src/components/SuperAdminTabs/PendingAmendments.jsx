@@ -11,7 +11,7 @@ import {
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { pendingAmendmentsData } from "../../data/dummyData";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import { pendingAmendmentsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const colors = {
@@ -27,7 +27,7 @@ const colors = {
 
 export default function PendingAmendments() {
   const tableScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   // Tab state
   const [activeTab, setActiveTab] = useState("Flight");
 
@@ -112,8 +112,28 @@ export default function PendingAmendments() {
   }
 
   const handleExport = () => {
-    exportCsv({
+    const statCards = [
+      { label: "Total Requests", value: total },
+      { label: "Pending", value: pending },
+      { label: "Approved", value: approved },
+      { label: "Rejected", value: rejected },
+    ];
+
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "From Date", value: dateFrom || "Any" },
+      { label: "To Date", value: dateTo || "Any" },
+      { label: "Corporate", value: corporate },
+      { label: "Type", value: type },
+      { label: "Status", value: status },
+      { label: "Active Tab", value: activeTab },
+    ];
+
+    exportExcel({
       key: "pending_amendments",
+      pageHeader: "Pending Amendments",
+      statCards,
+      appliedFilters,
       data: filteredData,
       columns: pendingAmendmentsExportTemplate,
       filenamePrefix: `${activeTab.toLowerCase()}_amendments_export`,

@@ -601,16 +601,72 @@ const resolveFlightRefundStatus = (booking = {}) => {
   return dbStatus || null;
 };
 
+/**
+ * Safely extract airport code from a segment's origin/destination field.
+ * Handles both object form { airportCode: "LHR" } and plain string "LHR".
+ */
+const resolveAirportCode = (field) => {
+  if (!field) return undefined;
+  if (typeof field === "string") return field;
+  return field.airportCode || field.code || undefined;
+};
+
 const mapFlightBookingTableDto = (booking = {}) => {
-  const segments = Array.isArray(booking.flightRequest?.segments)
-    ? booking.flightRequest.segments
-    : [];
-  const firstSegment = segments[0] || {};
   const traveler = (booking.travellers || [])[0] || {};
   const travelerName =
     [traveler.firstName, traveler.lastName].filter(Boolean).join(" ").trim() ||
     traveler.email ||
     "N/A";
+
+  // ── Prefer lastTicketedSnapshot.segments for reissued flights ──
+  // lastTicketedSnapshot holds the ACTUAL post-reissue segment data
+  // (new dates, new flight numbers, correct airport codes).
+  // Fall back to flightRequest.segments for non-reissued bookings.
+  const isReissued =
+    (booking.bookingLineage?.reissueGeneration || 0) > 0 ||
+    booking.bookingResult?.reissueMeta != null;
+
+  const ltsSegments = Array.isArray(booking.lastTicketedSnapshot?.segments)
+    ? booking.lastTicketedSnapshot.segments
+    : [];
+  const flightReqSegments = Array.isArray(booking.flightRequest?.segments)
+    ? booking.flightRequest.segments
+    : [];
+
+  // Use lastTicketedSnapshot segments when available (always preferred for reissued,
+  // but also a better source for non-reissued when populated)
+  const segments = (isReissued && ltsSegments.length > 0)
+    ? ltsSegments
+    : (ltsSegments.length > 0 ? ltsSegments : flightReqSegments);
+
+  const firstSegment = segments[0] || {};
+
+  // Build normalised segments that always expose airportCode correctly
+  const normalisedSegments = segments.map((seg) => ({
+    journeyType: seg.journeyType,
+    airlineName: seg.airlineName,
+    airlineCode: seg.airlineCode,
+    flightNumber: seg.flightNumber,
+    cabinClass: seg.cabinClass,
+    origin: {
+      airportCode: resolveAirportCode(seg.origin),
+    },
+    destination: {
+      airportCode: resolveAirportCode(seg.destination),
+    },
+    departureDateTime: seg.departureDateTime,
+    arrivalDateTime: seg.arrivalDateTime,
+  }));
+
+  // Build route array: prefer bookingSnapshot.sectors (already strings),
+  // otherwise derive from the best segment source
+  const route = Array.isArray(booking.bookingSnapshot?.sectors)
+    ? booking.bookingSnapshot.sectors
+    : normalisedSegments.map((seg) => {
+        const from = seg.origin?.airportCode;
+        const to = seg.destination?.airportCode;
+        return from && to ? `${from}-${to}` : undefined;
+      }).filter(Boolean);
 
   return {
     _id: booking._id,
@@ -630,6 +686,9 @@ const mapFlightBookingTableDto = (booking = {}) => {
     userId: booking.userId,
     employeeCode: booking.employeeCode,
     employeeId: booking.employeeId,
+    // Expose reissue metadata so the frontend can flag reissued bookings
+    reissueGeneration: booking.bookingLineage?.reissueGeneration || 0,
+    isReissued,
     travellers: traveler
       ? [
           {
@@ -647,19 +706,9 @@ const mapFlightBookingTableDto = (booking = {}) => {
       airline: booking.bookingSnapshot?.airline,
       orderId: booking.bookingSnapshot?.orderId,
     },
+    // Always return the best-available segment data
     flightRequest: {
-      segments: segments.map((segment) => ({
-        journeyType: segment.journeyType,
-        airlineName: segment.airlineName,
-        airlineCode: segment.airlineCode,
-        origin: {
-          airportCode: segment.origin?.airportCode,
-        },
-        destination: {
-          airportCode: segment.destination?.airportCode,
-        },
-        departureDateTime: segment.departureDateTime,
-      })),
+      segments: normalisedSegments,
     },
     pricingSnapshot: {
       totalAmount: booking.pricingSnapshot?.totalAmount,
@@ -681,15 +730,10 @@ const mapFlightBookingTableDto = (booking = {}) => {
       code: firstSegment.airlineCode || null,
       logo: booking.bookingSnapshot?.airlineLogo || firstSegment.airlineLogo || null,
     },
-    route: Array.isArray(booking.bookingSnapshot?.sectors)
-      ? booking.bookingSnapshot.sectors
-      : segments.map((segment) => ({
-          origin: segment?.origin?.airportCode,
-          destination: segment?.destination?.airportCode,
-        })),
+    route,
     travelDate:
-      booking.bookingSnapshot?.travelDate ||
       firstSegment.departureDateTime ||
+      booking.bookingSnapshot?.travelDate ||
       booking.travelDate ||
       null,
   };
@@ -948,12 +992,23 @@ exports.getAllFlightBookings = async (req, res) => {
       "bookingSnapshot.airline": 1,
       "bookingSnapshot.airlineLogo": 1,
       "bookingSnapshot.orderId": 1,
+      // flightRequest segments — used as fallback for non-reissued bookings
       "flightRequest.segments.journeyType": 1,
       "flightRequest.segments.airlineName": 1,
       "flightRequest.segments.airlineCode": 1,
-      "flightRequest.segments.origin.airportCode": 1,
-      "flightRequest.segments.destination.airportCode": 1,
+      "flightRequest.segments.flightNumber": 1,
+      "flightRequest.segments.cabinClass": 1,
+      "flightRequest.segments.origin": 1,
+      "flightRequest.segments.destination": 1,
       "flightRequest.segments.departureDateTime": 1,
+      "flightRequest.segments.arrivalDateTime": 1,
+      // lastTicketedSnapshot — authoritative source for reissued flights:
+      // contains the NEW dates, NEW flight numbers, NEW routes after reissue
+      "lastTicketedSnapshot.segments": 1,
+      // bookingLineage — tells us if / how many times this booking was reissued
+      "bookingLineage.reissueGeneration": 1,
+      // bookingResult.reissueMeta — alternative reissue flag
+      "bookingResult.reissueMeta": 1,
       "pricingSnapshot.totalAmount": 1,
       "pricingSnapshot.currency": 1,
       totalFare: 1,

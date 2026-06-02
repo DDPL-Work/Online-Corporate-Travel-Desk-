@@ -27,6 +27,12 @@ const { calculateOfflineReissueEstimate } = require("./reissuePricing.service");
 const reissueAssignmentService = require("./reissueAssignment.service");
 const reissueTicketGenerationService = require("./reissueTicketGeneration.service");
 const reissueBookingLifecycleService = require("./reissueBookingLifecycle.service");
+const reissueFinancialLedgerService = require("../../../../services/reissue/reissueFinancialLedger.service");
+const {
+  buildActiveTicketSnapshot,
+  buildActiveTicketSnapshotFromState,
+} = require("../utils/activeTicketSnapshot.helper");
+const { normalizeSsrSnapshot } = require("../utils/ssrSnapshot.util");
 
 const DEFAULT_SLA_HOURS = Number(process.env.OFFLINE_REISSUE_SLA_HOURS || 24);
 const ADMIN_ROLES = new Set(["super-admin", "master-admin", "ops-admin"]);
@@ -225,6 +231,37 @@ class OfflineReissueWorkflowService {
     return actor?.name?.firstName
       ? `${actor.name.firstName} ${actor.name.lastName || ""}`.trim()
       : actor?.email || actor?.role || "SYSTEM";
+  }
+
+  normalizeSelectedSsr(payload = {}, booking = {}) {
+    if (
+      !Object.prototype.hasOwnProperty.call(payload, "ssr") &&
+      !Object.prototype.hasOwnProperty.call(payload?.selectedFlight || {}, "selectedSSR")
+    ) {
+      return undefined;
+    }
+
+    return normalizeSsrSnapshot(
+      payload?.ssr ||
+        payload?.selectedFlight?.selectedSSR ||
+        payload?.preferredJourney?.selectedSSR ||
+        {},
+      booking?.flightRequest?.segments || [],
+    );
+  }
+
+  resolveSelectedSsrForRequest(request = {}, booking = {}) {
+    if (request?.metadata && Object.prototype.hasOwnProperty.call(request.metadata, "selectedSSR")) {
+      return request.metadata.selectedSSR;
+    }
+
+    return (
+      request?.activeTicketSnapshot?.ssrSnapshot ||
+      request?.activeTicketSnapshot?.ssr ||
+      booking?.flightRequest?.ssrSnapshot ||
+      booking?.bookingSnapshot?.ssrSnapshot ||
+      {}
+    );
   }
 
   isTerminalStatus(status) {
@@ -524,8 +561,8 @@ class OfflineReissueWorkflowService {
     domainEventBus.emit(eventName, {
       reissueRequestId: request._id.toString(),
       reissueId: request.requestId,
-      bookingId: request.bookingId?.toString?.(),
-      corporateId: request.corporateId?.toString?.(),
+      bookingId: request.bookingId?._id?.toString?.() || request.bookingId?.toString?.(),
+      corporateId: request.corporateId?._id?.toString?.() || request.corporateId?.toString?.(),
       userId: request.employeeId?._id?.toString?.() || request.employeeId?.toString?.(),
       metadata: {
         employeeEmail: request.metadata?.employeeEmail || null,
@@ -583,6 +620,7 @@ class OfflineReissueWorkflowService {
     const pricingSnapshot = selectedFlightSnapshot.pricingSnapshot || null;
     const corporate = await Corporate.findById(booking.corporateId);
     if (!corporate) throw new ApiError(404, "Corporate not found");
+    const normalizedSelectedSsr = this.normalizeSelectedSsr(payload, booking);
 
     const billingMode =
       corporate.classification === "postpaid"
@@ -631,6 +669,9 @@ class OfflineReissueWorkflowService {
           remarks: payload.remarks || "",
           status: OFFLINE_STATUSES.RAISED,
           billingMode,
+          financialLedger: reissueFinancialLedgerService.initializeLedger(booking),
+          pricingHistory: [],
+          activeTicketSnapshot: buildActiveTicketSnapshot(booking),
           reissueCharges: pricingSnapshot?.reissueCharge || 0,
           fareDifference: pricingSnapshot?.fareDifference || 0,
           totalAdjustment: pricingSnapshot?.totalEstimate || 0,
@@ -646,6 +687,7 @@ class OfflineReissueWorkflowService {
             searchTraceId: selectedFlightSnapshot?.metadata?.searchTraceId || null,
             selectedResultIndex: selectedFlightSnapshot?.resultIndex ?? null,
             selectedRoute: `${selectedFlightSnapshot.origin}-${selectedFlightSnapshot.destination}`,
+            ...(normalizedSelectedSsr !== undefined ? { selectedSSR: normalizedSelectedSsr } : {}),
           },
         });
 
@@ -818,6 +860,8 @@ class OfflineReissueWorkflowService {
     let request = await this.loadRequestOrThrow(requestId);
     this.ensureAccess(actor, request);
 
+    const booking = await this.loadBookingOrThrow(request.bookingId);
+
     if (payload.status === OFFLINE_STATUSES.TICKET_GENERATED) {
       return this.generateTicket({
         actor,
@@ -855,9 +899,25 @@ class OfflineReissueWorkflowService {
     if (payload.reissueCharges != null) request.reissueCharges = Number(payload.reissueCharges);
     if (payload.reissueCharge != null) request.reissueCharges = Number(payload.reissueCharge);
     if (payload.fareDifference != null) request.fareDifference = Number(payload.fareDifference);
-    request.totalAdjustment = roundCurrency(
-      (request.fareDifference || 0) + (request.reissueCharges || 0),
-    );
+
+    // Cumulative Delta calculation
+    const calculation = reissueFinancialLedgerService.calculateCumulativeReissueAmount({
+      request,
+      newFareQuote: { fare: (request.financialLedger?.originalTicketAmount || 0) + request.fareDifference },
+      selectedSSR: this.resolveSelectedSsrForRequest(request, booking),
+      supplierReissueCharge: request.reissueCharges,
+      booking,
+    });
+
+    request.normalizedPricing = {
+      reissuePenalty: request.reissueCharges || 0,
+      newFlightBase: calculation.newFare || 0,
+      newSSRTotal: calculation.newSSR || 0,
+      reusablePreviousValue: calculation.reusableValue || 0,
+      netPayable: calculation.netPayable || 0,
+    };
+
+    request.totalAdjustment = roundCurrency(calculation.additionalCollection);
 
     if (request.reissuePricingSnapshot) {
       request.reissuePricingSnapshot = {
@@ -879,6 +939,26 @@ class OfflineReissueWorkflowService {
     if (payload.status === OFFLINE_STATUSES.COMPLETED) {
       if (!request.generatedTicketUrl && !request.reissuedTicketUrl) {
         throw new ApiError(400, "Generate the revised ticket before completing the request");
+      }
+      // If the reissue cycle hasn't been applied yet, apply it now.
+      if (!request.pricingHistory || request.pricingHistory.length === 0) {
+        const compCalc = reissueFinancialLedgerService.calculateCumulativeReissueAmount({
+          request,
+          newFareQuote: { fare: (request.financialLedger?.originalTicketAmount || 0) + request.fareDifference },
+          selectedSSR: this.resolveSelectedSsrForRequest(request, booking),
+          supplierReissueCharge: request.reissueCharges,
+          booking,
+        });
+
+        request.normalizedPricing = {
+          reissuePenalty: request.reissueCharges || 0,
+          newFlightBase: compCalc.newFare || 0,
+          newSSRTotal: compCalc.newSSR || 0,
+          reusablePreviousValue: compCalc.reusableValue || 0,
+          netPayable: compCalc.netPayable || 0,
+        };
+
+        reissueFinancialLedgerService.applyReissueCycle(request, compCalc);
       }
       request.completedAt = now;
       await this.markBookingReissueState(request);
@@ -1008,7 +1088,9 @@ class OfflineReissueWorkflowService {
     let request = await this.loadRequestOrThrow(requestId);
     this.ensureAccess(actor, request);
 
+    const booking = await this.loadBookingOrThrow(request.bookingId);
     const selectedFlight = this.ensureSelectedFlightSnapshot(request);
+    request.isReissueLocked = true;
 
     if (!request.assignedOpsMember) {
       throw new ApiError(409, "Request must be assigned before ticket generation");
@@ -1063,6 +1145,25 @@ class OfflineReissueWorkflowService {
       });
     }
 
+    // Perform cumulative calculation and apply reissue cycle
+    const calculation = reissueFinancialLedgerService.calculateCumulativeReissueAmount({
+      request,
+      newFareQuote: selectedFlight,
+      selectedSSR: this.resolveSelectedSsrForRequest(request, booking),
+      supplierReissueCharge: request.reissueCharges,
+      booking,
+    });
+
+    request.normalizedPricing = {
+      reissuePenalty: request.reissueCharges || 0,
+      newFlightBase: calculation.newFare || 0,
+      newSSRTotal: calculation.newSSR || 0,
+      reusablePreviousValue: calculation.reusableValue || 0,
+      netPayable: calculation.netPayable || 0,
+    };
+
+    reissueFinancialLedgerService.applyReissueCycle(request, calculation);
+
     const generatedTicket = await reissueTicketGenerationService.generateReissuedTicket({
       request,
       actor,
@@ -1091,6 +1192,15 @@ class OfflineReissueWorkflowService {
       revisedTicketUrl: generatedTicket.generatedTicketUrl,
       revisedTicketPath: generatedTicket.generatedTicketPath || null,
     });
+
+    request.activeTicketSnapshot = activeBooking
+      ? buildActiveTicketSnapshotFromState(activeBooking, {
+          pnrOverride: request.originalPnr || request.pnr || null,
+          ssrSnapshotOverride: this.resolveSelectedSsrForRequest(request, booking),
+          revisedTicketOverride: { url: generatedTicket.generatedTicketUrl },
+          sourceBookingIdOverride: activeBooking?._id || null,
+        })
+      : request.activeTicketSnapshot;
 
     request.reissueHistory = Array.isArray(request.reissueHistory) ? request.reissueHistory : [];
     request.reissueHistory.push({
@@ -1162,6 +1272,17 @@ class OfflineReissueWorkflowService {
       },
     });
 
+    logger.info("SSR_PERSISTED", {
+      requestId: request.requestId,
+      totalSSRAmount: request.activeTicketSnapshot?.ssr?.totalSSRAmount || 0,
+      segmentCount: request.activeTicketSnapshot?.segments?.length || 0,
+    });
+    logger.info("REISSUE_COMPLETED", {
+      requestId: request.requestId,
+      activeBookingId: activeBooking?._id?.toString?.() || null,
+      mode: "OFFLINE",
+    });
+
     this.appendAudit(request, {
       action: "DOWNLOAD_READY",
       actor: {
@@ -1176,6 +1297,7 @@ class OfflineReissueWorkflowService {
     });
 
     this.refreshSlaFlags(request, generatedTicket.generatedAt);
+    request.isReissueLocked = false;
     await offlineReissueRepository.save(request);
 
     this.emitPassengerEvent(DOMAIN_EVENTS.OFFLINE_REISSUE_UPDATED, request, {

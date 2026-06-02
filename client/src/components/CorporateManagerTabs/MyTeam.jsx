@@ -27,6 +27,8 @@ import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { getMyEmployees } from "../../Redux/Actions/manager.thunk";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myTeamExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const PAGE_SIZE = 10;
 
@@ -72,57 +74,77 @@ export default function MyTeam() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   useEffect(() => {
     dispatch(getMyEmployees());
   }, [dispatch]);
 
   const employees = useMemo(() => {
     return (myEmployees || []).map((e, index) => {
-      const name = e.name || "";
-      const [firstName = "", lastName = ""] = name.split(" ");
+      const getFirstName = () => {
+        if (typeof e.name === "string") return e.name.split(" ")[0] || "";
+        return e.name?.firstName || "";
+      };
+      const getLastName = () => {
+        if (typeof e.name === "string") return e.name.split(" ").slice(1).join(" ");
+        return e.name?.lastName || "";
+      };
+
+      const pCode = e.projectCodeId;
+      const codeStr = typeof pCode === 'object' && pCode ? (pCode.code || pCode.name || "N/A") : (pCode || "N/A");
+
       return {
         _id: e.employeeId || index,
         employeeCode: e.employeeCode || "N/A",
         name: {
-          firstName,
-          lastName,
+          firstName: getFirstName(),
+          lastName: getLastName(),
         },
-        email: e.email,
+        email: e.email || "",
         department: e.department || "N/A",
         role: e.role || "Employee",
-        isActive: e.isActive !== false, // default to active
+        isActive: e.isActive !== false,
         createdAt: e.createdAt || new Date().toISOString(),
         project: {
-          name: e.projectName || "N/A",
-          code: e.projectCodeId || "N/A",
-          client: e.projectClient || "N/A",
+          name: typeof e.projectName === "string" ? e.projectName : "N/A",
+          code: String(codeStr),
+          client: typeof e.projectClient === "string" ? e.projectClient : "N/A",
         },
       };
     });
   }, [myEmployees]);
 
   const projects = useMemo(() => {
-    const codes = [...new Set(employees.map(e => e.project.code).filter(Boolean))].sort();
+    const codes = [...new Set(employees.map(e => String(e.project?.code || "")))].filter(c => c).sort();
     return ["All", ...codes];
   }, [employees]);
 
   const departments = useMemo(() => {
-    const depts = [...new Set(employees.map(e => e.department).filter(Boolean))].sort();
+    const depts = [...new Set(employees.map(e => String(e.department || "")))].filter(d => d).sort();
     return ["All", ...depts];
   }, [employees]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     return employees.filter(e => {
       const name = `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.toLowerCase();
-      const dept = (e.department || "").toLowerCase();
-      const projectCode = (e.project.code || "").toLowerCase();
+      const dept = String(e.department || "").toLowerCase();
+      const projectCode = String(e.project?.code || "").toLowerCase();
+      const roleStr = String(e.role || "").toLowerCase();
 
-      return (!q || name.includes(q) || e.email?.toLowerCase().includes(q) || dept.includes(q) || projectCode.includes(q)) &&
-        (roleFilter === "All" || e.role?.toLowerCase() === roleFilter.toLowerCase()) &&
-        (projectFilter === "All" || e.project.code?.toLowerCase() === projectFilter.toLowerCase()) &&
-        (deptFilter === "All" || dept === deptFilter.toLowerCase()) &&
-        (statusFilter === "All" || (statusFilter === "Active" ? e.isActive : !e.isActive));
+      const searchMatch = !q || 
+        name.includes(q) || 
+        String(e.email || "").toLowerCase().includes(q) || 
+        dept.includes(q) || 
+        projectCode.includes(q);
+
+      const roleMatch = roleFilter === "All" || roleStr === String(roleFilter).toLowerCase();
+      const projectMatch = projectFilter === "All" || projectCode === String(projectFilter).toLowerCase();
+      const deptMatch = deptFilter === "All" || dept === String(deptFilter).toLowerCase();
+      const statusMatch = statusFilter === "All" || (statusFilter === "Active" ? e.isActive : !e.isActive);
+
+      return searchMatch && roleMatch && projectMatch && deptMatch && statusMatch;
     });
   }, [employees, search, roleFilter, projectFilter, deptFilter, statusFilter]);
 
@@ -137,24 +159,7 @@ export default function MyTeam() {
     suspended: employees.filter(e => !e.isActive).length
   }), [employees]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Personnel", "Email", "Role", "Project Code", "Status", "Joined"];
-    const rows = filtered.map(e => [
-      `${e.name?.firstName} ${e.name?.lastName}`,
-      e.email,
-      e.role,
-      e.project.code,
-      e.isActive ? "Active" : "Inactive",
-      new Date(e.createdAt).toLocaleDateString()
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `my-team-reportees.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+
 
   const handleRefresh = () => dispatch(getMyEmployees());
 
@@ -252,8 +257,28 @@ export default function MyTeam() {
           title="My Team Directory"
           subtitle={`${filtered.length} reportees active`}
           wrapperClass="!border-none !shadow-none"
-          onExport={handleExport}
-          exportLabel="Export Data"
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "My Team Directory",
+            statCards: [
+              { label: "Total Reportees", value: stats.total },
+              { label: "Unit Managers", value: stats.managers },
+              { label: "Access Active", value: stats.active },
+              { label: "Suspended", value: stats.suspended }
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Project Code", value: projectFilter },
+              { label: "Department", value: deptFilter },
+              { label: "Role", value: roleFilter },
+              { label: "Status", value: statusFilter }
+            ],
+            data: filtered,
+            columns: myTeamExportTemplate,
+            filenamePrefix: "my_team"
+          })}
           pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
         >
           <table className="w-full text-left border-collapse">
@@ -273,7 +298,7 @@ export default function MyTeam() {
                 const isManager = emp.role?.toLowerCase() === "manager";
 
                 return (
-                  <tr key={emp._id} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
+                  <tr key={`${emp._id}-${emp.email}-${i}`} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
                     <td className="px-6! py-5!">
                       <div className="flex items-center gap-4">
                         <Avatar name={name} />

@@ -37,6 +37,8 @@ import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
 import { useNavigate } from "react-router-dom";
 import { airlineLogo } from "../../utils/formatter";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
 
 const fmt = (d) =>
   d
@@ -257,35 +259,7 @@ export default function CreditUtilizationPostpaid() {
     dispatch(clearCycleTransactions());
   };
 
-  const handleExport = () => {
-    const list = activeTab === "current" ? [currentCycleRow] : previousCycles;
-    if (!list.length) return;
-    const headers = ["Statement ID", "Billing Cycle", "Usage", "Due Date", "Payment Received"];
-    const rows = list.map((c) => [
-      c.statementId,
-      `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}`,
-      `₹${c.statementAmount.toLocaleString()}`,
-      fmt(c.dueDate),
-      c.isCurrent ? "N/A" : fmt(c.paymentReceivedAt),
-    ]);
-    const tableHtml = rows
-      .map(
-        (r) =>
-          `<tr>${r.map((c) => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`,
-      )
-      .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map((h) => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;font-weight:700;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `credit-ledger-report.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const handleScroll = (dir) => {
     if (scrollRef.current) {
@@ -630,15 +604,6 @@ export default function CreditUtilizationPostpaid() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {!drillCycle && (
-                <button
-                  onClick={handleExport}
-                  className="px-4 py-2.5 rounded-xl font-black text-[10px] flex items-center gap-2 border shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
-                  style={{ borderColor: C.border, color: C.muted }}
-                >
-                  <FiDownload size={14} /> Export Registry
-                </button>
-              )}
               {drillCycle && (
                 <button
                   onClick={handleBack}
@@ -667,7 +632,59 @@ export default function CreditUtilizationPostpaid() {
             </div>
           </div>
 
-          <div className="overflow-x-auto" ref={scrollRef}>
+          <ResponsiveDataTable
+            exportLabel="Export Excel"
+            exportLoading={isExporting}
+            exportDisabled={isExporting}
+            onExport={() => {
+              if (!drillCycle) {
+                exportExcel({
+                  pageHeader: activeTab === "current" ? "Active Cycle Registry" : "Archive Cycle Registry",
+                  statCards: [
+                    { label: "Total Credit Limit", value: `₹${fmtAmt(displayStats.totalLimit)}` },
+                    { label: displayStats.usedLabel, value: `₹${fmtAmt(displayStats.usedCredit)}` },
+                    { label: displayStats.availableLabel, value: `₹${fmtAmt(displayStats.availableCredit)}` }
+                  ],
+                  appliedFilters: [],
+                  data: activeTab === "current" && currentCycleRow ? [currentCycleRow] : (previousCycles || []),
+                  columns: [
+                    { header: "Statement ID", key: "statementId" },
+                    { header: "Billing Cycle", value: (c) => `${fmt(c.periodStart)} - ${fmt(c.periodEnd)}` },
+                    { header: "Usage", value: (c) => `₹${(c.statementAmount || 0).toLocaleString()}` },
+                    { header: "Due Date", value: (c) => fmt(c.dueDate) },
+                    { header: "Payment Received", value: (c) => c.isCurrent ? "N/A" : fmt(c.paymentReceivedAt) }
+                  ],
+                  filenamePrefix: "credit_ledger_report"
+                });
+              } else {
+                exportExcel({
+                  pageHeader: `Transaction Matrix: ${drillCycle.statementId}`,
+                  statCards: [
+                    { label: "Total Credit Limit", value: `₹${fmtAmt(displayStats.totalLimit)}` },
+                    { label: displayStats.usedLabel, value: `₹${fmtAmt(displayStats.usedCredit)}` },
+                    { label: displayStats.availableLabel, value: `₹${fmtAmt(displayStats.availableCredit)}` }
+                  ],
+                  appliedFilters: [
+                    { label: "Universal Search", value: searchTerm || "None" },
+                    { label: "From Date", value: fromDate || "Any" },
+                    { label: "To Date", value: toDate || "Any" },
+                    { label: "Employee", value: selectedEmployee ? (companyUsers.find(u => u._id === selectedEmployee)?.name?.firstName || "Selected") : "All" },
+                    { label: "Booking Type", value: selectedType || "All" }
+                  ],
+                  data: drillTx,
+                  columns: [
+                    { header: "Generation Date", value: (t) => fmt(t.createdAt) },
+                    { header: "Personnel", value: (t) => t.userId?.name ? `${t.userId.name.firstName} ${t.userId.name.lastName}` : "Staff Member" },
+                    { header: "Capital Flow", value: (t) => t.type || "—" },
+                    { header: "Amount", value: (t) => `₹${(t.amount || 0).toLocaleString()}` }
+                  ],
+                  filenamePrefix: "credit_transactions"
+                });
+              }
+            }}
+            wrapperClass="!border-none !shadow-none"
+          >
+            <div className="overflow-x-auto" ref={scrollRef}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -913,7 +930,8 @@ export default function CreditUtilizationPostpaid() {
                 )}
               </tbody>
             </table>
-          </div>
+            </div>
+          </ResponsiveDataTable>
 
           <div className="p-6 border-t" style={{ borderColor: C.border }}>
             <Pagination

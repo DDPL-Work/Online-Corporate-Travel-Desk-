@@ -31,7 +31,8 @@ import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
-
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminCancelledFlightsExportTemplate, adminCancelledHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
 
 const mapCancelStatus = (status) => {
@@ -109,6 +110,7 @@ function CancelledFlightSection() {
   const navigate = useNavigate();
   const { flightBookings, loading } = useSelector((state) => state.adminBooking);
   const { employees } = useSelector((state) => state.employeeAction);
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { 
     dispatch(getAllFlightBookingsAdmin()); 
@@ -190,17 +192,7 @@ function CancelledFlightSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalRefund = filtered.reduce((s, b) => s + (b.refundAmount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Route", "Status", "PNR", "Refund"];
-    const rows = filtered.map(b => [b.orderId, b.travellerName, b.routes?.map(r => `${r.fromCode}→${r.toCode}`).join(" | "), mapCancelStatus(b.cancelStatus || b.status), b.pnr, `₹${b.refundAmount.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `cancelled-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -235,7 +227,33 @@ function CancelledFlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Cancellation Ledger" subtitle={`${filtered.length} terminated assets`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Cancellation Ledger" 
+        subtitle={`${filtered.length} terminated assets`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Cancellation Ledger",
+          statCards: [
+            { label: "Cancelled Flights", value: filtered.length },
+            { label: "Refunds Resolved", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length },
+            { label: "Awaiting Settlement", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length },
+            { label: "Total Capital Recov.", value: `₹${totalRefund.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Settlement Status", value: cancelStatusFilter },
+            { label: "Date Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: adminCancelledFlightsExportTemplate,
+          filenamePrefix: "cancelled_flight_bookings"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -307,6 +325,7 @@ function CancelledHotelSection() {
   const navigate = useNavigate();
   const { cancelledHotelBookings, loading } = useSelector((state) => state.adminBooking);
   const { employees } = useSelector((state) => state.employeeAction);
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { 
     dispatch(getCancelledHotelBookingsAdmin()); 
@@ -343,17 +362,7 @@ function CancelledHotelSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalRefund = filtered.reduce((s, b) => s + (b.refundAmount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Hotel", "Status", "Refund"];
-    const rows = filtered.map(b => [b.orderId, b.guestName, b.hotelRequest?.selectedHotel?.hotelName, mapCancelStatus(b.cancelStatus || b.status), `₹${b.refundAmount.toLocaleString()}`]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `cancelled-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -388,7 +397,33 @@ function CancelledHotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Cancellation Ledger" subtitle={`${filtered.length} terminated assets`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Cancellation Ledger" 
+        subtitle={`${filtered.length} terminated assets`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Cancellation Ledger",
+          statCards: [
+            { label: "Cancelled Hotels", value: filtered.length },
+            { label: "Refunds Resolved", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length },
+            { label: "Awaiting Settlement", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length },
+            { label: "Total Capital Recov.", value: `₹${totalRefund.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Settlement Status", value: cancelStatusFilter },
+            { label: "Date Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: adminCancelledHotelsExportTemplate,
+          filenamePrefix: "cancelled_hotel_bookings"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

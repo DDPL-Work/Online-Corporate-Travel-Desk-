@@ -58,6 +58,7 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
+import CustomDatePicker from "../../../components/Shared/CustomDatePicker";
 import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
 import {
   handleHotelPreBookSessionExpiry,
@@ -1003,6 +1004,7 @@ const HotelReviewBooking = () => {
 
   const [travelers, setTravelers] = useState([]);
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  const [applyLeadPan, setApplyLeadPan] = useState(false);
   const [bookingRequest, setBookingRequest] = useState(null);
   const [flightRulesStatus, setFlightRulesStatus] = useState("loading"); // "loading", "ready", "error"
   const [isCorporateBooking, setIsCorporateBooking] = useState(false);
@@ -1024,12 +1026,12 @@ const HotelReviewBooking = () => {
     {};
 
   const totalAdultsFromSearch =
-    (searchParams?.rooms || []).reduce(
+    (searchParams?.rooms || searchParams?.PaxRooms || []).reduce(
       (sum, r) => sum + (r.Adults || r.adults || 0),
       0,
     ) || 1;
   const totalChildrenFromSearch =
-    (searchParams?.rooms || []).reduce(
+    (searchParams?.rooms || searchParams?.PaxRooms || []).reduce(
       (sum, r) => sum + (r.Children || r.children || 0),
       0,
     ) || 0;
@@ -1041,7 +1043,7 @@ const HotelReviewBooking = () => {
   }, [dispatch, id]);
 
   useEffect(() => {
-    if (user?.role === "employee" || user?.role === "manager") {
+    if (user?.role === "employee" || user?.role === "manager" || user?.role === "travel-admin" || user?.role === "finance_team") {
       dispatch(fetchMySSRPolicy());
       dispatch(fetchMyProfile());
     }
@@ -1081,13 +1083,13 @@ const HotelReviewBooking = () => {
   useEffect(() => {
     if (!isBookNowMode && travelers.length === 0 && user) {
       const generatedTravelers = [];
-      const roomsFromSearch = searchParams?.rooms || [];
+      const roomsFromSearch = searchParams?.rooms || searchParams?.PaxRooms || [];
 
       roomsFromSearch.forEach((room, roomIdx) => {
         const adults = room.Adults || room.adults || 0;
         const children = room.Children || room.children || 0;
         const childAges =
-          room.ChildrenAges || room.ChildAge || room.childAges || [];
+          room.childrenAges || room.ChildrenAges || room.ChildAge || room.childAges || [];
 
         for (let a = 0; a < adults; a++) {
           const isLead = generatedTravelers.length === 0;
@@ -1095,6 +1097,8 @@ const HotelReviewBooking = () => {
           let lName = "";
           let email = "";
           let phone = "";
+          let dob = "";
+          let age = "";
 
           if (isLead) {
             const sourceProfile = myProfile || user;
@@ -1117,6 +1121,19 @@ const HotelReviewBooking = () => {
                 sourceProfile.mobile ||
                 sourceProfile.phoneWithCode ||
                 "";
+              const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
+              dob = rawDob ? rawDob.split("T")[0] : "";
+              if (dob) {
+                const today = new Date();
+                const birth = new Date(dob);
+                if (!isNaN(birth.getTime())) {
+                  age = today.getFullYear() - birth.getFullYear();
+                  const m = today.getMonth() - birth.getMonth();
+                  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                    age--;
+                  }
+                }
+              }
             }
           }
 
@@ -1126,8 +1143,8 @@ const HotelReviewBooking = () => {
             firstName: fName,
             lastName: lName,
             paxType: 1,
-            age: "",
-            dob: "",
+            age: age,
+            dob: dob,
             gender: "Male",
             leadPassenger: isLead,
             email: email,
@@ -1147,6 +1164,7 @@ const HotelReviewBooking = () => {
             lastName: "",
             paxType: 2,
             age: childAges[c] || "",
+            originalAge: childAges[c] || "",
             dob: "",
             gender: "Male",
             leadPassenger: false,
@@ -1165,6 +1183,8 @@ const HotelReviewBooking = () => {
         let lName = "";
         let email = "";
         let phone = "";
+        let dob = "";
+        let age = "";
 
         const sourceProfile = myProfile || user;
         if (sourceProfile) {
@@ -1186,6 +1206,19 @@ const HotelReviewBooking = () => {
             sourceProfile.mobile ||
             sourceProfile.phoneWithCode ||
             "";
+          const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
+          dob = rawDob ? rawDob.split("T")[0] : "";
+          if (dob) {
+            const today = new Date();
+            const birth = new Date(dob);
+            if (!isNaN(birth.getTime())) {
+              age = today.getFullYear() - birth.getFullYear();
+              const m = today.getMonth() - birth.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+              }
+            }
+          }
         }
 
         generatedTravelers.push({
@@ -1194,8 +1227,8 @@ const HotelReviewBooking = () => {
           firstName: fName,
           lastName: lName,
           paxType: 1,
-          age: "",
-          dob: "",
+          age: age,
+          dob: dob,
           gender: "Male",
           leadPassenger: true,
           email: email,
@@ -1216,6 +1249,47 @@ const HotelReviewBooking = () => {
     totalChildrenFromSearch,
     searchParams,
   ]);
+
+  // ── Sync profile to lead passenger if myProfile loads later ──
+  useEffect(() => {
+    if (!isBookNowMode && travelers.length > 0 && myProfile) {
+      setTravelers((prev) => {
+        const newTravelers = [...prev];
+        const leadIndex = newTravelers.findIndex((t) => t.leadPassenger);
+        if (leadIndex !== -1) {
+          let updated = false;
+          const lead = { ...newTravelers[leadIndex] };
+          if (!lead.phoneWithCode) {
+            lead.phoneWithCode =
+              myProfile.phone || myProfile.mobile || myProfile.phoneWithCode || "";
+            updated = true;
+          }
+          if (!lead.dob) {
+            const rawDob = myProfile.dob || myProfile.dateOfBirth || "";
+            lead.dob = rawDob ? rawDob.split("T")[0] : "";
+            if (lead.dob) {
+              const today = new Date();
+              const birth = new Date(lead.dob);
+              if (!isNaN(birth.getTime())) {
+                let calcAge = today.getFullYear() - birth.getFullYear();
+                const m = today.getMonth() - birth.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                  calcAge--;
+                }
+                lead.age = calcAge;
+              }
+            }
+            updated = true;
+          }
+          if (updated) {
+            newTravelers[leadIndex] = lead;
+            return newTravelers;
+          }
+        }
+        return prev;
+      });
+    }
+  }, [myProfile, isBookNowMode]);
 
   // ── Guest management ──
   const handleAddGuest = (paxType = 1) => {
@@ -1393,15 +1467,15 @@ const HotelReviewBooking = () => {
     ? {
         checkIn: bookingRequest?.bookingSnapshot?.checkInDate,
         checkOut: bookingRequest?.bookingSnapshot?.checkOutDate,
-        rooms: bookingRequest?.hotelRequest?.rooms || [],
+        rooms: bookingRequest?.hotelRequest?.rooms || bookingRequest?.hotelRequest?.PaxRooms || [],
       }
     : searchParams;
 
-  const totalAdults = (displaySearchParams?.rooms || []).reduce(
+  const totalAdults = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
     (sum, r) => sum + (r.Adults || r.adults || 0),
     0,
   );
-  const totalChildren = (displaySearchParams?.rooms || []).reduce(
+  const totalChildren = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
     (sum, r) => sum + (r.Children || r.children || 0),
     0,
   );
@@ -1516,12 +1590,32 @@ const HotelReviewBooking = () => {
       // AGE VALIDATION
       const ageNum = Number(t.age);
       if (t.paxType === 2) {
-        if (isNaN(ageNum) || ageNum < 0 || ageNum > 18) {
+        // DOB is required for children
+        if (!t.dob) {
+          tErrors.dob = "Date of Birth is required for child";
+        } else {
+          // Calculate age from DOB and check if it matches the searched age
+          const today = new Date();
+          const birth = new Date(t.dob);
+          if (isNaN(birth.getTime())) {
+            tErrors.dob = "Invalid Date of Birth";
+          } else {
+            let calcAge = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) calcAge--;
+            if (t.originalAge && String(calcAge) !== String(t.originalAge)) {
+              tErrors.dob = `Age from DOB (${calcAge} yrs) does not match searched age (${t.originalAge} yrs). Please enter a valid Date of Birth.`;
+            }
+          }
+        }
+        if (!tErrors.dob && (isNaN(ageNum) || ageNum < 0 || ageNum > 18)) {
           tErrors.age = "Child age must be 0-18";
         }
       } else {
-        if (isNaN(ageNum) || ageNum <= 18) {
-          tErrors.age = "Adult age must be above 18";
+        if (t.dob || t.age) {
+          if (isNaN(ageNum) || ageNum <= 18) {
+            tErrors.age = "Adult age must be above 18";
+          }
         }
       }
 
@@ -1636,7 +1730,7 @@ const HotelReviewBooking = () => {
         Adults: Number(room.Adults || room.adults || 0),
         Children: Number(room.Children || room.children || 0),
         ChildrenAges:
-          room.ChildrenAges || room.childAges || room.ChildAge || [],
+          room.childrenAges || room.ChildrenAges || room.childAges || room.ChildAge || [],
       }));
 
     const payload = {
@@ -1697,7 +1791,7 @@ const HotelReviewBooking = () => {
           displaySearchParams?.rooms?.map((r) => ({
             noOfAdults: r.Adults || r.adults || 0,
             noOfChild: r.Children || r.children || 0,
-            childAge: r.ChildrenAges || r.ChildAge || r.childAges || [],
+            childAge: r.childrenAges || r.ChildrenAges || r.ChildAge || r.childAges || [],
           })) || roomGuests,
         rooms: (() => {
           const baseRooms =
@@ -1827,9 +1921,11 @@ const HotelReviewBooking = () => {
       });
       navigate("/my-pending-approvals");
     } catch (err) {
-      ToastWithTimer({
-        type: "error",
-        message: err || "Failed to submit request",
+      Swal.fire({
+        icon: "error",
+        title: "Booking Failed",
+        text: typeof err === "string" ? err : err?.message || "Failed to submit request",
+        confirmButtonColor: "#C9A84C",
       });
     }
   };
@@ -1892,8 +1988,8 @@ const HotelReviewBooking = () => {
   }
 
   if (loading && !hotel && !isBookNowMode) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
+  // Removed global error return to prevent blank page on API error
+  
   /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -1911,18 +2007,7 @@ const HotelReviewBooking = () => {
           >
             <MdArrowBack size={18} />
             Back to Details
-          </button>
-
-          {actionLoading && (
-            <div className="flex items-center gap-2 text-[#C9A84C] font-semibold animate-pulse">
-              <div className="w-4 h-4 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs uppercase tracking-wider">
-                Requesting...
-              </span>
-            </div>
-          )}
-
-          
+          </button>          
         </div>
       </div>
 
@@ -2055,7 +2140,7 @@ const HotelReviewBooking = () => {
               </div>
             ) : (
               /* Non-BookNow mode: editable guest form */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
@@ -2088,10 +2173,11 @@ const HotelReviewBooking = () => {
                   {travelers.map((t, index) => (
                     <div
                       key={t.id || t._id || index}
-                      className="rounded-2xl border border-slate-200 overflow-hidden shadow-md shadow-black/20"
+                      className="rounded-2xl border border-slate-200 shadow-md shadow-black/20 relative"
+                      style={{ zIndex: travelers.length - index + 10 }}
                     >
                       {/* Card Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200">
+                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200 rounded-t-2xl">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
                             {index + 1}
@@ -2108,7 +2194,7 @@ const HotelReviewBooking = () => {
                         </div>
                       </div>
 
-                      <div className="p-5 space-y-6 bg-white">
+                      <div className="p-5 space-y-6 bg-white rounded-b-2xl">
                         {/* Full Name */}
                         <div>
                           <SectionHeading
@@ -2314,31 +2400,50 @@ const HotelReviewBooking = () => {
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
-                                Date of Birth
+                                Date of Birth{t.paxType === 2 && <span className="text-red-500 ml-0.5">*</span>}
                               </label>
-                              <input
-                                type="date"
-                                value={t.dob || ""}
-                                disabled={isBookNowMode}
-                                onChange={(e) => {
-                                  const dob = e.target.value;
-                                  const today = new Date();
-                                  const birth = new Date(dob);
-                                  let age =
-                                    today.getFullYear() - birth.getFullYear();
-                                  const m = today.getMonth() - birth.getMonth();
-                                  if (
-                                    m < 0 ||
-                                    (m === 0 &&
-                                      today.getDate() < birth.getDate())
-                                  )
-                                    age--;
-
-                                  updateTraveler(t.id, "dob", dob);
-                                  updateTraveler(t.id, "age", age);
-                                }}
-                                className="field-input"
-                              />
+                              {isBookNowMode ? (
+                                <input
+                                  type="date"
+                                  value={t.dob || ""}
+                                  disabled={true}
+                                  className="field-input"
+                                />
+                              ) : (
+                                <div className={formErrors[t.id]?.dob ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                                  <CustomDatePicker
+                                    value={t.dob || ""}
+                                    maxDate={new Date().toISOString().split("T")[0]}
+                                    minDate={(() => {
+                                      if (t.paxType === 2 && t.originalAge) {
+                                        const minYear = new Date().getFullYear() - Number(t.originalAge) - 1;
+                                        return `${minYear}-01-01`;
+                                      }
+                                      return undefined;
+                                    })()}
+                                    onChange={(val) => {
+                                      if (!val) {
+                                        updateTraveler(t.id, "dob", "");
+                                        updateTraveler(t.id, "age", "");
+                                        return;
+                                      }
+                                      const dob = val;
+                                      const today = new Date();
+                                      const birth = new Date(dob);
+                                      let age = today.getFullYear() - birth.getFullYear();
+                                      const m = today.getMonth() - birth.getMonth();
+                                      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+                                      updateTraveler(t.id, "dob", dob);
+                                      updateTraveler(t.id, "age", age);
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              {formErrors[t.id]?.dob && (
+                                <p className="text-[10px] text-red-500 mt-1">
+                                  {formErrors[t.id].dob}
+                                </p>
+                              )}
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="field-label">
@@ -2383,13 +2488,20 @@ const HotelReviewBooking = () => {
                                     t.paxType === 2 ||
                                     (t.age && Number(t.age) <= 18)
                                   }
-                                  onChange={(e) =>
-                                    updateTraveler(
-                                      t.id,
-                                      "panCard",
-                                      e.target.value.toUpperCase(),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value.toUpperCase();
+                                    setTravelers((prev) =>
+                                      prev.map((tr) => {
+                                        if (tr.id === t.id) {
+                                          return { ...tr, panCard: val };
+                                        }
+                                        if (t.leadPassenger && applyLeadPan && tr.paxType === 1 && !tr.leadPassenger) {
+                                          return { ...tr, panCard: val };
+                                        }
+                                        return tr;
+                                      })
+                                    );
+                                  }}
                                   placeholder="ABCDE1234F"
                                   maxLength={10}
                                   className={`field-input font-mono tracking-widest ${formErrors[t.id]?.panCard ? "border-red-500 ring-1 ring-red-500" : ""}`}
@@ -2399,9 +2511,35 @@ const HotelReviewBooking = () => {
                                     {formErrors[t.id].panCard}
                                   </p>
                                 )}
-                                <p className="text-[10px] text-slate-500">
-                                  Required only for adults older than 18.
+                                <p className="text-[10px] text-yellow-700 font-semibold">
+                                  {isCorporateBooking ? "Enter Valid Corporate PAN." : "Required only for adults older than 18."}
                                 </p>
+                                {t.leadPassenger && travelers.some(tr => tr.paxType === 1 && !tr.leadPassenger) && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <input 
+                                      type="checkbox" 
+                                      id="applyLeadPan"
+                                      checked={applyLeadPan}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setApplyLeadPan(checked);
+                                        if (checked && t.panCard) {
+                                          setTravelers(prev => prev.map(tr => 
+                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: t.panCard } : tr
+                                          ));
+                                        } else if (!checked) {
+                                          setTravelers(prev => prev.map(tr => 
+                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: "" } : tr
+                                          ));
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-[#C9A84C] focus:ring-[#C9A84C] cursor-pointer"
+                                    />
+                                    <label htmlFor="applyLeadPan" className="text-xs text-slate-600 font-medium cursor-pointer">
+                                      Apply this PAN card to all other adults
+                                    </label>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2515,7 +2653,7 @@ const HotelReviewBooking = () => {
                 </div>
 
                 {/* Make Corporate Booking Checkbox */}
-                {!isBookNowMode && (
+                {!isBookNowMode && validation?.CorporateBookingAllowed && validation?.CrpPANMandatory && (
                   <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between rounded-b-2xl">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center h-5">

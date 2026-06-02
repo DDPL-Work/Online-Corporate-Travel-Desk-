@@ -22,6 +22,7 @@ import {
   FaChevronDown,
   FaPlane,
   FaHotel,
+  FaSignOutAlt,
 } from "react-icons/fa";
 import { MdCancel } from "react-icons/md";
 import { GrProjects, GrUserManager } from "react-icons/gr";
@@ -29,6 +30,7 @@ import { SiHomepage } from "react-icons/si";
 import { MdAirlineSeatReclineNormal } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
+import { logoutUser } from "../Redux/Slice/authSlice";
 import { C } from "../components/Shared/color";
 import api from "../API/axios";
 
@@ -76,6 +78,16 @@ export default function Sidebar({ isOpen, onClose }) {
         .catch(console.error);
     }
   }, [token, location.pathname]);
+
+  const handleLogout = () => {
+    dispatch(logoutUser());
+    const storedSlug = localStorage.getItem("companySlug");
+    if (storedSlug) {
+      navigate(`/${storedSlug}`);
+    } else {
+      navigate("/platform/flight-booking-info");
+    }
+  };
 
   // ========================= MENUS =========================
   const travelAdminMenu = useMemo(() => {
@@ -598,12 +610,14 @@ export default function Sidebar({ isOpen, onClose }) {
       >
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shrink-0"
+            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
             style={{ background: C.gold, color: C.navy }}
+            onClick={() => navigate("/my-profile")}
+            title="My Profile"
           >
             {user?.name?.firstName?.charAt(0).toUpperCase() || "U"}
           </div>
-          <div className="flex flex-col min-w-0">
+          <div className="flex flex-col min-w-0 flex-1">
             <p className="text-sm font-bold text-white truncate leading-tight">
               {user?.name?.firstName} {user?.name?.lastName}
             </p>
@@ -611,6 +625,13 @@ export default function Sidebar({ isOpen, onClose }) {
               {user?.role?.replace("-", " ")}
             </p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-red-400 hover:text-white hover:bg-red-500/20 transition-colors shrink-0"
+            title="Sign Out"
+          >
+            <FaSignOutAlt size={14} />
+          </button>
         </div>
       </div>
     </aside>

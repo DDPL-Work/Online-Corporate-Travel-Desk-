@@ -35,6 +35,8 @@ import {
 } from "../TravelAdminTabs/Shared/CommonComponents";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { rejectedFlightsExportTemplate, rejectedHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -86,6 +88,8 @@ function FlightSection({ data, loading }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const formatted = useMemo(() => (data || []).map(b => {
     const traveller = b.travellers?.length
@@ -177,7 +181,31 @@ function FlightSection({ data, loading }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Rejection Ledger" subtitle={`${filtered.length} requests rejected`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Rejection Ledger" 
+        subtitle={`${filtered.length} requests rejected`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Rejection Ledger",
+          statCards: [
+            { label: "Rejected Flights", value: filtered.length },
+            { label: "Value Impact", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` },
+            { label: "Avg. Response", value: "2.4h" },
+            { label: "Critical Rejections", value: filtered.length }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Rejection Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: rejectedFlightsExportTemplate,
+          filenamePrefix: "rejected_flights"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
@@ -244,6 +272,8 @@ function HotelSection({ data, loading }) {
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
 
+  const { exportExcel, isExporting } = useExcelExporter();
+
   const formatted = useMemo(() => (data || []).map(b => {
     const guest = b.travellers?.length
       ? `${b.travellers[0].title || ""} ${b.travellers[0].firstName || ""} ${b.travellers[0].lastName || ""}`.trim()
@@ -302,7 +332,31 @@ function HotelSection({ data, loading }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Rejection Ledger" subtitle={`${filtered.length} requests rejected`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Rejection Ledger" 
+        subtitle={`${filtered.length} requests rejected`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Rejection Ledger",
+          statCards: [
+            { label: "Rejected Hotels", value: filtered.length },
+            { label: "Value Impact", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` },
+            { label: "Critical Rejections", value: filtered.length },
+            { label: "Total Loss", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Rejection Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: rejectedHotelsExportTemplate,
+          filenamePrefix: "rejected_hotels"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">

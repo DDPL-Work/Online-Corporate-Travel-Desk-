@@ -50,7 +50,7 @@ exports.getProfile = async (req, res, next) => {
       profilePicture: user.profilePicture,
       role: user.role,
       corporateId: user.corporateId?._id || user.corporateId,
-      corporate: user.corporateId,
+      // corporate: user.corporateId,
 
       // Professional from Employee
       employeeId: employeeDoc?.employeeCode || (["travel-admin", "corporate-admin"].includes(user.role) ? "ADMIN" : "PENDING"),
@@ -66,9 +66,9 @@ exports.getProfile = async (req, res, next) => {
 
     // Check for all "Manager Selection" requests for this employee (including project-specific)
     const ManagerRequest = require("../models/ManagerRequest");
-    const managerRequests = await ManagerRequest.find({
-      employeeId: employee._id,
-    }).sort({ createdAt: -1 });
+    const managerRequests = employeeDoc ? await ManagerRequest.find({
+      employeeId: employeeDoc._id,
+    }).sort({ createdAt: -1 }) : [];
 
     // Determine the Travel Admin by searching users with the role 'travel-admin' for this corporate
     const travelAdminUser = await User.findOne({

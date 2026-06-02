@@ -19,6 +19,7 @@ import {
   FiFilter,
   FiEdit2,
   FiX,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { FaPlane, FaHotel } from "react-icons/fa";
 import { 
@@ -36,7 +37,7 @@ import { clearCycleTransactions } from "../../Redux/Slice/postpaidSlice";
 import { toast } from "sonner";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
-import useCsvExporter from "../../services/export/useCsvExporter";
+import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   creditAlertsExportTemplate,
   creditStatementsExportTemplate,
@@ -56,7 +57,7 @@ const STMT_COLS = [
 
 const TX_COLS = [
   "Transaction ID", "Payment ID", "Doc Type",
-  "Invoice Date", "Product Type", "Booking Date", "Booking Ref",
+  "Invoice Date", "Product Type", "Booking Date", "Order ID",
   "Txn Type", "Amount (₹)", "Status",
 ];
 
@@ -77,9 +78,12 @@ const COLORS = {
   critical: "#EF4444",
   warning: "#F59E0B",
   healthy: "#10B981",
-  primary: "#0A4D68",
-  secondary: "#088395",
+  primary: "#003399",
+  secondary: "#d97706",
   neutral: "#64748B",
+  dark: "#000d26",
+  offWhite: "#f8fafc",
+  border: "#e2e8f0",
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -89,7 +93,7 @@ export default function CreditStatusAlerts() {
   const tableScrollRef = useRef(null);
   const cycleTableScrollRef = useRef(null);
   const creditTransactionsScrollRef = useRef(null);
-  const { exportCsv, exportingKey } = useCsvExporter();
+  const { exportExcel, exportingKey } = useExcelExporter();
   
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,7 +105,6 @@ export default function CreditStatusAlerts() {
   
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [page, setPage] = useState(1);
 
   // Data
   const [corporates, setCorporates] = useState([]);
@@ -115,15 +118,19 @@ export default function CreditStatusAlerts() {
   const [activeTab, setActiveTab] = useState("current");
   const [drillCycle, setDrillCycle] = useState(null);
   const [drillPage, setDrillPage] = useState(1);
+  const [txSearch, setTxSearch] = useState("");
+  const [txStartDate, setTxStartDate] = useState("");
+  const [txEndDate, setTxEndDate] = useState("");
+  const [txCategory, setTxCategory] = useState("All");
 
   // Edit Modal State
   const [editModal, setEditModal] = useState({ isOpen: false, row: null, receivedAmount: "" });
 
   const {
     balance, loadingBalance: loadingPostpaidBalance,
-    transactions, pagination: transactionsMeta, loadingTransactions,
+    transactions, loadingTransactions,
     previousCycles, loadingCycles,
-    cycleTransactions, cycleTransactionsMeta, loadingCycleTransactions,
+    cycleTransactions, loadingCycleTransactions,
   } = useSelector((s) => s.postpaid);
 
   useEffect(() => {
@@ -135,7 +142,7 @@ export default function CreditStatusAlerts() {
           c => c.status === "active" && c.classification === "postpaid"
         );
         setCorporates(postpaidOnly);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load credit profiles");
       } finally {
         setLoading(false);
@@ -157,7 +164,8 @@ export default function CreditStatusAlerts() {
       };
       fetchHistory();
     } else {
-      setPeriodRevenue([]);
+      const timer = setTimeout(() => setPeriodRevenue([]), 0);
+      return () => clearTimeout(timer);
     }
   }, [startDate, endDate, dispatch]);
 
@@ -211,8 +219,13 @@ export default function CreditStatusAlerts() {
       ? new Date(stmtDate.getTime() + dueDays * 86400000)
       : null;
     const delayDays = dueDate && new Date() > dueDate
-      ? Math.floor((Date.now() - dueDate.getTime()) / 86400000)
+      ? Math.floor((new Date().getTime() - dueDate.getTime()) / 86400000)
       : 0;
+    
+    const remainingDays = balance.currentCycleEnd 
+      ? Math.max(0, Math.ceil((new Date(balance.currentCycleEnd).getTime() - new Date().getTime()) / 86400000))
+      : 0;
+
     return {
       rowNum: 1,
       cycleIndex: "current",
@@ -223,6 +236,7 @@ export default function CreditStatusAlerts() {
       statementDate: stmtDate,
       dueDate,
       delayDays,
+      remainingDays,
       statementAmount: balance.usedCredit || 0,
       isCurrent: true,
     };
@@ -272,16 +286,68 @@ export default function CreditStatusAlerts() {
   const openDrillDownCycle = (row) => {
     setDrillCycle(row);
     setDrillPage(1);
+    setTxSearch("");
+    setTxStartDate("");
+    setTxEndDate("");
+    setTxCategory("All");
   };
 
-  const drillTx = drillCycle?.isCurrent ? (transactions || []) : (cycleTransactions || []);
+  const drillTx = useMemo(
+    () => (drillCycle?.isCurrent ? (transactions || []) : (cycleTransactions || [])),
+    [drillCycle?.isCurrent, transactions, cycleTransactions],
+  );
   const drillLoading = drillCycle?.isCurrent ? loadingTransactions : loadingCycleTransactions;
   const drillStmtId = drillCycle?.statementId;
 
+  const updateTxFilter = (setter, value) => {
+    setDrillPage(1);
+    setter(value);
+  };
+
+  const filteredDrillTx = useMemo(() => {
+    const search = txSearch.trim().toLowerCase();
+    const start = txStartDate ? new Date(txStartDate).getTime() : null;
+    const end = txEndDate ? new Date(txEndDate).setHours(23, 59, 59, 999) : null;
+    const category = txCategory.toLowerCase();
+
+    return drillTx.filter((t) => {
+      const productType = String(
+        t.metadata?.bookingType ||
+          t.metadata?.productType ||
+          (t.type === "booking" ? "Air - Domestic" : ""),
+      );
+      const orderId = String(t.bookingId?.orderId || t.orderId || "");
+      const bookingRef = String(t.bookingReference || t.paymentReference || "");
+      const docType = String(t.type === "booking" ? "Sales Invoice" : t.type || "");
+      const txnType = String(t.transactionType || (t.type === "booking" ? "debit" : "credit"));
+      const txDate = new Date(t.bookingDate || t.createdAt).getTime();
+
+      const matchesSearch =
+        !search ||
+        String(t._id || "").toLowerCase().includes(search) ||
+        String(t.paymentId || "").toLowerCase().includes(search) ||
+        orderId.toLowerCase().includes(search) ||
+        bookingRef.toLowerCase().includes(search) ||
+        productType.toLowerCase().includes(search) ||
+        docType.toLowerCase().includes(search) ||
+        txnType.toLowerCase().includes(search) ||
+        String(t.status || "").toLowerCase().includes(search);
+
+      const matchesStart = !start || txDate >= start;
+      const matchesEnd = !end || txDate <= end;
+      const matchesCategory =
+        txCategory === "All" ||
+        productType.toLowerCase().includes(category) ||
+        docType.toLowerCase().includes(category);
+
+      return matchesSearch && matchesStart && matchesEnd && matchesCategory;
+    });
+  }, [drillTx, txSearch, txStartDate, txEndDate, txCategory]);
+
   const paginatedDrillTx = useMemo(() => {
     const start = (drillPage - 1) * DRILL_PAGE_SIZE;
-    return drillTx.slice(start, start + DRILL_PAGE_SIZE);
-  }, [drillTx, drillPage]);
+    return filteredDrillTx.slice(start, start + DRILL_PAGE_SIZE);
+  }, [filteredDrillTx, drillPage]);
 
   const setQuickPeriod = (type) => {
     const now = new Date();
@@ -349,8 +415,25 @@ export default function CreditStatusAlerts() {
   const isAlertsExporting = exportingKey === "credit_alerts";
 
   const handleAlertsExport = () => {
-    exportCsv({
+    const statCards = [
+      { label: "Critical Corporates", value: stats.criticalCount },
+      { label: "Warning Corporates", value: stats.warningCount },
+      { label: stats.isHistory ? "Period Spend" : "Current Exposure", value: inr(stats.totalExposure) },
+      { label: "Total Approved Limits", value: inr(stats.totalLimit) },
+    ];
+    const appliedFilters = [
+      { label: "Search", value: searchTerm || "None" },
+      { label: "Status", value: filterStatus },
+      { label: "Cycle", value: filterCycle },
+      { label: "Min Limit", value: minLimit || "None" },
+      { label: "Max Limit", value: maxLimit || "None" },
+      { label: "Usage Threshold", value: usageThreshold + "%" },
+    ];
+    exportExcel({
       key: "credit_alerts",
+      pageHeader: "Credit Profiles & Risk Alert Board",
+      statCards,
+      appliedFilters,
       data: filtered,
       columns: creditAlertsExportTemplate,
       filenamePrefix: "credit_alerts_export",
@@ -359,10 +442,13 @@ export default function CreditStatusAlerts() {
     });
   };
 
+
+   const handleRefresh = () => dispatch(fetchCorporates());
+
   if (loading) {
     return (
       <div className="p-10 flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0A4D68] mb-4"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003399] mb-4"></div>
         <p className="text-slate-500 font-bold uppercase tracking-widest animate-pulse">Computing Risk Ledger...</p>
       </div>
     );
@@ -378,8 +464,11 @@ export default function CreditStatusAlerts() {
     const isTransactionsExporting = exportingKey === "credit_transactions";
 
     const handleStatementsExport = () => {
-      exportCsv({
+      exportExcel({
         key: "credit_statements",
+        pageHeader: `${target.corporateName} - Statements`,
+        statCards: [],
+        appliedFilters: [],
         data: statementRows,
         columns: creditStatementsExportTemplate,
         filenamePrefix: "credit_statements_export",
@@ -391,9 +480,17 @@ export default function CreditStatusAlerts() {
     const handleTransactionsExport = () => {
       if (drillLoading) return;
 
-      exportCsv({
+      exportExcel({
         key: "credit_transactions",
-        data: paginatedDrillTx,
+        pageHeader: `${target.corporateName} - Transactions`,
+        statCards: [],
+        appliedFilters: [
+          { label: "Search", value: txSearch || "None" },
+          { label: "From Date", value: txStartDate || "Any" },
+          { label: "To Date", value: txEndDate || "Any" },
+          { label: "Category", value: txCategory },
+        ],
+        data: filteredDrillTx,
         columns: creditTransactionsExportTemplate,
         filenamePrefix: "credit_transactions_export",
         emptyMessage: "No credit transactions available to export",
@@ -402,65 +499,79 @@ export default function CreditStatusAlerts() {
     };
 
     return (
-      <div className="min-h-screen p-4 lg:p-6 bg-[#F8FAFC] space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => {
-                setDrillDownId(null);
-                setDrillCycle(null);
-                setActiveTab("current");
-              }}
-              className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-sm group"
-            >
-              <FiArrowLeft size={24} className="group-hover:-translate-x-1 transition-transform" />
-            </button>
-            <div className="text-left">
+      <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: COLORS.offWhite }}>
+        <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+          <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
-                 <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{target.corporateName}</h2>
-                 <span className="px-3 py-1 bg-[#0A4D68] text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-[#0A4D68]/20">
-                    <FiClock /> {target.billingCycle || '30 days'} Cycle
-                 </span>
+                <button
+                  onClick={() => {
+                    setDrillDownId(null);
+                    setDrillCycle(null);
+                    setActiveTab("current");
+                  }}
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm group"
+                >
+                  <FiArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+                </button>
               </div>
-              <div className="flex items-center gap-4 mt-2">
-                 <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Approved Line:</span>
-                    <span className="text-[11px] font-black text-slate-800">{inr(target.creditLimit)}</span>
-                 </div>
-                 <div className="w-1 h-1 rounded-full bg-slate-300" />
-                 <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Credit:</span>
-                    <span className={`text-[11px] font-black ${target.creditLimit - target.currentCredit < target.creditLimit * 0.1 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {inr(target.creditLimit - target.currentCredit)}
+
+              <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
+
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                  <FiBriefcase size={28} />
+                </div>
+                <div className="text-left">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-3xl font-black tracking-tight leading-none">{target.corporateName}</h2>
+                    <span className="px-3 py-1 bg-white/10 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-white/10">
+                      <FiClock /> {target.billingCycle || '30 days'} Cycle
                     </span>
-                 </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 mt-3 text-white/70">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-widest">Approved Line:</span>
+                      <span className="text-[11px] font-black text-white">{inr(target.creditLimit)}</span>
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-white/30" />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-widest">Available Credit:</span>
+                      <span className={`text-[11px] font-black ${target.creditLimit - target.currentCredit < target.creditLimit * 0.1 ? 'text-rose-200' : 'text-emerald-200'}`}>
+                        {inr(target.creditLimit - target.currentCredit)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex gap-1 bg-white border border-slate-100 rounded-2xl p-1 shadow-sm h-fit">
-            {[["current", "Current Cycle"], ["previous", "Previous Cycles"]].map(([k, lbl]) => (
-              <button
-                key={k}
-                onClick={() => handleTabSwitch(k)}
-                className="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                style={{
-                  background: activeTab === k ? COLORS.primary : "transparent",
-                  color: activeTab === k ? "#fff" : "#94a3b8",
-                }}
-              >
-                {lbl}
-              </button>
-            ))}
+            <div className="flex gap-1 bg-white/10 border border-white/10 rounded-2xl p-1 shadow-sm h-fit w-fit">
+              {[["current", "Current Cycle"], ["previous", "Previous Cycles"]].map(([k, lbl]) => (
+                <button
+                  key={k}
+                  onClick={() => handleTabSwitch(k)}
+                  className="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  style={{
+                    background: activeTab === k ? "#fff" : "transparent",
+                    color: activeTab === k ? COLORS.primary : "rgba(255,255,255,0.65)",
+                  }}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+
+        <div className="w-full px-4 md:px-10 -mt-10 space-y-6">
 
       {/* EDIT PREVIOUS CYCLE MODAL */}
       {editModal.isOpen && editModal.row && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 animate-in zoom-in-95 duration-200 border border-slate-100">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Edit Received Amount</h3>
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Add Received Amount</h3>
               <button 
                 onClick={() => setEditModal({ isOpen: false, row: null, receivedAmount: "" })}
                 className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
@@ -477,33 +588,41 @@ export default function CreditStatusAlerts() {
                 </div>
               </div>
               
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Amount</label>
-                <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-900 cursor-not-allowed mt-1">
-                  ₹{fmtAmt(editModal.row.statementAmount)}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Due</label>
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-900 cursor-not-allowed mt-1">
+                    ₹{fmtAmt(editModal.row.statementAmount)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Previously Received</label>
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black text-slate-600 cursor-not-allowed mt-1">
+                    ₹{fmtAmt(editModal.row.receivedAmount || 0)}
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 text-[#0A4D68]">Received Amount</label>
+                <label className="text-[10px] font-black uppercase tracking-widest px-1 text-[#003399]">New Received Amount</label>
                 <input 
                   type="number"
-                  placeholder="Enter amount received"
+                  placeholder="Enter additional amount received"
                   value={editModal.receivedAmount}
                   onChange={(e) => setEditModal({ ...editModal, receivedAmount: e.target.value })}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-[#0A4D68] rounded-xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-[#0A4D68]/10 transition-all mt-1"
+                  className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-[#003399] rounded-xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-[#003399]/10 transition-all mt-1"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Remaining Amount</label>
-                <div className={`w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black mt-1 ${editModal.row.statementAmount - Number(editModal.receivedAmount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  ₹{fmtAmt(Math.max(0, editModal.row.statementAmount - Number(editModal.receivedAmount || 0)))}
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Remaining Balance</label>
+                <div className={`w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black mt-1 ${editModal.row.statementAmount - ((Number(editModal.row.receivedAmount) || 0) + Number(editModal.receivedAmount || 0)) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  ₹{fmtAmt(Math.max(0, editModal.row.statementAmount - ((Number(editModal.row.receivedAmount) || 0) + Number(editModal.receivedAmount || 0))))}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Payment Received</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Last Payment Date</label>
                 <div className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-600 cursor-not-allowed mt-1">
                   {fmt(editModal.row.paymentReceivedAt)}
                 </div>
@@ -520,20 +639,21 @@ export default function CreditStatusAlerts() {
               <button 
                 onClick={async () => {
                   try {
+                    const newTotal = (Number(editModal.row.receivedAmount) || 0) + Number(editModal.receivedAmount || 0);
                     await dispatch(updateCycleReceipt({
                       corporateId: drillDownId,
                       cycleIndex: editModal.row.cycleIndex,
-                      receivedAmount: editModal.receivedAmount
+                      receivedAmount: newTotal
                     })).unwrap();
                     toast.success("Amount updated successfully");
                     setEditModal({ isOpen: false, row: null, receivedAmount: "" });
                     // Refresh data
                     dispatch(fetchPreviousCycles({ corporateId: drillDownId }));
-                  } catch (err) {
+                  } catch {
                     toast.error("Failed to update receipt");
                   }
                 }}
-                className="flex-1 px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-[#0A4D68] hover:bg-[#063346] shadow-lg shadow-[#0A4D68]/20 transition-all"
+                className="flex-1 px-4 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-[#003399] hover:bg-[#002266] shadow-lg shadow-[#003399]/20 transition-all"
               >
                 Save Updates
               </button>
@@ -563,38 +683,102 @@ export default function CreditStatusAlerts() {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-               <div className="px-8 py-5 border-b border-slate-50 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+               <div className="px-8 py-5 border-b border-slate-50 flex flex-wrap items-center justify-between gap-3 bg-white">
                   <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Transactions — {drillStmtId}</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
+                    Filter, review, and export cycle transactions
+                  </p>
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{drillTx.length} records</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredDrillTx.length} of {drillTx.length} records</span>
                     <TableActionBar
                       scrollRef={creditTransactionsScrollRef}
                       exportLabel="Export"
                       onExport={handleTransactionsExport}
                       exportDisabled={drillLoading || isTransactionsExporting}
                       exportLoading={isTransactionsExporting}
-                      exportClassName="bg-[#0A4D68] hover:bg-[#083d52] shadow-[#0A4D68]/20"
-                      arrowClassName="border-cyan-100 bg-cyan-50 text-[#0A4D68] hover:bg-cyan-100 hover:border-cyan-200 hover:text-[#083d52] disabled:hover:bg-cyan-50"
+                      exportClassName="bg-[#003399] hover:bg-[#002266] shadow-[#003399]/20"
+                      arrowClassName="border-blue-100 bg-blue-50 text-[#003399] hover:bg-blue-100 hover:border-blue-200 hover:text-[#002266] disabled:hover:bg-blue-50"
                     />
                   </div>
                </div>
                
-               <div ref={creditTransactionsScrollRef} className="overflow-x-auto min-h-[400px]">
+               <div className="px-8 py-4 border-b border-slate-50 bg-slate-50/50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+                    <div className="xl:col-span-2 flex flex-col gap-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <FiSearch size={12} /> Search Transactions
+                      </label>
+                      <div className="relative">
+                        <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Transaction, payment, order ID, status..."
+                          value={txSearch}
+                          onChange={(e) => updateTxFilter(setTxSearch, e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <FiCalendar size={12} /> From Date
+                      </label>
+                      <input
+                        type="date"
+                        value={txStartDate}
+                        onChange={(e) => updateTxFilter(setTxStartDate, e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-white"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <FiCalendar size={12} /> To Date
+                      </label>
+                      <input
+                        type="date"
+                        value={txEndDate}
+                        onChange={(e) => updateTxFilter(setTxEndDate, e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-white"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <FiFilter size={12} /> Category
+                      </label>
+                      <select
+                        value={txCategory}
+                        onChange={(e) => updateTxFilter(setTxCategory, e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-white cursor-pointer"
+                      >
+                        <option value="All">All Categories</option>
+                        <option value="flight">Flights</option>
+                        <option value="air">Air</option>
+                        <option value="hotel">Hotels</option>
+                        <option value="sales invoice">Sales Invoice</option>
+                      </select>
+                    </div>
+                  </div>
+               </div>
+
+               <div ref={creditTransactionsScrollRef} className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-slate-900 border-b border-slate-800">
+                      <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                         {TX_COLS.map((h) => (
-                          <th key={h} className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                          <th key={h} className="px-6 py-4 text-[9px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {drillLoading ? (
-                        <tr><td colSpan={TX_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
-                      ) : drillTx.length === 0 ? (
+                        <tr><td colSpan={TX_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003399] mx-auto"></div></td></tr>
+                      ) : filteredDrillTx.length === 0 ? (
                         <tr><td colSpan={TX_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No transactions found for this cycle</td></tr>
-                      ) : paginatedDrillTx.map((t, idx) => (
+                      ) : paginatedDrillTx.map((t) => (
                         <tr key={t._id} className="hover:bg-slate-50 transition-all text-[11px] font-bold text-slate-600">
                           <td className="px-6 py-3 font-mono text-slate-400 text-[10px]">{t._id}</td>
 
@@ -614,7 +798,7 @@ export default function CreditStatusAlerts() {
                             {t.metadata?.bookingType || t.metadata?.productType || (t.type === "booking" ? "Air - Domestic" : "—")}
                           </td>
                           <td className="px-6 py-3">{fmt(t.travelDate || t.bookingDate)}</td>
-                          <td className="px-6 py-3 font-mono">{t.bookingReference || t.paymentReference || "—"}</td>
+                          <td className="px-6 py-3 font-mono">{t.bookingId?.orderId || t.orderId || "—"}</td>
                           <td className="px-6 py-3 uppercase">{t.transactionType || (t.type === "booking" ? "debit" : "credit")}</td>
                           <td className={`px-6 py-3 font-black ${(t.transactionType === "debit" || (!t.transactionType && t.type === "booking")) ? 'text-rose-600' : 'text-emerald-600'}`}>
                             {(t.transactionType === "debit" || (!t.transactionType && t.type === "booking")) ? "-" : "+"}₹{fmtAmt(t.amount)}
@@ -628,18 +812,18 @@ export default function CreditStatusAlerts() {
                
                <div className="bg-slate-50 px-8 py-4 border-t border-slate-100 flex items-center justify-between">
                   <div className="flex gap-6 items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{drillTx.length} items</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredDrillTx.length} items</span>
                     <div className="w-px h-4 bg-slate-200" />
                     <span className="text-xs font-black text-slate-700">
                       Net: ₹{fmtAmt(
-                        drillTx.filter(t => t.transactionType === "debit" || (!t.transactionType && t.type === "booking")).reduce((s, t) => s + (t.amount || 0), 0) -
-                        drillTx.filter(t => t.transactionType === "credit" || (!t.transactionType && ["payment", "topup", "refund"].includes(t.type))).reduce((s, t) => s + (t.amount || 0), 0)
+                        filteredDrillTx.filter(t => t.transactionType === "debit" || (!t.transactionType && t.type === "booking")).reduce((s, t) => s + (t.amount || 0), 0) -
+                        filteredDrillTx.filter(t => t.transactionType === "credit" || (!t.transactionType && ["payment", "topup", "refund"].includes(t.type))).reduce((s, t) => s + (t.amount || 0), 0)
                       )}
                     </span>
                   </div>
                   <Pagination 
                     currentPage={drillPage} 
-                    totalPages={Math.ceil(drillTx.length / DRILL_PAGE_SIZE)} 
+                    totalPages={Math.ceil(filteredDrillTx.length / DRILL_PAGE_SIZE)}
                     onPageChange={setDrillPage} 
                   />
                </div>
@@ -649,7 +833,7 @@ export default function CreditStatusAlerts() {
 
         {/* ── CYCLE LIST VIEW ── */}
         {!drillCycle && (
-          <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="px-8 py-5 border-b border-slate-50 bg-slate-50/50 flex flex-wrap justify-between items-center gap-3">
               <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">
                 {activeTab === "current" ? "Current Billing Cycle" : "Statement History"}
@@ -668,16 +852,16 @@ export default function CreditStatusAlerts() {
             <div className="overflow-x-auto" ref={cycleTableScrollRef}>
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-900 border-b border-slate-800">
-                    {STMT_COLS.map((h) => (
-                      <th key={h} className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+                    {(activeTab === "current" ? STMT_COLS.filter(h => !["Payment Received", "Received (₹)", "Action"].includes(h)) : STMT_COLS).map((h) => (
+                      <th key={h} className="px-8 py-4 text-[9px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {activeTab === "current" ? (
                     loadingPostpaidBalance ? (
-                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
+                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003399] mx-auto"></div></td></tr>
                     ) : !currentCycleRow ? (
                       <tr><td colSpan={STMT_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No active cycle data</td></tr>
                     ) : (
@@ -689,7 +873,7 @@ export default function CreditStatusAlerts() {
                     )
                   ) : (
                     loadingCycles ? (
-                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A4D68] mx-auto"></div></td></tr>
+                      <tr><td colSpan={STMT_COLS.length} className="py-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003399] mx-auto"></div></td></tr>
                     ) : enhancedPreviousCycles.length === 0 ? (
                       <tr><td colSpan={STMT_COLS.length} className="py-20 text-center text-slate-400 font-black uppercase text-[10px] tracking-widest">No statement history available</td></tr>
                     ) : (
@@ -698,7 +882,7 @@ export default function CreditStatusAlerts() {
                           key={c.cycleIndex} 
                           row={c} 
                           onClick={() => openDrillDownCycle(c)}
-                          onEdit={(row) => setEditModal({ isOpen: true, row, receivedAmount: row.receivedAmount || "" })}
+                          onEdit={(row) => setEditModal({ isOpen: true, row, receivedAmount: "" })}
                         />
                       ))
                     )
@@ -719,47 +903,72 @@ export default function CreditStatusAlerts() {
           </div>
         )}
       </div>
+      </div>
     );
   }
 
   // --- MAIN VIEW ---
   return (
-    <div className="min-h-screen p-4 lg:p-6 bg-[#F8FAFC] space-y-6 animate-in fade-in duration-500">
-      {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center shadow-2xl shadow-slate-900/20 text-white transform rotate-3">
-            <FiShield size={28} />
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: COLORS.offWhite }}>
+      {/* Navy Header Section */}
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => navigate(-1)} 
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
+               >
+                 <FiArrowLeft size={20} />
+               </button>
+               <button 
+                  onClick={handleRefresh} 
+                  className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                  disabled={loading}
+               >
+                 <div className={loading ? "animate-spin" : ""}>
+                   <FiRefreshCw size={20} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+              <FiShield size={28} />
+            </div>
+            <div className="text-left">
+              <h1 className="text-3xl font-black tracking-tight leading-none">Credit Pulse</h1>
+              <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                Real-time Risk Intelligence & Aging
+              </p>
+            </div>
           </div>
-          <div className="text-left">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Credit Pulse</h1>
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              Real-time Risk Intelligence & Aging
-            </p>
+
+          <div className="hidden md:flex items-center gap-6">
+             <div className="bg-white/10 px-6 py-3 rounded-2xl border border-white/10 shadow-sm flex items-center gap-6">
+                <div className="text-center">
+                   <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">
+                     {stats.isHistory ? "Total Period Spend" : "Global Debt"}
+                   </p>
+                   <p className={`text-lg font-black leading-none ${stats.isHistory ? 'text-sky-200' : 'text-rose-200'}`}>
+                     {inr(stats.totalExposure)}
+                   </p>
+                </div>
+                <div className="w-px h-8 bg-white/10" />
+                <div className="text-center">
+                   <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Total Limit Cap</p>
+                   <p className="text-lg font-black text-white leading-none">{inr(stats.totalLimit)}</p>
+                </div>
+             </div>
           </div>
-        </div>
-        <div className="hidden md:flex items-center gap-6">
-           <div className="bg-white px-6 py-3 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-6">
-              <div className="text-center">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                   {stats.isHistory ? "Total Period Spend" : "Global Debt"}
-                 </p>
-                 <p className={`text-lg font-black leading-none ${stats.isHistory ? 'text-blue-600' : 'text-rose-600'}`}>
-                   {inr(stats.totalExposure)}
-                 </p>
-              </div>
-              <div className="w-px h-8 bg-slate-100" />
-              <div className="text-center">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Limit Cap</p>
-                 <p className="text-lg font-black text-slate-800 leading-none">{inr(stats.totalLimit)}</p>
-              </div>
-           </div>
         </div>
       </div>
 
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+
       {/* KPI GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <SummaryCard label="Critical Risks" value={stats.criticalCount} icon={<FiAlertTriangle />} color={COLORS.critical} sub="Usage > 90%" />
         <SummaryCard label="Warning Alerts" value={stats.warningCount} icon={<FiBell />} color={COLORS.warning} sub="Usage > 75%" />
         <SummaryCard 
@@ -773,16 +982,16 @@ export default function CreditStatusAlerts() {
       </div>
 
       {/* ADVANCED FILTERS */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 space-y-5">
+      <div className="bg-white rounded-2xl p-6 border shadow-sm space-y-5" style={{ borderColor: COLORS.border }}>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex-1 min-w-[300px] relative group pr-4">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0A4D68] transition-colors" />
+          <div className="flex-1 min-w-75 relative group pr-4">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#003399] transition-colors" />
             <input 
               type="text"
               placeholder="Search by name or reference ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-[#0A4D68]/10 transition-all placeholder:text-slate-300"
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 transition-all placeholder:text-slate-300"
             />
           </div>
 
@@ -790,7 +999,7 @@ export default function CreditStatusAlerts() {
              <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setQuickPeriod('this-month')}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${startDate && endDate && stats.isHistory ? 'bg-slate-100 text-slate-600' : 'bg-[#0A4D68]/10 text-[#0A4D68]'}`}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${startDate && endDate && stats.isHistory ? 'bg-slate-100 text-slate-600' : 'bg-[#003399]/10 text-[#003399]'}`}
                 >
                   This Month
                 </button>
@@ -845,17 +1054,17 @@ export default function CreditStatusAlerts() {
                 { label: "Custom Cycle", value: "custom" }
               ]}
            />
-           <div className="flex flex-col gap-1 w-[180px]">
+           <div className="flex flex-col gap-1 w-45">
               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-2 flex justify-between">
                 <span>Usage Filter</span>
-                <span className="text-[#0A4D68]">{usageThreshold}%+</span>
+                <span className="text-[#003399]">{usageThreshold}%+</span>
               </label>
               <input 
                 type="range" 
                 min="0" max="100" step="10"
                 value={usageThreshold}
                 onChange={(e) => setUsageThreshold(e.target.value)}
-                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#0A4D68]"
+                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#003399]"
               />
            </div>
            <div className="flex items-center gap-3">
@@ -866,7 +1075,7 @@ export default function CreditStatusAlerts() {
                   placeholder="₹ Min"
                   value={minLimit}
                   onChange={(e) => setMinLimit(e.target.value)}
-                  className="w-24 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-[#0A4D68]"
+                  className="w-24 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-[#003399]"
                  />
               </div>
               <div className="flex flex-col gap-1">
@@ -876,44 +1085,54 @@ export default function CreditStatusAlerts() {
                   placeholder="₹ Max"
                   value={maxLimit}
                   onChange={(e) => setMaxLimit(e.target.value)}
-                  className="w-24 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-[#0A4D68]"
+                  className="w-24 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-[#003399]"
                  />
               </div>
            </div>
         </div>
       </div>
 
-      <TableActionBar
-        scrollRef={tableScrollRef}
-        exportLabel="Export Alerts"
-        onExport={handleAlertsExport}
-        exportDisabled={isAlertsExporting}
-        exportLoading={isAlertsExporting}
-        exportClassName="bg-[#B45309] hover:bg-[#92400E] shadow-[#B45309]/20"
-        arrowClassName="border-amber-100 bg-amber-50 text-[#B45309] hover:bg-amber-100 hover:border-amber-200 hover:text-[#92400E] disabled:hover:bg-amber-50"
-      />
-
       {/* DATA TABLE */}
-      <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-        <div ref={tableScrollRef} className="overflow-x-auto min-h-[400px]">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4 bg-white">
+          <div>
+            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">
+              Credit Alert Ledger
+            </h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
+              {filtered.length} postpaid corporate{filtered.length === 1 ? "" : "s"} in current view
+            </p>
+          </div>
+          <TableActionBar
+            scrollRef={tableScrollRef}
+            exportLabel="Export Alerts"
+            onExport={handleAlertsExport}
+            exportDisabled={isAlertsExporting}
+            exportLoading={isAlertsExporting}
+            exportClassName="bg-[#003399] hover:bg-[#002266] shadow-[#003399]/20"
+            arrowClassName="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 disabled:hover:bg-slate-50"
+          />
+        </div>
+
+        <div ref={tableScrollRef} className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-900 border-b border-slate-800">
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Postpaid Identity</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Reference ID</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Billing Cycle</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Approved Limit</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90">Postpaid Identity</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90">Reference ID</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90">Billing Cycle</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90">Approved Limit</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90">
                   {startDate && endDate ? 'Period Credit Usage' : 'Live Utilization'}
                 </th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Available Line</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ledger</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90 text-right">Available Line</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest opacity-90 text-center">Ledger</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 ? (
                 <tr>
-                   <td colSpan="7" className="py-24 text-center">
+                   <td colSpan="7" className="py-16 text-center">
                       <div className="flex flex-col items-center opacity-20">
                          <FiActivity size={64} className="text-slate-400 mb-4" />
                          <p className="text-xl font-black uppercase tracking-widest">No active risks detected</p>
@@ -922,7 +1141,7 @@ export default function CreditStatusAlerts() {
                 </tr>
               ) : (
                 filtered.map((corp) => (
-                  <tr key={corp._id} className="group hover:bg-slate-50/50 transition-all border-l-4 border-transparent hover:border-[#0A4D68]">
+                  <tr key={corp._id} className="group hover:bg-slate-50/50 transition-all border-l-4 border-transparent hover:border-[#003399]">
                     <td className="px-8 py-4">
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs text-white shadow-lg ${corp.utilization >= 90 ? 'bg-red-500' : corp.utilization >= 75 ? 'bg-amber-500' : 'bg-slate-800'}`}>
@@ -939,7 +1158,7 @@ export default function CreditStatusAlerts() {
                     <td className="px-8 py-4">
                        <div className="space-y-1.5 text-left">
                           <div className="flex items-center gap-2 text-[10px] font-black text-slate-700 uppercase leading-none">
-                             <FiClock className="text-[#0A4D68]" /> {corp.billingCycle || '30 days'}
+                             <FiClock className="text-[#003399]" /> {corp.billingCycle || '30 days'}
                           </div>
                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
                              Term: {corp.classification?.toUpperCase()}
@@ -950,9 +1169,9 @@ export default function CreditStatusAlerts() {
                        <span className="font-black text-[14px] text-slate-900">{inr(corp.creditLimit)}</span>
                     </td>
                     <td className="px-8 py-4">
-                      <div className="w-[180px] space-y-2">
+                      <div className="w-45 space-y-2">
                         <div className="flex justify-between items-end">
-                          <p className={`text-[10px] font-black uppercase tracking-tighter ${startDate && endDate ? 'text-[#0A4D68]' : 'text-slate-500'}`}>
+                          <p className={`text-[10px] font-black uppercase tracking-tighter ${startDate && endDate ? 'text-[#003399]' : 'text-slate-500'}`}>
                             {startDate && endDate ? `Range: ${inr(corp.usageInPeriod)}` : `Live: ${inr(corp.currentCredit)}`}
                           </p>
                           {!startDate && !endDate && (
@@ -963,7 +1182,7 @@ export default function CreditStatusAlerts() {
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
                            <div 
-                              className={`h-full transition-all duration-1000 ${startDate && endDate ? 'bg-[#0A4D68]' : (corp.utilization >= 90 ? 'bg-red-500' : corp.utilization >= 75 ? 'bg-amber-500' : 'bg-[#0A4D68]')}`} 
+                              className={`h-full transition-all duration-1000 ${startDate && endDate ? 'bg-[#003399]' : (corp.utilization >= 90 ? 'bg-red-500' : corp.utilization >= 75 ? 'bg-amber-500' : 'bg-[#003399]')}`}
                               style={{ width: `${corp.utilization}%` }} 
                            />
                         </div>
@@ -980,7 +1199,7 @@ export default function CreditStatusAlerts() {
                           <button 
                             title="Audit Transaction Ledger"
                             onClick={() => setDrillDownId(corp._id)}
-                            className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#0A4D68] hover:bg-[#0A4D68]/10 hover:border-[#0A4D68]/20 transition-all hover:scale-110 active:scale-95 shadow-xs"
+                            className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#003399] hover:bg-[#003399]/10 hover:border-[#003399]/20 transition-all hover:scale-110 active:scale-95 shadow-xs"
                           >
                             <FiClock size={18} />
                           </button>
@@ -1000,6 +1219,7 @@ export default function CreditStatusAlerts() {
           </table>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -1009,11 +1229,11 @@ function StatementRow({ row, onClick, onEdit }) {
   return (
     <tr
       onClick={onClick}
-      className="group hover:bg-slate-50 cursor-pointer transition-all border-l-4 border-transparent hover:border-[#088395] text-[11px] font-bold"
+      className="group hover:bg-slate-50 cursor-pointer transition-all border-l-4 border-transparent hover:border-[#003399] text-[11px] font-bold"
     >
       <td className="px-8 py-4 font-mono text-slate-400">{row.rowNum}</td>
       <td className="px-8 py-4">
-        <span className="flex items-center gap-2 text-[#088395] font-black">
+        <span className="flex items-center gap-2 text-[#003399] font-black">
           {row.statementId} <FiArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </span>
       </td>
@@ -1022,66 +1242,79 @@ function StatementRow({ row, onClick, onEdit }) {
       </td>
       <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.statementDate)}</td>
       <td className="px-8 py-4 whitespace-nowrap text-slate-500">{fmt(row.dueDate)}</td>
-      <td className="px-8 py-4 whitespace-nowrap text-slate-500">
-        {row.isCurrent ? "—" : fmt(row.paymentReceivedAt)}
-      </td>
+      
+      {!row.isCurrent && (
+        <td className="px-8 py-4 whitespace-nowrap text-slate-500">
+          {fmt(row.paymentReceivedAt)}
+        </td>
+      )}
+
       <td className="px-8 py-4 text-center">
-        <span
-          className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs ${row.delayDays > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
-        >
-          {row.delayDays} Days Delay
-        </span>
-      </td>
-      <td className="px-8 py-4 font-black text-slate-900 text-[13px]">₹{fmtAmt(row.statementAmount)}</td>
-      <td className="px-8 py-4 font-black text-[#0A4D68] text-[13px]">
-        {row.isCurrent ? "—" : `₹${fmtAmt(row.receivedAmount || 0)}`}
-      </td>
-      <td className="px-8 py-4 text-center">
-        {!row.isCurrent && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(row); }}
-            className="p-2 text-slate-400 hover:text-[#0A4D68] bg-slate-100 hover:bg-[#0A4D68]/10 rounded-xl transition-all shadow-sm active:scale-95"
-            title="Edit Received Amount"
+        {row.isCurrent ? (
+          <span className="px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs bg-indigo-50 text-indigo-600 border border-indigo-100">
+            {row.remainingDays} Days Remaining
+          </span>
+        ) : (
+          <span
+            className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-xs ${row.delayDays > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
           >
-            <FiEdit2 size={14} />
-          </button>
+            {row.delayDays} Days Delay
+          </span>
         )}
       </td>
+      <td className="px-8 py-4 font-black text-slate-900 text-[13px]">₹{fmtAmt(row.statementAmount)}</td>
+      
+      {!row.isCurrent && (
+        <>
+          <td className="px-8 py-4 font-black text-[#003399] text-[13px]">
+            ₹{fmtAmt(row.receivedAmount || 0)}
+          </td>
+          <td className="px-8 py-4 text-center">
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(row); }}
+              className="p-2 text-slate-400 hover:text-[#003399] bg-slate-100 hover:bg-[#003399]/10 rounded-xl transition-all shadow-sm active:scale-95"
+              title="Edit Received Amount"
+            >
+              <FiEdit2 size={14} />
+            </button>
+          </td>
+        </>
+      )}
     </tr>
   );
 }
 
 function SummaryCard({ label, value, icon, color, sub }) {
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 group hover:border-slate-200 transition-all hover:-translate-y-1 duration-300">
-      <div className="flex items-start justify-between mb-4">
-        <div 
-          className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all group-hover:rotate-6 group-hover:scale-110"
-          style={{ backgroundColor: color, boxShadow: `0 8px 16px -4px ${color}55` }}
+    <div
+      className="bg-white rounded-2xl p-6 border-b-4 shadow-sm flex flex-col justify-between"
+      style={{ borderBottomColor: color }}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+          <h3 className="text-3xl font-black text-slate-800">{value}</h3>
+        </div>
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center"
+          style={{ backgroundColor: `${color}14`, color }}
         >
           {React.cloneElement(icon, { size: 24 })}
         </div>
-        <div className="p-1.5 bg-slate-50 rounded-lg">
-           <FiArrowUpRight size={14} className="text-slate-400" />
-        </div>
       </div>
-      <div>
-        <h4 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-2">{value}</h4>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 opacity-80">{label}</p>
-        <p className="text-[9px] font-bold text-slate-300 italic truncate">{sub}</p>
-      </div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4">{sub}</p>
     </div>
   );
 }
 
 function FilterSelect({ label, value, onChange, options }) {
   return (
-    <div className="flex flex-col gap-1 text-left min-w-[140px]">
+    <div className="flex flex-col gap-1 text-left min-w-35">
       <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-2">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-[#0A4D68]/5 transition-all shadow-xs"
+        className="w-full px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-[#003399]/5 transition-all shadow-xs"
       >
         {options.map((opt, i) => (
           <option key={i} value={opt.value}>{opt.label}</option>
@@ -1099,7 +1332,7 @@ function DateFilter({ label, value, onChange }) {
          type="date"
          value={value}
          onChange={(e) => onChange(e.target.value)}
-         className="px-2 py-1 bg-white border border-slate-100 rounded-lg text-[10px] font-black text-[#0A4D68] outline-none w-[110px] focus:ring-1 focus:ring-[#0A4D68]/10 transition-all text-center shadow-xs"
+         className="px-2 py-1 bg-white border border-slate-100 rounded-lg text-[10px] font-black text-[#003399] outline-none w-27.5 focus:ring-1 focus:ring-[#003399]/10 transition-all text-center shadow-xs"
        />
     </div>
   );

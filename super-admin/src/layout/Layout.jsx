@@ -63,15 +63,6 @@ export default function Layout() {
     dispatch(fetchUserProfile()).catch(() => {});
   }, [dispatch, effectiveToken]);
 
-  // 📱 Responsive Sidebar Reset on Resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) setIsSidebarOpen(false);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   // =============================
   // AUTH PAGES — Minimal Layout
   // =============================
@@ -113,7 +104,7 @@ export default function Layout() {
       <ScrollRestoration />
 
       <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
-        {/* ===== FIXED SIDEBAR ===== */}
+        {/* ===== OVERLAY SIDEBAR ===== */}
         <div className="fixed top-0 left-0 h-full z-50">
           <Sidebar
             role={effectiveRole}
@@ -124,7 +115,7 @@ export default function Layout() {
         </div>
 
         {/* ===== MAIN AREA ===== */}
-        <div className="flex-1 min-w-0 flex flex-col lg:ml-64">
+        <div className="flex-1 min-w-0 flex flex-col transition-all duration-300">
           {/* ===== STICKY HEADER ===== */}
           <header className="sticky top-0 z-40 bg-white shadow-sm">
             <Header
@@ -142,10 +133,10 @@ export default function Layout() {
           </main>
         </div>
 
-        {/* ===== MOBILE BACKDROP ===== */}
+        {/* ===== BACKDROP ===== */}
         {isSidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}

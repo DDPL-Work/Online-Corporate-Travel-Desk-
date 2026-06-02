@@ -35,6 +35,8 @@ import {
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { approvedFlightsExportTemplate, approvedHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 const FLIGHT_EXCLUDE = new Set(["ticketed", "cancel_requested", "cancelled"]);
 const HOTEL_EXCLUDE = new Set(["voucher_generated", "cancelled"]);
@@ -94,6 +96,8 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
   const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const flightRaw = useMemo(() => (rawApprovals || []).filter(a => a.bookingType === "flight" && !FLIGHT_EXCLUDE.has(a.executionStatus)), [rawApprovals]);
   
@@ -195,7 +199,32 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Approval Ledger" subtitle={`${filtered.length} requests pending execution`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Approval Ledger" 
+        subtitle={`${filtered.length} requests pending execution`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Approval Ledger",
+          statCards: [
+            { label: "Approved Flights", value: filtered.length },
+            { label: "Pending Ticket", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Failed Exec", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Total Value", value: `₹${filtered.reduce((s, a) => s + a.amount, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Execution", value: execFilter },
+            { label: "Approval Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: approvedFlightsExportTemplate,
+          filenamePrefix: "approved_flights"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -232,7 +261,13 @@ function FlightApprovalsSection({ rawApprovals, traceTimers, loading, onCountCha
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.travelDate ? new Date(a.travelDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                    <p className="text-[9px] font-bold text-slate-400 uppercase">{a.travelDate ? new Date(a.travelDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
                 </td>
-                <td className="px-6! py-5!"><ExecStatusBadge status={isDiscarded(a.travelDate) ? "discarded" : a.executionStatus} /></td>
+                <td className="px-6! py-5!">
+                  {a.requestStatus === "manager_approved" ? (
+                    <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">Awaiting Travel Admin Approval</span>
+                  ) : (
+                    <ExecStatusBadge status={isDiscarded(a.travelDate) ? "discarded" : a.executionStatus} />
+                  )}
+                </td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
                 <td className="px-6! py-5! text-center!">
                     <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">
@@ -268,6 +303,8 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const PAGE_SIZE = 10;
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   const hotelRaw = useMemo(() => (rawApprovals || []).filter(a => a.bookingType === "hotel" && !HOTEL_EXCLUDE.has(a.executionStatus)), [rawApprovals]);
   
@@ -338,7 +375,32 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Approval Ledger" subtitle={`${filtered.length} requests pending execution`} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Approval Ledger" 
+        subtitle={`${filtered.length} requests pending execution`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Approval Ledger",
+          statCards: [
+            { label: "Approved Hotels", value: filtered.length },
+            { label: "Pending Voucher", value: filtered.filter(a => a.executionStatus === "not_started").length },
+            { label: "Failed Exec", value: filtered.filter(a => a.executionStatus === "failed").length },
+            { label: "Total Value", value: `₹${filtered.reduce((s, a) => s + a.amount, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Execution", value: execFilter },
+            { label: "Approval Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: approvedHotelsExportTemplate,
+          filenamePrefix: "approved_hotels"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -375,7 +437,13 @@ function HotelApprovalsSection({ rawApprovals, loading, onCountChange }) {
                    <p className="text-xs font-black" style={{ color: C.navy }}>{a.hotelName}</p>
                    <p className="text-[10px] font-bold text-gold uppercase">{a.city}</p>
                 </td>
-                <td className="px-6! py-5!"><ExecStatusBadge status={isDiscarded(a.checkIn) ? "discarded" : a.executionStatus} /></td>
+                <td className="px-6! py-5!">
+                  {a.requestStatus === "manager_approved" ? (
+                    <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-1 rounded border border-amber-200 uppercase tracking-tight">Awaiting Travel Admin Approval</span>
+                  ) : (
+                    <ExecStatusBadge status={isDiscarded(a.checkIn) ? "discarded" : a.executionStatus} />
+                  )}
+                </td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{a.amount.toLocaleString()}</td>
                 <td className="px-6! py-5! text-center!">
                     <button onClick={() => setSelected(a)} className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:from-slate-800 group">

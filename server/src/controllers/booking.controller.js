@@ -1160,8 +1160,8 @@ exports.getMyRequests = asyncHandler(async (req, res) => {
     userId: req.user._id, // 🔐 ownership enforced
     bookingType: "flight",
 
-    // ✅ approved OR pending_approval
-    requestStatus: { $in: ["approved", "pending_approval"] },
+    // ✅ approved OR pending_approval OR manager_approved
+    requestStatus: { $in: ["approved", "pending_approval", "pending_second_approval", "manager_approved"] },
 
     // ✅ exclude ticketed
     executionStatus: { $ne: "ticketed" },
@@ -2676,11 +2676,16 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Project ID is required");
   }
 
-  const expenses = await BookingRequest.find({
-    projectId,
+  const query = {
     corporateId: req.user.corporateId,
     executionStatus: "ticketed",
-  })
+  };
+
+  if (projectId !== "all") {
+    query.projectId = projectId;
+  }
+
+  const expenses = await BookingRequest.find(query)
     .populate("userId", "name email")
     .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });

@@ -40,6 +40,8 @@ import {
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { adminPendingFlightRequestsExportTemplate, adminPendingHotelRequestsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components for both sections                            */
@@ -114,25 +116,8 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Personnel", "Route", "Email Identifier", "Status", "PNR Ref", "Amount"];
-    const rows = filtered.map(r => [
-      r.orderId, 
-      r.employee, 
-      r.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—", 
-      r.employeeId,
-      r.status,
-      r.pnr || "—",
-      `₹${r.estimatedCost.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pending-flights.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -164,7 +149,31 @@ function PendingFlightSection({ requests, onAction, refreshing, employeeOptions,
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Queue" subtitle={`${filtered.length} records awaiting action`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Flight Queue" 
+        subtitle={`${filtered.length} records awaiting action`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Queue",
+          statCards: [
+            { label: "Pending Flights", value: filtered.length },
+            { label: "Awaiting Review", value: filtered.length },
+            { label: "Critical/Expired", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Est. Commitment", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Fulfillment Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
+          data: filtered,
+          columns: adminPendingFlightRequestsExportTemplate,
+          filenamePrefix: "pending_flight_requests"
+        })}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -265,25 +274,8 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order Reference", "Personnel", "Email Identifier", "Asset Detail", "Booked Date", "Status", "Amount"];
-    const rows = filtered.map(r => [
-      r.orderId, 
-      r.employee, 
-      r.employeeId, 
-      r.hotelName, 
-      r.bookedDate.toLocaleDateString(),
-      r.status,
-      `₹${r.estimatedCost.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `pending-hotels.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+  // We rely on exportConfig on ResponsiveDataTable instead of a custom handleExport
+  const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -315,7 +307,31 @@ function PendingHotelSection({ requests, onAction, refreshing, employeeOptions, 
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Queue" subtitle={`${filtered.length} records awaiting action`} onExport={handleExport} wrapperClass="!border-none !shadow-none">
+      <ResponsiveDataTable 
+        title="Hotel Queue" 
+        subtitle={`${filtered.length} records awaiting action`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Queue",
+          statCards: [
+            { label: "Pending Hotels", value: filtered.length },
+            { label: "Awaiting Review", value: filtered.length },
+            { label: "Critical/Expired", value: filtered.filter(r => r.isTravelPassed).length },
+            { label: "Est. Commitment", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Personnel", value: empFilter },
+            { label: "Fulfillment Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+          ],
+          data: filtered,
+          columns: adminPendingHotelRequestsExportTemplate,
+          filenamePrefix: "pending_hotel_requests"
+        })}
+        wrapperClass="!border-none !shadow-none"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
@@ -529,7 +545,7 @@ export default function PendingTravelRequests() {
     });
   }, [list]);
 
-  const handleAction = async (id, type, action) => {
+  const handleAction = async (id, type, action, comments = "") => {
     const isApprove = action === "approve";
     if (isApprove) {
       const request = requests.find((r) => r.id === id);
@@ -557,23 +573,12 @@ export default function PendingTravelRequests() {
       }
     }
 
-    const result = await Swal.fire({
-      title: `${isApprove ? "Approve" : "Reject"} Travel Request`,
-      input: isApprove ? null : "textarea",
-      inputPlaceholder: isApprove ? "" : "Provide rejection reason...",
-      icon: isApprove ? "question" : "warning",
-      showCancelButton: true,
-      confirmButtonColor: isApprove ? "#10B981" : "#EF4444",
-      confirmButtonText: `Confirm ${action}`
-    });
-
-    if (result.isConfirmed) {
-      dispatch(isApprove ? approveApproval({ id, type }) : rejectApproval({ id, comments: result.value, type }))
-        .unwrap().then(() => { 
-          Swal.fire("Success", `Request ${action}d`, "success"); 
-        })
-        .catch(err => Swal.fire("Error", err || "Update failed", "error"));
-    }
+    dispatch(isApprove ? approveApproval({ id, type, comments }) : rejectApproval({ id, comments, type }))
+      .unwrap().then(() => { 
+        Swal.fire("Success", `Request ${action}d`, "success"); 
+        handleRefresh();
+      })
+      .catch(err => Swal.fire("Error", err || "Update failed", "error"));
   };
 
   const handleTransfer = async (id, type, secondApproverId, remark) => {
@@ -665,8 +670,8 @@ export default function PendingTravelRequests() {
         <PendingFlightDetailsModal 
           booking={selectedRequest.originalData} 
           onClose={() => setSelectedRequest(null)} 
-          onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
-          onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
+          onApprove={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
+          onReject={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
           onTransfer={(secondApproverId, remark, type) => handleTransfer(selectedRequest.id, type, secondApproverId, remark)}
           isDiscarded={selectedRequest.isTravelPassed} 
         />
@@ -676,8 +681,8 @@ export default function PendingTravelRequests() {
         <PendingHotelDetailsModal 
           booking={selectedRequest.originalData} 
           onClose={() => setSelectedRequest(null)} 
-          onApprove={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
-          onReject={(id, type, action) => { handleAction(id, type, action); setSelectedRequest(null); }} 
+          onApprove={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
+          onReject={(id, type, action, comments) => { handleAction(id, type, action, comments); setSelectedRequest(null); }} 
           onTransfer={(secondApproverId, remark, type) => handleTransfer(selectedRequest.id, type, secondApproverId, remark)}
           isDiscarded={selectedRequest.isTravelPassed} 
         />

@@ -40,6 +40,8 @@ import {
 import ResponsiveDataTable from "../TravelAdminTabs/Shared/ResponsiveDataTable";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import { C } from "../Shared/color";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import { myFlightsExportTemplate, myHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─── helpers ─── */
 function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
@@ -100,6 +102,8 @@ function FlightSection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list: flightBookings = [], loading } = useSelector((state) => state.bookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyBookings()); }, [dispatch]);
 
@@ -182,24 +186,7 @@ function FlightSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Route", "Booked Date", "Status", "PNR", "Amount"];
-    const rows = filtered.map(b => [
-      b.orderId, 
-      b.routes?.map(l => `${l.fromCode}→${l.toCode}`).join(" | ") || "—",
-      new Date(b.bookedDate).toLocaleDateString(), 
-      b.status, 
-      b.pnr, 
-      `₹${b.amount.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `my-flight-bookings.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -231,34 +218,59 @@ function FlightSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Flight Ledger" subtitle={`${filtered.length} active bookings`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Flight Ledger" 
+        subtitle={`${filtered.length} active bookings`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Flight Ledger",
+          statCards: [
+            { label: "My Flights", value: filtered.length },
+            { label: "Confirmed", value: filtered.filter(b => b.status === "Confirmed").length },
+            { label: "Pending", value: filtered.filter(b => b.status === "Pending").length },
+            { label: "Total Spent", value: `₹${totalSpend.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Status", value: statusFilter },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: myFlightsExportTemplate,
+          filenamePrefix: "my_flights"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Booked Date</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">PNR Ref</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 !text-left">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Route</Th>
+              <Th className="px-6! py-5!">Booked Date</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">PNR Ref</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-left!">Action</Th>
             </tr>
           </thead>
           <tbody>
             {paginated.length > 0 ? paginated.map((b, i) => (
               <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
-                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={b.orderId} /></td>
+                <td className="px-6! py-5!">
                    <RouteCell routes={b.routes} airline={b.airline} />
                 </td>
-                <td className="!px-6 !py-5 text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
-                <td className="!px-6 !py-5"><StatusBadge status={b.status} /></td>
-                <td className="!px-6 !py-5 font-black text-blue-500 text-xs">{b.pnr}</td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
-                <td className="!px-6 !py-5 !text-left">
+                <td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
+                <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
+                <td className="px-6! py-5! font-black text-blue-500 text-xs">{b.pnr}</td>
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="px-6! py-5! text-left!">
                     <button 
                       onClick={() => navigate(`/my-booking/${b._id}`)} 
-                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
                     >
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
@@ -266,7 +278,7 @@ function FlightSection() {
               </tr>
             )) : (
               <tr>
-                <td colSpan={7} className="!px-6 !py-20 text-center">
+                <td colSpan={7} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -288,11 +300,14 @@ function HotelSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [waitingBookingId, setWaitingBookingId] = useState(null);
   const PAGE_SIZE = 10;
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { completed: hotelBookings = [], loading } = useSelector((state) => state.hotelBookings);
+
+  const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => { dispatch(fetchMyHotelBookings()); }, [dispatch]);
 
@@ -329,24 +344,7 @@ function HotelSection() {
   const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
   const totalSpend = filtered.reduce((s, b) => s + (b.amount || 0), 0);
 
-  const handleExport = () => {
-    if (!filtered.length) return;
-    const headers = ["Order ID", "Hotel", "City", "Stay Dates", "Status", "Amount"];
-    const rows = filtered.map(b => [
-      b.orderId, 
-      b.hotelName, 
-      b.city, 
-      `${fmtDate(b.bookingSnapshot?.checkInDate)} - ${fmtDate(b.bookingSnapshot?.checkOutDate)}`,
-      b.status, 
-      `₹${b.amount.toLocaleString()}`
-    ]);
-    const tableHtml = rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #dbe4f0;padding:8px;">${c}</td>`).join("")}</tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head><body><table><thead><tr>${headers.map(h => `<th style="border:1px solid #cbd5e1;padding:10px;background:#000D26;color:#fff;">${h}</th>`).join("")}</tr></thead><tbody>${tableHtml}</tbody></table></body></html>`;
-    const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `my-hotel-bookings.xls`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -375,46 +373,84 @@ function HotelSection() {
         </div>
       </div>
 
-      <ResponsiveDataTable title="Hotel Ledger" subtitle={`${filtered.length} active stays`} onExport={handleExport} wrapperClass="!border-none !shadow-none" pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}>
+      <ResponsiveDataTable 
+        title="Hotel Ledger" 
+        subtitle={`${filtered.length} active stays`} 
+        exportLabel="Export Excel"
+        exportLoading={isExporting}
+        exportDisabled={isExporting}
+        onExport={() => exportExcel({
+          pageHeader: "Hotel Ledger",
+          statCards: [
+            { label: "My Hotels", value: filtered.length },
+            { label: "Confirmed", value: filtered.filter(b => b.status === "Confirmed").length },
+            { label: "Unique Cities", value: new Set(filtered.map(b => b.city)).size },
+            { label: "Total Spent", value: `₹${totalSpend.toLocaleString()}` }
+          ],
+          appliedFilters: [
+            { label: "Search", value: search || "None" },
+            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+          ],
+          data: filtered,
+          columns: myHotelsExportTemplate,
+          filenamePrefix: "my_hotels"
+        })}
+        wrapperClass="!border-none !shadow-none" 
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Hotel Detail</Th>
-              <Th className="!px-6 !py-5">Stay Period</Th>
-              <Th className="!px-6 !py-5">Booked Date</Th>
-              <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 !text-left">Action</Th>
+            <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
+              <Th className="px-6! py-5!">Order ID</Th>
+              <Th className="px-6! py-5!">Hotel Detail</Th>
+              <Th className="px-6! py-5!">Stay Period</Th>
+              <Th className="px-6! py-5!">Booked Date</Th>
+              <Th className="px-6! py-5!">Status</Th>
+              <Th className="px-6! py-5!">Amount</Th>
+              <Th className="px-6! py-5! text-left!">Action</Th>
             </tr>
           </thead>
           <tbody>
             {paginated.length > 0 ? paginated.map((b, i) => (
               <tr key={b._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
-                <td className="!px-6 !py-5"><IdCell id={b.orderId} /></td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!"><IdCell id={b.orderId} /></td>
+                <td className="px-6! py-5!">
                    <p className="text-xs font-black" style={{ color: C.navy }}>{b.hotelName}</p>
                    <p className="text-[10px] font-bold text-gold uppercase">{b.city}</p>
                 </td>
-                <td className="!px-6 !py-5">
+                <td className="px-6! py-5!">
                    <p className="text-[11px] font-bold text-slate-700">{fmtDate(b.bookingSnapshot?.checkInDate)}</p>
                    <p className="text-[9px] text-slate-400">to {fmtDate(b.bookingSnapshot?.checkOutDate)}</p>
                 </td>
-                <td className="!px-6 !py-5 text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
-                <td className="!px-6 !py-5"><StatusBadge status={b.status} /></td>
-                <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
-                <td className="!px-6 !py-5 !text-left">
+                <td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
+                <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
+                <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
+                <td className="px-6! py-5! text-left! relative">
                     <button 
-                      onClick={() => navigate(`/my-hotel-booking/${b._id}`)} 
-                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                      onClick={() => {
+                        const elapsed = (Date.now() - new Date(b.bookedDate).getTime()) / 1000;
+                        if (elapsed < 120) {
+                          setWaitingBookingId(b._id);
+                          setTimeout(() => setWaitingBookingId(null), 3000);
+                        } else {
+                          navigate(`/my-hotel-booking/${b._id}`);
+                        }
+                      }} 
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-linear-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
                     >
                       <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
                     </button>
+                    {waitingBookingId === b._id && (
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 mr-16 w-48 bg-white border border-amber-200 shadow-xl rounded-xl p-3 z-[100] animate-in fade-in zoom-in-95 duration-200">
+                        <p className="text-xs text-amber-600 font-black mb-1">Please Wait</p>
+                        <p className="text-[10px] text-slate-500 leading-tight">Your voucher is being generated. Please wait 120 seconds after booking to view details.</p>
+                      </div>
+                    )}
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={7} className="!px-6 !py-20 text-center">
+                <td colSpan={7} className="px-6! py-20! text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
@@ -460,7 +496,7 @@ export default function MyBookings() {
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       {/* Navy Header Section */}
-      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
@@ -481,7 +517,7 @@ export default function MyBookings() {
                </button>
              </div>
              
-             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+             <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
 
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >

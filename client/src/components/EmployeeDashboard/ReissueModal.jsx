@@ -275,6 +275,35 @@ function PricingRow({ label, value, strong = false }) {
   );
 }
 
+/** Signed adjustment row: negative = red, positive = normal. Shows +/− prefix. */
+function PricingAdjustmentRow({ label, rawAmount, currency, helpText, forcePositive = false }) {
+  const amt = Number(rawAmount);
+  const isNeg = !forcePositive && amt < 0;
+  const isPos = forcePositive || amt > 0;
+  const prefix = isNeg ? "−" : isPos ? "+" : "";
+  const colour = isNeg ? "text-rose-600" : isPos ? "text-emerald-700" : "text-slate-500";
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-3 text-sm">
+        <span className="text-slate-500 leading-snug">{label}</span>
+        <span className={`font-semibold shrink-0 ${colour}`}>
+          {prefix}{formatMoney(Math.abs(amt), currency)}
+        </span>
+      </div>
+      {helpText && (
+        <p className="mt-0.5 text-[10px] leading-tight text-slate-400">{helpText}</p>
+      )}
+    </div>
+  );
+}
+
+/** Section divider with label for the new sectioned pricing layout. */
+function PricingSection({ label }) {
+  return (
+    <p className="pt-2 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
+  );
+}
+
 function FlightOptionCard({
   option,
   selected,
@@ -372,25 +401,57 @@ function FlightOptionCard({
           </div>
         </div>
 
-        {/* RIGHT — Pricing panel */}
+        {/* RIGHT — Pricing panel (airline-grade sectioned breakdown) */}
         <div className="w-full rounded-3xl border border-slate-100 bg-slate-50 p-4 xl:max-w-[320px]">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
             {mode === "ONLINE" ? "Online Reissue Estimate" : "Offline Reissue Estimate"}
           </p>
-          <div className="mt-4 space-y-2">
-            <PricingRow label="Current Ticket" value={formatMoney(option.oldFare, option.currency)} />
-            <PricingRow label="New Flight" value={formatMoney(option.newFare ?? option.fare, option.currency)} />
-            <PricingRow label="Fare Difference" value={formatMoney(option.fareDifference, option.currency)} />
-            <PricingRow label="Date Change Fee" value={formatMoney(option.reissueCharge, option.currency)} />
-          </div>
-          <div className="mt-4 rounded-2xl bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-              Total Additional Collection
-            </p>
-            <p className="mt-2 text-2xl font-black text-slate-900">
-              {formatMoney(option.totalCollection ?? option.totalEstimate, option.currency)}
-            </p>
-          </div>
+          {(() => {
+            const previouslyPaid = Number(option.oldFare || 0);
+            const newFlightFare  = Number(option.newFare ?? option.fare ?? 0);
+            const penalty        = Number(option.reissueCharge || 0);
+            const flightAdj      = newFlightFare - previouslyPaid;
+            const netSettlement  = flightAdj + penalty;
+            const isRefund       = netSettlement < 0;
+            return (
+              <div className="mt-3 space-y-1">
+                {/* ── Section 1: Original Ticket Value ── */}
+                <PricingSection label="Original Ticket Value" />
+                <PricingRow label="Previously Paid" value={formatMoney(previouslyPaid, option.currency)} />
+                <div className="my-2 border-t border-slate-200" />
+                {/* ── Section 2: New Itinerary Cost ── */}
+                <PricingSection label="New Itinerary Cost" />
+                <PricingRow label="New Flight Fare" value={formatMoney(newFlightFare, option.currency)} />
+                <div className="my-2 border-t border-slate-200" />
+                {/* ── Section 3: Reissue Adjustments ── */}
+                <PricingSection label="Reissue Adjustments" />
+                <PricingAdjustmentRow
+                  label="Flight Fare Adjustment"
+                  rawAmount={flightAdj}
+                  currency={option.currency}
+                  helpText="Difference between previously ticketed fare and newly selected itinerary."
+                />
+                {penalty > 0 && (
+                  <PricingAdjustmentRow
+                    label="Airline Reissue Penalty"
+                    rawAmount={penalty}
+                    currency={option.currency}
+                    helpText="Penalty charged by airline for ticket modification."
+                    forcePositive
+                  />
+                )}
+                {/* ── Section 4: Final Settlement ── */}
+                <div className="mt-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                    {isRefund ? "Refund Due" : "Net Additional Collection"}
+                  </p>
+                  <p className={`mt-2 text-2xl font-black ${isRefund ? "text-emerald-600" : "text-slate-900"}`}>
+                    {formatMoney(Math.abs(netSettlement), option.currency)}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -426,18 +487,18 @@ function FlightOptionCard({
                   ? calcLayoverMinutes(prevSeg.arrivalTime, segment.departureTime)
                   : null;
                 return (
-                  <div key={`${segment.origin}-${segment.destination}-${index}`}>
+                  <div key={`${segment.origin?.code || segment.origin}-${segment.destination?.code || segment.destination}-${index}`}>
                     {layoverMins !== null && (
                       <div className="flex items-center gap-2 py-2 pl-4 text-xs font-semibold text-amber-700">
                         <span className="h-4 w-0.5 rounded bg-amber-300" />
-                        Layover at {prevSeg?.destination || ""}: {formatDuration(layoverMins)}
+                        Layover at {prevSeg?.destination?.code || prevSeg?.destination || ""}: {formatDuration(layoverMins)}
                       </div>
                     )}
                     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-bold text-slate-900">
-                            {segment.origin || PLACEHOLDER} → {segment.destination || PLACEHOLDER}
+                            {segment.origin?.code || segment.origin || PLACEHOLDER} → {segment.destination?.code || segment.destination || PLACEHOLDER}
                           </p>
                           <p className="mt-0.5 text-xs text-slate-500">
                             {segment.airlineName || segment.airlineCode || "Airline"}
@@ -804,7 +865,7 @@ export default function ReissueModal({ booking, onClose }) {
               <p className="mt-1 text-sm text-slate-600">
                 {showOfflineFlow
                   ? "Select one replacement flight before you can submit the request to operations."
-                  : "We will load reissue-eligible flight options with fare difference and airline date-change fees."}
+                  : "We will load reissue-eligible flight options with fare difference and airline reissue penalty."}
               </p>
             </div>
           </div>
@@ -830,35 +891,55 @@ export default function ReissueModal({ booking, onClose }) {
         <p className="mt-1 text-sm text-slate-600">
           {formatFlightTime(selectedOption.departureTime)} {"->"} {formatFlightTime(selectedOption.arrivalTime)}
         </p>
-        <div className="mt-4 rounded-2xl bg-white px-4 py-3 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-            Total Additional Collection
-          </p>
-          <p className="mt-2 text-2xl font-black text-slate-900">
-            {formatMoney(
-              summary?.totalCollection ?? summary?.totalEstimate ?? selectedOption.totalCollection,
-              currency,
-            )}
-          </p>
-        </div>
-        <div className="mt-4 space-y-2">
-          <PricingRow
-            label="Current Ticket"
-            value={formatMoney(summary?.oldFare ?? selectedOption.oldFare, currency)}
-          />
-          <PricingRow
-            label="New Flight"
-            value={formatMoney(summary?.newFare ?? selectedOption.newFare, currency)}
-          />
-          <PricingRow
-            label="Fare Difference"
-            value={formatMoney(summary?.fareDifference ?? selectedOption.fareDifference, currency)}
-          />
-          <PricingRow
-            label="Date Change Fee"
-            value={formatMoney(summary?.reissueCharge ?? selectedOption.reissueCharge, currency)}
-          />
-        </div>
+        {(() => {
+          const previouslyPaid = Number(summary?.alreadyPaid ?? summary?.previouslyPaid ?? summary?.oldFare ?? selectedOption.oldFare ?? 0);
+          const newFlightFare  = Number(summary?.newFare ?? selectedOption.newFare ?? selectedOption.fare ?? 0);
+          const newSSR         = Number(summary?.newSSR ?? summary?.newSSRTotal ?? 0);
+          const penalty        = Number(summary?.airlinePenalty ?? summary?.reissueCharge ?? summary?.airlineReissuePenalty ?? selectedOption.reissueCharge ?? 0);
+          const flightAdj      = summary?.flightAdjustment != null ? Number(summary.flightAdjustment) : newFlightFare - previouslyPaid;
+          const rawNet         = summary?.netPayable ?? summary?.totalCollection ?? summary?.totalEstimate ?? selectedOption.totalCollection;
+          const netSettlement  = rawNet != null ? Number(rawNet) : flightAdj + newSSR + penalty;
+          const isRefund       = (summary?.isRefund) || netSettlement < 0;
+          return (
+            <div className="mt-4 space-y-1">
+              {/* Section 1 */}
+              <PricingSection label="Original Ticket Value" />
+              <PricingRow label="Previously Paid" value={formatMoney(previouslyPaid, currency)} />
+              <div className="my-2 border-t border-[#0A4D68]/10" />
+              {/* Section 2 */}
+              <PricingSection label="New Itinerary Cost" />
+              <PricingRow label="New Flight Fare" value={formatMoney(newFlightFare, currency)} />
+              {newSSR > 0 && <PricingRow label="New SSR Total" value={formatMoney(newSSR, currency)} />}
+              <div className="my-2 border-t border-[#0A4D68]/10" />
+              {/* Section 3 */}
+              <PricingSection label="Reissue Adjustments" />
+              <PricingAdjustmentRow
+                label="Flight Fare Adjustment"
+                rawAmount={flightAdj}
+                currency={currency}
+                helpText="Difference between previously ticketed fare and newly selected itinerary."
+              />
+              {penalty > 0 && (
+                <PricingAdjustmentRow
+                  label="Airline Reissue Penalty"
+                  rawAmount={penalty}
+                  currency={currency}
+                  helpText="Penalty charged by airline for ticket modification."
+                  forcePositive
+                />
+              )}
+              {/* Section 4 */}
+              <div className="mt-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {isRefund ? "Refund Due" : "Net Additional Collection"}
+                </p>
+                <p className={`mt-2 text-2xl font-black ${isRefund ? "text-emerald-600" : "text-[#0A4D68]"}`}>
+                  {formatMoney(Math.abs(netSettlement), currency)}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -882,20 +963,32 @@ export default function ReissueModal({ booking, onClose }) {
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
             Final Payable
           </p>
-          <div className="mt-4 space-y-3">
-            <PricingRow
-              label="Fare Difference"
-              value={formatMoney(quoteSnapshot?.fareDifference, "INR")}
+          <div className="mt-4 space-y-1.5">
+            <PricingAdjustmentRow
+              label="Flight Fare Adjustment"
+              rawAmount={quoteSnapshot?.flightAdjustment ?? quoteSnapshot?.fareDifference}
+              currency="INR"
+              helpText="Difference between previously ticketed fare and newly selected itinerary."
             />
-            <PricingRow
-              label="Supplier Reissue Charges"
-              value={formatMoney(quoteSnapshot?.reissueCharges, "INR")}
-            />
-            <PricingRow
-              label="Total Additional Collection"
-              value={formatMoney(quoteSnapshot?.totalAdjustment, "INR")}
-              strong
-            />
+            {Number(quoteSnapshot?.reissueCharges ?? quoteSnapshot?.reissueCharge ?? 0) > 0 && (
+              <PricingAdjustmentRow
+                label="Airline Reissue Penalty"
+                rawAmount={quoteSnapshot?.reissueCharges ?? quoteSnapshot?.reissueCharge}
+                currency="INR"
+                helpText="Penalty charged by airline for ticket modification."
+                forcePositive
+              />
+            )}
+            <div className="pt-1 border-t border-slate-100">
+              <PricingRow
+                label={quoteSnapshot?.isRefund ? "Refund Due" : "Net Additional Collection"}
+                value={formatMoney(
+                  quoteSnapshot?.netPayable ?? quoteSnapshot?.totalAdjustment,
+                  "INR",
+                )}
+                strong
+              />
+            </div>
           </div>
         </div>
 

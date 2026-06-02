@@ -12,12 +12,6 @@ export const fetchWalletRechargeLogs = createAsyncThunk(
     try {
       const res = await api.get("/wallet-logs", { params });
       return res.data.data;
-      /*
-        {
-          logs: [],
-          pagination: { total, page, pages }
-        }
-      */
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Failed to fetch wallet recharge logs"
@@ -58,7 +52,12 @@ const walletRechargeLogsSlice = createSlice({
       })
       .addCase(fetchWalletRechargeLogs.fulfilled, (state, action) => {
         state.loading = false;
-        state.logs = action.payload.logs;
+        const isAppend = action.meta.arg?.page > 1;
+        if (isAppend) {
+          state.logs = [...state.logs, ...action.payload.logs];
+        } else {
+          state.logs = action.payload.logs;
+        }
         state.pagination = action.payload.pagination;
       })
       .addCase(fetchWalletRechargeLogs.rejected, (state, action) => {
