@@ -52,9 +52,16 @@ function HotelSearchResults() {
       CheckIn: searchPayload.CheckIn,
       CheckOut: searchPayload.CheckOut,
       CityCode: searchPayload.CityCode,
+      CityCodes: searchPayload.CityCodes || [],
       GuestNationality: searchPayload.GuestNationality || "IN",
       NoOfRooms: searchPayload.NoOfRooms,
       PaxRooms: searchPayload.PaxRooms,
+      CityName: searchPayload.CityName,
+      CityDisplayName: searchPayload.CityDisplayName,
+      CityDisplayType: searchPayload.CityDisplayType,
+      CountryCode: searchPayload.CountryCode,
+      MetroCityName: searchPayload.MetroCityName,
+      MetroAreas: searchPayload.MetroAreas || [],
       timestamp: searchPayload.timestamp,
     };
   }, [searchPayload]);

@@ -648,6 +648,7 @@ const HeroWithSearch = ({
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [filteredCities, setFilteredCities] = useState([]);
   const [selectedCityCode, setSelectedCityCode] = useState(null);
+  const [selectedCityDetails, setSelectedCityDetails] = useState(null);
   const [noResults, setNoResults] = useState(false);
 
   const guestRef = useRef(null);
@@ -679,6 +680,7 @@ const HeroWithSearch = ({
     setCountry(code);
     setCity("");
     setSelectedCityCode(null);
+    setSelectedCityDetails(null);
     setFilteredCities([]);
   };
 
@@ -707,6 +709,8 @@ const HeroWithSearch = ({
 
   const handleCityChange = (val) => {
     setCity(val);
+    setSelectedCityCode(null);
+    setSelectedCityDetails(null);
     if (!val.trim()) {
       setFilteredCities([]);
       setShowCitySuggestions(true);
@@ -727,6 +731,7 @@ const HeroWithSearch = ({
     const code = cityObj.cityCode || cityObj.CityCode || cityObj.Code || "";
     setCity(name);
     setSelectedCityCode(code);
+    setSelectedCityDetails(cityObj);
     setFilteredCities([]);
     setShowCitySuggestions(false);
   };
@@ -752,7 +757,13 @@ const HeroWithSearch = ({
       CheckIn: checkIn,
       CheckOut: checkOut,
       CityCode: selectedCityCode,
+      CityCodes: selectedCityDetails?.cityCodes || [],
       CityName: city,
+      CityDisplayName: selectedCityDetails?.displayName || city,
+      CityDisplayType: selectedCityDetails?.displayType || "",
+      MetroCityName:
+        selectedCityDetails?.metroName || selectedCityDetails?.displayName || "",
+      MetroAreas: selectedCityDetails?.childAreas || [],
       CountryCode: country,
       GuestNationality: guestNationality,
       ResponseTime: 23,
@@ -1388,21 +1399,33 @@ const HeroWithSearch = ({
                             : currentCities;
                           return listToRender.map((c, idx) => (
                             <div
-                              key={(c.cityName || c.cityCode || idx) + idx}
+                              key={`${c.displayType || "CITY"}-${c.cityCode || idx}-${idx}`}
                               onMouseDown={() => handleCitySelect(c)}
-                              className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-amber-50 border-b last:border-0"
+                              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-amber-50 border-b last:border-0 ${
+                                c.displayType === "AREA" && c.parentMetro
+                                  ? "pl-8"
+                                  : ""
+                              }`}
                               style={{ borderColor: FIELD_BORDER }}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
                                 <FaMapMarkerAlt
                                   style={{ color: FIELD_MUTED, fontSize: 12 }}
                                 />
-                                <p
-                                  className="text-sm font-medium"
-                                  style={{ color: C.navy }}
-                                >
-                                  {c.cityName || c.CityName || c.Name}
-                                </p>
+                                <div className="min-w-0">
+                                  <p
+                                    className="text-sm font-medium truncate"
+                                    style={{ color: C.navy }}
+                                  >
+                                    {c.cityName || c.CityName || c.Name}
+                                  </p>
+                                  {c.displayType === "METRO" &&
+                                    c.childAreas?.length > 0 && (
+                                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                        Includes {c.childAreas.join(", ")}
+                                      </p>
+                                    )}
+                                </div>
                               </div>
                             </div>
                           ));

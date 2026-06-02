@@ -2,6 +2,7 @@
 
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../API/axios";
+import { groupCitiesByMetro } from "../../utils/cityGrouping";
 
 /* ======================================================
    THUNKS
@@ -33,17 +34,24 @@ export const fetchCities = createAsyncThunk(
       
       const rawCities = Array.isArray(data.data) ? data.data : data.data?.CityList || [];
       
-      const mappedCities = rawCities.map(c => ({
+      const mappedCities = rawCities.map((c) => ({
         cityName: c.cityName || c.CityName || c.Name || c.name || "",
         cityCode: c.cityCode || c.CityCode || c.Code || c.code || "",
         countryCode: c.countryCode || countryCode,
-        countryName: c.countryName || ""
+        countryName: c.countryName || "",
+        displayName: c.displayName || "",
+        displayType: c.displayType || "",
+        cityCodes: c.cityCodes || [],
+        childAreas: c.childAreas || [],
+        parentMetro: c.parentMetro || null,
+        metroName: c.metroName || null,
       }));
+      const groupedCities = groupCitiesByMetro(mappedCities, countryCode);
 
-      console.log(`🏙️ [Thunk] Cities for ${countryCode}:`, mappedCities.length);
+      console.log("[Thunk] Cities for", countryCode, groupedCities.length);
       return {
         countryCode,
-        cities: mappedCities,
+        cities: groupedCities,
       };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);

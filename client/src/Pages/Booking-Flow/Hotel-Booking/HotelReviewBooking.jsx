@@ -58,7 +58,13 @@ import api from "../../../API/axios";
 import { ProjectApproverBlock } from "./components/ProjectApproverBlock";
 import { selectManager } from "../../../Redux/Actions/manager.thunk";
 import { fetchMySSRPolicy } from "../../../Redux/Actions/ssrPolicy.thunks";
+import CustomDatePicker from "../../../components/Shared/CustomDatePicker";
 import { fetchMyProfile } from "../../../Redux/Slice/employeeActionSlice";
+import {
+  calculateDobRange,
+  getAgeOnTravelDate,
+  validatePassengerDob,
+} from "../../../utils/passengerDobValidation";
 import {
   handleHotelPreBookSessionExpiry,
   isHotelPreBookSessionExpired,
@@ -1003,6 +1009,7 @@ const HotelReviewBooking = () => {
 
   const [travelers, setTravelers] = useState([]);
   const [purposeOfTravel, setPurposeOfTravel] = useState("");
+  const [applyLeadPan, setApplyLeadPan] = useState(false);
   const [bookingRequest, setBookingRequest] = useState(null);
   const [flightRulesStatus, setFlightRulesStatus] = useState("loading"); // "loading", "ready", "error"
   const [isCorporateBooking, setIsCorporateBooking] = useState(false);
@@ -1469,6 +1476,31 @@ const HotelReviewBooking = () => {
       }
     : searchParams;
 
+  const hotelTravelDate =
+    displaySearchParams?.checkIn ||
+    displaySearchParams?.CheckInDate ||
+    searchParams?.checkIn ||
+    searchParams?.CheckInDate ||
+    new Date().toISOString().split("T")[0];
+
+  const getHotelExpectedAge = (traveler) => {
+    const expected =
+      traveler?.originalAge ??
+      traveler?.expectedAge ??
+      traveler?.searchedAge;
+    return expected !== undefined && expected !== null && expected !== ""
+      ? Number(expected)
+      : undefined;
+  };
+
+  const getHotelDobRange = (traveler) =>
+    calculateDobRange({
+      passengerType: traveler?.paxType === 2 ? "CHD" : "ADT",
+      expectedAge: getHotelExpectedAge(traveler),
+      travelDate: hotelTravelDate,
+      rules: traveler?.paxType === 1 ? { minAge: 18, maxAge: null } : undefined,
+    });
+
   const totalAdults = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
     (sum, r) => sum + (r.Adults || r.adults || 0),
     0,
@@ -1585,39 +1617,36 @@ const HotelReviewBooking = () => {
         }
       }
 
-      // AGE VALIDATION
+      // AGE / DOB VALIDATION
       const ageNum = Number(t.age);
+      const expectedAge = getHotelExpectedAge(t);
+      const dobValidation = validatePassengerDob({
+        dob: t.dob,
+        passengerType: t.paxType === 2 ? "CHD" : "ADT",
+        expectedAge,
+        travelDate: hotelTravelDate,
+        required: t.paxType === 2 || expectedAge !== undefined,
+        rules: t.paxType === 1 ? { minAge: 18, maxAge: null } : undefined,
+      });
+
+      if (!dobValidation.valid) {
+        tErrors.dob = dobValidation.error;
+      }
+
+      const effectiveAgeNum = dobValidation.age ?? ageNum;
       if (t.paxType === 2) {
-        // DOB is required for children
-        if (!t.dob) {
-          tErrors.dob = "Date of Birth is required for child";
-        } else {
-          // Calculate age from DOB and check if it matches the searched age
-          const today = new Date();
-          const birth = new Date(t.dob);
-          if (isNaN(birth.getTime())) {
-            tErrors.dob = "Invalid Date of Birth";
-          } else {
-            let calcAge = today.getFullYear() - birth.getFullYear();
-            const m = today.getMonth() - birth.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) calcAge--;
-            if (t.originalAge && String(calcAge) !== String(t.originalAge)) {
-              tErrors.dob = `Age from DOB (${calcAge} yrs) does not match searched age (${t.originalAge} yrs). Please enter a valid Date of Birth.`;
-            }
-          }
-        }
-        if (!tErrors.dob && (isNaN(ageNum) || ageNum < 0 || ageNum > 18)) {
+        if (!tErrors.dob && (isNaN(effectiveAgeNum) || effectiveAgeNum < 0 || effectiveAgeNum > 18)) {
           tErrors.age = "Child age must be 0-18";
         }
-      } else {
-        if (isNaN(ageNum) || ageNum <= 18) {
+      } else if (t.dob || t.age) {
+        if (isNaN(effectiveAgeNum) || effectiveAgeNum <= 18) {
           tErrors.age = "Adult age must be above 18";
         }
       }
 
       // PAN CARD
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      const isAdult = t.paxType === 1 && Number(t.age) > 18;
+      const isAdult = t.paxType === 1 && Number(effectiveAgeNum) > 18;
       const panRequiredCount = validation?.PanCountRequired || 0;
 
       let isPanMandatoryForThisTraveller = false;
@@ -2136,7 +2165,7 @@ const HotelReviewBooking = () => {
               </div>
             ) : (
               /* Non-BookNow mode: editable guest form */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
@@ -2169,10 +2198,11 @@ const HotelReviewBooking = () => {
                   {travelers.map((t, index) => (
                     <div
                       key={t.id || t._id || index}
-                      className="rounded-2xl border border-slate-200 overflow-hidden shadow-md shadow-black/20"
+                      className="rounded-2xl border border-slate-200 shadow-md shadow-black/20 relative"
+                      style={{ zIndex: travelers.length - index + 10 }}
                     >
                       {/* Card Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200">
+                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200 rounded-t-2xl">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
                             {index + 1}
@@ -2189,7 +2219,7 @@ const HotelReviewBooking = () => {
                         </div>
                       </div>
 
-                      <div className="p-5 space-y-6 bg-white">
+                      <div className="p-5 space-y-6 bg-white rounded-b-2xl">
                         {/* Full Name */}
                         <div>
                           <SectionHeading
@@ -2397,29 +2427,34 @@ const HotelReviewBooking = () => {
                               <label className="field-label">
                                 Date of Birth{t.paxType === 2 && <span className="text-red-500 ml-0.5">*</span>}
                               </label>
-                              <input
-                                type="date"
-                                value={t.dob || ""}
-                                disabled={isBookNowMode}
-                                onChange={(e) => {
-                                  const dob = e.target.value;
-                                  const today = new Date();
-                                  const birth = new Date(dob);
-                                  let age =
-                                    today.getFullYear() - birth.getFullYear();
-                                  const m = today.getMonth() - birth.getMonth();
-                                  if (
-                                    m < 0 ||
-                                    (m === 0 &&
-                                      today.getDate() < birth.getDate())
-                                  )
-                                    age--;
-
-                                  updateTraveler(t.id, "dob", dob);
-                                  updateTraveler(t.id, "age", age);
-                                }}
-                                className={`field-input ${formErrors[t.id]?.dob ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                              />
+                              {isBookNowMode ? (
+                                <input
+                                  type="date"
+                                  value={t.dob || ""}
+                                  disabled={true}
+                                  className="field-input"
+                                />
+                              ) : (
+                                <div className={formErrors[t.id]?.dob ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                                  <CustomDatePicker
+                                    value={t.dob || ""}
+                                    maxDate={getHotelDobRange(t)?.maxDate}
+                                    minDate={getHotelDobRange(t)?.minDate}
+                                    helperText={getHotelDobRange(t)?.helperText}
+                                    onChange={(val) => {
+                                      if (!val) {
+                                        updateTraveler(t.id, "dob", "");
+                                        updateTraveler(t.id, "age", "");
+                                        return;
+                                      }
+                                      const dob = val;
+                                      const age = getAgeOnTravelDate(dob, hotelTravelDate);
+                                      updateTraveler(t.id, "dob", dob);
+                                      updateTraveler(t.id, "age", age ?? "");
+                                    }}
+                                  />
+                                </div>
+                              )}
                               {formErrors[t.id]?.dob && (
                                 <p className="text-[10px] text-red-500 mt-1">
                                   {formErrors[t.id].dob}
@@ -2469,13 +2504,20 @@ const HotelReviewBooking = () => {
                                     t.paxType === 2 ||
                                     (t.age && Number(t.age) <= 18)
                                   }
-                                  onChange={(e) =>
-                                    updateTraveler(
-                                      t.id,
-                                      "panCard",
-                                      e.target.value.toUpperCase(),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value.toUpperCase();
+                                    setTravelers((prev) =>
+                                      prev.map((tr) => {
+                                        if (tr.id === t.id) {
+                                          return { ...tr, panCard: val };
+                                        }
+                                        if (t.leadPassenger && applyLeadPan && tr.paxType === 1 && !tr.leadPassenger) {
+                                          return { ...tr, panCard: val };
+                                        }
+                                        return tr;
+                                      })
+                                    );
+                                  }}
                                   placeholder="ABCDE1234F"
                                   maxLength={10}
                                   className={`field-input font-mono tracking-widest ${formErrors[t.id]?.panCard ? "border-red-500 ring-1 ring-red-500" : ""}`}
@@ -2488,6 +2530,32 @@ const HotelReviewBooking = () => {
                                 <p className="text-[10px] text-yellow-700 font-semibold">
                                   {isCorporateBooking ? "Enter Valid Corporate PAN." : "Required only for adults older than 18."}
                                 </p>
+                                {t.leadPassenger && travelers.some(tr => tr.paxType === 1 && !tr.leadPassenger) && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <input 
+                                      type="checkbox" 
+                                      id="applyLeadPan"
+                                      checked={applyLeadPan}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setApplyLeadPan(checked);
+                                        if (checked && t.panCard) {
+                                          setTravelers(prev => prev.map(tr => 
+                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: t.panCard } : tr
+                                          ));
+                                        } else if (!checked) {
+                                          setTravelers(prev => prev.map(tr => 
+                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: "" } : tr
+                                          ));
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-[#C9A84C] focus:ring-[#C9A84C] cursor-pointer"
+                                    />
+                                    <label htmlFor="applyLeadPan" className="text-xs text-slate-600 font-medium cursor-pointer">
+                                      Apply this PAN card to all other adults
+                                    </label>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

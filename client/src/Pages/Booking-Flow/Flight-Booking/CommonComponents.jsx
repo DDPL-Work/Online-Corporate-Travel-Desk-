@@ -34,6 +34,11 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useNavigate } from "react-router-dom";
 import { airlineLogo, airlineThemes } from "../../../utils/formatter";
+import CustomDatePicker from "../../../components/Shared/CustomDatePicker";
+import {
+  calculateDobRange,
+  getAgeOnTravelDate,
+} from "../../../utils/passengerDobValidation";
 import "./Fares.css"; // custom animation + minor overrides
 
 // Updated color scheme - corporate premium
@@ -1080,20 +1085,23 @@ const isInternationalTrip = (parsedFlightData) => {
   return false;
 };
 
-const calculateAgeFromDOB = (dob) => {
-  if (!dob) return "";
+const getFlightTravelDate = (parsedFlightData) =>
+  parsedFlightData?.flightData?.date ||
+  parsedFlightData?.segments?.[0]?.dt ||
+  parsedFlightData?.onwardSegments?.[0]?.dt ||
+  parsedFlightData?.allSegmentsData?.[0]?.segments?.[0]?.dt ||
+  new Date().toISOString().split("T")[0];
 
-  const birthDate = new Date(dob);
-  const today = new Date();
+const getExpectedPassengerAge = (traveler) => {
+  const expected =
+    traveler?.expectedAge ??
+    traveler?.originalAge ??
+    traveler?.searchedAge ??
+    traveler?.searchAge;
 
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-
-  return age;
+  return expected !== undefined && expected !== null && expected !== ""
+    ? Number(expected)
+    : undefined;
 };
 
 export const TravelerForm = ({
@@ -1113,6 +1121,7 @@ export const TravelerForm = ({
 
   const isInternational =
     isIntlFromProp ?? isInternationalTrip(parsedFlightData);
+  const travelDate = getFlightTravelDate(parsedFlightData);
 
   const adultOptions = travelers
     .map((t, idx) =>
@@ -1249,7 +1258,16 @@ export const TravelerForm = ({
           </p>
         </div>
 
-        {travelers.map((traveler, index) => (
+        {travelers.map((traveler, index) => {
+          const paxType = (traveler.type || "ADULT").toUpperCase();
+          const expectedAge = getExpectedPassengerAge(traveler);
+          const dobRange = calculateDobRange({
+            passengerType: paxType,
+            expectedAge,
+            travelDate,
+          });
+
+          return (
           <div
             key={traveler.id ?? index}
             className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
@@ -1260,7 +1278,7 @@ export const TravelerForm = ({
                   Passenger {index + 1}
                 </p>
                 <p className="text-sm font-bold text-gray-800">
-                  {(traveler.type || "ADULT").toUpperCase()}
+                  {paxType}
                 </p>
               </div>
               {traveler.type === "INFANT" && (
@@ -1478,21 +1496,24 @@ export const TravelerForm = ({
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Date of Birth
+                  {(paxType === "CHILD" || paxType === "INFANT" || expectedAge !== undefined) && (
+                    <span className="text-red-500"> *</span>
+                  )}
                 </label>
-                <input
-                  type="date"
-                  value={traveler.dob || ""}
-                  onChange={(e) => {
-                    const dob = e.target.value;
-                    const age = calculateAgeFromDOB(dob);
+                <div className={errors?.[index]?.dob ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                  <CustomDatePicker
+                    value={traveler.dob || ""}
+                    minDate={dobRange?.minDate}
+                    maxDate={dobRange?.maxDate}
+                    helperText={dobRange?.helperText}
+                    onChange={(dob) => {
+                      const age = dob ? getAgeOnTravelDate(dob, travelDate) : "";
 
-                    updateTraveler(traveler.id, "dob", dob);
-                    updateTraveler(traveler.id, "age", age); // derived
-                  }}
-                  className={`w-full px-4 py-3 border-2 rounded-lg ${
-                    errors?.[index]?.dob ? "border-red-500" : "border-gray-300"
-                  }`}
-                />
+                      updateTraveler(traveler.id, "dob", dob || "");
+                      updateTraveler(traveler.id, "age", age ?? "");
+                    }}
+                  />
+                </div>
                 {errors?.[index]?.dob && (
                   <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
                     {errors[index].dob}
@@ -1649,7 +1670,8 @@ export const TravelerForm = ({
               </p>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {canAddMore && (
           <button

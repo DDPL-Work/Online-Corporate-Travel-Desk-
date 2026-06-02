@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiClock, FiX, FiEye, FiCreditCard, FiArrowLeft, FiCalendar, FiPower, FiPercent } from "react-icons/fi";
-import { MdVerifiedUser, MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
+import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiClock, FiX, FiCreditCard, FiPercent, FiInbox, FiCalendar } from "react-icons/fi";
+import { MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
+import { FaChartLine } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
-import AddCorporateModal from "../../Modal/AddCorporateModal";
-import ViewCorporateModal from "../../Modal/ViewCorporateModal";
-import ToggleStatusModal from "../../Modal/ToggleStatusModal";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
-import useExcelExporter from "../../services/export/useExcelExporter";
-import { onboardedCorporatesExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
 const C = {
   navy: "#003399",
@@ -84,71 +80,46 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-export default function OnboardedCorporates() {
+export default function MarkupEngine() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const tableScrollRef = useRef(null);
-  const { exportExcel, exportingKey } = useExcelExporter();
 
   const { corporates = [], loading } = useSelector(
     (state) => state.corporateList
   );
 
-  const [openAddModal, setOpenAddModal] = useState(false);
-  const [openViewModal, setOpenViewModal] = useState(false);
-  const [openStatusModal, setOpenStatusModal] = useState(false);
-  const [selectedCorporate, setSelectedCorporate] = useState(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("");
-  const isExporting = exportingKey === "onboarded_corporates";
+  const [corporateFilter, setCorporateFilter] = useState("");
 
   useEffect(() => {
     dispatch(fetchCorporates());
   }, [dispatch]);
-
-  const handleExport = () => {
-    if (loading) return;
-
-    const statCards = [
-      { label: "Total Corporates", value: stats.total },
-      { label: "Active Corporates", value: stats.active },
-      { label: "Pending Approval", value: stats.pending },
-      { label: "Postpaid Accounts", value: stats.postpaid },
-    ];
-
-    const appliedFilters = [
-      { label: "Search", value: search || "None" },
-      { label: "Filter Status", value: filter },
-      { label: "Date Filter", value: dateFilter || "Any" },
-    ];
-
-    exportExcel({
-      key: "onboarded_corporates",
-      pageHeader: "Onboarded Corporates",
-      statCards,
-      appliedFilters,
-      data: filtered,
-      columns: onboardedCorporatesExportTemplate,
-      filenamePrefix: "onboarded_corporates_export",
-      emptyMessage: "No corporates available to export",
-      successMessage: "Corporates exported",
-    });
-  };
 
   const stats = useMemo(() => {
     const all = corporates || [];
     return {
       total: all.length,
       active: all.filter((c) => c.status === "active").length,
-      pending: all.filter((c) => c.status === "pending").length,
       postpaid: all.filter((c) => c.classification === "postpaid").length,
+      prepaid: all.filter((c) => c.classification === "prepaid").length,
     };
   }, [corporates]);
 
+  const activeCorporates = useMemo(() => {
+    return (corporates || []).filter((c) => {
+      const status = String(c.status || "").toLowerCase();
+      return status === "active" || status === "approved";
+    });
+  }, [corporates]);
+
   const filtered = useMemo(() => {
-    let list = corporates || [];
-    if (filter !== "all") list = list.filter((c) => c.status === filter);
+    let list = [...activeCorporates].reverse();
+    
+    if (corporateFilter) {
+      list = list.filter((c) => c._id === corporateFilter);
+    }
+    
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((c) => {
@@ -160,17 +131,8 @@ export default function OnboardedCorporates() {
         );
       });
     }
-    if (dateFilter) {
-      list = list.filter((c) => {
-        const dateToCheck = c.status === "pending" ? c.createdAt : (c.onboardDate || c.updatedAt || c.createdAt);
-        if (!dateToCheck) return false;
-        const d = new Date(dateToCheck);
-        if (isNaN(d.getTime())) return false;
-        return d.toISOString().split('T')[0] === dateFilter;
-      });
-    }
     return list;
-  }, [corporates, filter, search, dateFilter]);
+  }, [activeCorporates, search, corporateFilter]);
 
   const handleRefresh = () => dispatch(fetchCorporates());
 
@@ -181,12 +143,6 @@ export default function OnboardedCorporates() {
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
-               <button 
-                  onClick={() => navigate(-1)} 
-                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white shadow-sm"
-               >
-                 <FiArrowLeft size={20} />
-               </button>
                <button 
                   onClick={handleRefresh} 
                   className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
@@ -202,12 +158,12 @@ export default function OnboardedCorporates() {
 
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
-                 <MdBusiness size={28} />
+                 <FaChartLine size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Onboarded Corporates</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Markup Engine</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Manage your corporate partners and their classifications
+                   Manage global pricing strategies and corporate markups
                  </p>
                </div>
              </div>
@@ -219,15 +175,15 @@ export default function OnboardedCorporates() {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard label="Total Corporates" value={stats.total} Icon={MdBusiness} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-          <StatCard label="Active Corporates" value={stats.active} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-          <StatCard label="Pending Approval" value={stats.pending} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+          <StatCard label="Active Markups" value={stats.active} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
           <StatCard label="Postpaid Accounts" value={stats.postpaid} Icon={FiUsers} borderCls="border-indigo-500" iconBgCls="bg-indigo-50" iconColorCls="text-indigo-600" />
+          <StatCard label="Prepaid Accounts" value={stats.prepaid} Icon={FiCreditCard} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
         </div>
 
         {/* Filter Section */}
         <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-            <div className="flex flex-col gap-1.5 lg:col-span-5">
+            <div className="flex flex-col gap-1.5 lg:col-span-6">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FiSearch size={12} /> Search Directory</label>
               <div className="relative">
                 <input
@@ -241,32 +197,22 @@ export default function OnboardedCorporates() {
               </div>
             </div>
             
-            <div className="flex flex-col gap-1.5 lg:col-span-3">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FiCheckCircle size={12}/> Filter Status</label>
+            <div className="flex flex-col gap-1.5 lg:col-span-4">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Select Corporate</label>
               <select
                 className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                value={corporateFilter}
+                onChange={(e) => setCorporateFilter(e.target.value)}
               >
-                <option value="all">All Corporates</option>
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="suspended">Suspended</option>
+                <option value="">All Corporates</option>
+                {activeCorporates.map(c => (
+                  <option key={c._id} value={c._id}>{c.corporateName}</option>
+                ))}
               </select>
             </div>
-
-            <div className="flex flex-col gap-1.5 lg:col-span-3">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FiCalendar size={12}/> Date Filter</label>
-              <input
-                type="date"
-                className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-              />
-            </div>
             
-            <div className="flex items-end lg:col-span-1">
-               <button onClick={() => { setSearch(""); setFilter("all"); setDateFilter(""); }} title="Reset Filters" className="w-full py-2.5 rounded-xl font-black text-[13px] flex items-center justify-center border shadow-sm transition-all hover:bg-slate-100 hover:text-slate-700 bg-white text-slate-500 border-slate-200">
+            <div className="flex items-end lg:col-span-2">
+               <button onClick={() => { setSearch(""); setCorporateFilter(""); }} title="Reset Filters" className="w-full py-2.5 rounded-xl font-black text-[13px] flex items-center justify-center border shadow-sm transition-all hover:bg-slate-100 hover:text-slate-700 bg-white text-slate-500 border-slate-200">
                   <FiX />
                </button>
             </div>
@@ -277,18 +223,9 @@ export default function OnboardedCorporates() {
         <div className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: C.border }}>
           <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: C.border, background: C.white }}>
             <div>
-              <h2 className="font-black text-slate-800 tracking-tight text-lg">Corporate Ledger</h2>
-              <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>{filtered.length} corporate records</p>
+              <h2 className="font-black text-slate-800 tracking-tight text-lg">Markup Profiles</h2>
+              <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>Select a corporate to configure their markup settings</p>
             </div>
-            <TableActionBar
-              scrollRef={tableScrollRef}
-              exportLabel="Export CSV"
-              onExport={handleExport}
-              exportDisabled={loading || isExporting}
-              exportLoading={isExporting}
-              exportClassName="bg-[#003399] hover:bg-[#002266] text-white shadow-sm rounded-lg text-xs font-bold px-4 py-2"
-              arrowClassName="border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-50"
-            />
           </div>
           
           <div ref={tableScrollRef} className="overflow-x-auto">
@@ -298,7 +235,6 @@ export default function OnboardedCorporates() {
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Corporate Entity</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Primary Contact</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Classification</th>
-                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Financial Status</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Date</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Status</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest text-center">Action</th>
@@ -307,7 +243,7 @@ export default function OnboardedCorporates() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-20 text-center">
+                    <td colSpan="6" className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="animate-spin text-[#003399]">
                           <FiRefreshCw size={32} />
@@ -351,14 +287,6 @@ export default function OnboardedCorporates() {
                       </td>
                       
                       <td className="px-6 py-5">
-                        <p className="text-xs font-black whitespace-normal break-words" style={{ color: C.navy }}>
-                          {c.classification === "postpaid"
-                            ? `₹${c.currentCredit} / ₹${c.creditLimit}`
-                            : `Wallet: ₹${c.walletBalance || 0}`}
-                        </p>
-                      </td>
-                      
-                      <td className="px-6 py-5">
                         <div className="flex flex-col">
                           <span className="text-[11px] font-black text-slate-700">
                             {(() => {
@@ -380,25 +308,13 @@ export default function OnboardedCorporates() {
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => {
-                              setSelectedCorporate(c);
-                              setOpenViewModal(true);
+                              navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });
                             }}
-                            className="p-2 rounded hover:bg-[#003399]/10 text-[#003399] transition-colors cursor-pointer"
-                            title="View Corporate"
+                            className="px-4 py-2 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
+                            title="Configure Markup"
                           >
-                            <FiEye size={16} />
+                            <FiPercent size={14} /> Configure
                           </button>
-                          {c.status !== "pending" && (
-                            <button
-                              onClick={() => {
-                                navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });
-                              }}
-                              className="p-2 rounded hover:bg-violet-100 text-violet-600 transition-colors cursor-pointer"
-                              title="Markup Configuration"
-                            >
-                              <FiPercent size={16} />
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -406,7 +322,7 @@ export default function OnboardedCorporates() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-6 py-20 text-center">
+                    <td colSpan="6" className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                           <FiInbox size={32} />
@@ -420,17 +336,6 @@ export default function OnboardedCorporates() {
             </table>
           </div>
         </div>
-
-        {/* MODAL */}
-        {openAddModal && (
-          <AddCorporateModal onClose={() => setOpenAddModal(false)} />
-        )}
-        {openViewModal && selectedCorporate && (
-          <ViewCorporateModal corporate={selectedCorporate} onClose={() => setOpenViewModal(false)} />
-        )}
-        {/* {openStatusModal && selectedCorporate && (
-          <ToggleStatusModal corporate={selectedCorporate} onClose={() => setOpenStatusModal(false)} />
-        )} */}
       </div>
     </div>
   );

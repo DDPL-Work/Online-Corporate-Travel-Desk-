@@ -18,6 +18,7 @@ const normalizeGuestConfig = (room = {}) => {
 
 const buildSearchCacheKey = ({
   CityCode,
+  CityCodes,
   CheckIn,
   CheckOut,
   GuestNationality = "IN",
@@ -31,7 +32,11 @@ const buildSearchCacheKey = ({
     .map(normalizeGuestConfig)
     .join("|")}`;
 
-  const key = `search:${String(CityCode || "").trim()}:${fmtDate(CheckIn)}:${fmtDate(CheckOut)}:${paxSignature}:${String(
+  const citySignature = Array.isArray(CityCodes) && CityCodes.length
+    ? CityCodes.map((code) => String(code || "").trim()).filter(Boolean).join(",")
+    : String(CityCode || "").trim();
+
+  const key = `search:${citySignature}:${fmtDate(CheckIn)}:${fmtDate(CheckOut)}:${paxSignature}:${String(
     GuestNationality || "IN",
   ).trim().toUpperCase()}`;
 

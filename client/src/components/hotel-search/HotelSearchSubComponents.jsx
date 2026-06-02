@@ -3,6 +3,20 @@ import { FaGlobe, FaChevronDown, FaSearch } from "react-icons/fa";
 
 const GOLD = "#C9A240";
 
+const getOptionSearchText = (item = {}, displayKey = "Name") =>
+  [
+    item[displayKey],
+    item.displayName,
+    item.cityName,
+    item.CityName,
+    item.Name,
+    item.cityCode,
+    item.CityCode,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
 /* ─── Shared Country Selector ─── */
 export const CountrySelector = ({ value, onChange, countries, label = "Country", disabled = false, variant = "default" }) => {
   const [open, setOpen] = useState(false);
@@ -158,8 +172,8 @@ export const SearchableSelect = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filtered = options.filter((item) => 
-    String(item[displayKey] || "").toLowerCase().includes(search.toLowerCase())
+  const filtered = options.filter((item) =>
+    getOptionSearchText(item, displayKey).includes(search.toLowerCase())
   );
   
   const selected = options.find((opt) => opt[valueKey] === value);
@@ -207,11 +221,20 @@ export const SearchableSelect = ({
                 <div
                   key={item[valueKey]}
                   onClick={() => { onChange(item); setOpen(false); setSearch(""); }}
-                  className="px-4 py-3 text-sm cursor-pointer flex items-center justify-between hover:bg-blue-50 transition-colors group"
+                  className={`px-4 py-3 text-sm cursor-pointer flex items-center justify-between hover:bg-blue-50 transition-colors group ${
+                    item.displayType === "AREA" && item.parentMetro ? "pl-8" : ""
+                  }`}
                 >
-                  <span className={`font-semibold group-hover:text-blue-700 ${value === item[valueKey] ? "text-blue-700" : "text-gray-700"}`}>
-                    {item[displayKey]}
-                  </span>
+                  <div className="min-w-0">
+                    <span className={`block truncate font-semibold group-hover:text-blue-700 ${value === item[valueKey] ? "text-blue-700" : "text-gray-700"}`}>
+                      {item[displayKey]}
+                    </span>
+                    {item.displayType === "METRO" && item.childAreas?.length > 0 && (
+                      <span className="block text-[10px] text-gray-400 font-medium truncate mt-0.5">
+                        Includes {item.childAreas.join(", ")}
+                      </span>
+                    )}
+                  </div>
                   {value === item[valueKey] && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                 </div>
               ))

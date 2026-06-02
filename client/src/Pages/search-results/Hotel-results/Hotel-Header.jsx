@@ -121,6 +121,11 @@ const Header = () => {
     country: "IN",
     cityCode: "",
     cityName: "",
+    cityCodes: [],
+    cityDisplayName: "",
+    cityDisplayType: "",
+    metroCityName: "",
+    metroAreas: [],
     checkIn: "",
     checkOut: "",
     rooms: 1,
@@ -153,12 +158,18 @@ const Header = () => {
         "IN";
       const cityName = searchPayload.CityName || searchPayload.cityName || "";
       const cityCode = searchPayload.CityCode || searchPayload.cityCode || "";
+      const cityCodes = searchPayload.CityCodes || searchPayload.cityCodes || [];
 
       setForm({
         country: destCountry,
         guestNationality: searchPayload.GuestNationality || "IN",
         cityCode: cityCode,
         cityName: cityName,
+        cityCodes,
+        cityDisplayName: searchPayload.CityDisplayName || cityName,
+        cityDisplayType: searchPayload.CityDisplayType || "",
+        metroCityName: searchPayload.MetroCityName || "",
+        metroAreas: searchPayload.MetroAreas || [],
         checkIn: searchPayload.CheckIn || "",
         checkOut: searchPayload.CheckOut || "",
         rooms: searchPayload.NoOfRooms || 1,
@@ -195,10 +206,24 @@ const Header = () => {
 
   useEffect(() => {
     if (form.cityCode && currentCities.length > 0) {
-      const matched = currentCities.find((c) => c.cityCode === form.cityCode);
-      if (matched) setForm((prev) => ({ ...prev, cityName: matched.cityName }));
+      const matched = currentCities.find(
+        (c) =>
+          c.cityCode === form.cityCode &&
+          (!form.cityDisplayType || c.displayType === form.cityDisplayType),
+      );
+      if (matched) {
+        setForm((prev) => ({
+          ...prev,
+          cityName: matched.cityName,
+          cityCodes: matched.cityCodes || [],
+          cityDisplayName: matched.displayName || matched.cityName,
+          cityDisplayType: matched.displayType || "",
+          metroCityName: matched.metroName || matched.displayName || "",
+          metroAreas: matched.childAreas || [],
+        }));
+      }
     }
-  }, [form.cityCode, currentCities]);
+  }, [form.cityCode, form.cityDisplayType, currentCities]);
 
   useEffect(() => {
     setRoomConfigs((prev) => {
@@ -235,7 +260,12 @@ const Header = () => {
       CheckIn: form.checkIn,
       CheckOut: form.checkOut,
       CityCode: form.cityCode,
+      CityCodes: form.cityCodes,
       CityName: form.cityName,
+      CityDisplayName: form.cityDisplayName || form.cityName,
+      CityDisplayType: form.cityDisplayType,
+      MetroCityName: form.metroCityName,
+      MetroAreas: form.metroAreas,
       CountryCode: form.country,
       GuestNationality: form.guestNationality,
       NoOfRooms: form.rooms,
@@ -333,6 +363,11 @@ const Header = () => {
                   ...form,
                   cityCode: item.cityCode,
                   cityName: item.cityName,
+                  cityCodes: item.cityCodes || [],
+                  cityDisplayName: item.displayName || item.cityName,
+                  cityDisplayType: item.displayType || "",
+                  metroCityName: item.metroName || item.displayName || "",
+                  metroAreas: item.childAreas || [],
                 })
               }
               placeholder="Where are you going?"
@@ -496,6 +531,11 @@ const Header = () => {
             {form.cityName && (
               <span className="text-white/50 text-xs font-medium flex items-center gap-1">
                 <MdLocationOn className="text-xs" /> {form.cityName}
+              </span>
+            )}
+            {form.cityDisplayType === "METRO" && form.metroAreas?.length > 0 && (
+              <span className="text-white/40 text-xs font-medium">
+                Includes: {form.metroAreas.join(", ")}
               </span>
             )}
             {nights > 0 && (

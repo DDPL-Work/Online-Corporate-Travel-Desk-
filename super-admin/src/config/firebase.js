@@ -188,10 +188,10 @@ export const requestForToken = async () => {
       window.localStorage.setItem(FCM_TOKEN_CACHE_KEY, currentToken);
     }
 
-    console.info(`[FCM:${APP_NAME}] FCM token generated`, {
-      refreshed: previousToken !== currentToken,
-      tokenPreview: `${currentToken.slice(0, 12)}...${currentToken.slice(-8)}`,
-    });
+    // console.info(`[FCM:${APP_NAME}] FCM token generated`, {
+    //   refreshed: previousToken !== currentToken,
+    //   tokenPreview: `${currentToken.slice(0, 12)}...${currentToken.slice(-8)}`,
+    // });
 
     return currentToken;
   } catch (error) {

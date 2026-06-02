@@ -41,6 +41,10 @@ import { ProjectApproverBlock } from "../Hotel-Booking/components/ProjectApprove
 import Swal from "sweetalert2";
 import LandingHeader from "../../../layout/LandingHeader";
 import { mergeLeadTravelerProfile } from "../../../utils/profileTraveler";
+import {
+  getAgeOnTravelDate,
+  validatePassengerDob,
+} from "../../../utils/passengerDobValidation";
 
 import { clearFareDetails } from "../../../Redux/Slice/flightSearchSliceRT";
 
@@ -1305,15 +1309,14 @@ export default function RoundTripFlightBooking() {
     };
   };
 
-  const ageFromDob = (dob) => {
-    if (!dob) return null;
-    const birth = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age;
-  };
+  const getTravelDateForDob = () =>
+    parsedFlightData?.onwardSegments?.[0]?.dt ||
+    parsedFlightData?.onwardData?.date ||
+    rawFlightData?.onward?.Segments?.[0]?.[0]?.Origin?.DepTime ||
+    searchParams?.departureDate ||
+    new Date().toISOString().split("T")[0];
+
+  const ageFromDob = (dob) => getAgeOnTravelDate(dob, getTravelDateForDob());
 
   // Auto-calculate and keep traveler age (incl. infants) in sync with DOB
   useEffect(() => {
@@ -1368,18 +1371,17 @@ export default function RoundTripFlightBooking() {
       if (!t.nationality?.trim()) e.nationality = "Nationality is required";
 
       const paxType = (t.type || "ADULT").toUpperCase();
-      const age = ageFromDob(t.dob);
+      const expectedAge = t.expectedAge ?? t.originalAge ?? t.searchedAge;
+      const dobValidation = validatePassengerDob({
+        dob: t.dob,
+        passengerType: paxType,
+        expectedAge,
+        travelDate: getTravelDateForDob(),
+        required: paxType === "CHILD" || paxType === "INFANT" || expectedAge !== undefined,
+      });
 
-      if (age != null) {
-        if (paxType === "ADULT" && age < 12) {
-          e.dob = "Adult must be 12+ years";
-        }
-        if (paxType === "CHILD" && (age < 2 || age > 11)) {
-          e.dob = "Child age must be 2-11 years";
-        }
-        if (paxType === "INFANT" && age >= 2) {
-          e.dob = "Infant must be under 2 years";
-        }
+      if (!dobValidation.valid) {
+        e.dob = dobValidation.error;
       }
 
       if (paxType === "INFANT") {

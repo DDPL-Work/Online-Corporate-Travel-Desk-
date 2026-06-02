@@ -10,6 +10,12 @@ const TBOCity = require("../models/TBOCity");
 const TBOHotel = require("../models/TBOHotel");
 const TBOHotelDetails = require("../models/TBOHotelDetails");
 const {
+  expandMetroCityCodes,
+  getMetroAreas,
+  groupCitiesByMetro,
+  isMetroSearch,
+} = require("../utils/cityGrouping");
+const {
   buildHotelFilterMeta,
   prepareHotelsForFiltering,
   applyHotelFilters,
@@ -103,18 +109,28 @@ const fetchFullHotelSearchDataset = async ({
   CheckIn,
   CheckOut,
   CityCode,
+  CityCodes,
   GuestNationality,
   NoOfRooms,
   PaxRooms,
   IsDetailedResponse,
   ResponseTime,
 }) => {
-  const localHotels = await TBOHotel.find({ cityCode: CityCode })
-    .select("hotelCode")
-    .lean();
+  const expandedCityCodes = Array.isArray(CityCodes) && CityCodes.length
+    ? CityCodes.map((code) => String(code || "").trim()).filter(Boolean)
+    : [String(CityCode || "").trim()].filter(Boolean);
+
+  const hotelsByCity = await Promise.all(
+    expandedCityCodes.map((cityCode) =>
+      TBOHotel.find({ cityCode }).select("hotelCode").lean(),
+    ),
+  );
+  const localHotels = hotelsByCity.flat();
 
   if (!localHotels.length) {
-    logger.warn(`[hotel-search] No hotel codes found in DB for city ${CityCode}`);
+    logger.warn(
+      `[hotel-search] No hotel codes found in DB for city codes ${expandedCityCodes.join(",")}`,
+    );
     return {
       hotels: [],
       traceId: null,
@@ -122,12 +138,17 @@ const fetchFullHotelSearchDataset = async ({
       totalChunks: 0,
       elapsedMs: 0,
       totalHotelCodes: 0,
+      expandedCityCodes,
     };
   }
 
-  const hotelCodes = localHotels
-    .map((hotel) => String(hotel.hotelCode || "").trim())
-    .filter(Boolean);
+  const hotelCodes = [
+    ...new Set(
+      localHotels
+        .map((hotel) => String(hotel.hotelCode || "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
   // logger.info(
   //   `[hotel-search] Starting full search for ${hotelCodes.length} hotel codes in city ${CityCode}`,
@@ -166,6 +187,7 @@ const fetchFullHotelSearchDataset = async ({
       buildDetailsLookup(hotelDetails),
     ),
     totalHotelCodes: hotelCodes.length,
+    expandedCityCodes,
   };
 };
 
@@ -236,11 +258,15 @@ exports.getCityList = asyncHandler(async (req, res) => {
   const cities = await TBOCity.find(query)
     .select("cityCode cityName countryCode countryName -_id")
     .sort({ cityName: 1 });
+  const groupedCities = groupCitiesByMetro(
+    cities.map((city) => city.toObject()),
+    countryCode,
+  );
 
   return res.status(200).json(
     new ApiResponse(
       200,
-      cities,
+      groupedCities,
       "City list fetched from database successfully",
     ),
   );
@@ -280,6 +306,9 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     CheckIn,
     CheckOut,
     CityCode,
+    CityCodes,
+    CityDisplayName,
+    CityDisplayType,
     GuestNationality,
     NoOfRooms,
     PaxRooms,
@@ -306,10 +335,28 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     throw new ApiError(400, "NoOfRooms must match PaxRooms length");
   }
 
+  const metroSelection = {
+    CityCode,
+    CityCodes,
+    CityName: req.body.CityName,
+    CityDisplayName,
+    CityDisplayType,
+    CountryCode: req.body.CountryCode,
+    MetroCityName: req.body.MetroCityName,
+    MetroAreas: req.body.MetroAreas,
+  };
+  const expandedCityCodes = expandMetroCityCodes(metroSelection);
+  const metroSearch = isMetroSearch(metroSelection);
+  const selectedDisplayCity =
+    CityDisplayName ||
+    req.body.CityName ||
+    (metroSearch ? `${req.body.MetroCityName || ""} (All Areas)` : CityCode);
+
   const baseSearchPayload = {
     CheckIn,
     CheckOut,
     CityCode,
+    CityCodes: expandedCityCodes,
     GuestNationality: GuestNationality || "IN",
     NoOfRooms: Number(NoOfRooms),
     PaxRooms,
@@ -351,6 +398,13 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   const total = allHotels.length;
   const failedChunks = Array.isArray(dataset?.failedChunks) ? dataset.failedChunks : [];
 
+  logger.info("[hotel-search-analytics]", {
+    selectedDisplayCity,
+    expandedCityCodes,
+    hotelCodeCount: dataset?.totalHotelCodes || 0,
+    hotelResultCount: total,
+  });
+
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -369,6 +423,10 @@ exports.searchHotels = asyncHandler(async (req, res) => {
         searchMeta: {
           cacheHit,
           backgroundRefreshTriggered,
+          selectedDisplayCity,
+          isMetroSearch: metroSearch,
+          expandedCityCodes,
+          metroAreas: metroSearch ? getMetroAreas(metroSelection) : [],
           totalHotelCodes: dataset?.totalHotelCodes || 0,
           totalChunks: dataset?.totalChunks || 0,
           failedChunkCount: failedChunks.length,
