@@ -552,7 +552,6 @@ function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoo
     <div className="flex flex-col gap-8">
       {rooms.map((room, index) => {
         const descriptionHtml = room.RoomDescription || room.Description || "";
-        const perNight = room.Price?.perNight || room.totalFare / (room.Price?.nights || 1) || 0;
 
         const preBookRoom = preBookRooms[index] || {};
         const allRoomMatch = allRooms.find(r => r.name === room.Name?.[0] || r.name === room.Name || r.name === room.roomTypeName) || allRooms[index] || {};
@@ -575,12 +574,7 @@ function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoo
                   `Room ${index + 1}`}
               </h3>
               <div className="flex gap-3 items-center">
-                {perNight > 0 && (
-                  <div className="text-right mr-2">
-                    <div className="text-[9px] font-bold tracking-wider uppercase text-[#A89F94] mb-1">Per Night</div>
-                    <div className="text-[18px] font-bold text-[#1A1714]">₹{perNight.toLocaleString("en-IN")}</div>
-                  </div>
-                )}
+
                 <div className="flex gap-2 flex-wrap">
                   {room.MealType && (
                     <span className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-wider">
@@ -1092,47 +1086,18 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
     <div className="bg-white border border-[#EAE4D9] p-6">
       <div className="max-w-[600px]">
         <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-4">
-          Base Charges
+          Fare Details
         </div>
         <div className="flex flex-col gap-3">
-          <div className="flex justify-between text-[14px]">
-            <span className="text-[#7A7068]">Room Rate</span>
-            <span className="font-semibold">
-              ₹{priceBreakUp.RoomRate?.toLocaleString("en-IN")}
+          <div className="flex justify-between items-center text-[14px]">
+            <span className="text-[#1A1714] font-bold">
+              Total Paid <span className="font-normal text-slate-500 text-[11px] ml-1">(incl. all taxes and service fee)</span>
             </span>
-          </div>
-          {priceBreakUp.RoomExtraGuestCharges > 0 && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Extra Guest Charges</span>
-              <span className="font-semibold">
-                ₹{priceBreakUp.RoomExtraGuestCharges?.toLocaleString("en-IN")}
-              </span>
-            </div>
-          )}
-          {priceBreakUp.RoomChildCharges > 0 && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Child Charges</span>
-              <span className="font-semibold">
-                ₹{priceBreakUp.RoomChildCharges?.toLocaleString("en-IN")}
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between text-[14px] pt-3 border-t border-dashed border-[#EAE4D9]">
-            <span className="text-[#1A1714] font-bold">Total Tax</span>
-            <span className="font-bold text-[#B5341A]">
-              ₹{priceBreakUp.RoomTax?.toLocaleString("en-IN")}
+            <span className="font-bold text-[#B5341A] text-[20px]">
+              ₹{Number(totalFare).toLocaleString("en-IN")}
             </span>
           </div>
         </div>
-      </div>
-
-      <div className="mt-6 p-4 bg-[#FAF8F4] border border-[#EAE4D9] flex justify-between items-center">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em]">
-          Final Invoice Amount
-        </span>
-        <span className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
-          ₹{Number(totalFare).toLocaleString("en-IN")}
-        </span>
       </div>
     </div>
   );

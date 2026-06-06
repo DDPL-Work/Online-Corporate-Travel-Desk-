@@ -280,12 +280,10 @@ export default function MultiCityFlightBooking() {
         errorMsg.toLowerCase().includes("expired") ||
         errorMsg.toLowerCase().includes("invalid");
 
-      Swal.fire({
-        title: isSessionExp ? "Session Expired" : "Fare Revalidation Failed",
-        text: isSessionExp ? "Your search session has expired. Please search again." : errorMsg,
-        icon: "warning",
-        confirmButtonColor: "#0A4D68",
-      }).then(() => {
+      if (isSessionExp) {
+        localStorage.setItem("sessionExpiredEvent", Date.now().toString());
+        sessionStorage.setItem("traceExpiredMsg", errorMsg);
+        sessionStorage.setItem("traceExpired", "true");
         window.close();
         setTimeout(() => {
           if (window.history.length > 1) {
@@ -294,7 +292,23 @@ export default function MultiCityFlightBooking() {
             navigate("/travel");
           }
         }, 300);
-      });
+      } else {
+        Swal.fire({
+          title: "Fare Revalidation Failed",
+          text: errorMsg,
+          icon: "warning",
+          confirmButtonColor: "#0A4D68",
+        }).then(() => {
+          window.close();
+          setTimeout(() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate("/travel");
+            }
+          }, 300);
+        });
+      }
     }
   }, [fareQuote, navigate]);
 

@@ -1,68 +1,18 @@
 const logger = require("../../../utils/logger");
 
-const FLIGHT_PRIORITY = {
-  "airline_wise": 1,
-  "Airline Wise": 1,
-  "sector_wise": 2,
-  "Sector Wise": 2,
-  "passenger_wise": 3,
-  "Passenger Wise": 3,
-  "fare_slab_wise": 4,
-  "Fare Slab Wise": 4,
-  "date_wise": 5,
-  "Date Wise": 5,
-  "booking_time_wise": 6,
-  "Booking Time Wise": 6,
-  "generic": 7,
-  "Generic": 7
-};
-
-const HOTEL_PRIORITY = {
-  "hotel_wise": 1,
-  "Hotel Wise": 1,
-  "city_wise": 2,
-  "City Wise": 2,
-  "star_rating_wise": 3,
-  "Star Rating Wise": 3,
-  "room_type_wise": 4,
-  "Room Type Wise": 4,
-  "generic": 5,
-  "Generic": 5
-};
-
 class MarkupResolverService {
   /**
-   * Resolves the single highest-priority rule that matches the given payload.
-   * Only one rule wins. No stacking.
+   * Resolves all rules that match the given payload.
+   * Stacks rules so all matched rules apply.
    */
-  static resolveRule(rules, payload, productType) {
-    if (!rules || rules.length === 0) return null;
+  static resolveRules(rules, payload, productType) {
+    if (!rules || rules.length === 0) return [];
 
-    let bestRule = null;
-    let bestPriority = Infinity;
+    const matchedRules = rules.filter(rule => {
+      return this.isMatch(rule, payload, productType);
+    });
 
-    for (const rule of rules) {
-      if (this.isMatch(rule, payload, productType)) {
-        const priority = this.getPriority(rule.category, productType);
-        
-        if (priority < bestPriority) {
-          bestPriority = priority;
-          bestRule = rule;
-        }
-      }
-    }
-
-    return bestRule; // Returns the single winning rule, or null if no match
-  }
-
-  static getPriority(category, productType) {
-    if (productType === "flight") {
-      return FLIGHT_PRIORITY[category] || 99; // 99 for unknown fallback
-    }
-    if (productType === "hotel") {
-      return HOTEL_PRIORITY[category] || 99;
-    }
-    return 99;
+    return matchedRules; // Returns all matching rules
   }
 
   static isMatch(rule, payload, productType) {
@@ -75,7 +25,9 @@ class MarkupResolverService {
   }
 
   static isFlightMatch(rule, flight) {
-    const category = rule.category?.toLowerCase().replace(/ /g, "_");
+    const rawCategory = (rule.category || "").trim();
+    const category = rawCategory.toLowerCase().replace(/ /g, "_");
+
     const criteria = rule.criteria || {};
 
     switch (category) {
@@ -85,9 +37,32 @@ class MarkupResolverService {
             flight.ValidatingAirline?.toUpperCase() === targetAirline) {
           return true;
         }
-        if (flight.Segments && flight.Segments[0] && flight.Segments[0][0]) {
-          if (flight.Segments[0][0].Airline?.AirlineCode?.toUpperCase() === targetAirline) {
-            return true;
+        if (flight.Segments && Array.isArray(flight.Segments)) {
+          for (const leg of flight.Segments) {
+            if (Array.isArray(leg)) {
+              for (const segment of leg) {
+                if (segment.Airline?.AirlineCode?.toUpperCase() === targetAirline) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
+
+      case "cabin_wise":
+        const targetCabin = Number(criteria.cabinClass);
+        if (isNaN(targetCabin)) return false;
+        
+        if (flight.Segments && Array.isArray(flight.Segments)) {
+          for (const leg of flight.Segments) {
+            if (Array.isArray(leg)) {
+              for (const segment of leg) {
+                if (Number(segment.CabinClass) === targetCabin) {
+                  return true;
+                }
+              }
+            }
           }
         }
         return false;
@@ -107,14 +82,62 @@ class MarkupResolverService {
           }
         }
         
-        return (reqOrigin === flightOrigin && reqDest === flightDest);
+        if (reqOrigin === flightOrigin && reqDest === flightDest) {
+          return true;
+        }
+        return false;
+
+      case "flight_type_wise":
+      case "domestic_flights":
+      case "international_flights":
+        let targetFlightType = "domestic";
+        if (category === "international_flights") {
+          targetFlightType = "international";
+        } else if (category === "flight_type_wise") {
+          targetFlightType = (criteria.flightType || "").toLowerCase();
+        }
+        
+        let resolvedFlightType = null;
+        
+        // Primary Strategy: Use IsDomestic flag from TBO if available
+        if (typeof flight.IsDomestic === "boolean") {
+          resolvedFlightType = flight.IsDomestic ? "domestic" : "international";
+        } else {
+          // Fallback Strategy: Dynamic Country Evaluation
+          const countries = new Set();
+          
+          if (flight.Segments && Array.isArray(flight.Segments)) {
+            for (const leg of flight.Segments) {
+              if (Array.isArray(leg)) {
+                for (const segment of leg) {
+                  const originCountry = segment.Origin?.Airport?.CountryCode?.toUpperCase();
+                  const destCountry = segment.Destination?.Airport?.CountryCode?.toUpperCase();
+                  
+                  if (originCountry) countries.add(originCountry);
+                  if (destCountry) countries.add(destCountry);
+                }
+              }
+            }
+          }
+          
+          // Fail Safe: If no valid CountryCode found anywhere -> JourneyType = International (Revenue protection)
+          if (countries.size === 0) {
+            resolvedFlightType = "international";
+          } else if (countries.size <= 1) {
+            resolvedFlightType = "domestic";
+          } else {
+            resolvedFlightType = "international";
+          }
+        }
+
+        return resolvedFlightType === targetFlightType;
 
       case "passenger_wise":
       case "fare_slab_wise":
       case "date_wise":
       case "booking_time_wise":
       case "generic":
-        return true; // Simplification. In reality, you'd check dates, fare slabs, etc. For now, match if generic.
+        return true; 
 
       default:
         // Generic fallback
@@ -123,20 +146,40 @@ class MarkupResolverService {
   }
 
   static isHotelMatch(rule, hotel) {
-    const category = rule.category?.toLowerCase().replace(/ /g, "_");
+    const rawCategory = (rule.category || "").trim();
+    const category = rawCategory.toLowerCase().replace(/ /g, "_");
     const criteria = rule.criteria || {};
 
     switch (category) {
       case "hotel_wise":
         const targetHotel = (criteria.hotel || "").toUpperCase();
-        return (hotel.HotelCode?.toUpperCase() === targetHotel || hotel.HotelName?.toUpperCase() === targetHotel);
+        if (hotel.HotelCode?.toUpperCase() === targetHotel || hotel.HotelName?.toUpperCase() === targetHotel) {
+          return true;
+        }
+        return false;
+
+      case "country_wise":
+        const targetCountry = (criteria.country || "").toUpperCase();
+        if (hotel.CountryCode?.toUpperCase() === targetCountry || hotel.CountryName?.toUpperCase() === targetCountry) {
+          return true;
+        }
+        return false;
+
+      case "fare_slab_based":
+        return true;
 
       case "city_wise":
         const targetCity = (criteria.hotelCityCode || criteria.city || "").toUpperCase();
-        return (hotel.CityCode?.toUpperCase() === targetCity || hotel.CityName?.toUpperCase() === targetCity);
+        if (hotel.CityCode?.toUpperCase() === targetCity || hotel.CityName?.toUpperCase() === targetCity) {
+          return true;
+        }
+        return false;
 
       case "star_rating_wise":
-        return hotel.StarRating === criteria.starRating;
+        if (Number(hotel.StarRating) === Number(criteria.starRating)) {
+          return true;
+        }
+        return false;
 
       case "room_type_wise":
       case "generic":

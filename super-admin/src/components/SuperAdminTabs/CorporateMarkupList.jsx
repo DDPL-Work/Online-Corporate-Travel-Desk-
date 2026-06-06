@@ -6,10 +6,21 @@ import { FaPlane, FaHotel } from "react-icons/fa";
 import { MdBusiness } from "react-icons/md";
 import { toast } from "sonner";
 import { getAllCorporateMarkups, deleteCorporateMarkup, saveCorporateMarkup } from "../../Redux/Actions/markup.thunks";
+import axios from "../../API/axios";
+import { airlineLogo } from "../../utils/formatter";
 
 const C = {
   navy: "#003399",
   offWhite: "#f8fafc",
+};
+
+const CABIN_CLASS_MAP = {
+  1: "All",
+  2: "Economy",
+  3: "Premium Economy",
+  4: "Business",
+  5: "Premium Business",
+  6: "First"
 };
 
 export default function CorporateMarkupList() {
@@ -27,10 +38,62 @@ export default function CorporateMarkupList() {
   const { configuredMarkups, fetchMarkupsLoading, deleteMarkupLoading } = useSelector(state => state.markup);
 
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, markupDoc: null, idx: null, type: null, rule: null, productType: null });
+  const [resolvedNames, setResolvedNames] = useState({});
 
   useEffect(() => {
     dispatch(getAllCorporateMarkups(id));
   }, [dispatch, id]);
+
+  useEffect(() => {
+    if (!configuredMarkups || configuredMarkups.length === 0) return;
+    
+    const airlinesToFetch = new Set();
+    const airportsToFetch = new Set();
+
+    configuredMarkups.forEach(doc => {
+      if (doc.productType === 'flight' && doc.rules) {
+        doc.rules.forEach(rule => {
+          if (rule.criteria?.airline) airlinesToFetch.add(rule.criteria.airline);
+          if (rule.criteria?.origin) airportsToFetch.add(rule.criteria.origin);
+          if (rule.criteria?.destination) airportsToFetch.add(rule.criteria.destination);
+        });
+      }
+    });
+
+    const fetchNames = async () => {
+      const newNames = { ...resolvedNames };
+      let changed = false;
+
+      for (const code of airlinesToFetch) {
+        if (!newNames[code]) {
+          try {
+            const res = await axios.get(`/markup/airlines?search=${code}&limit=1`);
+            if (res.data?.data?.[0]) {
+              newNames[code] = res.data.data[0].name;
+              changed = true;
+            }
+          } catch(e) {}
+        }
+      }
+
+      for (const code of airportsToFetch) {
+        if (!newNames[code]) {
+          try {
+            const res = await axios.get(`/markup/airports?search=${code}&limit=1`);
+            if (res.data?.data?.[0]) {
+              const apt = res.data.data[0];
+              newNames[code] = apt.name ? `${apt.name}, ${apt.city}` : apt.city;
+              changed = true;
+            }
+          } catch(e) {}
+        }
+      }
+
+      if (changed) setResolvedNames(newNames);
+    };
+
+    fetchNames();
+  }, [configuredMarkups]);
 
   const handleDeleteClick = (productType, markupDoc) => {
     setDeleteModal({ isOpen: true, type: 'doc', productType, markupDoc });
@@ -240,15 +303,35 @@ export default function CorporateMarkupList() {
                                 <div className="flex flex-wrap gap-2">
                                   {Object.entries(rule.criteria).map(([key, val]) => {
                                     if (!val) return null;
+                                    
+                                    let displayValue = val;
+                                    if (key === 'airline') {
+                                      displayValue = resolvedNames[val] ? `${resolvedNames[val]} (${val})` : val;
+                                    } else if (key === 'origin' || key === 'destination') {
+                                      displayValue = resolvedNames[val] ? `${resolvedNames[val]} (${val})` : val;
+                                    } else if (key === 'cabinClass') {
+                                      displayValue = `${CABIN_CLASS_MAP[val] || val} (Code: ${val})`;
+                                    }
+
                                     return (
-                                      <span key={key} className="text-xs font-bold text-slate-700 bg-slate-100/80 border border-slate-200/60 px-2.5 py-1 rounded-md">
-                                        <span className="text-slate-500 capitalize mr-1 font-medium">{key}:</span>{val}
+                                      <span key={key} className="text-xs font-bold text-slate-700 bg-slate-100/80 border border-slate-200/60 px-2.5 py-1.5 rounded-md flex items-center">
+                                        <span className="text-slate-500 capitalize mr-1.5 font-medium">{key}:</span>
+                                        {key === 'airline' && (
+                                          <img src={airlineLogo(val)} alt={val} className="w-5 h-5 object-contain inline-block mr-1.5 rounded-sm" />
+                                        )}
+                                        {displayValue}
                                       </span>
                                     );
                                   })}
                                 </div>
                               ) : rule.category !== "Fare Slab Based" ? (
-                                <span className="text-xs font-medium text-slate-400 italic">No specific criteria (Applies to all)</span>
+                                <span className="text-xs font-medium text-slate-400 italic">
+                                  {rule.category === 'Domestic Flights' 
+                                    ? 'India to India flights (Origin and Destination both in India)' 
+                                    : rule.category === 'International Flights' 
+                                    ? 'International flights (Outside India, or between India and other countries)' 
+                                    : 'No specific criteria (Applies to all)'}
+                                </span>
                               ) : (
                                 <span className="text-xs font-medium text-slate-400 italic">Based on Fare Slabs</span>
                               )}

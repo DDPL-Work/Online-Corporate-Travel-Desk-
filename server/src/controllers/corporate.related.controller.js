@@ -1072,10 +1072,16 @@ exports.getFlightBookingById = async (req, res) => {
       });
     }
 
+    const BookingMarkupAudit = require("../modules/markup/schemas/BookingMarkupAudit.model");
+    const markupAudit = await BookingMarkupAudit.findOne({ bookingId: req.params.id }).lean();
+
     return res.status(200).json({
       success: true,
       message: "Flight booking fetched successfully",
-      data: mapFlightBookingDto(booking),
+      data: {
+        ...mapFlightBookingDto(booking),
+        markupAudit
+      },
     });
   } catch (error) {
     console.error("SuperAdmin Flight Detail Error:", error);
@@ -1238,6 +1244,9 @@ exports.getHotelBookingById = async (req, res) => {
       });
     }
 
+    const BookingMarkupAudit = require("../modules/markup/schemas/BookingMarkupAudit.model");
+    const markupAudit = await BookingMarkupAudit.findOne({ bookingId: req.params.id }).lean();
+
     let liveBookingData = null;
     try {
       const bookResult = booking.bookingResult?.providerResponse?.BookResult;
@@ -1261,7 +1270,8 @@ exports.getHotelBookingById = async (req, res) => {
       message: "Hotel booking fetched successfully",
       data: {
         ...mapHotelBookingDto(booking),
-        liveBookingData
+        liveBookingData,
+        markupAudit
       },
     });
   } catch (error) {

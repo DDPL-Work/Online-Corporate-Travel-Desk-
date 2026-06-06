@@ -35,4 +35,10 @@ router.get("/corporate/all", markupCtrl.getAllCorporateMarkups);
 // DELETE /api/markup/corporate
 router.delete("/corporate", markupCtrl.deleteCorporateMarkup);
 
+// GET /api/markup/revenue
+router.get("/revenue", markupCtrl.getMarkupRevenue);
+
+// GET /api/markup/audit
+router.get("/audit", markupCtrl.getBookingMarkupAudit);
+
 module.exports = router;

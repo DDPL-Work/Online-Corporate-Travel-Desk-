@@ -800,32 +800,7 @@ export const PendingHotelDetailsModal = ({
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                              Per Room / Night
-                            </p>
-                            <p className="text-2xl font-black text-indigo-700 tracking-tighter">
-                              ₹{r.DayRates?.[0]?.[0]?.BasePrice ||
-                                r.DayRates?.[0]?.[0]?.RoomRate ||
-                                (
-                                  (r.TotalFare ||
-                                    r.Price?.totalFare ||
-                                    r.NetAmount ||
-                                    0) /
-                                  ((Array.isArray(r.Name) ? r.Name.length : 1) *
-                                    (bookSnap.nights || 1))
-                                ).toLocaleString()}
-                            </p>
-                            {r.count > 1 && (
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                                Total: ₹
-                                {(
-                                  r.TotalFare ||
-                                  r.Price?.totalFare ||
-                                  r.NetAmount ||
-                                  0
-                                ).toLocaleString()}
-                              </p>
-                            )}
+                            {/* Per Night charge hidden as per request */}
                           </div>
                         </div>
 
@@ -921,29 +896,11 @@ export const PendingHotelDetailsModal = ({
                     <SectionLabel icon={<FiDollarSign />} title="Fare Summary" />
                     <div className="mt-6">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                        Total Amount (Inc. Tax)
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter">
                         ₹ {totalAmount.toLocaleString()}
                       </h4>
-                      <div className="mt-8 space-y-3 pt-6 border-t border-slate-800">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Base Price
-                          </span>
-                          <span className="text-slate-200 font-black">
-                            ₹{baseFare.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Taxes & Fees
-                          </span>
-                          <span className="text-slate-200 font-black">
-                            ₹{tax.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
                     </div>
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
                   </div>
@@ -1940,7 +1897,7 @@ export const PendingFlightDetailsModal = ({
                     />
                     <div className="mt-8 relative">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">
-                        Total Payable Amount
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-slate-500 italic">
@@ -1951,14 +1908,6 @@ export const PendingFlightDetailsModal = ({
                         </h4>
                       </div>
                       <div className="mt-8 space-y-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6">
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
-                          <span className="text-slate-400">Base Fare</span>
-                          <span className="text-slate-100">₹{Math.ceil(baseFare).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
-                          <span className="text-slate-400">Taxes & Fees</span>
-                          <span className="text-slate-100">₹{Math.ceil(totalTax).toLocaleString()}</span>
-                        </div>
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
                           <span className="text-slate-400">SSR Add-ons</span>
                           <span className="text-[#C9A84C]">

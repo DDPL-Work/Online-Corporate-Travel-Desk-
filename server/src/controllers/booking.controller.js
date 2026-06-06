@@ -28,6 +28,7 @@ const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
 const flightOrchestrationService = require("../services/booking/flightOrchestration.service");
 const { resolvePnr } = require("../utils/bookingResolver.util");
 const { resolveBookingContext } = require("../utils/activeBookingResolver.util");
+const MarkupAccountingService = require("../modules/markup/services/markupAccounting.service");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -510,21 +511,17 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
     },
-    markupSnapshot: req.body.markupSnapshot || null,
+    markupSnapshot: req.body.markupSnapshot || (bookingType === "flight" && flightRequest?.fareSnapshot?.markupAmount > 0 ? {
+      supplierFare: flightRequest.fareSnapshot.supplierFare || 0,
+      finalFare: flightRequest.fareSnapshot.finalFare || flightRequest.fareSnapshot.TotalFare || flightRequest.fareSnapshot.totalFare || 0,
+      markupAmount: flightRequest.fareSnapshot.markupAmount,
+      markupBreakdown: flightRequest.fareSnapshot.markupBreakdown || []
+    } : null),
     bookingSnapshot,
     // bookingSnapshot: req.body.bookingSnapshot,
   });
 
-  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
-     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
-     await MarkupRevenueService.trackRevenue({
-        bookingId: bookingRequest._id,
-        corporateId: corporate._id,
-        serviceType: "flight",
-        markupAmount: req.body.markupSnapshot.markupAmount,
-        ruleId: req.body.markupSnapshot.appliedRuleId
-     });
-  }
+
 
   /* ================= NOTIFICATION ================= */
   const _flightRequesterEmail = user.email;
@@ -968,20 +965,16 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
     },
-    markupSnapshot: req.body.markupSnapshot || null,
+    markupSnapshot: req.body.markupSnapshot || (bookingType === "flight" && flightRequest?.fareSnapshot?.markupAmount > 0 ? {
+      supplierFare: flightRequest.fareSnapshot.supplierFare || 0,
+      finalFare: flightRequest.fareSnapshot.finalFare || flightRequest.fareSnapshot.TotalFare || flightRequest.fareSnapshot.totalFare || 0,
+      markupAmount: flightRequest.fareSnapshot.markupAmount,
+      markupBreakdown: flightRequest.fareSnapshot.markupBreakdown || []
+    } : null),
     bookingSnapshot,
   });
 
-  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
-     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
-     await MarkupRevenueService.trackRevenue({
-        bookingId: bookingRequest._id,
-        corporateId: corporate._id,
-        serviceType: "flight",
-        markupAmount: req.body.markupSnapshot.markupAmount,
-        ruleId: req.body.markupSnapshot.appliedRuleId
-     });
-  }
+
 
   /* ================= NOTIFICATION ================= */
   const _flightRequesterName = user.name?.firstName
@@ -1133,6 +1126,13 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
           throw err;
         }
       }
+
+      await MarkupAccountingService.recordBookingRevenue(bookingRequest, corporate).catch((err) => {
+        logger.error("Failed to record markup revenue", {
+          bookingId: bookingRequest._id,
+          error: err.message,
+        });
+      });
 
       logger.info("✅ Instant flight booking executed successfully", {
         bookingId: bookingRequest._id,
@@ -2338,7 +2338,7 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Booking not found");
   }
 
-  const isAdminOrOps = ["super-admin", "travel-admin", "ops-member"].includes(
+  const isAdminOrOps = ["super-admin", "travel-admin", "ops-member", "manager"].includes(
     req.user.role
   );
 

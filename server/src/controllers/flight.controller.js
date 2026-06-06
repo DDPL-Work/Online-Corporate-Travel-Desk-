@@ -66,8 +66,9 @@ exports.getSSR = asyncHandler(async (req, res) => {
  * -------------------------------------------------- */
 exports.getFareUpsell = asyncHandler(async (req, res) => {
   const { traceId, resultIndex } = req.body;
+  const corporateId = req.user?.corporateId; // Extracted for markup
 
-  const data = await tboService.getFareUpsell(traceId, resultIndex);
+  const data = await tboService.getFareUpsell(traceId, resultIndex, corporateId);
 
   res
     .status(200)

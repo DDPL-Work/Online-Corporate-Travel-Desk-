@@ -47,14 +47,27 @@ const corporateMarkupSchema = new mongoose.Schema(
       fareSlabs: [fareSlabSchema],
       criteria: {
         airline: { type: String }, 
+        airlineName: { type: String },
+        airlineIcao: { type: String },
         cabinClass: { type: Number, enum: [2, 3, 4, 5, 6] },
         origin: { type: String },            
+        originName: { type: String },
+        originCity: { type: String },
         destination: { type: String },
+        destinationName: { type: String },
+        destinationCity: { type: String },
         country: { type: String },
+        countryName: { type: String },
         city: { type: String },
+        cityName: { type: String },
         hotelCityCode: { type: String },
+        hotelCityName: { type: String },
         hotel: { type: String },
-        starRating: { type: Number, enum: [1, 2, 3, 4, 5] }
+        hotelName: { type: String },
+        hotelCountryCode: { type: String },
+        hotelStarRating: { type: Number },
+        starRating: { type: Number, enum: [1, 2, 3, 4, 5] },
+        flightType: { type: String, enum: ["domestic", "international"] }
       }
     }],
 

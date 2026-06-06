@@ -11,25 +11,46 @@ const asyncHandler = require("../utils/asyncHandler");
 // ─────────────────────────────────────────────────────────────────────────────
 exports.getAirlines = asyncHandler(async (req, res) => {
     const { search, limit = 100 } = req.query;
-    const filter = {};
+    let airlines;
 
     if (search && search.trim() !== "") {
         const term = search.trim();
         const regex = new RegExp(term, "i");
+        const termRegexStart = new RegExp(`^${term}`, "i");
 
-        filter.$or = [
-            { name: { $regex: regex } },
-            { iata: { $regex: regex } },
-            { icao: { $regex: regex } },
-            { callsign: { $regex: regex } },
-        ];
+        // Priority 1: Exact IATA match
+        const exactAirlines = await Airline.find({ iata: new RegExp(`^${term}$`, "i") }).lean();
+
+        // Priority 2: IATA starts with term
+        const startAirlines = await Airline.find({
+            iata: termRegexStart,
+            _id: { $nin: exactAirlines.map(a => a._id) }
+        }).limit(Number(limit)).lean();
+
+        const foundIds = [...exactAirlines, ...startAirlines].map(a => a._id);
+        const remainingLimit = Number(limit) - foundIds.length;
+        let otherAirlines = [];
+
+        if (remainingLimit > 0) {
+            otherAirlines = await Airline.find({
+                $or: [
+                    { name: { $regex: regex } },
+                    { icao: { $regex: regex } },
+                    { callsign: { $regex: regex } }
+                ],
+                _id: { $nin: foundIds }
+            }).limit(remainingLimit).sort({ name: 1 }).lean();
+        }
+
+        airlines = [...exactAirlines, ...startAirlines, ...otherAirlines];
+        airlines = airlines.map(a => ({ _id: a._id, name: a.name, iata: a.iata, icao: a.icao, callsign: a.callsign, country: a.country }));
+    } else {
+        airlines = await Airline.find({})
+            .select("name iata icao callsign country")
+            .sort({ name: 1 })
+            .limit(Number(limit))
+            .lean();
     }
-
-    const airlines = await Airline.find(filter)
-        .select("name iata icao callsign country")
-        .sort({ name: 1 })
-        .limit(Number(limit))
-        .lean();
 
     return res.status(200).json({
         success: true,
@@ -133,23 +154,46 @@ exports.getHotels = asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 exports.getAirports = asyncHandler(async (req, res) => {
     const { search, limit = 100 } = req.query;
-    const filter = {};
+    let airports;
 
     if (search && search.trim() !== "") {
-        const regex = new RegExp(search.trim(), "i");
-        filter.$or = [
-            { name: { $regex: regex } },
-            { iata_code: { $regex: regex } },
-            { city: { $regex: regex } },
-            { country: { $regex: regex } },
-        ];
-    }
+        const term = search.trim();
+        const regex = new RegExp(term, "i");
+        const termRegexStart = new RegExp(`^${term}`, "i");
 
-    const airports = await Airport.find(filter)
-        .select("name iata_code city country")
-        .sort({ name: 1 })
-        .limit(Number(limit))
-        .lean();
+        // Priority 1: Exact IATA match
+        const exactAirports = await Airport.find({ iata_code: new RegExp(`^${term}$`, "i") }).lean();
+
+        // Priority 2: IATA starts with term
+        const startAirports = await Airport.find({
+            iata_code: termRegexStart,
+            _id: { $nin: exactAirports.map(a => a._id) }
+        }).limit(Number(limit)).lean();
+
+        const foundIds = [...exactAirports, ...startAirports].map(a => a._id);
+        const remainingLimit = Number(limit) - foundIds.length;
+        let otherAirports = [];
+
+        if (remainingLimit > 0) {
+            otherAirports = await Airport.find({
+                $or: [
+                    { name: { $regex: regex } },
+                    { city: { $regex: regex } },
+                    { country: { $regex: regex } }
+                ],
+                _id: { $nin: foundIds }
+            }).limit(remainingLimit).sort({ name: 1 }).lean();
+        }
+
+        airports = [...exactAirports, ...startAirports, ...otherAirports];
+        airports = airports.map(a => ({ _id: a._id, name: a.name, iata_code: a.iata_code, city: a.city, country: a.country }));
+    } else {
+        airports = await Airport.find({})
+            .select("name iata_code city country")
+            .sort({ name: 1 })
+            .limit(Number(limit))
+            .lean();
+    }
 
     return res.status(200).json({
         success: true,
@@ -206,8 +250,7 @@ exports.saveCorporateMarkup = asyncHandler(async (req, res) => {
                 changes: { new: rules }
             });
         }
-
-        await MarkupCacheService.invalidateCache(corporateId, productType);
+        await MarkupCacheService.invalidateRules(corporateId, productType);
 
         return res.status(200).json({
             success: true,
@@ -303,12 +346,71 @@ exports.deleteCorporateMarkup = asyncHandler(async (req, res) => {
                 changedBy: req.user?._id,
                 changes: { deleted: true }
             });
-            await MarkupCacheService.invalidateCache(corporateId, productType);
+            await MarkupCacheService.invalidateRules(corporateId, productType);
         }
 
         return res.status(200).json({
             success: true,
             message: "Markup configuration deleted successfully."
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET MARKUP REVENUE
+// ─────────────────────────────────────────────────────────────────────────────
+exports.getMarkupRevenue = asyncHandler(async (req, res) => {
+    try {
+        const MarkupRevenue = require("../modules/markup/schemas/MarkupRevenue.model");
+        const { corporateId, productType, orderId, bookingId } = req.query;
+        
+        const query = {};
+        if (corporateId) query.corporateId = corporateId;
+        if (productType) query.productType = productType;
+        if (orderId) query.orderId = orderId;
+        if (bookingId) query.bookingId = bookingId;
+        
+        const revenues = await MarkupRevenue.find(query).sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: revenues.length,
+            data: revenues
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET BOOKING MARKUP AUDIT
+// ─────────────────────────────────────────────────────────────────────────────
+exports.getBookingMarkupAudit = asyncHandler(async (req, res) => {
+    try {
+        const BookingMarkupAudit = require("../modules/markup/schemas/BookingMarkupAudit.model");
+        
+        const { corporateId, productType, orderId, bookingId } = req.query;
+        
+        const query = {};
+        if (corporateId) query.corporateId = corporateId;
+        if (productType) query.productType = productType;
+        if (orderId) query.orderId = orderId;
+        if (bookingId) query.bookingId = bookingId;
+        
+        const audits = await BookingMarkupAudit.find(query).sort({ createdAt: -1 }).lean();
+
+        return res.status(200).json({
+            success: true,
+            count: audits.length,
+            data: audits
         });
     } catch (error) {
         return res.status(400).json({

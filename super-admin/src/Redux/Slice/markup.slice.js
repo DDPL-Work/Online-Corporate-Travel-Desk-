@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports, saveCorporateMarkup, getAllCorporateMarkups, deleteCorporateMarkup } from "../Actions/markup.thunks";
+import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports, saveCorporateMarkup, getAllCorporateMarkups, deleteCorporateMarkup, fetchMarkupRevenue, fetchBookingMarkupAudit } from "../Actions/markup.thunks";
 
 const initialState = {
   airlines: [],
@@ -30,6 +30,14 @@ const initialState = {
   fetchMarkupsError: null,
 
   deleteMarkupLoading: false,
+
+  revenue: [],
+  revenueLoading: false,
+  revenueError: null,
+
+  audit: [],
+  auditLoading: false,
+  auditError: null,
 };
 
 const markupSlice = createSlice({
@@ -50,6 +58,12 @@ const markupSlice = createSlice({
     },
     clearAirports: (state) => {
       state.airports = [];
+    },
+    clearRevenue: (state) => {
+      state.revenue = [];
+    },
+    clearAudit: (state) => {
+      state.audit = [];
     },
   },
   extraReducers: (builder) => {
@@ -161,10 +175,38 @@ const markupSlice = createSlice({
       })
       .addCase(deleteCorporateMarkup.rejected, (state) => {
         state.deleteMarkupLoading = false;
+      })
+
+      // Fetch Markup Revenue
+      .addCase(fetchMarkupRevenue.pending, (state) => {
+        state.revenueLoading = true;
+        state.revenueError = null;
+      })
+      .addCase(fetchMarkupRevenue.fulfilled, (state, action) => {
+        state.revenueLoading = false;
+        state.revenue = action.payload?.data || [];
+      })
+      .addCase(fetchMarkupRevenue.rejected, (state, action) => {
+        state.revenueLoading = false;
+        state.revenueError = action.payload || "Failed to fetch markup revenue";
+      })
+
+      // Fetch Booking Markup Audit
+      .addCase(fetchBookingMarkupAudit.pending, (state) => {
+        state.auditLoading = true;
+        state.auditError = null;
+      })
+      .addCase(fetchBookingMarkupAudit.fulfilled, (state, action) => {
+        state.auditLoading = false;
+        state.audit = action.payload?.data || [];
+      })
+      .addCase(fetchBookingMarkupAudit.rejected, (state, action) => {
+        state.auditLoading = false;
+        state.auditError = action.payload || "Failed to fetch booking markup audit";
       });
   },
 });
 
-export const { clearAirlines, clearCountries, clearCities, clearHotels, clearAirports } = markupSlice.actions;
+export const { clearAirlines, clearCountries, clearCities, clearHotels, clearAirports, clearRevenue, clearAudit } = markupSlice.actions;
 
 export default markupSlice.reducer;

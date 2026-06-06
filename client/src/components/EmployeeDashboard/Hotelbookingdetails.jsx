@@ -3,7 +3,7 @@
 // All original logic preserved. Only UI/layout/design replaced.
 
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   FiArrowLeft,
@@ -31,6 +31,8 @@ import {
   FiSend,
   FiClock,
   FiXCircle,
+  FiUsers,
+  FiHash,
   FiTag,
 } from "react-icons/fi";
 import {
@@ -43,29 +45,12 @@ import {
   MdCancel,
   MdKingBed,
 } from "react-icons/md";
-import {
-  fetchBookedHotelDetails,
-  generateHotelVoucher,
-} from "../../Redux/Actions/hotelBooking.thunks";
+import { generateHotelVoucher } from "../../Redux/Actions/hotelBooking.thunks";
+import { fetchBookedHotelDetails } from "../../Redux/Actions/hotelBooking.thunks";
 import {
   sendHotelAmendment,
   getHotelAmendmentStatus,
 } from "../../Redux/Actions/hotelAmendment.thunks";
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Design tokens Mapping (for reference during conversion)        */
-/* ─────────────────────────────────────────────────────────────── */
-// bg: "#FAF8F4"         -> bg-[#FAF8F4]
-// surface: "#FFFFFF"    -> bg-white
-// border: "#EAE4D9"     -> border-[#EAE4D9]
-// gold: "#B5862A"       -> text-[#B5862A] / bg-[#B5862A]
-// text: "#1A1714"       -> text-[#1A1714]
-// textMuted: "#7A7068"  -> text-[#7A7068]
-// textLight: "#A89F94"  -> text-[#A89F94]
-// green: "#2C7A4B"      -> text-[#2C7A4B] / bg-[#2C7A4B]
-// red: "#B5341A"        -> text-[#B5341A] / bg-[#B5341A]
-// amber: "#8A6200"      -> text-[#8A6200] / bg-[#8A6200]
-// blue: "#1A4A7A"       -> text-[#1A4A7A] / bg-[#1A4A7A]
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -91,13 +76,21 @@ function nightsCount(ci, co) {
 /*  StatusPill                                                     */
 /* ─────────────────────────────────────────────────────────────── */
 function StatusPill({ status }) {
-  const label = status === "voucher_generated" ? "Confirmed" : status;
-  const isCancelled = ["cancelled", "cancel_requested"].includes(
-    (status || "").toLowerCase(),
-  );
-  const isConfirmed = ["confirmed", "voucher_generated"].includes(
-    (status || "").toLowerCase(),
-  );
+  const s = (status || "").toLowerCase();
+  const labelMap = {
+    voucher_generated: "Confirmed",
+    booked: "Booked",
+    confirmed: "Confirmed",
+    cancelled: "Cancelled",
+    cancel_requested: "Cancel Requested",
+    amendment_requested: "Cancelled",
+    amendment_in_progress: "Cancelled",
+    amendment_completed: "Cancelled",
+  };
+  const label = labelMap[s] || status;
+  const isAmendment = s.startsWith("amendment_");
+  const isCancelled = ["cancelled", "cancel_requested"].includes(s) || isAmendment;
+  const isConfirmed = ["confirmed", "voucher_generated", "booked"].includes(s);
 
   const colors = isCancelled
     ? "bg-[#FDF1EE] text-[#B5341A] border-[#F0C4BA]"
@@ -115,7 +108,7 @@ function StatusPill({ status }) {
     <span
       className={`inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-[2px] border text-[10px] font-semibold tracking-[0.12em] uppercase ${colors}`}
     >
-      <span className={`w-[6px] height-[6px] rounded-full ${dotColor}`} />
+      <span className={`w-[6px] h-[6px] rounded-full ${dotColor}`} />
       {label}
     </span>
   );
@@ -125,11 +118,11 @@ function StatusPill({ status }) {
 /*  Stars                                                          */
 /* ─────────────────────────────────────────────────────────────── */
 function Stars({ count = 0 }) {
-  if (!count) return null;
+  const rating = count || 0;
   return (
-    <span className="inline-flex gap-[2px]">
-      {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
-        <svg key={i} width="13" height="13" fill="#B5862A" viewBox="0 0 20 20">
+    <span className="inline-flex gap-[2px] items-center">
+      {[...Array(5)].map((_, i) => (
+        <svg key={i} width="16" height="16" className={i < rating ? "fill-[#B5862A]" : "fill-[#EAE4D9]"} viewBox="0 0 20 20">
           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
         </svg>
       ))}
@@ -140,12 +133,9 @@ function Stars({ count = 0 }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  SectionHeader                                                  */
 /* ─────────────────────────────────────────────────────────────── */
-function SectionHeader({ num, title }) {
+function SectionHeader({ title }) {
   return (
     <div className="flex items-center pb-3 border-b border-[#EAE4D9] mb-6">
-      {/* <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">
-        {String(num).padStart(2, "0")}
-      </span> */}
       <h2 className="font-['Cormorant_Garamond'] text-[22px] font-semibold text-[#1A1714] md:text-[18px]">
         {title}
       </h2>
@@ -168,21 +158,49 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   const selectedRoom = hotelReq?.selectedRoom || {};
   const selectedHotel = hotelReq?.selectedHotel || {};
 
-  const hotelName = detail?.HotelName || snapshot?.hotelName || selectedHotel?.hotelName || "Hotel";
-  const city = detail?.City || selectedHotel?.city || "";
+  const hotelName = booking?.hotelName || snapshot?.hotelName || detail?.HotelName || selectedHotel?.hotelName || "Hotel";
+  const city = booking?.city || detail?.City || selectedHotel?.city || "";
   const address = detail?.AddressLine1 || selectedHotel?.address || "";
   const starRating = detail?.StarRating || selectedHotel?.starRating || 0;
-  const checkIn = detail?.CheckInDate || hotelReq?.checkInDate;
-  const checkOut = detail?.CheckOutDate || hotelReq?.checkOutDate;
-  const nights = nightsCount(checkIn, checkOut);
+  const checkIn = booking?.checkIn || snapshot?.checkInDate || detail?.CheckInDate || hotelReq?.checkInDate;
+  const checkOut = booking?.checkOut || snapshot?.checkOutDate || detail?.CheckOutDate || hotelReq?.checkOutDate;
+  const nights = snapshot?.nights || nightsCount(checkIn, checkOut);
+
+  const rateConditions = 
+    hotelReq?.preBookResponse?.HotelResult?.[0]?.RateConditions || 
+    booking?.raw?.Rooms?.[0]?.RateConditions || 
+    booking?.raw?.HotelResult?.[0]?.RateConditions || 
+    booking?.raw?.RateConditions || 
+    [];
+  let extractedCheckInTime = "14:00 (Estimated)";
+  let extractedCheckOutTime = "11:00 (Estimated)";
+  rateConditions.forEach((c) => {
+    if (!c) return;
+    const text = c.replace(/&lt;[^>]*&gt;/g, ""); // Strip raw HTML just in case
+    const lower = text.toLowerCase();
+    
+    if (lower.includes("checkin time") || lower.includes("check-in time")) {
+      if (!lower.includes("-end")) {
+        const val = text.split(/time.*?:/i)[1]?.trim() || text.substring(text.indexOf(":") + 1).trim();
+        if (val) extractedCheckInTime = val;
+      }
+    }
+    if (lower.includes("checkout time") || lower.includes("check-out time")) {
+      const val = text.split(/time.*?:/i)[1]?.trim() || text.substring(text.indexOf(":") + 1).trim();
+      if (val) extractedCheckOutTime = val;
+    }
+  });
+  // Room name: allRooms[].name[] is an array of strings in the new API
   const roomType =
-    rooms.length > 1
-      ? rooms.map((r) => r.RoomTypeName).join(", ")
-      : rooms[0]?.RoomTypeName || "Standard Room";
+    (hotelReq.allRooms?.[0]?.name?.[0]) ||
+    (hotelReq.selectedRoom?.rawRoomData?.[0]?.Name?.[0]) ||
+    rooms[0]?.RoomTypeName ||
+    "Standard Room";
+
   let images =
     booking?.images ||
     selectedHotel?.images ||
-    selectedRoom?.rawRoomData?.images ||
+    hotelReq?.selectedRoom?.rawRoomData?.[0]?.images ||
     [];
   if (snapshot?.hotelImage && !images.includes(snapshot.hotelImage)) {
     images = [snapshot.hotelImage, ...images];
@@ -242,11 +260,17 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         <div className="p-8 md:p-9">
           {/* Hotel name + stars + city */}
           <div className="mb-6">
-            <h1 className="font-['Cormorant_Garamond'] text-[36px] font-bold leading-[1.1] text-[#1A1714] mb-2">
-              {isCancelled ? "Your trip was cancelled." : hotelName}
-            </h1>
+            <div className="flex items-center gap-4 flex-wrap mb-2">
+              <h1 className="font-['Cormorant_Garamond'] text-[36px] font-bold leading-[1.1] text-[#1A1714]">
+                {isCancelled
+                  ? "Your trip was cancelled."
+                  : location.state?.isPastTrip
+                    ? "Your trip is completed."
+                    : hotelName}
+              </h1>
+              <Stars count={starRating} />
+            </div>
             <div className="flex items-center gap-3 flex-wrap mb-[6px]">
-              {starRating > 0 && <Stars count={starRating} />}
               {city && (
                 <span className="flex items-center gap-1 text-[12px] text-[#7A7068]">
                   <MdLocationOn size={13} className="text-[#B5862A]" />
@@ -260,8 +284,11 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               </p>
             )}
             {executionStatus && (
-              <div className="mt-[10px]">
+              <div className="mt-[10px] flex items-center gap-2 flex-wrap">
                 <StatusPill status={executionStatus} />
+                {booking?.amendment?.status && booking.amendment.status !== "completed" && (
+                  <StatusPill status={`amendment_${booking.amendment.status}`} />
+                )}
               </div>
             )}
           </div>
@@ -282,9 +309,8 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               <div className="text-[13px] text-[#7A7068] font-medium">
                 {fmtDate(checkIn, { month: "short", year: "numeric" })}
               </div>
-              <div className="text-[11px] text-[#A89F94]">
-                {fmtDay(checkIn)} ·{" "}
-                {fmtTime(checkIn) !== "—" ? fmtTime(checkIn) : "14:00"}
+              <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                {fmtDay(checkIn)} <br /> Check-in Time: {extractedCheckInTime}
               </div>
             </div>
 
@@ -316,62 +342,13 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               <div className="text-[13px] text-[#7A7068] font-medium">
                 {fmtDate(checkOut, { month: "short", year: "numeric" })}
               </div>
-              <div className="text-[11px] text-[#A89F94]">
-                {fmtDay(checkOut)} · 11:00
+              <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                {fmtDay(checkOut)} <br /> Check-out Time: {extractedCheckOutTime}
               </div>
             </div>
           </div>
 
           <hr className="border-t border-[#EAE4D9] my-5" />
-
-          {/* Confirmation refs */}
-          {paymentSuccessful ? (
-            <div className="grid grid-cols-2 gap-5">
-              <div>
-                <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
-                  Confirmation No.
-                </div>
-                {confirmationNo ? (
-                  <div className="font-['DM_Mono'] text-[16px] font-medium text-[#1A1714]">
-                    {confirmationNo}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-[#A89F94]">
-                    <FiRefreshCw
-                      size={12}
-                      className="animate-spin"
-                    />
-                    <span className="text-[12px]">Awaiting confirmation…</span>
-                  </div>
-                )}
-                {invoiceNo && (
-                  <div className="text-[11px] text-[#A89F94] mt-[2px]">
-                    Invoice: {invoiceNo}
-                  </div>
-                )}
-              </div>
-              {tboRef && (
-                <div>
-                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
-                    TBO Reference
-                  </div>
-                  <div className="font-['DM_Mono'] text-[14px] font-medium text-[#7A7068]">
-                    {tboRef}
-                  </div>
-                  {bookingRefNo && (
-                    <div className="text-[11px] text-[#A89F94] mt-[2px]">
-                      Ref: {bookingRefNo}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-[#A89F94] text-[12px]">
-              <FiAlertCircle size={14} />
-              Complete payment to view confirmation details
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -386,6 +363,7 @@ function PaymentStatusCard({
   paymentSuccessful,
   isConfirmed,
   hotelReq,
+  isTravelAdmin,
 }) {
   const items = [
     {
@@ -397,6 +375,7 @@ function PaymentStatusCard({
       ) : (
         <FiAlertCircle size={13} />
       ),
+      hidden: !isTravelAdmin,
     },
     {
       label: "Invoice",
@@ -418,12 +397,22 @@ function PaymentStatusCard({
       icon: <MdHotel size={13} />,
     },
     {
+      label: "Guests",
+      value: `${hotelReq.roomGuests?.[0]?.noOfAdults || 0} Adults${
+        hotelReq.roomGuests?.[0]?.noOfChild > 0
+          ? `, ${hotelReq.roomGuests[0].noOfChild} Child`
+          : ""
+      }`,
+      ok: null,
+      icon: <FiUsers size={13} />,
+    },
+    {
       label: "Purpose",
       value: booking.purposeOfTravel || "—",
       ok: null,
       icon: <FiBriefcase size={13} />,
     },
-  ];
+  ].filter((item) => !item.hidden);
 
   return (
     <div className="grid grid-cols-4 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
@@ -464,49 +453,57 @@ function PaymentStatusCard({
 /*  Room Section                                                   */
 /* ─────────────────────────────────────────────────────────────── */
 function RoomSection({ rooms, selectedRoom }) {
+  const [expandedAmenities, setExpandedAmenities] = useState({});
+
   if (!rooms?.length) return null;
+
+  const toggleAmenities = (index) => {
+    setExpandedAmenities((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
 
   return (
     <div className="flex flex-col gap-8">
       {rooms.map((room, index) => {
-        // Parse inclusions as chips
-        const inclusions = room.Inclusion
-          ? room.Inclusion.split(/,|\s+/)
-              .filter(Boolean)
-              .filter((v, i, a) => a.indexOf(v) === i)
-          : [];
-
         const descriptionHtml = room.RoomDescription || "";
+        const inclusions = room.Inclusion ? room.Inclusion.split(',') : [];
+        const promotions = room.RoomPromotion || [];
+        const amenities = room.Amenities || [];
+        const isExpanded = expandedAmenities[index];
+        const visibleAmenities = isExpanded ? amenities : amenities.slice(0, 10);
 
         return (
-          <div key={index}>
+          <div key={index} className="border border-[#EAE4D9] bg-white overflow-hidden">
             {/* Room header */}
-            <div className="flex justify-between items-center mb-4">
+            <div className="p-6 border-b border-[#EAE4D9] flex justify-between items-center bg-[#FAF8F4]">
               <h3 className="font-['Cormorant_Garamond'] text-[26px] font-semibold text-[#1A1714]">
-                {room.RoomTypeName || `Room ${index + 1}`}
+                {room.RoomTypeName ||
+                  (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
+                  `Room ${index + 1}`}
               </h3>
-              {room.Inclusion && (
-                <div className="flex gap-2">
-                  {inclusions.slice(0, 3).map((item, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#D4A843] text-[10px] font-medium text-[#B5862A] bg-[#FDF8EE]"
-                    >
-                      <FiCheckCircle size={10} /> {item}
+              <div className="flex gap-3 items-center">
+                <div className="flex gap-2 flex-wrap">
+                  {room.MealType && (
+                    <span className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-wider">
+                      {room.MealType.replace(/_/g, " ")}
                     </span>
-                  ))}
+                  )}
+                  {room.IsRefundable !== undefined && (
+                    <span
+                      className={`inline-flex items-center gap-[5px] px-[10px] py-1 border text-[10px] font-bold uppercase tracking-wider ${
+                        room.IsRefundable
+                          ? "border-[#2C7A4B] text-[#2C7A4B] bg-[#EDF7F2]"
+                          : "border-[#B5341A] text-[#B5341A] bg-[#FDF1EE]"
+                      }`}
+                    >
+                      {room.IsRefundable ? "Refundable" : "Non-Refundable"}
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Description + inclusions two-column */}
-            <div
-              className={`grid gap-[1px] bg-[#EAE4D9] ${
-                descriptionHtml && inclusions.length
-                  ? "grid-cols-[3fr_2fr]"
-                  : "grid-cols-1"
-              }`}
-            >
+            {/* Content sections */}
+            <div className="flex flex-col gap-[1px] bg-[#EAE4D9]">
               {/* Description */}
               {descriptionHtml && (
                 <div className="bg-white p-6">
@@ -522,40 +519,53 @@ function RoomSection({ rooms, selectedRoom }) {
                 </div>
               )}
 
-              {/* Inclusions + cancellation */}
-              {inclusions.length > 0 && (
+              {/* Inclusions + Promotions */}
+              {(inclusions.length > 0 || promotions.length > 0) && (
                 <div className="bg-white p-6">
                   <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
-                    Inclusions
+                    Inclusions & Promotions
                   </div>
-                  <div className="flex flex-wrap gap-[6px]">
-                    {inclusions.map((item, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#D4A843] text-[11px] text-[#B5862A] bg-[#FDF8EE]"
-                      >
-                        <FiCheckCircle size={10} /> {item}
-                      </span>
+                  <ul className="list-none p-0 m-0 flex flex-col gap-2">
+                    {inclusions.map((inc, i) => (
+                      <li key={`inc-${i}`} className="flex gap-2 items-center text-[13px] text-[#7A7068]">
+                        <FiCheckCircle className="text-[#2C7A4B] shrink-0" size={14} />
+                        {inc.trim()}
+                      </li>
                     ))}
-                  </div>
+                    {promotions.map((promo, i) => (
+                      <li key={`promo-${i}`} className="flex gap-2 items-center text-[13px] text-[#B5862A]">
+                        <FiStar className="text-[#B5862A] shrink-0" size={14} />
+                        {promo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-                  {/* Cancellation note from room */}
-                  {room.LastCancellationDate && (
-                    <div className="mt-5">
-                      <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-[6px]">
-                        Cancellation
+              {/* Amenities */}
+              {amenities.length > 0 && (
+                <div className="bg-white p-6">
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                    Room Amenities
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {visibleAmenities.map((amenity, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-[#B5862A] shrink-0" />
+                        <span className="text-[13px] text-[#7A7068] leading-tight">{amenity}</span>
                       </div>
-                      <div className="text-[#2C7A4B] text-[14px] font-semibold leading-[1.4]">
-                        Free cancellation
-                        <br />
-                        until {fmtDate(room.LastCancellationDate)}
+                    ))}
+                    {amenities.length > 10 && (
+                      <div className="col-span-full mt-2">
+                        <button
+                          onClick={() => toggleAmenities(index)}
+                          className="text-[12px] text-[#B5862A] font-semibold hover:underline"
+                        >
+                          {isExpanded ? "Show Less" : `+ ${amenities.length - 10} more amenities available (click to show all)`}
+                        </button>
                       </div>
-                      <div className="text-[11px] text-[#A89F94] mt-1">
-                        After this date, the booking becomes non-refundable per
-                        the rate policy.
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -565,6 +575,7 @@ function RoomSection({ rooms, selectedRoom }) {
     </div>
   );
 }
+
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Amenities                                                      */
@@ -638,9 +649,16 @@ function AmenitiesSection({ amenities = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Check-in Instructions (Hotel Policies)                         */
 /* ─────────────────────────────────────────────────────────────── */
+const decodeHtml = (html) => {
+  if (!html) return "";
+  const txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
+};
+
 function CheckInInstructions({ conditions = [] }) {
   const filtered = conditions.filter(
-    (c) => c && c.trim() && !c.startsWith("&lt;"),
+    (c) => c && c.trim(),
   );
   if (!filtered.length) return null;
 
@@ -665,9 +683,10 @@ function CheckInInstructions({ conditions = [] }) {
               <span className="font-['DM_Mono'] text-[10px] text-[#B5862A] font-medium min-w-[18px] pt-[2px]">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="text-[13px] text-[#7A7068] leading-[1.6]">
-                {c}
-              </span>
+              <span 
+                className="text-[13px] text-[#7A7068] leading-[1.6] [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mt-1 [&>ul>li]:mb-1 [&>p]:mb-1"
+                dangerouslySetInnerHTML={{ __html: decodeHtml(c) }}
+              />
             </li>
           ))}
         </ol>
@@ -681,6 +700,16 @@ function CheckInInstructions({ conditions = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 function CancellationPolicySection({ policies = [], lastCancellationDate }) {
   if (!policies.length) return null;
+
+  const now = new Date();
+
+  const parseDate = (str) => {
+    if (!str) return null;
+    const [datePart, timePart] = str.split(" ");
+    const [d, m, y] = datePart.split("-").map(Number);
+    const [hh, mm, ss] = (timePart || "00:00:00").split(":").map(Number);
+    return new Date(y, m - 1, d, hh, mm, ss);
+  };
 
   const typeLabel = (type) => {
     if (type === 1 || type === "Fixed") return "Fixed (INR)";
@@ -720,17 +749,37 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
           </tr>
         </thead>
         <tbody>
-          {policies.map((p, i) => (
-            <tr
-              key={i}
-              className="hover:bg-[#B5862A08]"
-            >
-              <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#7A7068]">
-                {p.FromDate || "—"}
-              </td>
-              <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#A89F94]">
-                {p.ToDate || "—"}
-              </td>
+          {policies.map((p, i) => {
+            const nextPolicy = policies[i + 1];
+            const displayToDate = p.ToDate || nextPolicy?.FromDate || "Check-in";
+
+            const fromDateObj = parseDate(p.FromDate);
+            const toDateObj = parseDate(displayToDate === "Check-in" ? null : displayToDate);
+            
+            const fromTime = fromDateObj?.getTime() || 0;
+            const toTime = toDateObj?.getTime() || Infinity;
+            const nowTime = now.getTime();
+            
+            const isActive = nowTime >= fromTime && nowTime < toTime;
+
+            return (
+              <tr
+                key={i}
+                className={`${isActive ? "bg-[#B5862A08]" : "hover:bg-[#B5862A04]"}`}
+              >
+                <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#7A7068]">
+                  <div className="flex items-center gap-2">
+                    {p.FromDate || "—"}
+                    {isActive && (
+                      <span className="text-[8px] font-bold tracking-widest uppercase bg-[#B5862A] text-white px-1.5 py-0.5 rounded-sm animate-pulse">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#A89F94]">
+                  {displayToDate}
+                </td>
               <td className="p-[14px_12px] border-b border-[#EAE4D9]">
                 <span
                   className={`text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-[2px] ${
@@ -754,7 +803,8 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -762,27 +812,29 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Order ID                                                       */
+/*  Booking References                                             */
 /* ─────────────────────────────────────────────────────────────── */
 function BookingReferencesSection({ booking, bookingDetail, result }) {
+  const detail = bookingDetail || booking?.raw || {};
   const refs = [
     { label: "Order ID", val: booking.orderId || "—", hash: true },
     {
       label: "Confirmation No.",
-      val: bookingDetail?.ConfirmationNo || result?.hotelBookingId || "—",
+      val: booking?.confirmationNo || detail?.ConfirmationNo || result?.hotelBookingId || "—",
       hash: true,
     },
     {
       label: "Invoice No.",
       val:
-        bookingDetail?.InvoiceNo ||
+        detail?.InvoiceNo ||
         result?.providerResponse?.BookResult?.InvoiceNumber ||
         "—",
       doc: true,
     },
+  
     {
       label: "TBO Reference",
-      val: bookingDetail?.TBOReferenceNo || "—",
+      val: detail?.TBOReferenceNo || "—",
       hash: true,
     },
   ];
@@ -910,56 +962,136 @@ function GuestSection({ travellers = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  08 Fare Breakdown (Travel Admin Only)                          */
 /* ─────────────────────────────────────────────────────────────── */
-function FareBreakdownSection({ priceBreakUp, totalFare, detailRoom }) {
+function FareBreakdownSection({ priceBreakUp, totalFare }) {
   if (!priceBreakUp) return null;
 
   return (
     <div className="bg-white border border-[#EAE4D9] p-6">
       <div className="max-w-[600px]">
         <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-4">
-          Base Charges
+          Fare Details
         </div>
         <div className="flex flex-col gap-3">
-          <div className="flex justify-between text-[14px]">
-            <span className="text-[#7A7068]">Base Price (Per Night/Person)</span>
-            <span className="font-semibold">
-              ₹{(detailRoom?.DayRates?.[0]?.[0]?.BasePrice || 
-                 detailRoom?.DayRates?.[0]?.[0]?.RoomRate || 
-                 priceBreakUp.RoomRate)?.toLocaleString("en-IN")}
+          <div className="flex justify-between items-center text-[14px]">
+            <span className="text-[#1A1714] font-bold">
+              Total Paid <span className="font-normal text-slate-500 text-[11px] ml-1">(incl. all taxes and service fee)</span>
             </span>
-          </div>
-          {priceBreakUp.RoomExtraGuestCharges > 0 && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Extra Guest Charges</span>
-              <span className="font-semibold">
-                ₹{priceBreakUp.RoomExtraGuestCharges?.toLocaleString("en-IN")}
-              </span>
-            </div>
-          )}
-          {priceBreakUp.RoomChildCharges > 0 && (
-            <div className="flex justify-between text-[14px]">
-              <span className="text-[#7A7068]">Child Charges</span>
-              <span className="font-semibold">
-                ₹{priceBreakUp.RoomChildCharges?.toLocaleString("en-IN")}
-              </span>
-            </div>
-          )}
-          <div className="flex justify-between text-[14px] pt-3 border-t border-dashed border-[#EAE4D9]">
-            <span className="text-[#1A1714] font-bold">Total Tax</span>
-            <span className="font-bold text-[#B5341A]">
-              ₹{priceBreakUp.RoomTax?.toLocaleString("en-IN")}
+            <span className="font-bold text-[#B5341A] text-[20px]">
+              ₹{Number(totalFare).toLocaleString("en-IN")}
             </span>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-6 p-4 bg-[#FAF8F4] border border-[#EAE4D9] flex justify-between items-center">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.05em]">
-          Final Invoice Amount
-        </span>
-        <span className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
-          ₹{(totalFare).toLocaleString("en-IN")}
-        </span>
+const getVoucherDate = (b) => {
+  if (b.voucheredAt) return b.voucheredAt;
+  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  if (tboVoucherDate) return tboVoucherDate;
+  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  return null;
+};
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                     */
+/* ─────────────────────────────────────────────────────────────── */
+function BookingHistory({ booking }) {
+  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
+  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+  
+
+
+  const steps = [
+    {
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
+    },
+    {
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt,
+      desc: (() => {
+        if (booking.rejectedAt) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (booking.approvedAt) {
+          const requesterId = booking.userId?._id || booking.userId;
+          const approverId = booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+          
+          if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
+            return "Auto Approved by System (Travel Policy)";
+          }
+          
+          return `Approved by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Awaiting approval";
+      })(),
+      icon: <FiCheckCircle size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt),
+    },
+    {
+      label: "Voucher Issued",
+      date: getVoucherDate(booking),
+      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      icon: <FiTag size={14} />,
+      active: isConfirmed,
+    }
+  ];
+
+  if (isCancelled) {
+    steps.push({
+      label: "Cancelled",
+      date: booking.cancelledAt || booking.cancellation?.cancelledAt || booking.updatedAt,
+      desc: `Hotel booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
+      icon: <FiXCircle size={14} className="text-[#B5341A]" />,
+      active: true,
+      isError: true,
+    });
+  }
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] p-8">
+      <div className="flex items-center pb-3 border-b border-[#EAE4D9] mb-8">
+        <span className="font-['DM_Mono'] text-[#B5862A] text-[11px] tracking-wider mr-3">06</span>
+        <h2 className="font-['Cormorant_Garamond'] text-[22px] font-semibold text-[#1A1714] md:text-[18px]">
+          Booking Timeline & History
+        </h2>
+      </div>
+      
+      <div className="relative">
+        <div className="absolute left-[15px] top-2 bottom-2 w-[1px] bg-[#EAE4D9]" />
+        
+        <div className="space-y-10">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative pl-12">
+              {/* Dot */}
+              <div className={`absolute left-0 top-0 w-8 h-8 rounded-full border border-[#EAE4D9] flex items-center justify-center bg-white z-10 transition-colors ${
+                step.isError ? "text-[#B5341A] border-[#B5341A]" :
+                step.active ? "text-[#B5862A] border-[#B5862A]" : "text-[#A89F94]"
+              }`}>
+                {step.icon}
+              </div>
+              
+              <div className={step.active ? "opacity-100" : "opacity-40"}>
+                <div className="flex flex-wrap items-center gap-3 mb-1">
+                  <p className={`text-[13px] font-semibold tracking-wide ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="font-['DM_Mono'] text-[10px] text-[#B5862A] px-2 py-0.5 bg-[#FAF8F4] border border-[#EAE4D9] uppercase tracking-wider">
+                      {fmtDate(step.date)} · {fmtTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-[#7A7068] leading-relaxed">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -980,7 +1112,7 @@ const CANCEL_REASONS = [
 
 const CANCEL_STATUS_CONFIG = {
   pending: {
-    label: "Request Submitted",
+    label: "Refund is in Process",
     icon: FiClock,
     color: "text-[#8A6200]",
     bg: "bg-[#FDF8EE]",
@@ -1001,7 +1133,7 @@ const CANCEL_STATUS_CONFIG = {
     border: "border-[#F0C4BA]",
   },
   processing: {
-    label: "Processing Cancellation",
+    label: "Refund is in Process",
     icon: FiRefreshCw,
     color: "text-[#1A4A7A]",
     bg: "bg-[#EEF4FD]",
@@ -1020,6 +1152,16 @@ function CancellationSection({
 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const { amendmentStatus } = useSelector((state) => state.hotelAmendment);
+
+  const providerStatusRaw =
+    amendmentStatus?.response?.HotelChangeRequestStatusResult ||
+    booking?.amendment?.providerResponse?.HotelChangeRequestStatusResult;
+  const providerStatus =
+    providerStatusRaw?.ChangeRequestStatus !== undefined
+      ? providerStatusRaw
+      : null;
 
   const [showForm, setShowForm] = useState(false);
   const [reason, setReason] = useState("");
@@ -1040,27 +1182,25 @@ function CancellationSection({
   const isCancelled = ["cancelled", "cancel_requested"].includes(
     (booking?.executionStatus || "").toLowerCase(),
   );
-  const canRequest = isConfirmed && !isCancelled && !cancelRequest;
-
-  const { amendmentStatus } = useSelector((state) => state.hotelAmendment);
+  const checkInDate = booking?.hotelRequest?.checkInDate;
+  const isPastCheckIn =
+    checkInDate && new Date(checkInDate) < new Date().setHours(0, 0, 0, 0);
+  const canRequest =
+    isConfirmed && !isCancelled && !cancelRequest && !isPastCheckIn;
 
   useEffect(() => {
-    if (booking?.bookingId && (cancelRequest || isCancelled)) {
-      dispatch(getHotelAmendmentStatus({ bookingId: booking.bookingId }));
+    // Only hit the status API if an amendment has actually been requested
+    // Hit once on mount to get current state
+    const bId = booking?.bookingId || booking?._id;
+    if (bId && cancelRequest) {
+      dispatch(getHotelAmendmentStatus({ bookingId: bId }));
     }
-  }, [booking?.bookingId, !!cancelRequest, isCancelled, dispatch]);
-
-  const providerStatusRaw =
-    amendmentStatus?.response?.HotelChangeRequestStatusResult ||
-    booking?.amendment?.providerResponse?.HotelChangeRequestStatusResult;
-  const providerStatus =
-    providerStatusRaw?.ChangeRequestStatus !== undefined
-      ? providerStatusRaw
-      : null;
+  }, [booking?.bookingId, booking?._id, !!cancelRequest, dispatch]);
 
   const mappedStatus = (() => {
     const s = providerStatus?.ChangeRequestStatus;
     if (s !== undefined && s !== null) {
+      if (s === 0) return "pending"; // NotSet usually means it's just started
       if (s === 1) return "pending";
       if (s === 2) return "processing";
       if (s === 3) return "approved";
@@ -1079,57 +1219,63 @@ function CancellationSection({
   const calculateCurrentCharges = () => {
     if (!cancelPolicies?.length)
       return { charge: 0, refund: totalFare, isFree: true };
-    const parseDate = (d) => {
-      if (!d) return null;
-      if (typeof d === "string" && d.includes("/")) {
-        const parts = d.split(/[/\s:]/);
-        if (parts.length >= 3) {
-          return new Date(
-            parseInt(parts[2]),
-            parseInt(parts[1]) - 1,
-            parseInt(parts[0]),
-            parseInt(parts[3] || 0),
-            parseInt(parts[4] || 0),
-            parseInt(parts[5] || 0),
-          );
-        }
+    const parseDate = (str) => {
+      if (!str) return null;
+      if (str instanceof Date) return str;
+      const parts = String(str).split(/[/\-\s:]/);
+      if (parts.length >= 3) {
+        const d = parseInt(parts[0]);
+        const m = parseInt(parts[1]);
+        const y = parseInt(parts[2]);
+        const hh = parseInt(parts[3] || 0);
+        const mm = parseInt(parts[4] || 0);
+        const ss = parseInt(parts[5] || 0);
+        return new Date(y, m - 1, d, hh, mm, ss);
       }
-      return new Date(d);
+      return new Date(str);
     };
+
     const now = new Date();
     let applicablePolicy = null;
+
+    // Find the last policy that has already started
     for (const policy of cancelPolicies) {
       const fromDate = parseDate(policy.FromDate);
-      if (fromDate && now >= fromDate) applicablePolicy = policy;
+      if (fromDate && now >= fromDate) {
+        // If we already found a policy, only update if this one starts later
+        if (
+          !applicablePolicy ||
+          fromDate > parseDate(applicablePolicy.FromDate)
+        ) {
+          applicablePolicy = policy;
+        }
+      }
     }
+
     if (!applicablePolicy) {
-      const firstDate = parseDate(cancelPolicies[0]?.FromDate);
-      if (firstDate && now < firstDate)
-        return {
-          charge: 0,
-          refund: totalFare,
-          isFree: true,
-          note: "Pre-cancellation period (Free)",
-        };
       return {
         charge: 0,
         refund: totalFare,
         isFree: true,
-        note: "No applicable policy found",
+        note: "Pre-cancellation period (Free)",
       };
     }
+
     const chargeValue = Number(applicablePolicy.CancellationCharge);
-    let chargeAmount =
+    const chargeAmount =
       applicablePolicy.ChargeType === 2 ||
       applicablePolicy.ChargeType === "Percentage"
         ? (totalFare * chargeValue) / 100
         : chargeValue;
+
     return {
       charge: chargeAmount,
       refund: Math.max(0, totalFare - chargeAmount),
       isFree: chargeAmount === 0,
       policy: applicablePolicy,
-      note: `Policy in effect since ${fmtDate(applicablePolicy.FromDate)}`,
+      note: `Policy in effect since ${
+        applicablePolicy.FromDate.split(" ")[0]
+      }`,
     };
   };
 
@@ -1223,11 +1369,7 @@ function CancellationSection({
               {
                 label: "Cancelled On",
                 val: cancelledOn
-                  ? new Date(cancelledOn).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
+                  ? `${fmtDate(cancelledOn)} · ${fmtTime(cancelledOn)}`
                   : "—",
                 color: "text-[#1A1714]",
               },
@@ -1344,11 +1486,21 @@ function CancellationSection({
                   <span
                     className={`text-[9px] font-semibold tracking-[0.12em] uppercase px-[10px] py-[3px] border ${cfg.color} ${cfg.bg} ${cfg.border}`}
                   >
-                    {mappedStatus}
+                    {mappedStatus === "pending" || mappedStatus === "processing"
+                      ? "In Process"
+                      : mappedStatus}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-[1fr_2fr] gap-3">
+                <div className="grid grid-cols-[auto_1fr_2fr] gap-3">
+                  <div className="bg-white/60 p-[12px_14px]">
+                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                      Request ID
+                    </div>
+                    <div className="text-[13px] font-['DM_Mono'] font-bold text-[#1A1714]">
+                      #{changeRequestId}
+                    </div>
+                  </div>
                   <div className="bg-white/60 p-[12px_14px]">
                     <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
                       Reason
@@ -1382,14 +1534,30 @@ function CancellationSection({
                 )}
                 {mappedStatus === "approved" && (
                   <div className="mt-3 flex flex-col gap-3 bg-[#EDF7F2] border border-[#C3E4D2] p-[16px_20px]">
-                    <div className="flex gap-2 items-center">
-                      <FiCheckCircle
-                        size={14}
-                        className="text-[#2C7A4B] shrink-0"
-                      />
-                      <p className="text-[14px] text-[#2C7A4B] font-semibold">
-                        Refund will be processed within 5–7 business days
-                      </p>
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-2 items-center">
+                        <FiCheckCircle
+                          size={14}
+                          className="text-[#2C7A4B] shrink-0"
+                        />
+                        <p className="text-[14px] text-[#2C7A4B] font-semibold">
+                          Refund will be processed within 5–7 business days
+                        </p>
+                      </div>
+                      {providerStatus?.RefundedAmount === 0 && providerStatus?.ChangeRequestStatus === 3 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase">
+                            Not Refunded
+                          </span>
+                          <button
+                            onClick={() => dispatch(getHotelAmendmentStatus({ bookingId: booking?.bookingId || booking?._id }))}
+                            className="text-[10px] text-amber-700 hover:underline flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
+                          >
+                            <FiRefreshCw size={10} className={statusLoading ? "animate-spin" : ""} />
+                            Check Status
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4 mt-1">
                       <div>
@@ -1440,7 +1608,7 @@ function CancellationSection({
                 )}
                 {cancelRequest?.requestedAt && (
                   <p className="mt-3 text-[11px] text-[#A89F94]">
-                    Submitted on {fmtDate(cancelRequest.requestedAt)}
+                    Submitted on {fmtDate(cancelRequest.requestedAt)} · {fmtTime(cancelRequest.requestedAt)}
                   </p>
                 )}
               </div>
@@ -1638,7 +1806,9 @@ function CancellationSection({
             className="text-[#A89F94]"
           />
           <p className="text-[13px] text-[#7A7068]">
-            Cancellation requests can only be submitted for confirmed bookings.
+            {isPastCheckIn
+              ? "Cancellation is no longer possible as the check-in date has passed."
+              : "Cancellation requests can only be submitted for confirmed bookings."}
           </p>
         </div>
       )}
@@ -1660,18 +1830,116 @@ function TotalPriceBar({ totalFare, onDownload, isCancelled }) {
           ₹{Number(totalFare).toLocaleString("en-IN")}
         </div>
       </div>
-      {!isCancelled && (
-        <button
-          onClick={onDownload}
-          className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#B5862A] text-white border-none cursor-pointer font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase transition-colors hover:bg-[#D4A843]"
-        >
-          <FiDownload size={14} />
-          Download Voucher
-        </button>
-      )}
     </div>
   );
 }
+
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Corporate Audit / Summary                                       */
+/* ─────────────────────────────────────────────────────────────── */
+function CorporateAuditSection({ booking }) {
+  const isConfirmed =
+    booking.executionStatus === "voucher_generated" ||
+    booking.executionStatus === "confirmed" ||
+    booking.executionStatus === "booked";
+
+  const approverName = (() => {
+    const requesterId = booking.userId?._id || booking.userId;
+    const approverId = booking.approverId;
+    if (
+      booking.approverName === "Auto Approve" ||
+      (requesterId && approverId && requesterId.toString() === approverId.toString())
+    ) {
+      return "Auto Approved (System)";
+    }
+    return booking.approverName || "—";
+  })();
+
+  const requesterName =
+    booking.requesterDetails?.name ||
+    (booking.userId?.name
+      ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}`
+      : booking.travellers?.[0]
+      ? `${booking.travellers[0].firstName} ${booking.travellers[0].lastName}`
+      : "—");
+
+  const sections = [
+    {
+      heading: "Project Information",
+      fields: [
+        { label: "Project Name", value: booking.projectName || "—", icon: <FiBriefcase size={11} /> },
+        { label: "Project Code", value: booking.projectId || booking.projectCodeId || "—", icon: <FiTag size={11} /> },
+        { label: "Project Client", value: booking.projectClient || "—", icon: <FiBriefcase size={11} /> },
+      ],
+    },
+    {
+      heading: "Requester Details",
+      fields: [
+        { label: "Requester Name", value: requesterName, icon: <FiUser size={11} /> },
+        { label: "Requester Email", value: booking.requesterDetails?.email || booking.userId?.email || booking.travellers?.[0]?.email || "—", icon: <FiMail size={11} />, isEmail: true },
+        { label: "Purpose of Travel", value: booking.purposeOfTravel || "—", icon: <FiBriefcase size={11} /> },
+      ],
+    },
+    {
+      heading: "Approval Details",
+      fields: [
+        { label: "Selected Approver", value: approverName, icon: <FiUser size={11} /> },
+        { label: "Approver Email", value: booking.approverEmail || "—", icon: <FiMail size={11} />, isEmail: true },
+        { label: "Approver Role", value: booking.approverRole ? booking.approverRole.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "—", icon: <FiShield size={11} /> },
+        ...(booking.approvedBy?.name ? [
+          { label: "Approved By", value: `${booking.approvedBy.name.firstName || ""} ${booking.approvedBy.name.lastName || ""}`.trim() || "—", icon: <FiUser size={11} /> },
+          { label: "Approved By Email", value: booking.approvedBy?.email || "—", icon: <FiMail size={11} />, isEmail: true },
+          { label: "Approved By Role", value: booking.approvedBy?.role ? booking.approvedBy.role.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "—", icon: <FiShield size={11} /> },
+        ] : []),
+        ...(isConfirmed && getVoucherDate(booking) ? [{
+          label: "Vouchered At",
+          value: `${fmtDate(getVoucherDate(booking))} ${fmtTime(getVoucherDate(booking))}`,
+          icon: <FiClock size={11} />,
+        }] : []),
+      ],
+    },
+  ];
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+      {sections.map((section, si) => (
+        <div key={si} className={si > 0 ? "border-t border-[#EAE4D9]" : ""}>
+          {/* Section heading */}
+          <div className="px-6 pt-5 pb-3 bg-[#FAF8F4]">
+            <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A]">
+              {section.heading}
+            </div>
+          </div>
+          {/* Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[#EAE4D9]">
+            {section.fields.map((field, fi) => (
+              <div
+                key={fi}
+                className={`px-6 py-5 ${
+                  fi % 3 !== 2 ? "sm:border-r border-[#EAE4D9]" : ""
+                } ${fi >= 3 ? "border-t border-[#EAE4D9]" : ""}`}
+              >
+                <div className="flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                  <span className="text-[#B5862A]">{field.icon}</span>
+                  {field.label}
+                </div>
+                <div
+                  className={`text-[13px] font-semibold text-[#1A1714] leading-snug ${
+                    field.isEmail ? "break-all" : ""
+                  }`}
+                >
+                  {field.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Page                                                      */
@@ -1679,14 +1947,19 @@ function TotalPriceBar({ totalFare, onDownload, isCancelled }) {
 export default function HotelBookingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
 
-  const { selectedBookingDetails: booking, loading, voucherLoading } = useSelector(
+  const { selectedBookingDetails: booking, loading, voucherLoading, error } = useSelector(
     (s) => s.hotelBookings,
   );
   const user = useSelector((state) => state.auth?.user);
   const isTravelAdmin = user?.role === "travel-admin";
-  const rooms = Array.isArray(booking?.rooms) ? booking.rooms : [];
+  const rawRoomsData = booking?.hotelRequest?.selectedRoom?.rawRoomData;
+  const roomsFallback = rawRoomsData ? (Array.isArray(rawRoomsData) ? rawRoomsData : [rawRoomsData]) : [];
+  const rooms = (Array.isArray(booking?.rooms) && booking.rooms.length > 0)
+    ? booking.rooms
+    : roomsFallback;
   const {
     sendLoading,
     sendError,
@@ -1701,7 +1974,7 @@ export default function HotelBookingDetails() {
     if (id) dispatch(fetchBookedHotelDetails(id));
   }, [id, dispatch]);
 
-  if (loading || !booking) {
+  if (loading || (!booking && !error)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAF8F4] font-['DM_Sans']">
         <div className="w-10 h-10 rounded-full border-2 border-[#EAE4D9] border-t-[#B5862A] animate-spin" />
@@ -1710,35 +1983,81 @@ export default function HotelBookingDetails() {
     );
   }
 
+  if (error && !booking) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAF8F4] font-['DM_Sans'] p-6 text-center">
+        <FiAlertCircle size={40} className="text-[#B5341A] opacity-50" />
+        <h2 className="text-[16px] font-semibold text-[#1A1714]">Failed to load booking</h2>
+        <p className="text-[13px] text-[#A89F94] max-w-xs">{error}</p>
+        <button 
+          onClick={() => dispatch(fetchBookedHotelDetails(id))}
+          className="mt-2 px-6 py-2 bg-[#B5862A] text-white text-[12px] font-semibold uppercase tracking-wider hover:bg-[#966b1d] transition-colors"
+        >
+          Retry
+        </button>
+        <button 
+          onClick={() => navigate(-1)}
+          className="text-[12px] text-[#7A7068] hover:underline"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
   /* ── Data ── */
-  const detail = booking?.raw || {};
   const hotelReq = booking?.hotelRequest || {};
+  const selectedRoom = hotelReq?.selectedRoom || {};
   const snapshot = booking?.bookingSnapshot || {};
   const pricing = booking?.pricingSnapshot || {};
-  const result = booking?.bookingResult || {};
-  const selectedRoom = hotelReq.selectedRoom || {};
-  const travellers = booking?.travellers?.length
-    ? booking.travellers
-    : booking?.guests?.length
-      ? booking.guests
-      : booking?.raw?.Rooms?.flatMap((r) => r?.HotelPassenger || []) || [];
-  const bookingDetail = booking?.raw || null;
-  const detailRoom = booking?.raw?.Rooms?.[0] || {};
-  const priceBreakUp = detailRoom?.PriceBreakUp || {};
+  const priceBreakUp = pricing?.priceBreakUp || null;
+  const bookingResult = booking?.bookingResult || {};
+  const result = bookingResult; // alias for JSX compatibility
 
-  const paymentSuccessful =
-    booking.payment?.status === "completed" || !!booking?.confirmationNo;
-  const executionStatus = booking.executionStatus || "";
+
+  // Room data from the actual API response structure
+  const allRooms = hotelReq.allRooms || [];
+  const rawData = hotelReq.selectedRoom?.rawRoomData;
+  const selectedRoomRaw = Array.isArray(rawData) ? rawData[0] : (rawData || allRooms[0] || {});
+
+  const cancelPolicies = selectedRoomRaw?.CancelPolicies || [];
+  const amenities = selectedRoomRaw?.Amenities || [];
+
+  const travellers = booking?.travellers || [];
+  const bookingDetail = null; // no raw TBO detail in this API
+  const detailRoom = selectedRoomRaw;
+  const rateConditions = 
+    hotelReq?.preBookResponse?.HotelResult?.[0]?.RateConditions || 
+    booking?.raw?.Rooms?.[0]?.RateConditions || 
+    booking?.raw?.HotelResult?.[0]?.RateConditions || 
+    booking?.raw?.RateConditions || 
+    [];
+
+  const paymentSuccessful = booking?.payment?.status === "completed";
+  const executionStatus = booking?.executionStatus || "";
+  const bookingAmendmentStatus = booking?.amendment?.status || "";
+
+  // Combined status: if amendment is pending, show that; otherwise use executionStatus
+  const displayStatus = ["requested", "in_progress"].includes(bookingAmendmentStatus)
+    ? `amendment_${bookingAmendmentStatus}`
+    : executionStatus;
+
   const isConfirmed =
-    executionStatus === "voucher_generated" || executionStatus === "confirmed";
+    executionStatus === "voucher_generated" ||
+    executionStatus === "confirmed" ||
+    executionStatus === "booked";
   const isCancelled = ["cancelled", "cancel_requested"].includes(
-    (executionStatus || "").toLowerCase(),
+    executionStatus.toLowerCase(),
   );
+  const isAmendmentPending = bookingAmendmentStatus === "requested" || bookingAmendmentStatus === "in_progress";
 
-  const cancelPolicies = rooms.flatMap((r) => r.CancelPolicies || []);
-  const amenities = rooms.flatMap((r) => r.Amenities || []);
-  const totalFare = booking?.totalFare || booking?.raw?.InvoiceAmount || 0;
-  const rateConditions = bookingDetail?.RateConditions || [];
+  const totalFare =
+    pricing?.totalAmount ||
+    selectedRoomRaw?.TotalFare ||
+    allRooms[0]?.totalFare ||
+    booking?.totalFare ||
+    0;
+
 
   return (
     <div className="bg-[#FAF8F4] min-h-screen font-['DM_Sans'] selection:bg-[#B5862A20] selection:text-[#B5862A]">
@@ -1747,109 +2066,170 @@ export default function HotelBookingDetails() {
       `}</style>
 
       {/* ── Sticky nav ── */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] h-14 px-8 flex items-center gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
-        >
-          <FiArrowLeft size={14} />
-          Back
-        </button>
-        <span className="w-[1px] h-4 bg-[#EAE4D9]" />
-        <h1 className="text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em]">
-          Hotel Booking Details
-        </h1>
+      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] flex flex-col pt-4 px-8 gap-4">
+        {/* Top Row */}
+        <div className="flex items-center gap-4 w-full">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
+          >
+            <FiArrowLeft size={14} />
+            Back
+          </button>
+          <span className="w-[1px] h-4 bg-[#EAE4D9]" />
+          <h1 className="text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em]">
+            Hotel Booking Details
+          </h1>
 
-        <div className="ml-auto flex items-center gap-4">
-          {isConfirmed && !isCancelled && (
-            <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
-              <MdVerifiedUser size={11} /> Voucher Issued
-            </span>
-          )}
-          {(booking.orderId || booking.bookingReference) && (
-            <span className="text-[11px] text-[#A89F94]">
-              Order ID:{" "}
-              <strong className="text-[#1A1714] font-['DM_Mono']">
-                {booking.orderId || booking.bookingReference}
-              </strong>
-            </span>
-          )}
-          {paymentSuccessful && !isCancelled && (
-            <button
-              onClick={() => dispatch(generateHotelVoucher(booking.bookingId))}
-              disabled={voucherLoading}
-              className="inline-flex items-center gap-[6px] px-4 py-[7px] bg-[#B5862A] text-white border-none cursor-pointer font-['DM_Sans'] text-[11px] font-semibold tracking-[0.05em] uppercase transition-colors hover:bg-[#D4A843] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {voucherLoading ? (
-                <>
-                  <FiRefreshCw size={12} className="animate-spin" />
-                  Downloading…
-                </>
-              ) : (
-                <>
-                  <FiDownload size={12} />
-                  Download Voucher
-                </>
-              )}
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-4">
+            {(booking.orderId || booking.bookingReference) && (
+              <span className="text-[11px] text-[#A89F94]">
+                Order ID:{" "}
+                <strong className="text-[#1A1714] font-['DM_Mono']">
+                  {booking.orderId || booking.bookingReference}
+                </strong>
+              </span>
+            )}
+            {isConfirmed && !isCancelled && (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
+                  <MdVerifiedUser size={11} /> Voucher Issued
+                </span>
+                <button
+                  onClick={() => dispatch(generateHotelVoucher(booking._id))}
+                  className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
+                >
+                  <FiDownload size={11} /> Download Voucher
+                </button>
+              </div>
+            )}
+            
+          </div>
         </div>
-      </header>
 
-      {/* Tabs Navigation */}
-      <div className="bg-white border-b border-[#EAE4D9] sticky top-14 z-30">
-        <div className="w-full mx-auto px-8 flex items-center gap-8 overflow-x-auto no-scrollbar">
+        {/* Tabs Navigation */}
+        <div className="flex items-center gap-6 overflow-x-auto w-full">
           {[
             { id: "hotel_details", label: "Hotel Details" },
             { id: "room_details", label: "Room Details" },
-            { id: "rules", label: "Rules & Policies" },
+            { id: "project", label: "Project Details" },
+            { id: "rules", label: "Rules and Policies" },
             { id: "guest", label: "Guest" },
-            { id: "amendment", label: "Amendment" },
-            { id: "history", label: "Booking History" },
+            {
+              id: "amendment",
+              label: isCancelled
+                ? "Cancellation Details"
+                : isAmendmentPending
+                ? "Cancellation Request"
+                : bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested"
+                ? "Amendment Status"
+                : "Cancellation",
+            },
+            { id: "history", label: "Booking Life Cycle" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-4 text-[12px] font-bold tracking-[0.05em] uppercase whitespace-nowrap border-b-2 transition-colors ${
+              className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
                 activeTab === tab.id
-                  ? "border-[#B5862A] text-[#1A1714]"
-                  : "border-transparent text-[#A89F94] hover:text-[#1A1714]"
+                  ? "text-[#1A1714]"
+                  : "text-[#A89F94] hover:text-[#7A7068]"
               }`}
             >
               {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
+              )}
             </button>
           ))}
         </div>
-      </div>
+      </header>
 
       {/* ── Main ── */}
-      <main className="w-full mx-auto p-[32px_24px_120px]">
+      <main className="w-full px-4 lg:px-10 py-8 pb-24 space-y-6">
+        {/* ── Dynamic Header ── */}
+        {(() => {
+          let label = "Reservation";
+          let title = isCancelled ? "The trip is cancelled." : location.state?.isPastTrip ? "The trip is completed." : "The trip is confirmed.";
+          let subtitle = "A clean, single-page record of the itinerary, guests and payment.";
+
+          if (activeTab === "room_details") {
+            label = "Room Details";
+            title = "Accommodation Info";
+            subtitle = "Detailed breakdown of the reserved rooms, amenities, and meal plans.";
+          } else if (activeTab === "project") {
+            label = "Project Details";
+            title = "Project & Approvals";
+            subtitle = "Information about the project code and the approval workflow for this trip.";
+          } else if (activeTab === "rules") {
+            label = "Rules & Policies";
+            title = "Hotel Policies";
+            subtitle = "Important guidelines, cancellation policies, and hotel rules.";
+          } else if (activeTab === "guest") {
+            label = "Guest Information";
+            title = "Guests";
+            subtitle = "List of all guests staying in this reservation.";
+          } else if (activeTab === "amendment") {
+            if (isCancelled) {
+              label = "Cancellation";
+              title = "Cancellation Details";
+              subtitle = "Your cancellation has been processed. See the full details and refund information below.";
+            } else if (isAmendmentPending) {
+              label = "Cancellation Request";
+              title = "Cancellation Request Pending";
+              subtitle = "Your cancellation request has been submitted and is currently being processed.";
+            } else if (bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested") {
+              label = "Amendment";
+              title = "Amendment Status";
+              subtitle = "Review the current status of your cancellation or amendment request.";
+            } else {
+              label = "Cancellation";
+              title = "Request Cancellation";
+              subtitle = "Submit a cancellation request for this booking. Refunds are subject to the hotel's cancellation policy.";
+            }
+
+          } else if (activeTab === "history") {
+            label = "Audit Trail";
+            title = "Booking Life Cycle";
+            subtitle = "Chronological history of status changes and events for this reservation.";
+          }
+
+          return (
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+                  {label}
+                </p>
+                <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
+                  {title}
+                </h1>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {subtitle}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+        
+
+        {/* Tab Contents */}
         {activeTab === "hotel_details" && (
-          <div className="space-y-10">
-            <HotelHeroCard
-              booking={booking}
-              bookingDetail={bookingDetail}
-              paymentSuccessful={paymentSuccessful}
-            />
-            <PaymentStatusCard
-              booking={booking}
-              paymentSuccessful={paymentSuccessful}
-              isConfirmed={isConfirmed}
-              hotelReq={hotelReq}
-            />
-            <div className={`grid gap-6 ${isTravelAdmin && priceBreakUp ? "grid-cols-1 lg:grid-cols-[minmax(0,350px)_1fr]" : "grid-cols-1"}`}>
-              {isTravelAdmin && priceBreakUp && (
-                <section>
-                  <SectionHeader num={8} title="Fare Breakdown" />
-                  <FareBreakdownSection
-                    priceBreakUp={priceBreakUp}
-                    totalFare={totalFare}
-                    detailRoom={detailRoom}
-                  />
-                </section>
-              )}
+          <div className={`grid grid-cols-1 gap-6 ${isTravelAdmin ? "lg:grid-cols-3" : ""}`}>
+            <div className={`space-y-6 ${isTravelAdmin ? "lg:col-span-2" : ""}`}>
+              <HotelHeroCard
+                booking={booking}
+                bookingDetail={bookingDetail}
+                paymentSuccessful={paymentSuccessful}
+              />
+              <PaymentStatusCard
+                booking={booking}
+                paymentSuccessful={paymentSuccessful}
+                isConfirmed={isConfirmed}
+                hotelReq={hotelReq}
+                isTravelAdmin={isTravelAdmin}
+              />
               <section>
-                <SectionHeader num={5} title="Order ID" />
+                <SectionHeader num={4} title="Booking Summry" />
                 <BookingReferencesSection
                   booking={booking}
                   bookingDetail={bookingDetail}
@@ -1857,6 +2237,29 @@ export default function HotelBookingDetails() {
                 />
               </section>
             </div>
+            
+            {/* Fare Breakdown for Travel Admin */}
+            {isTravelAdmin && priceBreakUp && (
+              <div className="lg:col-span-1">
+                <section>
+                  <SectionHeader num={7} title="Fare Breakdown" />
+                  <FareBreakdownSection
+                    priceBreakUp={priceBreakUp}
+                    totalFare={totalFare}
+                  />
+                </section>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Project Details Tab */}
+        {activeTab === "project" && (
+          <div className="space-y-6">
+            <section>
+              <SectionHeader num={1} title="Corporate Audit" />
+              <CorporateAuditSection booking={booking} />
+            </section>
           </div>
         )}
 
@@ -1864,34 +2267,71 @@ export default function HotelBookingDetails() {
           <div className="space-y-12">
             {rooms.length > 0 && (
               <section>
-                <SectionHeader num={1} title="The Room" />
+                <SectionHeader title="The Room" />
                 <RoomSection rooms={rooms} selectedRoom={selectedRoom} />
-              </section>
-            )}
-            {amenities.length > 0 && (
-              <section>
-                <SectionHeader num={2} title="Amenities" />
-                <AmenitiesSection amenities={amenities} />
               </section>
             )}
           </div>
         )}
 
+  
+
         {activeTab === "rules" && (
           <div className="space-y-12">
-            {rateConditions.length > 0 && (
+            <section>
+              <SectionHeader title="Cancellation Policies" />
+              <div className="space-y-6">
+                {rooms.map((room, idx) => {
+                  const policies = room.CancelPolicies || [];
+                  const policyText = room.CancellationPolicy || "";
+                  if (!policies.length && !policyText) return null;
+
+                  return (
+                    <div key={idx} className="bg-white p-6 border border-[#EAE4D9]">
+                      <div className="text-[12px] font-semibold text-[#1A1714] mb-4">
+                        Room {idx + 1}: {room.RoomTypeName || (Array.isArray(room.Name) ? room.Name[0] : room.Name)}
+                      </div>
+                      
+                      {policies.length > 0 && (
+                        <div className="mb-4">
+                          <div className="grid grid-cols-3 gap-2 pb-2 border-b border-[#EAE4D9] text-[11px] font-semibold text-[#1A1714]">
+                            <div>From</div>
+                            <div>To</div>
+                            <div className="text-right">Charge</div>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {policies.map((pol, pidx) => (
+                              <div key={pidx} className="grid grid-cols-3 gap-2 text-[12px] text-[#7A7068]">
+                                <div className="truncate">{pol.FromDate ? pol.FromDate.split(' ')[0] : '-'}</div>
+                                <div className="truncate">{pol.ToDate ? pol.ToDate.split(' ')[0] : '-'}</div>
+                                <div className="text-right font-medium text-[#B5341A]">
+                                  {pol.ChargeType === 1 || pol.ChargeType === "Fixed" ? `${pol.Currency || "INR"} ${pol.CancellationCharge}` : `${pol.CancellationCharge}%`}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {policyText && (
+                        <div className="mt-4 p-4 bg-[#FAF8F4] border-l-2 border-[#B5862A] text-[12px] text-[#7A7068] leading-relaxed">
+                          <div className="font-semibold text-[#1A1714] mb-1 flex items-center gap-1">
+                            <FiInfo size={12} className="text-[#B5862A]" /> Policy Notes
+                          </div>
+                          {policyText.split('|').filter(Boolean).map((pt, pidx) => (
+                            <div key={pidx} className="mb-1">{pt.replace('#^#', ' - ').replace('#!#', '')}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+            {rateConditions?.length > 0 && (
               <section>
-                <SectionHeader num={3} title="Check-in Instructions" />
+                <SectionHeader title="Rate Conditions & Check-In Rules" />
                 <CheckInInstructions conditions={rateConditions} />
-              </section>
-            )}
-            {cancelPolicies.length > 0 && (
-              <section>
-                <SectionHeader num={4} title="Cancellation Policy" />
-                <CancellationPolicySection
-                  policies={cancelPolicies}
-                  lastCancellationDate={detailRoom?.LastCancellationDate || bookingDetail?.LastCancellationDate}
-                />
               </section>
             )}
           </div>
@@ -1901,7 +2341,7 @@ export default function HotelBookingDetails() {
           <div className="space-y-12">
             {travellers.length > 0 && (
               <section>
-                <SectionHeader num={6} title="Guest" />
+                <SectionHeader title="Guest" />
                 <GuestSection travellers={travellers} />
               </section>
             )}
@@ -1909,9 +2349,19 @@ export default function HotelBookingDetails() {
         )}
 
         {activeTab === "amendment" && (
-          <div className="space-y-12">
+          <div className="space-y-8">
             <section>
-              <SectionHeader num={7} title="Cancellation Request" />
+              <SectionHeader
+                title={
+                  isCancelled
+                    ? "Cancellation Details"
+                    : isAmendmentPending
+                    ? "Cancellation Request Status"
+                    : bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested"
+                    ? "Amendment Status"
+                    : "Request Cancellation"
+                }
+              />
               <CancellationSection
                 booking={booking}
                 isConfirmed={isConfirmed}
@@ -1919,172 +2369,144 @@ export default function HotelBookingDetails() {
                 totalFare={totalFare}
               />
             </section>
+
+            {/* Show raw amendment/cancellation response from the API */}
+            {booking?.amendment && booking.amendment.status && booking.amendment.status !== "not_requested" && (() => {
+              const amend = booking.amendment;
+              const provResp =
+                amend?.providerResponse?.HotelChangeRequestStatusResult ||
+                amend?.providerResponse?.HotelChangeRequestResult ||
+                amend?.providerResponse;
+              const statusLabel = {
+                requested: "Pending",
+                in_progress: "In Progress",
+                approved: "Approved",
+                rejected: "Rejected",
+                cancelled: "Cancelled",
+              }[amend.status] || amend.status;
+
+              const statusColor = {
+                requested: "text-[#8A6200] bg-[#FDF8EE] border-[#F0E0A8]",
+                in_progress: "text-[#1A4A7A] bg-[#EEF4FD] border-[#C0D4F0]",
+                approved: "text-[#2C7A4B] bg-[#EDF7F2] border-[#C3E4D2]",
+                rejected: "text-[#B5341A] bg-[#FDF1EE] border-[#F0C4BA]",
+                cancelled: "text-[#B5341A] bg-[#FDF1EE] border-[#F0C4BA]",
+              }[amend.status] || "text-[#1A1714] bg-[#FAF8F4] border-[#EAE4D9]";
+
+              return (
+                <section>
+                  <SectionHeader title="Cancellation / Amendment Response" />
+                  <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+                    {/* Status bar */}
+                    <div className={`px-6 py-4 border-b border-[#EAE4D9] flex items-center justify-between flex-wrap gap-3`}>
+                      <div className="flex items-center gap-3">
+                        <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#A89F94]">Request Status</div>
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold tracking-[0.12em] uppercase border ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      {amend.requestedAt && (
+                        <div className="text-[11px] text-[#A89F94]">
+                          Requested on {fmtDate(amend.requestedAt)} at {fmtTime(amend.requestedAt)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Fields grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[#EAE4D9]">
+                      {amend.remarks && (
+                        <div className="px-6 py-5 sm:border-r border-[#EAE4D9]">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">Reason / Remarks</div>
+                          <div className="text-[13px] font-medium text-[#1A1714] italic">"{amend.remarks}"</div>
+                        </div>
+                      )}
+                      {amend.cancelledAt && (
+                        <div className="px-6 py-5 sm:border-r border-[#EAE4D9]">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">Cancelled At</div>
+                          <div className="text-[13px] font-semibold text-[#1A1714]">{fmtDate(amend.cancelledAt)} {fmtTime(amend.cancelledAt)}</div>
+                        </div>
+                      )}
+                      {amend.refundedAmount !== undefined && amend.refundedAmount !== null && (
+                        <div className="px-6 py-5">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">Refunded Amount</div>
+                          <div className="text-[16px] font-bold text-[#2C7A4B]">₹{Number(amend.refundedAmount).toLocaleString("en-IN")}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Provider API response */}
+                    {provResp && (
+                      <div className="border-t border-[#EAE4D9] px-6 pt-5 pb-6 bg-[#FAF8F4]">
+                        <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A] mb-4">Provider Response</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {[
+                            { label: "Change Request ID", value: provResp.ChangeRequestId || provResp.RequestId },
+                            { label: "Request Status", value: provResp.ChangeRequestStatus !== undefined ? (
+                              { 0: "Not Set", 1: "Pending", 2: "In Progress", 3: "Approved", 4: "Rejected" }[provResp.ChangeRequestStatus] || provResp.ChangeRequestStatus
+                            ) : undefined },
+                            { label: "Cancellation ID", value: provResp.CancellationId },
+                            { label: "Credit Note", value: provResp.CreditNote },
+                            { label: "Refund Amount", value: provResp.RefundedAmount !== undefined ? `₹${Number(provResp.RefundedAmount).toLocaleString("en-IN")}` : undefined },
+                            { label: "Cancellation Charges", value: provResp.CancellationCharges !== undefined ? `₹${Number(provResp.CancellationCharges).toLocaleString("en-IN")}` : undefined },
+                            { label: "Remarks", value: provResp.Remarks || provResp.Status },
+                          ].filter(f => f.value !== undefined && f.value !== null && f.value !== "").map((field, fi) => (
+                            <div key={fi}>
+                              <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">{field.label}</div>
+                              <div className="text-[13px] font-semibold text-[#1A1714]">{field.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Raw cancellation status from booking.raw */}
+                    {booking?.raw?.CancellationStatus?.[0] && (() => {
+                      const cs = booking.raw.CancellationStatus[0];
+                      return (
+                        <div className="border-t border-[#EAE4D9] px-6 pt-5 pb-6">
+                          <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A] mb-4">Cancellation Confirmation</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[
+                              { label: "Cancellation ID", value: cs.CancellationId },
+                              { label: "Status", value: cs.Status },
+                              { label: "Refund Amount", value: cs.RefundAmount !== undefined ? `₹${Number(cs.RefundAmount).toLocaleString("en-IN")}` : undefined },
+                              { label: "Cancellation Charges", value: cs.CancellationCharges !== undefined ? `₹${Number(cs.CancellationCharges).toLocaleString("en-IN")}` : undefined },
+                              { label: "Credit Note", value: cs.CreditNote },
+                              { label: "Remarks", value: cs.Remarks },
+                            ].filter(f => f.value !== undefined && f.value !== null && f.value !== "").map((field, fi) => (
+                              <div key={fi}>
+                                <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">{field.label}</div>
+                                <div className="text-[13px] font-semibold text-[#1A1714]">{field.value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </section>
+              );
+            })()}
           </div>
         )}
+
 
         {activeTab === "history" && (
           <div className="space-y-12">
-            <BookingHistory booking={booking} />
+            <section>
+              <SectionHeader title="Audit Trail" />
+              <BookingHistory booking={booking} />
+            </section>
           </div>
         )}
       </main>
-    </div>
-  );
-}
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Booking History / Timeline                                     */
-/* ─────────────────────────────────────────────────────────────── */
-const ensureUTC = (d) => {
-  if (!d) return null;
-  if (d instanceof Date) return d;
-  if (typeof d !== "string") return d;
-  
-  // 1. Handle TBO specific format: "DD/MM/YYYY HH:MM:SS"
-  if (d.includes("/") && d.includes(":")) {
-    const parts = d.split(" ");
-    if (parts.length >= 2) {
-      const [datePart, timePart] = parts;
-      const [day, month, year] = datePart.split("/");
-      return new Date(`${year}-${month}-${day}T${timePart}Z`);
-    }
-  }
-  
-  // 2. Handle ISO format without timezone: "YYYY-MM-DDTHH:MM:SS"
-  if (d.includes("-") && d.includes(":") && !d.includes("Z") && !d.includes("+")) {
-    return new Date(`${d}Z`);
-  }
-  
-  return new Date(d);
-};
-
-const getVoucherDate = (b) => {
-  if (b.voucheredAt) return ensureUTC(b.voucheredAt);
-  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || 
-                         b.bookingResult?.providerResponse?.Response?.VoucherDate ||
-                         b.raw?.BookingDate || 
-                         b.raw?.InvoiceCreatedOn;
-  if (tboVoucherDate) return ensureUTC(tboVoucherDate);
-  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return ensureUTC(b.updatedAt);
-  return null;
-};
-
-function BookingHistory({ booking }) {
-  const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
-  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
-
-  const steps = [
-    {
-      label: "Request Created",
-      date: ensureUTC(booking.createdAt),
-      desc: "Booking request was successfully created.",
-      icon: <FiClock size={14} />,
-      active: true,
-    },
-    {
-      label: "Approval Status",
-      date: ensureUTC(booking.approvedAt || booking.rejectedAt) || (["approved", "rejected"].includes(booking.requestStatus) ? ensureUTC(booking.updatedAt || booking.createdAt) : null),
-      desc: (() => {
-        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
-        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
-        
-        if (isRejected) {
-          const fullName = `${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""}`.trim();
-          const email = booking.approvedBy?.email || booking.approverEmail;
-          return `Rejected by ${fullName || "Manager"}${email ? ` (${email})` : ""}`;
-        }
-        if (isApproved) {
-          const reqEmail =
-            booking.userId?.email || booking.requesterDetails?.email;
-          const appEmail = booking.approvedBy?.email || booking.approverEmail;
-          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
-
-          // If explicitly auto-approved, or same user (self-approved), or no approver info exists
-          if (
-            booking.approverName === "Auto Approve" ||
-            isSameUser ||
-            (!booking.approvedBy && !booking.approverName)
-          ) {
-            return "Auto Approved";
-          }
-
-          const firstName =
-            booking.approvedBy?.name?.firstName || booking.approverName || "";
-          const lastName = booking.approvedBy?.name?.lastName || "";
-          const fullName = `${firstName} ${lastName}`.trim();
-          const email = booking.approvedBy?.email || booking.approverEmail;
-
-          if (!fullName && !email) return "Auto Approved";
-
-          return `Approved by ${fullName}${email ? ` (${email})` : ""}`;
-        }
-        return "Waiting for manager approval";
-      })(),
-      icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
-    },
-    {
-      label: "Voucher Issued",
-      date: getVoucherDate(booking) || (isConfirmed ? (booking.updatedAt || booking.createdAt) : null),
-      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
-      icon: <FiTag size={14} />,
-      active: isConfirmed,
-    },
-    {
-      label: "Cancellation",
-      date: ensureUTC(booking.cancelledAt) || (isCancelled ? ensureUTC(booking.updatedAt) : null),
-      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
-      icon: <FiXCircle size={14} />,
-      active: isCancelled,
-      isLast: true,
-    },
-  ];
-
-  const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
-
-  return (
-    <div className="bg-white border border-[#EAE4D9] p-8 mt-12 mb-8">
-      <div className="flex items-center gap-4 mb-10">
-        <div className="w-10 h-10 rounded-full bg-[#B5862A]/10 flex items-center justify-center">
-          <FiRefreshCw size={18} className="text-[#B5862A]" />
-        </div>
-        <div>
-          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">Booking Lifecycle</h3>
-          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">Audit Trail & Timeline</p>
-        </div>
-      </div>
-
-      <div className="relative">
-        {/* Vertical line */}
-        <div className="absolute left-[13px] top-2 bottom-2 w-[1px] bg-gradient-to-b from-[#B5862A]/40 via-[#EAE4D9] to-transparent" />
-
-        <div className="space-y-10">
-          {steps.map((step, idx) => (
-            <div key={idx} className="relative flex gap-8">
-              <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
-                step.active ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg" : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
-              }`}>
-                {step.icon}
-              </div>
-
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                  <p className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
-                    {step.label}
-                  </p>
-                  {step.date && step.active && (
-                    <span className="text-[10px] font-bold text-[#B5862A] px-3 py-1 bg-[#FAF8F4] border border-[#EAE4D9] rounded-sm uppercase tracking-wider">
-                      {formatDateStr(step.date)} · {formatTimeStr(step.date)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[#A89F94] text-[13px] leading-relaxed">{step.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Sticky bottom total price bar */}
+      {/* <TotalPriceBar
+        totalFare={totalFare}
+        isCancelled={isCancelled}
+        onDownload={() => dispatch(generateHotelVoucher(booking.bookingId))}
+      /> */}
     </div>
   );
 }

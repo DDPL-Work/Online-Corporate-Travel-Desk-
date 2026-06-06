@@ -16,6 +16,7 @@ import CorporateMarkupConfiguration from "../components/SuperAdminTabs/Corporate
 import CorporateMarkupList from "../components/SuperAdminTabs/CorporateMarkupList";
 import BookingsSummary from "../components/SuperAdminTabs/BookingsSummary";
 import CorporateRevenue from "../components/SuperAdminTabs/CorporateRevenue";
+import MarkupRevenueAndAudit from "../components/SuperAdminTabs/MarkupRevenueAndAudit";
 import CreditStatusAlerts from "../components/SuperAdminTabs/CreditStatusAlerts";
 import WalletRechargeLogs from "../components/SuperAdminTabs/WalletRechargeLogs";
 import CorporateAccessControl from "../components/SuperAdminTabs/CorporateAccessControl";
@@ -84,6 +85,7 @@ export const appRouter = createBrowserRouter([
           { path: "/cancellation-query", element: <Navigate to="/cancellation-queries" replace /> },
           { path: "/all-reissue-requests", element: <AllReissueRequests /> },
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
+          { path: "/markup-revenue", element: <MarkupRevenueAndAudit /> },
           { path: "/credit-status", element: <Navigate to="/credit-status-alerts" replace /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },
           { path: "/tbo-commissions-taxes", element: <TboCommissionsTaxes /> },

@@ -594,30 +594,18 @@ class FlightService {
   }
 
   /* ---------------- FARE UPSELL ---------------- */
-  async getFareUpsell(traceId, resultIndex) {
+  async getFareUpsell(traceId, resultIndex, corporateId) {
     if (!traceId || !resultIndex) {
       throw new ApiError(400, "traceId and resultIndex are required");
     }
 
     const env = this.getEnv();
 
-    // 🔸 Log request
-    // logger.info("TBO FARE UPSELL REQUEST", {
-    //   traceId,
-    //   resultIndex,
-    //   env,
-    // });
-
     const response = await this.postLive(
       "flightFareUpsell",
       { TraceId: traceId, ResultIndex: resultIndex },
       env,
     );
-
-    // 🔥 FULL RAW RESPONSE LOG (MAIN DEBUG)
-    // logger.info(
-    //   "TBO FARE UPSELL RESPONSE:\n" + JSON.stringify(response, null, 2),
-    // );
 
     // 🔥 ERROR HANDLING (IMPORTANT)
     if (response?.Response?.ResponseStatus !== 1) {
@@ -626,6 +614,15 @@ class FlightService {
         resultIndex,
         error: response?.Response?.Error,
       });
+    }
+
+    // Apply markup if Corporate context exists
+    if (corporateId && response?.Response?.Results) {
+      const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+      response.Response.Results = await MarkupCalculatorService.applyFlightMarkup(
+        response.Response.Results,
+        corporateId
+      );
     }
 
     return response;

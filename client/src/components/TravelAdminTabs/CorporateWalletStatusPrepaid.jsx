@@ -663,8 +663,8 @@ export default function CorporateWallet() {
         </div>
       </div>
 
-      {showRecharge && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      {showRecharge && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-6" style={{ isolation: "isolate" }}>
           <div
             className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-300"
             style={{ background: `${C.navy}CC` }}
@@ -761,7 +761,8 @@ export default function CorporateWallet() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {/* Recharge Details Modal */}
       {showDetails && selectedTx && (

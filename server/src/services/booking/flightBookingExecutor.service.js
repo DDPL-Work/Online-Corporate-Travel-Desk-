@@ -6,6 +6,7 @@ const {
 } = require("../../utils/bookingResolver.util");
 const paymentService = require("../payment.service");
 const tboService = require("../tektravels/flight.service");
+const MarkupAccountingService = require("../../modules/markup/services/markupAccounting.service");
 
 const extractPnr = (response = {}) =>
   resolvePnr(response) ||
@@ -457,6 +458,13 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
     booking.executionStatus = "booked";
     await booking.save();
 
+    // Record Markup Revenue safely (non-blocking)
+    try {
+      await MarkupAccountingService.recordBookingRevenue(booking, corporate);
+    } catch (err) {
+      logger.error(`[MarkupAccounting] Failed to record revenue for booking ${booking._id}`, err);
+    }
+
     await paymentService.processBookingPayment({ booking, corporate });
 
     const onwardSupplierBookingId =
@@ -640,6 +648,13 @@ const performBooking = async ({ booking, passengers, corporate, isLCC }) => {
   };
   booking.executionStatus = "booked";
   await booking.save();
+
+  // Record Markup Revenue safely (non-blocking)
+  try {
+    await MarkupAccountingService.recordBookingRevenue(booking, corporate);
+  } catch (err) {
+    logger.error(`[MarkupAccounting] Failed to record revenue for booking ${booking._id}`, err);
+  }
 
   await paymentService.processBookingPayment({ booking, corporate });
 

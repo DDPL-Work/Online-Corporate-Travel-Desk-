@@ -15,13 +15,23 @@ const EVENTS = require("../events/eventConstants");
 const User = require("../models/User");
 const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 const logger = require("../utils/logger");
+const MarkupAccountingService = require("../modules/markup/services/markupAccounting.service");
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
 // @access  Private
 
 exports.preBookHotel = asyncHandler(async (req, res) => {
-  const { BookingCode } = req.body;
+  const { 
+    BookingCode, 
+    corporateId, 
+    hotelRequest,
+    CityCode, cityCode, city,
+    CityName, cityName,
+    CountryCode, countryCode, country,
+    CountryName, countryName,
+    StarRating, starRating
+  } = req.body;
 
   /* ================= VALIDATION ================= */
   if (!BookingCode) {
@@ -34,14 +44,20 @@ exports.preBookHotel = asyncHandler(async (req, res) => {
       ? BookingCode.join(",")
       : BookingCode,
     EndUserIp: process.env.TBO_END_USER_IP,
+    corporateId: corporateId || req.corporate?._id,
+    CityCode: CityCode || cityCode || hotelRequest?.cityCode || hotelRequest?.CityCode || "",
+    CityName: CityName || cityName || city || hotelRequest?.city || hotelRequest?.cityName || hotelRequest?.rawHotelData?.CityName || "",
+    CountryCode: CountryCode || countryCode || hotelRequest?.countryCode || hotelRequest?.CountryCode || "",
+    CountryName: CountryName || countryName || country || hotelRequest?.country || hotelRequest?.countryName || hotelRequest?.rawHotelData?.CountryName || "",
+    StarRating: StarRating || starRating || hotelRequest?.starRating || hotelRequest?.StarRating || 0
   };
 
-  console.log("PREBOOK PAYLOAD:", payload);
+  // console.log("PREBOOK PAYLOAD:", payload);
 
   /* ================= CALL SERVICE ================= */
   const preBookResp = await hotelService.preBookHotel(payload);
 
-  console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
+  // console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
 
   /* ================= VALIDATION ================= */
   if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {
@@ -319,20 +335,34 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
       ...pricingSnapshot,
       capturedAt: new Date(),
     },
-    markupSnapshot: req.body.markupSnapshot || null,
+    markupSnapshot: (() => {
+      let snapshot = req.body.markupSnapshot || null;
+      
+      // The frontend might pass the raw room data inside hotelRequest.selectedRoom.rawRoomData
+      // Due to transformation, it might be nested at transformedHotelRequest.selectedRoom.rawRoomData.rawRoomData
+      // or transformedHotelRequest.selectedRoom.rawRoomData
+      const roomData = transformedHotelRequest?.selectedRoom?.rawRoomData;
+      const actualRawRoom = roomData?.rawRoomData || roomData || {};
+      
+      if (!snapshot && actualRawRoom?.markupAmount > 0) {
+        snapshot = {
+          supplierFare: actualRawRoom?.supplierFare || 0,
+          finalFare: actualRawRoom?.TotalFare || actualRawRoom?.totalFare || transformedHotelRequest.selectedRoom.totalFare || 0,
+          markupAmount: actualRawRoom.markupAmount,
+          markupBreakdown: actualRawRoom.markupBreakdown || []
+        };
+      }
+      
+      // Ensure markupBreakdown is included
+      if (snapshot && (!snapshot.markupBreakdown || snapshot.markupBreakdown.length === 0)) {
+        snapshot.markupBreakdown = actualRawRoom?.markupBreakdown || [];
+      }
+      
+      return snapshot;
+    })(),
     bookingSnapshot,
   });
 
-  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
-     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
-     await MarkupRevenueService.trackRevenue({
-        bookingId: bookingRequest._id,
-        corporateId: corporate._id,
-        serviceType: "hotel",
-        markupAmount: req.body.markupSnapshot.markupAmount,
-        ruleId: req.body.markupSnapshot.appliedRuleId
-     });
-  }
 
   const isAutoApproved = requestStatus === "approved";
 
@@ -449,7 +479,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         IsVoucherBooking: true,
         GuestNationality: transformedHotelRequest.guestNationality,
         EndUserIp: process.env.TBO_END_USER_IP,
-        NetAmount: bookingRequest?.markupSnapshot?.supplierFare || transformedHotelRequest.selectedRoom.totalFare, // Skip PreBook, use original fare
+        NetAmount: hotelRequest?.selectedRoom?.supplierFare || transformedHotelRequest.selectedRoom.rawRoomData?.supplierFare || bookingRequest?.markupSnapshot?.supplierFare || transformedHotelRequest.selectedRoom.rawRoomData?.TotalFare || transformedHotelRequest.selectedRoom.totalFare,
         ClientReferenceId: bookingRequest.bookingReference,
         TraceId: hotelRequest.traceId || hotelRequest.TraceId,
         HotelRoomsDetails,
@@ -484,6 +514,10 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         bookingRequest.executionStatus = "voucher_generated";
         bookingRequest.voucheredAt = new Date();
         await bookingRequest.save();
+
+        await MarkupAccountingService.recordBookingRevenue(bookingRequest, corporate).catch(err => {
+          logger.error("Failed to record markup revenue for instant hotel booking", err);
+        });
 
         await notificationService.sendBookingNotification(
           bookingRequest,
@@ -848,20 +882,15 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       ...pricingSnapshot,
       capturedAt: new Date(),
     },
-    markupSnapshot: req.body.markupSnapshot || null,
+    markupSnapshot: req.body.markupSnapshot || (transformedHotelRequest?.selectedRoom?.rawRoomData?.markupAmount > 0 ? {
+      supplierFare: transformedHotelRequest.selectedRoom.rawRoomData?.supplierFare || 0,
+      finalFare: transformedHotelRequest.selectedRoom.rawRoomData?.TotalFare || transformedHotelRequest.selectedRoom.totalFare || 0,
+      markupAmount: transformedHotelRequest.selectedRoom.rawRoomData.markupAmount,
+      markupBreakdown: transformedHotelRequest.selectedRoom.rawRoomData.markupBreakdown || []
+    } : null),
     bookingSnapshot,
   });
 
-  if (req.body.markupSnapshot && req.body.markupSnapshot.markupAmount > 0) {
-     const MarkupRevenueService = require("../modules/markup/services/markupRevenue.service");
-     await MarkupRevenueService.trackRevenue({
-        bookingId: bookingRequest._id,
-        corporateId: corporate._id,
-        serviceType: "hotel",
-        markupAmount: req.body.markupSnapshot.markupAmount,
-        ruleId: req.body.markupSnapshot.appliedRuleId
-     });
-  }
 
   const isAutoApproved = requestStatus === "approved";
 
@@ -1062,7 +1091,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       throw new ApiError(500, "PreBook failed - BookingCode missing");
     }
 
-    const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
+    const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.supplierFare || preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare || preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
 
     // 🔥 TBO PREBOOK SUCCESS CHECK (CORRECT)
     if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {
@@ -1381,6 +1410,10 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     booking.voucheredAt = new Date();
     await booking.save();
 
+    await MarkupAccountingService.recordBookingRevenue(booking, corporate).catch(err => {
+      console.error("Failed to record markup revenue for approved hotel booking", err);
+    });
+
     // Notify User
     await notificationService.sendBookingNotification(
       booking,
@@ -1547,6 +1580,17 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     voucheredAt,
     createdAt,
     updatedAt,
+    corporateId,
+    userId,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+    requesterDetails,
+    gstDetails,
   } = booking;
 
   const amendment = booking.amendment || null;
@@ -1725,7 +1769,19 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       orderId: booking.orderId,
       purposeOfTravel: booking.purposeOfTravel,
 
-      // ✅ DB (stable)
+      corporateId,
+      userId,
+      projectName,
+      projectId,
+      projectClient,
+      approverId,
+      approverEmail,
+      approverName,
+      approverRole,
+      requesterDetails,
+      gstDetails,
+
+      // 📌 DB (stable)
       executionStatus,
       requestStatus,
       bookingSnapshot,

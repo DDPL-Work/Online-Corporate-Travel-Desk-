@@ -16,42 +16,66 @@ class MarkupCalculatorService {
       // Avoid re-evaluating if markup is already applied in DB snapshot
       if (flight.markupApplied) return;
 
-      const winningRule = MarkupResolverService.resolveRule(rules, flight, "flight");
-      if (winningRule) {
-        let markupAmount = 0;
+      const matchedRules = MarkupResolverService.resolveRules(rules, flight, "flight");
+      if (matchedRules && matchedRules.length > 0) {
         const supplierFare = Number(flight.Fare?.PublishedFare || flight.Fare?.OfferedFare || flight.Fare?.BaseFare || 0);
-        
-        if (winningRule.markupMethod === "fixed") {
-          markupAmount = winningRule.markupValue || 0;
-        } else if (winningRule.markupMethod === "percentage") {
-          const pct = winningRule.markupValue || 0;
-          markupAmount = (supplierFare * pct) / 100;
-        }
+        let totalMarkupAmount = 0;
+        let markupBreakdown = [];
+        let appliedRuleIds = [];
+        let markupMatchedCategories = [];
 
-        // Slab Logic if present
-        if (winningRule.fareSlabs && winningRule.fareSlabs.length > 0) {
-           const slab = winningRule.fareSlabs.find(s => supplierFare >= s.from && supplierFare <= s.to);
-           if (slab) {
-             if (slab.method === "fixed") {
-               markupAmount = slab.value || 0;
-             } else if (slab.method === "percentage") {
-               markupAmount = (supplierFare * (slab.value || 0)) / 100;
+        for (const rule of matchedRules) {
+          let ruleMarkup = 0;
+
+          if (rule.markupMethod === "fixed") {
+            ruleMarkup = rule.markupValue || 0;
+          } else if (rule.markupMethod === "percentage") {
+            const pct = rule.markupValue || 0;
+            // Percentage markup ALWAYS calculated based on original supplier fare
+            ruleMarkup = (supplierFare * pct) / 100;
+          }
+
+          // Slab Logic if present
+          if (rule.fareSlabs && rule.fareSlabs.length > 0) {
+             const slab = rule.fareSlabs.find(s => supplierFare >= s.from && supplierFare <= s.to);
+             if (slab) {
+               if (slab.method === "fixed") {
+                 ruleMarkup = slab.value || 0;
+               } else if (slab.method === "percentage") {
+                 ruleMarkup = (supplierFare * (slab.value || 0)) / 100;
+               }
              }
-           }
-        }
+          }
 
-        markupAmount = Math.ceil(markupAmount);
+          ruleMarkup = Math.ceil(ruleMarkup);
+          totalMarkupAmount += ruleMarkup;
+          
+          appliedRuleIds.push(rule._id?.toString());
+          const categoryName = rule.category?.toUpperCase().replace(/ /g, "_") || "UNKNOWN";
+          markupMatchedCategories.push(categoryName);
+          
+          markupBreakdown.push({
+            ruleId: rule._id?.toString(),
+            category: rule.category,
+            markupMethod: rule.markupMethod,
+            markupAmount: ruleMarkup
+          });
+        }
 
         if (flight.Fare) {
           flight.Fare.supplierFare = supplierFare; // store original
-          flight.Fare.markupAmount = markupAmount;
-          flight.Fare.PublishedFare = supplierFare + markupAmount; 
-          flight.Fare.OfferedFare = supplierFare + markupAmount;
+          flight.Fare.markupAmount = totalMarkupAmount;
+          flight.Fare.PublishedFare = supplierFare + totalMarkupAmount; 
+          flight.Fare.OfferedFare = supplierFare + totalMarkupAmount;
           
           flight.markupApplied = true;
-          flight.appliedRuleId = winningRule._id?.toString();
-          flight.SnapshotId = `MKS-${winningRule._id}-${Date.now()}`;
-          flight.markupAmount = markupAmount;
+          // Maintain backwards compatibility
+          flight.appliedRuleId = appliedRuleIds[0];
+          flight.appliedRuleIds = appliedRuleIds;
+          flight.markupMatchedCategories = [...new Set(markupMatchedCategories)];
+          flight.markupBreakdown = markupBreakdown;
+          flight.SnapshotId = `MKS-${appliedRuleIds.join('-')}-${Date.now()}`;
+          flight.markupAmount = totalMarkupAmount;
           flight.supplierFare = supplierFare;
         }
       } else {
@@ -91,60 +115,94 @@ class MarkupCalculatorService {
     const processHotel = (hotel) => {
        if (hotel.markupApplied) return;
 
-       const winningRule = MarkupResolverService.resolveRule(rules, hotel, "hotel");
-       if (winningRule) {
-         let maxMarkup = 0;
+       const matchedRules = MarkupResolverService.resolveRules(rules, hotel, "hotel");
+       if (matchedRules && matchedRules.length > 0) {
+         let maxTotalMarkup = 0;
+         let markupBreakdown = [];
+         let appliedRuleIds = [];
+         let markupMatchedCategories = [];
 
-         // For hotels, apply markup to each Room's DayRates or overall price
-         // Since hotel responses vary, we will apply the logic to the highest level total price
-         if (hotel.Rooms && Array.isArray(hotel.Rooms)) {
-            hotel.Rooms.forEach(room => {
-               if (room.DayRates && Array.isArray(room.DayRates)) {
-                  room.DayRates.forEach(dayRateArray => {
-                     if (Array.isArray(dayRateArray)) {
-                        dayRateArray.forEach(rate => {
-                           if (rate.Price) {
-                              const supplierPrice = rate.Price.PublishedPriceRoundedOff || rate.Price.PublishedPrice || rate.Price.RoomPrice || 0;
-                              let mkt = 0;
-                              if (winningRule.markupMethod === "fixed") {
-                                mkt = winningRule.markupValue || 0;
-                              } else {
-                                mkt = (supplierPrice * (winningRule.markupValue || 0)) / 100;
-                              }
-                              mkt = Math.ceil(mkt);
-
-                              rate.Price.supplierPrice = supplierPrice;
-                              rate.Price.markupAmount = mkt;
-                              rate.Price.PublishedPriceRoundedOff = supplierPrice + mkt;
-                              rate.Price.PublishedPrice = rate.Price.PublishedPriceRoundedOff;
-                              maxMarkup = Math.max(maxMarkup, mkt);
-                           }
-                        });
-                     }
-                  });
-               }
-            });
-         } else if (hotel.Price) {
-            // Simplified hotel summary level price
-            const supplierPrice = hotel.Price.PublishedPriceRoundedOff || hotel.Price.PublishedPrice || 0;
-            let mkt = 0;
-            if (winningRule.markupMethod === "fixed") {
-              mkt = winningRule.markupValue || 0;
-            } else {
-              mkt = (supplierPrice * (winningRule.markupValue || 0)) / 100;
-            }
-            mkt = Math.ceil(mkt);
-            hotel.Price.supplierPrice = supplierPrice;
-            hotel.Price.markupAmount = mkt;
-            hotel.Price.PublishedPriceRoundedOff = supplierPrice + mkt;
-            hotel.Price.PublishedPrice = hotel.Price.PublishedPriceRoundedOff;
-            maxMarkup = Math.max(maxMarkup, mkt);
+         for (const rule of matchedRules) {
+             appliedRuleIds.push(rule._id?.toString());
+             const categoryName = rule.category?.toUpperCase().replace(/ /g, "_") || "UNKNOWN";
+             markupMatchedCategories.push(categoryName);
          }
 
+         // For hotels, apply markup to each Room's TotalFare
+         if (hotel.Rooms && Array.isArray(hotel.Rooms)) {
+            hotel.Rooms.forEach(room => {
+               const supplierPrice = room.TotalFare || 0;
+               let roomTotalMarkup = 0;
+               let roomBreakdown = [];
+
+               for (const rule of matchedRules) {
+                 let mkt = 0;
+                 if (rule.fareSlabs && rule.fareSlabs.length > 0) {
+                   const slab = rule.fareSlabs.find(s => supplierPrice >= s.from && supplierPrice <= s.to);
+                   if (slab) {
+                     if (slab.method === "fixed") {
+                       mkt = slab.value || 0;
+                     } else {
+                       mkt = (supplierPrice * (slab.value || 0)) / 100;
+                     }
+                   }
+                 } else {
+                   if (rule.markupMethod === "fixed") {
+                     mkt = rule.markupValue || 0;
+                   } else {
+                     mkt = (supplierPrice * (rule.markupValue || 0)) / 100;
+                   }
+                 }
+                 
+                 mkt = Math.ceil(mkt);
+                 roomTotalMarkup += mkt;
+                 
+                 roomBreakdown.push({
+                   ruleId: rule._id?.toString(),
+                   category: rule.category,
+                   markupMethod: rule.markupMethod,
+                   markupAmount: mkt
+                 });
+               }
+
+               room.supplierFare = supplierPrice;
+               room.markupAmount = roomTotalMarkup;
+               room.TotalFare = supplierPrice + roomTotalMarkup;
+               room.markupBreakdown = roomBreakdown;
+               
+               // Distribute markup evenly across DayRates BasePrice so UI displays marked up per-night rate
+               if (roomTotalMarkup > 0 && room.DayRates && Array.isArray(room.DayRates)) {
+                 let totalNights = 0;
+                 room.DayRates.forEach(dayRateArray => {
+                   if (Array.isArray(dayRateArray)) totalNights += dayRateArray.length;
+                 });
+                 if (totalNights > 0) {
+                   const markupPerNight = roomTotalMarkup / totalNights;
+                   room.DayRates.forEach(dayRateArray => {
+                     if (Array.isArray(dayRateArray)) {
+                       dayRateArray.forEach(night => {
+                         if (night && typeof night.BasePrice === 'number') {
+                           night.BasePrice += markupPerNight;
+                         }
+                       });
+                     }
+                   });
+                 }
+               }
+               
+               if (roomTotalMarkup > maxTotalMarkup) {
+                   maxTotalMarkup = roomTotalMarkup;
+                   markupBreakdown = roomBreakdown;
+               }
+            });
+         }
          hotel.markupApplied = true;
-         hotel.appliedRuleId = winningRule._id?.toString();
-         hotel.markupAmount = maxMarkup; // Max markup for summary
-         hotel.SnapshotId = `MKS-${winningRule._id}-${Date.now()}`;
+         hotel.appliedRuleId = appliedRuleIds[0];
+         hotel.appliedRuleIds = appliedRuleIds;
+         hotel.markupMatchedCategories = [...new Set(markupMatchedCategories)];
+         hotel.markupBreakdown = markupBreakdown;
+         hotel.markupAmount = maxTotalMarkup; // Max markup for summary
+         hotel.SnapshotId = `MKS-${appliedRuleIds.join('-')}-${Date.now()}`;
        } else {
          hotel.markupApplied = false;
        }

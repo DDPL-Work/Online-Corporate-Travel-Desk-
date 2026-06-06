@@ -820,8 +820,6 @@ function FareSummaryCard({ baseFare, tax, pricingSnap, refundable, ssrSnapshot, 
         <FiCreditCard size={14} /> Fare Summary
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-        <InfoRow label="Base Fare" value={`₹${baseFare}`} />
-        <InfoRow label="Tax" value={`₹${tax}`} />
         <InfoRow
           label="Currency"
           value={pricingSnap?.currency || "INR"}
@@ -921,7 +919,9 @@ function FareSummaryCard({ baseFare, tax, pricingSnap, refundable, ssrSnapshot, 
 
       {pricingSnap?.totalAmount != null && (
         <div className="mt-4 bg-teal-50 rounded-lg p-4 flex justify-between items-center">
-          <span className="font-semibold text-teal-800">Total Paid</span>
+          <span className="font-semibold text-teal-800">
+            Total Paid <span className="font-normal text-teal-700/70 text-[11px] ml-1">(incl. all taxes and service fee)</span>
+          </span>
           <span className="text-2xl font-black text-gray-900">
             ₹{pricingSnap.totalAmount}
           </span>

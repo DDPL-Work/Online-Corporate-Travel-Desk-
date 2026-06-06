@@ -297,21 +297,17 @@ export default function OneFlightBooking() {
     if (quoteResponse?.ResponseStatus === 2 || quoteResponse?.Error?.ErrorCode > 0) {
       const errorMsg = quoteResponse?.Error?.ErrorMessage || "Pricing failed from the supplier end. Please search again.";
       
-      Swal.fire({
-        title: "Session Expired",
-        text: errorMsg,
-        icon: "warning",
-        confirmButtonColor: "#0A4D68",
-      }).then(() => {
-        window.close();
-        setTimeout(() => {
-          if (window.history.length > 1) {
-            navigate(-1);
-          } else {
-            navigate("/travel");
-          }
-        }, 300);
-      });
+      localStorage.setItem("sessionExpiredEvent", Date.now().toString());
+      sessionStorage.setItem("traceExpiredMsg", errorMsg);
+      sessionStorage.setItem("traceExpired", "true");
+      window.close();
+      setTimeout(() => {
+        if (window.history.length > 1) {
+          navigate(-1);
+        } else {
+          navigate("/travel");
+        }
+      }, 300);
     }
   }, [fareQuote, navigate]);
 

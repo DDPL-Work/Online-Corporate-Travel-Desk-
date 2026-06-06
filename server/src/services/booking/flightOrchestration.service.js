@@ -18,6 +18,7 @@ const {
   performBooking,
 } = require("./flightBookingExecutor.service");
 const bookingReconstructionService = require("./bookingReconstruction.service");
+const MarkupAccountingService = require("../../modules/markup/services/markupAccounting.service");
 
 const SEARCH_CACHE_TTL_SECONDS = 90;
 const LOCK_TTL_MS = 2 * 60 * 1000;
@@ -1290,6 +1291,14 @@ class FlightOrchestrationService {
         ...(booking.orchestration || {}),
         pendingRevalidation: null,
       };
+
+      await MarkupAccountingService.recordBookingRevenue(booking, corporate).catch((err) => {
+        logger.error("Failed to record markup revenue", {
+          bookingId,
+          error: err.message,
+        });
+      });
+
       const successPayload = buildSuccessResponse(booking, directBookingResult, {
         revalidated: false,
       });

@@ -124,3 +124,31 @@ export const deleteCorporateMarkup = createAsyncThunk(
     }
   }
 );
+
+export const fetchMarkupRevenue = createAsyncThunk(
+  "markup/fetchMarkupRevenue",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get("/markup/revenue", { params });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch markup revenue"
+      );
+    }
+  }
+);
+
+export const fetchBookingMarkupAudit = createAsyncThunk(
+  "markup/fetchBookingMarkupAudit",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get("/markup/audit", { params });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch booking markup audit"
+      );
+    }
+  }
+);

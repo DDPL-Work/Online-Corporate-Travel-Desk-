@@ -106,10 +106,30 @@ export default function CorporateMarkupConfiguration() {
       if (c.cabinClass) initialRule.cabinClass = c.cabinClass;
       if (c.origin) { initialRule.origin = c.origin; initialRule.originSearchTerm = c.origin; }
       if (c.destination) { initialRule.destination = c.destination; initialRule.destinationSearchTerm = c.destination; }
-      if (c.country) { initialRule.country = c.country; initialRule.countrySearchTerm = c.country; }
-      if (c.city) { initialRule.city = c.city; initialRule.citySearchTerm = c.city; }
-      if (c.hotelCityCode) { initialRule.hotelCityCode = c.hotelCityCode; initialRule.hotelCitySearchTerm = c.hotelCityCode; }
-      if (c.hotel) { initialRule.hotel = c.hotel; initialRule.hotelSearchTerm = c.hotel; }
+      if (c.country) { 
+        initialRule.country = c.country; 
+        initialRule.countrySearchTerm = c.countryName ? `${c.country} - ${c.countryName}` : c.country; 
+        if (c.countryName) initialRule.countryName = c.countryName;
+      }
+      if (c.city) { 
+        initialRule.city = c.city; 
+        initialRule.citySearchTerm = c.cityName ? `${c.cityName} (${c.city}) - ${c.countryName || ''}` : c.city; 
+        if (c.cityName) initialRule.cityName = c.cityName;
+        if (c.countryName) initialRule.countryName = c.countryName;
+      }
+      if (c.hotelCityCode) { 
+        initialRule.hotelCityCode = c.hotelCityCode; 
+        initialRule.hotelCitySearchTerm = c.hotelCityName ? `${c.hotelCityName} (${c.hotelCityCode})` : c.hotelCityCode; 
+        if (c.hotelCityName) initialRule.hotelCityName = c.hotelCityName;
+      }
+      if (c.hotel) { 
+        initialRule.hotel = c.hotel; 
+        initialRule.hotelSearchTerm = c.hotelName ? `${c.hotel} - ${c.hotelName}` : c.hotel; 
+        if (c.hotelName) initialRule.hotelName = c.hotelName;
+        if (c.hotelCityName) initialRule.hotelCityName = c.hotelCityName;
+        if (c.hotelCountryCode) initialRule.hotelCountryCode = c.hotelCountryCode;
+        if (c.hotelStarRating) initialRule.hotelStarRating = c.hotelStarRating;
+      }
       if (c.starRating) initialRule.starRating = c.starRating;
 
       setCategoryRulesMap({
@@ -192,35 +212,122 @@ export default function CorporateMarkupConfiguration() {
   }, [activeRule?.hotelSearchTerm, activeRule?.hotelCityCode, activeCategory, activeDropdown, dispatch]);
 
   useEffect(() => {
-    // Reset selections when tab changes ONLY if not in edit mode
-    if (!location.state?.editMode) {
-      setSelectedCategories([]);
-      setActiveCategory("");
-      setCategoryRulesMap({});
-    }
-  }, [activeTab, location.state]);
+    const loadMarkups = async () => {
+      if (!location.state?.editMode && corporate?._id) {
+        try {
+          const res = await dispatch(getAllCorporateMarkups(corporate._id));
+          if (res.payload?.success && res.payload.data) {
+            const doc = res.payload.data.find(m => m.productType === activeTab);
+            if (doc && doc.rules && doc.rules.length > 0) {
+              const newCategories = new Set();
+              const newMap = {};
+              
+              doc.rules.forEach(rule => {
+                const cat = rule.category;
+                newCategories.add(cat);
+                if (!newMap[cat]) newMap[cat] = [];
+                
+                const initialRule = getDefaultRuleForCategory(cat);
+                initialRule.method = rule.markupMethod;
+                initialRule.value = rule.markupValue;
+                
+                if (rule.fareSlabs) initialRule.fareSlabs = rule.fareSlabs;
+                
+                const c = rule.criteria || {};
+                if (c.airline) { 
+                  initialRule.airline = c.airline; 
+                  initialRule.airlineSearchTerm = c.airlineName ? `${c.airline} - ${c.airlineName}` : c.airline; 
+                  if (c.airlineName) initialRule.airlineName = c.airlineName;
+                  if (c.airlineIcao) initialRule.airlineIcao = c.airlineIcao;
+                }
+                if (c.cabinClass) initialRule.cabinClass = c.cabinClass;
+                if (c.origin) { 
+                  initialRule.origin = c.origin; 
+                  initialRule.originSearchTerm = c.originName ? `${c.origin} - ${c.originCity}` : c.origin; 
+                  if (c.originName) initialRule.originName = c.originName;
+                  if (c.originCity) initialRule.originCity = c.originCity;
+                }
+                if (c.destination) { 
+                  initialRule.destination = c.destination; 
+                  initialRule.destinationSearchTerm = c.destinationName ? `${c.destination} - ${c.destinationCity}` : c.destination; 
+                  if (c.destinationName) initialRule.destinationName = c.destinationName;
+                  if (c.destinationCity) initialRule.destinationCity = c.destinationCity;
+                }
+                if (c.country) { 
+                  initialRule.country = c.country; 
+                  initialRule.countrySearchTerm = c.countryName ? `${c.country} - ${c.countryName}` : c.country; 
+                  if (c.countryName) initialRule.countryName = c.countryName;
+                }
+                if (c.city) { 
+                  initialRule.city = c.city; 
+                  initialRule.citySearchTerm = c.cityName ? `${c.cityName} (${c.city}) - ${c.countryName || ''}` : c.city; 
+                  if (c.cityName) initialRule.cityName = c.cityName;
+                  if (c.countryName) initialRule.countryName = c.countryName;
+                }
+                if (c.hotelCityCode) { 
+                  initialRule.hotelCityCode = c.hotelCityCode; 
+                  initialRule.hotelCitySearchTerm = c.hotelCityName ? `${c.hotelCityName} (${c.hotelCityCode})` : c.hotelCityCode; 
+                  if (c.hotelCityName) initialRule.hotelCityName = c.hotelCityName;
+                }
+                if (c.hotel) { 
+                  initialRule.hotel = c.hotel; 
+                  initialRule.hotelSearchTerm = c.hotelName ? `${c.hotel} - ${c.hotelName}` : c.hotel; 
+                  if (c.hotelName) initialRule.hotelName = c.hotelName;
+                  if (c.hotelCityName) initialRule.hotelCityName = c.hotelCityName;
+                  if (c.hotelCountryCode) initialRule.hotelCountryCode = c.hotelCountryCode;
+                  if (c.hotelStarRating) initialRule.hotelStarRating = c.hotelStarRating;
+                }
+                if (c.starRating) initialRule.starRating = c.starRating;
+                
+                newMap[cat].push(initialRule);
+              });
+              
+              setCategoryRulesMap(newMap);
+              const catArray = Array.from(newCategories);
+              setSelectedCategories(catArray);
+              if (catArray.length > 0) {
+                setActiveCategory(catArray[0]);
+              } else {
+                setActiveCategory("");
+              }
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Failed to load existing markups", err);
+        }
+      }
+      
+      if (!location.state?.editMode) {
+        setSelectedCategories([]);
+        setActiveCategory("");
+        setCategoryRulesMap({});
+      }
+    };
+    
+    loadMarkups();
+  }, [activeTab, corporate?._id, dispatch, location.state]);
 
   const toggleCategory = (cat) => {
-    setSelectedCategories(prev => {
-      const isSelected = prev.includes(cat);
-      const next = isSelected ? prev.filter(c => c !== cat) : [...prev, cat];
-      
-      if (!isSelected) {
-        // Newly checked → make it active and initialize default rule if none exists
-        setActiveCategory(cat);
-        setCategoryRulesMap(prevMap => {
-          if (!prevMap[cat] || prevMap[cat].length === 0) {
-            return { ...prevMap, [cat]: [getDefaultRuleForCategory(cat)] };
-          }
-          return prevMap;
-        });
-      } else if (cat === activeCategory) {
-        // Unchecked active → set active to last remaining
-        const remaining = next;
-        setActiveCategory(remaining.length > 0 ? remaining[remaining.length - 1] : "");
-      }
-      return next;
-    });
+    const isSelected = selectedCategories.includes(cat);
+    const next = isSelected ? selectedCategories.filter(c => c !== cat) : [...selectedCategories, cat];
+    
+    setSelectedCategories(next);
+    
+    if (!isSelected) {
+      // Newly checked → make it active and initialize default rule if none exists
+      setActiveCategory(cat);
+      setCategoryRulesMap(prevMap => {
+        if (!prevMap[cat] || prevMap[cat].length === 0) {
+          return { ...prevMap, [cat]: [getDefaultRuleForCategory(cat)] };
+        }
+        return prevMap;
+      });
+    } else if (cat === activeCategory) {
+      // Unchecked active → set active to last remaining
+      const remaining = next;
+      setActiveCategory(remaining.length > 0 ? remaining[remaining.length - 1] : "");
+    }
   };
 
   const handleSave = async () => {
@@ -250,17 +357,39 @@ export default function CorporateMarkupConfiguration() {
         }
 
         const criteria = {};
-        if (cat === "Airline Wise") criteria.airline = rule.airline;
+        if (cat === "Airline Wise") {
+          criteria.airline = rule.airline;
+          if (rule.airlineName) criteria.airlineName = rule.airlineName;
+          if (rule.airlineIcao) criteria.airlineIcao = rule.airlineIcao;
+        }
         if (cat === "Cabin Wise") criteria.cabinClass = rule.cabinClass;
         if (cat === "Sector Wise") {
           criteria.origin = rule.origin;
+          if (rule.originName) criteria.originName = rule.originName;
+          if (rule.originCity) criteria.originCity = rule.originCity;
+          
           criteria.destination = rule.destination;
+          if (rule.destinationName) criteria.destinationName = rule.destinationName;
+          if (rule.destinationCity) criteria.destinationCity = rule.destinationCity;
         }
-        if (cat === "Country Wise") criteria.country = rule.country;
-        if (cat === "City Wise") criteria.city = rule.city;
+        if (cat === "Country Wise") {
+          criteria.country = rule.country;
+          if (rule.countryName) criteria.countryName = rule.countryName;
+        }
+        if (cat === "City Wise") {
+          criteria.city = rule.city;
+          if (rule.cityName) criteria.cityName = rule.cityName;
+          if (rule.countryName) criteria.countryName = rule.countryName;
+        }
         if (cat === "Hotel Wise") {
           criteria.hotelCityCode = rule.hotelCityCode;
+          if (rule.hotelCityName) criteria.hotelCityName = rule.hotelCityName;
+          
           criteria.hotel = rule.hotel;
+          if (rule.hotelName) criteria.hotelName = rule.hotelName;
+          if (rule.hotelCityName) criteria.hotelCityName = rule.hotelCityName;
+          if (rule.hotelCountryCode) criteria.hotelCountryCode = rule.hotelCountryCode;
+          if (rule.hotelStarRating) criteria.hotelStarRating = rule.hotelStarRating;
         }
         if (cat === "Star Rating Wise") criteria.starRating = rule.starRating;
 
@@ -282,18 +411,6 @@ export default function CorporateMarkupConfiguration() {
     let payloadRules = finalRules;
     
     try {
-      let existingRulesForProductType = [];
-      if (!location.state?.editMode) {
-        // Fetch existing rules so we can append
-        const markupsAction = await dispatch(getAllCorporateMarkups(corporate._id));
-        if (markupsAction.payload && markupsAction.payload.data) {
-          const existingDoc = markupsAction.payload.data.find(m => m.productType === activeTab);
-          if (existingDoc && existingDoc.rules) {
-            existingRulesForProductType = existingDoc.rules;
-          }
-        }
-      }
-
       if (location.state?.editMode && location.state?.markupDoc) {
         const allOriginalRules = [...location.state.markupDoc.rules];
         allOriginalRules.splice(location.state.editIndex, 1, ...finalRules);
@@ -305,7 +422,22 @@ export default function CorporateMarkupConfiguration() {
       let hasDuplicate = false;
 
       const checkRule = (rule) => {
-        const criteriaString = JSON.stringify(rule.criteria || {});
+        // Strip out display fields from criteria for signature matching
+        const coreCriteria = {};
+        if (rule.criteria) {
+           if (rule.criteria.airline) coreCriteria.airline = rule.criteria.airline;
+           if (rule.criteria.cabinClass) coreCriteria.cabinClass = rule.criteria.cabinClass;
+           if (rule.criteria.origin) coreCriteria.origin = rule.criteria.origin;
+           if (rule.criteria.destination) coreCriteria.destination = rule.criteria.destination;
+           if (rule.criteria.country) coreCriteria.country = rule.criteria.country;
+           if (rule.criteria.city) coreCriteria.city = rule.criteria.city;
+           if (rule.criteria.hotelCityCode) coreCriteria.hotelCityCode = rule.criteria.hotelCityCode;
+           if (rule.criteria.hotel) coreCriteria.hotel = rule.criteria.hotel;
+           if (rule.criteria.starRating) coreCriteria.starRating = rule.criteria.starRating;
+           if (rule.criteria.flightType) coreCriteria.flightType = rule.criteria.flightType;
+        }
+
+        const criteriaString = JSON.stringify(coreCriteria);
         const ruleSignature = `${rule.category}-${criteriaString}`;
         if (seenSignatures.has(ruleSignature)) {
           return true;
@@ -314,15 +446,8 @@ export default function CorporateMarkupConfiguration() {
         return false;
       };
 
-      // Populate set with existing rules (only if not in edit mode)
-      if (!location.state?.editMode) {
-        for (const rule of existingRulesForProductType) {
-          checkRule(rule);
-        }
-      }
-
-      // Check new payloadRules
-      for (const rule of finalRules) {
+      // Check payloadRules
+      for (const rule of payloadRules) {
         if (checkRule(rule)) {
           hasDuplicate = true;
           break;
@@ -332,11 +457,6 @@ export default function CorporateMarkupConfiguration() {
       if (hasDuplicate) {
         toast.error("Duplicate rule detected! A rule for this category and criteria already exists.");
         return;
-      }
-
-      // If not in edit mode, append to existing rules
-      if (!location.state?.editMode) {
-        payloadRules = [...existingRulesForProductType, ...payloadRules];
       }
 
       const payload = {
@@ -447,7 +567,8 @@ export default function CorporateMarkupConfiguration() {
                     <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
                       <li
                         className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => {
+                        onMouseDown={(e) => {
+                          e.preventDefault();
                           const newSlabs = [...fareSlabs];
                           newSlabs[index].method = "percentage";
                           updateRule(0, 'fareSlabs', newSlabs);
@@ -458,7 +579,8 @@ export default function CorporateMarkupConfiguration() {
                       </li>
                       <li
                         className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium flex items-center gap-2"
-                        onClick={() => {
+                        onMouseDown={(e) => {
+                          e.preventDefault();
                           const newSlabs = [...fareSlabs];
                           newSlabs[index].method = "fixed";
                           updateRule(0, 'fareSlabs', newSlabs);
@@ -560,9 +682,12 @@ export default function CorporateMarkupConfiguration() {
                                   <li
                                     key={a._id}
                                     className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-3"
-                                    onClick={() => {
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
                                       updateRule(index, 'airlineSearchTerm', displayStr);
                                       updateRule(index, 'airline', a.iata);
+                                      updateRule(index, 'airlineName', a.name);
+                                      updateRule(index, 'airlineIcao', a.icao);
                                       setActiveDropdown(null);
                                     }}
                                   >
@@ -616,7 +741,8 @@ export default function CorporateMarkupConfiguration() {
                                 <li
                                   key={c.value}
                                   className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                                  onClick={() => {
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
                                     updateRule(index, 'cabinClass', c.value);
                                     setActiveDropdown(null);
                                   }}
@@ -657,9 +783,12 @@ export default function CorporateMarkupConfiguration() {
                                     <li
                                       key={a.iata_code}
                                       className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
-                                      onClick={() => {
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
                                         updateRule(index, 'originSearchTerm', displayStr);
                                         updateRule(index, 'origin', a.iata_code);
+                                        updateRule(index, 'originName', a.name);
+                                        updateRule(index, 'originCity', a.city);
                                         setActiveDropdown(null);
                                       }}
                                     >
@@ -697,9 +826,12 @@ export default function CorporateMarkupConfiguration() {
                                     <li
                                       key={a.iata_code}
                                       className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
-                                      onClick={() => {
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
                                         updateRule(index, 'destinationSearchTerm', displayStr);
                                         updateRule(index, 'destination', a.iata_code);
+                                        updateRule(index, 'destinationName', a.name);
+                                        updateRule(index, 'destinationCity', a.city);
                                         setActiveDropdown(null);
                                       }}
                                     >
@@ -740,9 +872,11 @@ export default function CorporateMarkupConfiguration() {
                                   <li
                                     key={c._id || c.Code}
                                     className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                                    onClick={() => {
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
                                       updateRule(index, 'countrySearchTerm', displayStr);
                                       updateRule(index, 'country', c.Code);
+                                      updateRule(index, 'countryName', c.Name);
                                       setActiveDropdown(null);
                                     }}
                                   >
@@ -781,9 +915,12 @@ export default function CorporateMarkupConfiguration() {
                                   <li
                                     key={c._id || c.cityCode}
                                     className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                                    onClick={() => {
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
                                       updateRule(index, 'citySearchTerm', displayStr);
                                       updateRule(index, 'city', c.cityCode);
+                                      updateRule(index, 'cityName', c.cityName);
+                                      updateRule(index, 'countryName', c.countryName);
                                       setActiveDropdown(null);
                                     }}
                                   >
@@ -822,9 +959,11 @@ export default function CorporateMarkupConfiguration() {
                                     <li
                                       key={`hc-${c._id || c.cityCode}`}
                                       className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
-                                      onClick={() => {
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
                                         updateRule(index, 'hotelCitySearchTerm', displayStr);
                                         updateRule(index, 'hotelCityCode', c.cityCode);
+                                        updateRule(index, 'hotelCityName', c.cityName);
                                         setActiveDropdown(null);
                                       }}
                                     >
@@ -860,9 +999,14 @@ export default function CorporateMarkupConfiguration() {
                                     <li
                                       key={h._id || h.hotelCode}
                                       className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex flex-col"
-                                      onClick={() => {
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
                                         updateRule(index, 'hotelSearchTerm', displayStr);
                                         updateRule(index, 'hotel', h.hotelCode);
+                                        updateRule(index, 'hotelName', h.hotelName);
+                                        updateRule(index, 'hotelCityName', h.cityName);
+                                        updateRule(index, 'hotelCountryCode', h.countryCode);
+                                        updateRule(index, 'hotelStarRating', h.starRating);
                                         setActiveDropdown(null);
                                       }}
                                     >
@@ -900,7 +1044,8 @@ export default function CorporateMarkupConfiguration() {
                                 <li
                                   key={`star-${stars}`}
                                   className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-2"
-                                  onClick={() => {
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
                                     updateRule(index, 'starRating', stars);
                                     setActiveDropdown(null);
                                   }}
@@ -950,7 +1095,8 @@ export default function CorporateMarkupConfiguration() {
                   <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
                     <li
                       className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 flex items-center gap-2"
-                      onClick={() => {
+                      onMouseDown={(e) => {
+                        e.preventDefault();
                         updateRule(index, 'method', 'percentage');
                         setActiveDropdown(null);
                       }}
@@ -959,7 +1105,8 @@ export default function CorporateMarkupConfiguration() {
                     </li>
                     <li
                       className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium flex items-center gap-2"
-                      onClick={() => {
+                      onMouseDown={(e) => {
+                        e.preventDefault();
                         updateRule(index, 'method', 'fixed');
                         setActiveDropdown(null);
                       }}

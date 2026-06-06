@@ -16,11 +16,11 @@ class MarkupCacheService {
     const cacheKey = `markup:corp:${corporateId}:${productType}`;
 
     try {
-      // 1. Try Redis
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
-      }
+      // 1. Try Redis (Bypassed temporarily for debugging)
+      // const cached = await redis.get(cacheKey);
+      // if (cached) {
+      //   return JSON.parse(cached);
+      // }
 
       // 2. Mongo Fallback
       // The prompt specified "Corporate Rule ↓ Global Rule".

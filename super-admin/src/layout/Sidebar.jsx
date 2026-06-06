@@ -131,6 +131,11 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           icon: <FaFileInvoiceDollar />,
         },
         {
+          to: "/markup-revenue",
+          label: "Markup Revenue & Audit",
+          icon: <FaFileInvoiceDollar />,
+        },
+        {
           to: "/wallet-recharge-logs",
           label: "Wallet Recharge Logs",
           icon: <FaWallet />,
