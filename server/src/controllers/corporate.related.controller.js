@@ -1421,7 +1421,7 @@ exports.fetchCancellationQueries = async (req, res) => {
     } = req.query;
 
     const userRole = req.user?.role;
-    const userId = req.user?._id;
+    const userId = req.user?._id || req.user?.id;
     const corporateId = req.user?.corporateId;
 
     let query = {};
@@ -1440,7 +1440,10 @@ exports.fetchCancellationQueries = async (req, res) => {
       query["user.id"] = { $in: [...teamUserIds, userId] };
     } else if (userRole === "travel-admin") {
       // Travel Admin sees all requests for their corporate
-      query["corporate.companyId"] = corporateId;
+      query.$or = [
+        { "corporate.companyId": corporateId },
+        { corporateId },
+      ];
     } else if (userRole === "super-admin" || userRole === "ops-member") {
       // Super Admin sees everything or filtered by query params
       if (req.query.corporateId) {

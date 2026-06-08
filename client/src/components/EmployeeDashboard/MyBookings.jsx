@@ -263,8 +263,9 @@ function FlightSection() {
                 <td className="px-6! py-5!">
                    <RouteCell routes={b.routes} airline={b.airline} />
                 </td>
-                <td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
-                <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
+<td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">
+  {new Date(b.bookedDate).toLocaleDateString("en-GB")}
+</td>                <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
                 <td className="px-6! py-5! font-black text-blue-500 text-xs">{b.pnr}</td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
                 <td className="px-6! py-5! text-left!">
@@ -421,8 +422,9 @@ function HotelSection() {
                    <p className="text-[11px] font-bold text-slate-700">{fmtDate(b.bookingSnapshot?.checkInDate)}</p>
                    <p className="text-[9px] text-slate-400">to {fmtDate(b.bookingSnapshot?.checkOutDate)}</p>
                 </td>
-                <td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">{new Date(b.bookedDate).toLocaleDateString()}</td>
-                <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
+<td className="px-6! py-5! text-[11px] font-bold text-slate-500 uppercase">
+  {new Date(b.bookedDate).toLocaleDateString("en-GB")}
+</td>                <td className="px-6! py-5!"><StatusBadge status={b.status} /></td>
                 <td className="px-6! py-5! font-black text-xs" style={{ color: C.navy }}>₹{b.amount.toLocaleString()}</td>
                 <td className="px-6! py-5! text-left!">
                     <button 

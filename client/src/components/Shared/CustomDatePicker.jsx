@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { MdOutlineCalendarMonth, MdClose } from "react-icons/md";
 import { C } from "./color";
@@ -33,7 +34,9 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
   const [isOpen, setIsOpen] = useState(false);
   const [viewMode, setViewMode] = useState("days"); // 'days', 'months', 'years'
   const [viewDate, setViewDate] = useState(() => clampViewDate(value, minDate, maxDate));
+  const [dropdownStyle, setDropdownStyle] = useState({});
   const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     setViewDate((current) => {
@@ -50,7 +53,10 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      const clickedTrigger = containerRef.current?.contains(event.target);
+      const clickedDropdown = dropdownRef.current?.contains(event.target);
+
+      if (!clickedTrigger && !clickedDropdown) {
         setIsOpen(false);
         setViewMode("days");
       }
@@ -58,6 +64,57 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const updateDropdownPosition = () => {
+      const trigger = containerRef.current?.getBoundingClientRect();
+      if (!trigger) return;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 12;
+      const gap = 8;
+      const dropdownWidth = Math.min(280, viewportWidth - margin * 2);
+      const dropdownHeight = dropdownRef.current?.offsetHeight || 330;
+
+      let left = trigger.left;
+      if (left + dropdownWidth > viewportWidth - margin) {
+        left = viewportWidth - margin - dropdownWidth;
+      }
+      left = Math.max(margin, left);
+
+      let top = trigger.bottom + gap;
+      const hasSpaceBelow = top + dropdownHeight <= viewportHeight - margin;
+      const topAbove = trigger.top - gap - dropdownHeight;
+
+      if (!hasSpaceBelow && topAbove >= margin) {
+        top = topAbove;
+      } else if (!hasSpaceBelow) {
+        top = Math.max(margin, viewportHeight - margin - dropdownHeight);
+      }
+
+      setDropdownStyle({
+        position: "fixed",
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${dropdownWidth}px`,
+        zIndex: 1000,
+      });
+    };
+
+    updateDropdownPosition();
+    const frameId = window.requestAnimationFrame(updateDropdownPosition);
+    window.addEventListener("resize", updateDropdownPosition);
+    window.addEventListener("scroll", updateDropdownPosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", updateDropdownPosition);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+    };
+  }, [isOpen, viewDate, viewMode]);
 
   const handleMonthChange = (offset) => {
     if (viewMode === "years") {
@@ -292,12 +349,30 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
 
   let formattedValue = "";
   if (value) {
-    const d = new Date(value);
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    formattedValue = `${day}/${month}/${year}`;
+    const d = parseDateOnly(value);
+    if (d) {
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      formattedValue = `${day}/${month}/${year}`;
+    }
   }
+
+  const dropdown = (
+    <div
+      ref={dropdownRef}
+      className="bg-white border border-slate-100 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.15)] p-4 animate-in fade-in zoom-in-95 duration-200"
+      style={dropdownStyle}
+    >
+      {renderHeader()}
+
+      <div className="min-h-[200px]">
+        {viewMode === "days" && renderDays()}
+        {viewMode === "months" && renderMonths()}
+        {viewMode === "years" && renderYears()}
+      </div>
+    </div>
+  );
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -333,17 +408,7 @@ export default function CustomDatePicker({ value, onChange, label, placeholder =
         </div>
       </button>
 
-      {isOpen && (
-        <div className="absolute z-[200] mt-3 left-0 bg-white border border-slate-100 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.15)] p-4 w-[280px] animate-in fade-in zoom-in-95 duration-200">
-          {renderHeader()}
-          
-          <div className="min-h-[200px]">
-            {viewMode === "days" && renderDays()}
-            {viewMode === "months" && renderMonths()}
-            {viewMode === "years" && renderYears()}
-          </div>
-        </div>
-      )}
+      {isOpen && createPortal(dropdown, document.body)}
       {helperText && (
         <p className="mt-1 text-[10px] font-medium text-slate-500">
           {helperText}
