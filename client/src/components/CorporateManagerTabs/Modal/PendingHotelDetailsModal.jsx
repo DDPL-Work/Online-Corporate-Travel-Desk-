@@ -1001,18 +1001,15 @@ export const PendingHotelDetailsModal = ({
                     <div className="mt-8 flex items-center gap-6">
                       <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
                         {
-                          (booking.requesterDetails?.name ||
-                            booking.userId?.name?.firstName ||
-                            "?")[0]
+                          (booking.requesterDetails?.name || booking.userId?.name?.firstName || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || "?")[0]
                         }
                       </div>
                       <div>
                         <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
-                          {booking.requesterDetails?.name ||
-                            `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim()}
+                          {booking.requesterDetails?.name || `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim() || `${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || ""} ${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.lastName || ""}`.trim() || "Unknown"}
                         </p>
                         <p className="text-xs font-bold text-slate-400 mt-1">
-                          {booking.requesterDetails?.email || booking.userId?.email}
+                          {booking.requesterDetails?.email || booking.userId?.email || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.email || "No email"}
                         </p>
                         <div className="mt-2 flex gap-2">
                           <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
@@ -1031,6 +1028,27 @@ export const PendingHotelDetailsModal = ({
                         "
                       </div>
                     </div>
+                    {(booking.requestStatus === "rejected" || booking.status === "rejected" || booking.bookingStatus === "rejected") && (
+                      <div className="mt-8 pt-8 border-t border-slate-50">
+                        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 shadow-sm">
+                          <SectionLabel icon={<FiXCircle className="text-red-500" />} title="Rejection Details" />
+                          <div className="mt-8">
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {typeof booking.rejectedBy === 'string' ? booking.rejectedBy : (booking.rejectedBy?.name?.firstName ? `${booking.rejectedBy.name.firstName} ${booking.rejectedBy.name.lastName || ""}` : "System")}
+                            </p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                              {booking.rejectedDate ? formatDateTime(booking.rejectedDate) : (booking.rejectedAt ? formatDateTime(booking.rejectedAt) : "Unknown date")}
+                            </p>
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mt-6 mb-4">
+                              Reason for Rejection
+                            </p>
+                            <div className="bg-white p-6 rounded-[2rem] border border-red-100 italic text-sm font-black text-red-700 leading-relaxed shadow-inner">
+                              "{booking.approverComments || booking.reason || "No reason provided"}"
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1931,24 +1949,6 @@ export const PendingFlightDetailsModal = ({
                     </div>
                     <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
                   </div>
-
-                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-3 font-mono">
-                      Flight Reference
-                    </p>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">PNR / Booking Ref</p>
-                        <p className="text-xs font-black text-slate-900">{booking.bookingReference || "Pending"}</p>
-                      </div>
-                      <div className="pt-3 border-t border-slate-50">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cabin Class</p>
-                        <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
-                          {cabinDisplay}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -2037,18 +2037,15 @@ export const PendingFlightDetailsModal = ({
                     <div className="mt-8 flex items-center gap-6">
                       <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
                         {
-                          (booking.requesterDetails?.name ||
-                            booking.userId?.name?.firstName ||
-                            "?")[0]
+                          (booking.requesterDetails?.name || booking.userId?.name?.firstName || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || "?")[0]
                         }
                       </div>
                       <div>
                         <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
-                          {booking.requesterDetails?.name ||
-                            `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim()}
+                          {booking.requesterDetails?.name || `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim() || `${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || ""} ${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.lastName || ""}`.trim() || "Unknown"}
                         </p>
                         <p className="text-xs font-bold text-slate-400 mt-1">
-                          {booking.requesterDetails?.email || booking.userId?.email}
+                          {booking.requesterDetails?.email || booking.userId?.email || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.email || "No email"}
                         </p>
                         <div className="mt-2 flex gap-2">
                           <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
@@ -2067,6 +2064,27 @@ export const PendingFlightDetailsModal = ({
                         "
                       </div>
                     </div>
+                    {(booking.requestStatus === "rejected" || booking.status === "rejected" || booking.bookingStatus === "rejected") && (
+                      <div className="mt-8 pt-8 border-t border-slate-50">
+                        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 shadow-sm">
+                          <SectionLabel icon={<FiXCircle className="text-red-500" />} title="Rejection Details" />
+                          <div className="mt-8">
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {typeof booking.rejectedBy === 'string' ? booking.rejectedBy : (booking.rejectedBy?.name?.firstName ? `${booking.rejectedBy.name.firstName} ${booking.rejectedBy.name.lastName || ""}` : "System")}
+                            </p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                              {booking.rejectedDate ? formatDateTime(booking.rejectedDate) : (booking.rejectedAt ? formatDateTime(booking.rejectedAt) : "Unknown date")}
+                            </p>
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mt-6 mb-4">
+                              Reason for Rejection
+                            </p>
+                            <div className="bg-white p-6 rounded-[2rem] border border-red-100 italic text-sm font-black text-red-700 leading-relaxed shadow-inner">
+                              "{booking.approverComments || booking.reason || "No reason provided"}"
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

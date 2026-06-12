@@ -73,13 +73,11 @@ export default function OneFlightBooking() {
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired =
-    !isTravelAdmin && myPolicy?.approvalRequired !== false; // default true
 
   const isSSRError = ssr?.Response?.ResponseStatus === 2;
 
   const ssrErrorMessage =
-    ssr?.Response?.Error?.ErrorMessage || "No SSR available";
+    ssr?.Response?.Error?.ErrorMessage || "No seat available";
 
   const localState = useMemo(() => {
     const localStateStr = localStorage.getItem("flightBookingState");
@@ -362,14 +360,14 @@ export default function OneFlightBooking() {
     }
   }, [loading, selectedFlight, rawFlightData, navigate]);
 
-  const isSSRReady = useMemo(() => {
-    if (isSSRError) return false;
-    const hasSeats =
-      (ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.length || 0) > 0;
-    const hasMeals = (ssr?.Response?.MealDynamic?.length || 0) > 0;
-    const hasBaggage = (ssr?.Response?.Baggage?.length || 0) > 0;
-    return hasSeats || hasMeals || hasBaggage;
-  }, [ssr, isSSRError]);
+  const getSegmentSSRStatus = (idx) => {
+    if (!ssr) return "loading";
+    if (isSSRError) return "error";
+    const segmentSeat = ssr?.Response?.SeatDynamic?.[0]?.SegmentSeat?.[idx];
+    const hasSeats = (segmentSeat?.RowSeats?.length || 0) > 0;
+    if (!hasSeats) return "none";
+    return true;
+  };
 
   const validateMandatorySSR = () => {
     const validators = fareQuote?.Response?.Results?.RequiredFieldValidators;
@@ -408,7 +406,7 @@ export default function OneFlightBooking() {
   };
 
   const openSeatModal = (segmentIndex) => {
-    if (!isSSRReady) {
+    if (getSegmentSSRStatus(segmentIndex) !== true) {
       ToastWithTimer({
         type: "info",
         message: isSSRError
@@ -589,6 +587,27 @@ export default function OneFlightBooking() {
     return total;
   };
 
+  const grandTotal = fareTotals.total + calculateSSRTotal();
+  const isAutoApprove = myPolicy?.approvalRequired === false;
+
+  let applicableLimit = 0;
+  let isUnlimitedLimit = true;
+  if (myPolicy?.flightLimits?.length && parsedFlightData?.segments?.length > 0) {
+    const isIntl = parsedFlightData.segments.some(
+      (s) => s?.da?.countryCode !== "IN" || s?.aa?.countryCode !== "IN"
+    );
+    const loc = isIntl ? "International" : "Domestic";
+    const cabinNum = Number(parsedFlightData.segments[0]?.cabinClass) || 2;
+    const limitObj = myPolicy.flightLimits.find(l => l.location === loc && l.cabinClass === cabinNum);
+    if (limitObj) {
+      applicableLimit = limitObj.limit;
+      isUnlimitedLimit = limitObj.isUnlimited !== false;
+    }
+  }
+
+  const isOverLimit = isAutoApprove && !isUnlimitedLimit && applicableLimit > 0 && grandTotal > applicableLimit;
+  const approvalRequired = !isTravelAdmin && (!isAutoApprove || isOverLimit);
+
   const fullSegments =
     rawFlightData?.Segments?.flat()?.map((s, index) => ({
       segmentIndex: index,
@@ -750,7 +769,7 @@ export default function OneFlightBooking() {
       travelDate: firstSegment?.dt || "N/A",
       returnDate: lastSegment?.at || "N/A",
       cabinClass,
-      amount: fareTotals.total + calculateSSRTotal(),
+      amount: grandTotal,
       purposeOfTravel: purposeOfTravel || "N/A",
       city: lastSegment?.to || "N/A",
       gstDetails,
@@ -829,7 +848,7 @@ export default function OneFlightBooking() {
       purposeOfTravel,
       bookingSnapshot, // ✅ include summary for backend to save
       pricingSnapshot: {
-        totalAmount: fareTotals.total + calculateSSRTotal(),
+        totalAmount: grandTotal,
         currency: "INR",
       },
       gstDetails,
@@ -890,10 +909,7 @@ export default function OneFlightBooking() {
       // passportNumber validation: only if flight is international
       const isInternational = Boolean(
         parsedFlightData?.segments?.some(
-          (s) =>
-            s?.origin?.country &&
-            s?.destination?.country &&
-            s.origin.country !== s.destination.country,
+          (s) => s?.da?.countryCode !== "IN" || s?.aa?.countryCode !== "IN"
         ),
       );
 
@@ -992,7 +1008,8 @@ export default function OneFlightBooking() {
         });
       } else {
         // ✅ Traditional approval workflow
-        if (!isTravelAdmin) {
+        const isApproverTravelAdmin = projectApproverData.approver?.role === "travel-admin";
+        if (!isTravelAdmin && !isApproverTravelAdmin) {
           await dispatch(
             selectManager({
               approverId: projectApproverData.approver?.id,
@@ -1276,7 +1293,7 @@ export default function OneFlightBooking() {
                       selectedSeats={selectedSeats}
                       openSeatModal={openSeatModal}
                       journeyType="onward"
-                      isSeatReady={isSSRReady}
+                      isSeatReady={getSegmentSSRStatus}
                     />
                   </div>
                 </div>
@@ -1342,7 +1359,7 @@ export default function OneFlightBooking() {
           {/* RIGHT */}
           <div className="space-y-6">
             <div className="sticky top-6 space-y-6">
-              <ProjectApproverBlock onChange={setProjectApproverData} />
+              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} />
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,

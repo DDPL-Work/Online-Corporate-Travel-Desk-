@@ -320,8 +320,13 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
                 <div className="flex-1 border-t border-dashed border-[#EAE4D9] w-10" />
                 <span className="w-[6px] h-[6px] rounded-full bg-[#B5862A] inline-block" />
               </div>
-              <div className="text-[10px] text-[#A89F94] mt-2 max-w-[80px] text-center mx-auto">
-                {roomType}
+              <div className="mt-2 text-center">
+                <div className="text-[8px] font-bold tracking-[0.15em] uppercase text-[#B5862A] mb-[2px]">
+                  Selected Room Type
+                </div>
+                <div className="text-[10px] font-bold text-[#1A1714] max-w-[120px] mx-auto uppercase tracking-wide">
+                  {roomType}
+                </div>
               </div>
             </div>
 
@@ -461,11 +466,16 @@ function RoomSection({ rooms, selectedRoom }) {
           <div key={index}>
             {/* Room header */}
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-['Cormorant_Garamond'] text-[26px] font-semibold text-[#1A1714]">
-                {room.RoomTypeName ||
-                  (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
-                  `Room ${index + 1}`}
-              </h3>
+              <div>
+                <div className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#B5862A] mb-1">
+                  Selected Room Type
+                </div>
+                <h3 className="font-['Cormorant_Garamond'] text-[26px] font-semibold text-[#1A1714]">
+                  {room.RoomTypeName ||
+                    (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
+                    `Room ${index + 1}`}
+                </h3>
+              </div>
               <div className="flex gap-3 items-center">
 
                 <div className="flex gap-2 flex-wrap">

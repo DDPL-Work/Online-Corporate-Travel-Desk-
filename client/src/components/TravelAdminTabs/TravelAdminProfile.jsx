@@ -24,31 +24,48 @@ import { fetchCorporateAdmin, updateCorporateAdmin } from "../../Redux/Slice/cor
 import { C } from "../Shared/color";
 
 const CORPORATE_FIELDS = [
-  { key: "corporateName", label: "Corporate Designation", icon: FiUser, type: "text", editable: true },
-  { key: "classification", label: "Classification", icon: FiBriefcase, type: "text", editable: false },
-  { key: "billingCycle", label: "Billing Protocol", icon: FiCalendar, type: "text", editable: false },
+  { key: "corporateName", label: "Company Name", icon: FiUser, type: "text" },
+  { key: "classification", label: "Classification", icon: FiBriefcase, type: "text" },
+  { key: "billingCycle", label: "Billing Cycle", icon: FiCalendar, type: "text" },
 ];
 
 const ADDRESS_FIELDS = [
-  { key: "registeredAddress.street", label: "Tactical Street", icon: FiMapPin, type: "text", editable: true },
-  { key: "registeredAddress.city", label: "Operational City", icon: FiMapPin, type: "text", editable: true },
-  { key: "registeredAddress.state", label: "Strategic State", icon: FiMapPin, type: "text", editable: true },
-  { key: "registeredAddress.pincode", label: "Sector Pincode", icon: FiMapPin, type: "text", editable: true },
+  { key: "registeredAddress.street", label: "Street", icon: FiMapPin, type: "text" },
+  { key: "registeredAddress.city", label: "City", icon: FiMapPin, type: "text" },
+  { key: "registeredAddress.state", label: "State", icon: FiMapPin, type: "text" },
+  { key: "registeredAddress.pincode", label: "Pincode", icon: FiMapPin, type: "text" },
 ];
 
 const CONTACT_FIELDS = [
-  { key: "primaryContact.name", label: "Designated Name", icon: FiUser, type: "text", editable: true },
-  { key: "primaryContact.email", label: "Verified Email", icon: FiMail, type: "email", editable: true },
-  { key: "primaryContact.mobile", label: "Comm. Mobile", icon: FiPhone, type: "tel", editable: true },
+  { key: "primaryContact.name", label: "Name", icon: FiUser, type: "text" },
+  { key: "primaryContact.email", label: "Email", icon: FiMail, type: "email" },
+  { key: "primaryContact.mobile", label: "Mobile", icon: FiPhone, type: "tel" },
+];
+
+const FINANCE_FIELDS = [
+  { key: "billingDepartment.name", label: "Name", icon: FiUser, type: "text" },
+  { key: "billingDepartment.email", label: "Email", icon: FiMail, type: "email" },
+  { key: "billingDepartment.mobile", label: "Mobile", icon: FiPhone, type: "tel" },
+];
+
+const GST_FIELDS = [
+  { key: "gstDetails.legalName", label: "Legal Name", icon: FaBuilding, type: "text" },
+  { key: "gstDetails.gstin", label: "GSTIN", icon: FiBriefcase, type: "text" },
+  { key: "gstDetails.address", label: "Address", icon: FiMapPin, type: "text" },
+  { key: "gstDetails.gstEmail", label: "Email", icon: FiMail, type: "email" },
+  { key: "gstDetails.contactNumber", label: "Contact", icon: FiPhone, type: "tel" },
 ];
 
 const SSO_FIELDS = [
-  { key: "ssoConfig.type", label: "Protocol Provider", icon: FiShield, type: "text", editable: false },
-  { key: "ssoConfig.domain", label: "Authorized Domain", icon: FiShield, type: "text", editable: false },
-  { key: "ssoConfig.verified", label: "Validation Status", icon: FiShield, type: "checkbox", editable: false },
+  { key: "ssoConfig.type", label: "Provider", icon: FiShield, type: "text" },
+  { key: "ssoConfig.domain", label: "Domain", icon: FiShield, type: "text" },
+  { key: "ssoConfig.verified", label: "Verified Status", icon: FiShield, type: "checkbox" },
 ];
 
 function getInitials(name = "") {
+  if (typeof name === "object") {
+    name = `${name.firstName || ""} ${name.lastName || ""}`.trim();
+  }
   return name.trim().split(/\s+/).map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
@@ -60,58 +77,28 @@ const getNestedValue = (obj, path) => {
 export default function TravelAdminProfile() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { corporate, loading, error } = useSelector((state) => state.corporateAdmin);
-  const [editing, setEditing] = useState(false);
-  const [formData, setFormData] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const { corporate, loading } = useSelector((state) => state.corporateAdmin);
 
   useEffect(() => { dispatch(fetchCorporateAdmin()); }, [dispatch]);
 
-  useEffect(() => { if (corporate && !formData) setFormData(JSON.parse(JSON.stringify(corporate))); }, [corporate]);
-
-  const handleFieldChange = (path, value) => {
-    setFormData((prev) => {
-      const newData = { ...prev };
-      const keys = path.split(".");
-      let current = newData;
-      for (let i = 0; i < keys.length - 1; i++) {
-        if (!current[keys[i]]) current[keys[i]] = {};
-        current = current[keys[i]];
-      }
-      current[keys[keys.length - 1]] = value;
-      return newData;
-    });
+  const handleRefresh = () => {
+    dispatch(fetchCorporateAdmin());
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await dispatch(updateCorporateAdmin(formData)).unwrap();
-      setEditing(false);
-      dispatch(fetchCorporateAdmin());
-    } catch (err) { alert("Protocol Failure: Unable to update profile."); }
-    finally { setSaving(false); }
-  };
-
-  const handleCancel = () => {
-    setFormData(JSON.parse(JSON.stringify(corporate)));
-    setEditing(false);
-  };
-
-  if (loading && !formData) {
+  if (loading && !corporate) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.offWhite }}>
          <div className="flex flex-col items-center gap-4">
             <FiRefreshCw className="animate-spin" size={32} style={{ color: C.gold }} />
-            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Synchronizing Profile...</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Loading Profile...</p>
          </div>
       </div>
     );
   }
 
-  if (!formData) return null;
+  if (!corporate) return null;
 
-  const initials = getInitials(formData.corporateName);
+  const initials = getInitials(corporate.corporateName);
   const walletBalance = corporate.walletBalance || 0;
   const creditLimit = corporate.creditLimit || 0;
   const creditUtilization = corporate.creditUtilization || 0;
@@ -127,16 +114,16 @@ export default function TravelAdminProfile() {
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => navigate(-1)} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
-               <div className={`p-3 rounded-xl bg-white/10 border border-white/10 ${loading ? "animate-spin" : ""}`}>
-                  <FiRefreshCw size={20} />
-               </div>
+               <button onClick={handleRefresh} disabled={loading} className={`p-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <FiRefreshCw size={20} className={loading ? "animate-spin" : ""} />
+               </button>
              </div>
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
-             <div className="flex items-center gap-5">
+              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FaBuilding size={28} /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Corporate Profile Hub</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage your corporate credentials, authorization matrix & documents</p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Corporate Profile</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View your corporate profile and details</p>
                </div>
              </div>
           </div>
@@ -154,29 +141,35 @@ export default function TravelAdminProfile() {
                   {initials || <FaBuilding size={32} />}
                 </div>
                 <h2 className="mt-4 text-lg font-black text-slate-800 leading-tight">
-                  {formData.corporateName}
+                  {corporate.corporateName}
                 </h2>
-                <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">{formData.classification || "—"}</p>
+                <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-wider">{corporate.classification || "—"}</p>
                 
                 <div className="mt-4 w-full flex flex-col gap-2 items-center">
-                  <span className="inline-block text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full" style={{ color: C.navy, background: C.gold + "22" }}>
-                    {formData.billingCycle || "No Billing Cycle"}
-                  </span>
+                  {corporate.classification === "postpaid" && (
+                    <span className="inline-block text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full" style={{ color: C.navy, background: C.gold + "22" }}>
+                      {corporate.billingCycle || "No Billing Cycle"}
+                    </span>
+                  )}
                   <span className={`inline-block text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full ${isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
                     {corporate.status || "INACTIVE"}
                   </span>
                 </div>
 
                 <div className="mt-8 w-full border-t border-slate-100 pt-6 space-y-4 text-left">
-                  <InfoRow icon={FaRupeeSign} value={`₹${walletBalance.toLocaleString()}`} label="Liquid Assets" />
-                  <InfoRow icon={FiCreditCard} value={`₹${creditLimit.toLocaleString()}`} label="Credit Authorization" />
-                  <InfoRow icon={FiActivity} value={`₹${usedCredit.toLocaleString()}`} label="Deployed Credit" />
-                  {formData.classification === "postpaid" && (
-                    <InfoRow icon={FiCalendar} value={`${formData.dueDays || 0} Days`} label="Payment Due Days" />
+                  {corporate.classification === "prepaid" && (
+                    <InfoRow icon={FaRupeeSign} value={`₹${walletBalance.toLocaleString()}`} label="Wallet Balance" />
                   )}
-                  <InfoRow icon={FiUser} value={formData.primaryContact?.name || "—"} label="Primary Contact" />
-                  <InfoRow icon={FiMail} value={formData.primaryContact?.email || "—"} label="Contact Email" />
-                  <InfoRow icon={FiPhone} value={formData.primaryContact?.mobile || "—"} label="Contact Mobile" />
+                  {corporate.classification === "postpaid" && (
+                    <>
+                      <InfoRow icon={FiCreditCard} value={`₹${creditLimit.toLocaleString()}`} label="Credit Limit" />
+                      <InfoRow icon={FiActivity} value={`₹${usedCredit.toLocaleString()}`} label="Used Credit" />
+                      <InfoRow icon={FiCalendar} value={`${corporate.dueDays || 0} Days`} label="Payment Due Days" />
+                    </>
+                  )}
+                  <InfoRow icon={FiUser} value={corporate.primaryContact?.name || "—"} label="Primary Contact" />
+                  <InfoRow icon={FiMail} value={corporate.primaryContact?.email || "—"} label="Contact Email" />
+                  <InfoRow icon={FiPhone} value={corporate.primaryContact?.mobile || "—"} label="Contact Mobile" />
                 </div>
               </div>
             </div>
@@ -193,40 +186,19 @@ export default function TravelAdminProfile() {
                       <FaBuilding style={{ color: C.navy }} />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Corporate Information</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Strategic & Operational Base Registry</p>
+                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Basic Information & Address</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Company Details</p>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {editing ? (
-                      <div className="flex gap-2">
-                         <button onClick={handleCancel} className="px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition">Cancel</button>
-                         <button 
-                          onClick={handleSave} 
-                          disabled={saving}
-                          className="px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 shadow-md" style={{ background: C.gold, color: C.navy }}
-                         >
-                          {saving ? "Saving..." : "Save Changes"}
-                         </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditing(true)} className="flex items-center gap-2 px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm hover:shadow-md" style={{ background: C.offWhite, color: C.navy }}>
-                        <FiEdit2 size={12} /> Edit Profile
-                      </button>
-                    )}
                   </div>
                </div>
                
                <div className="p-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    {CORPORATE_FIELDS.concat(ADDRESS_FIELDS).map((f) => (
+                    {CORPORATE_FIELDS.filter(f => corporate.classification === "postpaid" || f.key !== "billingCycle").concat(ADDRESS_FIELDS).map((f) => (
                       <Field
                         key={f.key}
                         field={f}
-                        value={getNestedValue(formData, f.key)}
-                        editing={editing}
-                        onChange={(v) => handleFieldChange(f.key, v)}
+                        value={getNestedValue(corporate, f.key)}
                       />
                     ))}
                   </div>
@@ -240,8 +212,8 @@ export default function TravelAdminProfile() {
                   <FiUser />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Primary Liaison</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Direct Organizational Contact</p>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Primary Contact Details</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Main Person of Contact</p>
                 </div>
               </div>
 
@@ -251,11 +223,95 @@ export default function TravelAdminProfile() {
                     <Field
                       key={f.key}
                       field={f}
-                      value={getNestedValue(formData, f.key)}
-                      editing={editing}
-                      onChange={(v) => handleFieldChange(f.key, v)}
+                      value={getNestedValue(corporate, f.key)}
                     />
                   ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Finance Details */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
+              <div className="p-8 border-b border-slate-50 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 shadow-sm">
+                  <FiDollarSign />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Finance & Billing Department</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Billing Team Details</p>
+                </div>
+              </div>
+
+              <div className="p-8">
+                {corporate.financeMembers && corporate.financeMembers.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {corporate.financeMembers.map((member) => (
+                      <div key={member._id} className="p-5 rounded-[1.25rem] border border-slate-200 shadow-sm flex flex-col gap-3 relative" style={{ backgroundColor: C.offWhite }}>
+                        {member.status === "active" ? (
+                           <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                        ) : (
+                           <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></div>
+                        )}
+                        <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+                           <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-black">
+                              {getInitials(typeof member.name === "object" ? `${member.name.firstName} ${member.name.lastName}` : member.name)}
+                           </div>
+                           <div className="min-w-0">
+                              <p className="text-sm font-black text-slate-800 truncate leading-tight">
+                                {typeof member.name === "object" ? `${member.name.firstName} ${member.name.lastName}` : member.name}
+                              </p>
+                              <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 leading-tight mt-0.5">{member.role.replace("_", " ")}</p>
+                           </div>
+                        </div>
+                        <div className="space-y-2 mt-1">
+                           <div className="flex items-center gap-2 text-xs text-slate-600">
+                             <FiMail size={12} className="text-slate-400 shrink-0" />
+                             <span className="truncate">{member.email}</span>
+                           </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-[1.25rem] border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                    <FiDollarSign size={24} className="text-slate-300 mb-3" />
+                    <p className="text-sm font-black text-slate-800">No Finance Members Found</p>
+                    <p className="text-xs text-slate-500 mt-1">There are no finance team members assigned to this corporate yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* GST Details */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
+              <div className="p-8 border-b border-slate-50 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm">
+                  <FaBuilding />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">GST Details</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Company Registration Info</p>
+                </div>
+              </div>
+
+              <div className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  {GST_FIELDS.map((f) => (
+                    <Field
+                      key={f.key}
+                      field={f}
+                      value={getNestedValue(corporate, f.key)}
+                    />
+                  ))}
+                  <div className="flex flex-col gap-2 text-left">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                        <FiShield size={10} style={{ color: C.gold }} />
+                        GST Verified
+                     </label>
+                     <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+                        <span className="text-xs font-black uppercase tracking-widest" style={{ color: C.navy }}>{corporate.gstDetails?.verified ? "Yes" : "No"}</span>
+                     </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -267,8 +323,8 @@ export default function TravelAdminProfile() {
                   <FiShield />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Security Protocols (SSO)</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Single Sign-On Configuration</p>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">SSO Details</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Sign-in Settings</p>
                 </div>
               </div>
 
@@ -278,9 +334,7 @@ export default function TravelAdminProfile() {
                     <Field
                       key={f.key}
                       field={f}
-                      value={getNestedValue(formData, f.key)}
-                      editing={editing}
-                      onChange={(v) => handleFieldChange(f.key, v)}
+                      value={getNestedValue(corporate, f.key)}
                     />
                   ))}
                 </div>
@@ -294,23 +348,23 @@ export default function TravelAdminProfile() {
                   <FiDollarSign />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Platform Engagement Fees</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Service Charges for Aviation & Hospitality</p>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Service Fees</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Fees for Flight & Hotel Bookings</p>
                 </div>
               </div>
 
               <div className="p-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                   <div className="space-y-6">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Aviation Service Matrix (Per Pax)</p>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Flight Fees (Per Passenger)</p>
                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <InfoRow label="Domestic" value={`₹${corporate.serviceCharges?.domesticFlight?.toLocaleString() || "0"}`} />
-                        <InfoRow label="Intl O/W" value={`₹${corporate.serviceCharges?.internationalOneWayFlight?.toLocaleString() || "0"}`} />
-                        <InfoRow label="Intl RTN" value={`₹${corporate.serviceCharges?.internationalReturnFlight?.toLocaleString() || "0"}`} />
+                        <InfoRow label="Intl One-Way" value={`₹${corporate.serviceCharges?.internationalOneWayFlight?.toLocaleString() || "0"}`} />
+                        <InfoRow label="Intl Return" value={`₹${corporate.serviceCharges?.internationalReturnFlight?.toLocaleString() || "0"}`} />
                      </div>
                   </div>
                   <div className="space-y-6">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Hospitality Service Matrix (Per Txn)</p>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Hotel Fees (Per Booking)</p>
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <InfoRow label="Domestic" value={`₹${corporate.serviceCharges?.domesticHotel?.toLocaleString() || "0"}`} />
                         <InfoRow label="International" value={`₹${corporate.serviceCharges?.internationalHotel?.toLocaleString() || "0"}`} />
@@ -319,7 +373,7 @@ export default function TravelAdminProfile() {
                 </div>
                 <div className="mt-8 p-4 rounded-2xl bg-slate-50 border flex items-center gap-3" style={{ borderColor: C.border }}>
                   <FiInfo className="text-gold shrink-0" />
-                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest italic">Fees are finalized by platform super-admin. Contact support for protocol amendments.</p>
+                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest italic">Fees are set by the platform admin. Please contact support if you have any questions.</p>
                 </div>
               </div>
             </div>
@@ -331,7 +385,7 @@ export default function TravelAdminProfile() {
   );
 }
 
-function Field({ field, value, editing, onChange }) {
+function Field({ field, value }) {
   const Icon = field.icon;
   return (
     <div className="flex flex-col gap-2 text-left">
@@ -339,37 +393,13 @@ function Field({ field, value, editing, onChange }) {
         <Icon size={10} style={{ color: C.gold }} />
         {field.label}
       </label>
-      {editing ? (
-        field.type === "checkbox" ? (
-          <div className="flex items-center gap-3 px-5 py-3 border rounded-[1.25rem]" style={{ 
-            backgroundColor: field.editable ? C.gold + "11" : "#f8fafc", 
-            borderColor: field.editable ? C.gold + "44" : "#e2e8f0" 
-          }}>
-            <input type="checkbox" disabled={!field.editable} checked={value === true || value === "true" || value === "Allowed"} onChange={(e) => onChange(e.target.checked)} className={`w-5 h-5 rounded accent-gold ${!field.editable ? "cursor-not-allowed opacity-50" : ""}`} />
-            <span className={`text-xs font-black uppercase tracking-widest ${!field.editable ? "text-slate-400" : ""}`} style={{ color: field.editable ? C.navy : undefined }}>{value ? "Authorized" : "Restricted"}</span>
-          </div>
-        ) : (
-          <input
-            type={field.type}
-            value={value || ""}
-            onChange={(e) => onChange(e.target.value)}
-            readOnly={!field.editable}
-            className={`w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm ${!field.editable ? "cursor-not-allowed text-slate-500" : ""}`}
-            style={{ 
-              backgroundColor: field.editable ? C.gold + "11" : "#f8fafc", 
-              borderColor: field.editable ? C.gold + "44" : "#e2e8f0",
-            }}
-          />
-        )
-      ) : (
-        <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
-          {field.type === "checkbox" ? (
-            <span className="text-xs font-black uppercase tracking-widest" style={{ color: C.navy }}>{value ? "Authorized" : "Restricted"}</span>
-          ) : value || (
-            <span className="text-slate-400 italic font-bold">Not configured</span>
-          )}
-        </div>
-      )}
+      <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+        {field.type === "checkbox" ? (
+          <span className="text-xs font-black uppercase tracking-widest" style={{ color: C.navy }}>{value ? "Yes" : "No"}</span>
+        ) : value || (
+          <span className="text-slate-400 italic font-bold">Not available</span>
+        )}
+      </div>
     </div>
   );
 }

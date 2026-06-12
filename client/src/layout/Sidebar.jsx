@@ -192,18 +192,7 @@ export default function Sidebar({ isOpen, onClose }) {
   }, [classification]);
 
   const financeTeamMenu = useMemo(() => {
-    const menu = [
-      {
-        to: "/project-management",
-        label: "Project Management",
-        icon: <FaFileExcel />,
-      },
-      {
-        to: "/projects-table",
-        label: "Project Expenditures",
-        icon: <GrProjects />,
-      },
-    ];
+    const menu = [];
     if (classification === "prepaid") {
       menu.push({
         to: "/corporate-wallet",

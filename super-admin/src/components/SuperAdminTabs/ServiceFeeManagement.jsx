@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   FiDownload,
   FiEdit2,
@@ -11,6 +11,7 @@ import {
   FiToggleRight,
   FiTrash2,
   FiX,
+  FiChevronDown,
 } from "react-icons/fi";
 import { FaHotel, FaPlane, FaRupeeSign } from "react-icons/fa";
 import TableActionBar from "../Shared/TableActionBar";
@@ -70,24 +71,28 @@ const initialRules = [
   },
 ];
 
+const flightOperations = ["Book", "Cancel", "Re-Issue"];
+const hotelOperations = ["Book", "Cancel"];
+const cabinClasses = ["Economy", "Premium Economy", "Business", "Premium Business", "First Class"];
+const starRatings = ["1 Star", "2 Star", "3 Star", "4 Star", "5 Star"];
+
+const getEmptyFees = (productType) => {
+  const conditions = productType === "Flight" ? cabinClasses : starRatings;
+  const fees = {};
+  conditions.forEach(c => fees[c] = { enabled: false, feeType: "Fixed", feeValue: "" });
+  return fees;
+};
+
 const emptyForm = {
   id: null,
   ruleName: "",
   productType: "Flight",
   operation: "Book",
   tripType: "Domestic",
-  cabinClass: "Economy",
-  starRating: "3 Star",
   roomCount: 1,
-  feeType: "Fixed",
-  feeValue: "",
+  fees: getEmptyFees("Flight"),
   status: "Active",
 };
-
-const flightOperations = ["Book", "Cancel", "Re-Issue"];
-const hotelOperations = ["Book", "Cancel"];
-const cabinClasses = ["Economy", "Premium Economy", "Business", "Premium Business", "First Class"];
-const starRatings = ["1 Star", "2 Star", "3 Star", "4 Star", "5 Star"];
 
 export default function ServiceFeeManagement() {
   const tableScrollRef = useRef(null);
@@ -149,11 +154,24 @@ export default function ServiceFeeManagement() {
   };
 
   const openEdit = (rule) => {
-    setForm({
-      ...emptyForm,
-      ...rule,
+    const isFlight = rule.productType === "Flight";
+    const condition = isFlight ? rule.cabinClass : rule.starRating;
+    const initialFees = getEmptyFees(rule.productType);
+    initialFees[condition] = {
+      enabled: true,
+      feeType: rule.feeType,
       feeValue: String(rule.feeValue),
+    };
+    
+    setForm({
+      id: rule.id,
+      ruleName: rule.ruleName,
+      productType: rule.productType,
+      operation: rule.operation,
+      tripType: rule.tripType,
       roomCount: rule.roomCount || 1,
+      fees: initialFees,
+      status: rule.status,
     });
     setOpenForm(true);
   };
@@ -163,8 +181,7 @@ export default function ServiceFeeManagement() {
       ...prev,
       productType,
       operation: "Book",
-      cabinClass: productType === "Flight" ? prev.cabinClass || "Economy" : "",
-      starRating: productType === "Hotel" ? prev.starRating || "3 Star" : "",
+      fees: getEmptyFees(productType),
       roomCount: productType === "Hotel" ? prev.roomCount || 1 : "",
     }));
   };
@@ -172,37 +189,43 @@ export default function ServiceFeeManagement() {
   const saveRule = (event) => {
     event.preventDefault();
 
-    const isDuplicate = rules.some(r => 
-      r.id !== form.id &&
-      r.productType === form.productType &&
-      r.operation === form.operation &&
-      r.tripType === form.tripType &&
-      (form.productType === "Flight" 
-        ? r.cabinClass === form.cabinClass 
-        : (r.starRating === form.starRating && r.roomCount === Number(form.roomCount || 1)))
-    );
+    const isFlight = form.productType === "Flight";
+    const conditionsToSave = Object.keys(form.fees).filter(c => form.fees[c].enabled && form.fees[c].feeValue !== "");
 
-    if (isDuplicate) {
-      alert("A rule for this scenario already exists. Please edit the existing rule instead.");
+    if (conditionsToSave.length === 0) {
+      alert("Please define a fee for at least one enabled condition.");
       return;
     }
 
     setLoading(true);
 
-    const nextRule = {
-      ...form,
-      ruleName: form.ruleName.trim() || buildRuleName(form),
-      feeValue: Number(form.feeValue || 0),
-      roomCount: form.productType === "Hotel" ? Number(form.roomCount || 1) : "",
-      lastUpdated: new Date().toISOString().slice(0, 10),
-    };
+    const newRules = conditionsToSave.map(condition => {
+      const isEdit = form.id && conditionsToSave.length === 1;
+      const ruleNameAuto = `${form.tripType} ${condition} ${form.productType} ${form.operation}`.trim();
+      return {
+        id: isEdit ? form.id : Date.now() + Math.random(),
+        ruleName: form.ruleName.trim() || ruleNameAuto,
+        productType: form.productType,
+        operation: form.operation,
+        tripType: form.tripType,
+        cabinClass: isFlight ? condition : "",
+        starRating: !isFlight ? condition : "",
+        roomCount: !isFlight ? Number(form.roomCount || 1) : "",
+        feeType: form.fees[condition].feeType,
+        feeValue: Number(form.fees[condition].feeValue || 0),
+        status: form.status,
+        lastUpdated: new Date().toISOString().slice(0, 10),
+      };
+    });
 
     window.setTimeout(() => {
-      setRules((prev) => (
-        nextRule.id
-          ? prev.map((rule) => (rule.id === nextRule.id ? nextRule : rule))
-          : [{ ...nextRule, id: Date.now() }, ...prev]
-      ));
+      setRules((prev) => {
+        let updated = [...prev];
+        if (form.id) {
+          updated = updated.filter(r => r.id !== form.id);
+        }
+        return [...newRules, ...updated];
+      });
       setLoading(false);
       setOpenForm(false);
     }, 250);
@@ -449,13 +472,13 @@ function FilterSelect({ label, value, onChange, options, className = "" }) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
-      <select
+      <CustomDropdown
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus:border-[#003399]"
-      >
-        {options.map((option) => <option key={option} value={option}>{option === "All" ? `All ${label.replace(" Type", "s")}` : option}</option>)}
-      </select>
+        onChange={onChange}
+        options={options}
+        className="w-full px-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 cursor-pointer focus-within:border-[#003399]"
+        formatOption={(opt) => opt === "All" ? `All ${label.replace(" Type", "s")}` : opt}
+      />
     </div>
   );
 }
@@ -492,10 +515,10 @@ function RuleFormModal({ form, loading, onClose, onSubmit, onChange, onProductTy
   const operations = isFlight ? flightOperations : hotelOperations;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <form
         onSubmit={onSubmit}
-        className="h-full w-full lg:w-[700px] bg-white shadow-2xl flex flex-col"
+        className="w-full lg:w-[1200px] max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="px-6 py-5 bg-gradient-to-r from-[#003399] to-[#000d26] text-white flex items-center justify-between">
@@ -513,7 +536,7 @@ function RuleFormModal({ form, loading, onClose, onSubmit, onChange, onProductTy
             <div className="xl:col-span-3 space-y-5">
               <Panel title="Rule Information">
                 <LabeledInput label="Rule Name">
-                  <input value={form.ruleName} onChange={(event) => onChange("ruleName", event.target.value)} placeholder={buildRuleName(form)} className="field-input" />
+                  <input value={form.ruleName} onChange={(event) => onChange("ruleName", event.target.value)} placeholder={`${form.tripType} ${form.productType} ${form.operation}`} className="field-input" />
                 </LabeledInput>
                 <div className="grid grid-cols-2 gap-3">
                   {["Flight", "Hotel"].map((type) => (
@@ -540,35 +563,66 @@ function RuleFormModal({ form, loading, onClose, onSubmit, onChange, onProductTy
                 <SegmentedControl options={["Domestic", "International"]} value={form.tripType} onChange={(value) => onChange("tripType", value)} />
               </Panel>
 
-              <Panel title="Conditional Configuration">
-                {isFlight ? (
-                  <LabeledInput label="Cabin Class">
-                    <select value={form.cabinClass} onChange={(event) => onChange("cabinClass", event.target.value)} className="field-input">
-                      {cabinClasses.map((cabin) => <option key={cabin} value={cabin}>{cabin}</option>)}
-                    </select>
-                  </LabeledInput>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <LabeledInput label="Hotel Star Rating">
-                      <select value={form.starRating} onChange={(event) => onChange("starRating", event.target.value)} className="field-input">
-                        {starRatings.map((rating) => <option key={rating} value={rating}>{rating}</option>)}
-                      </select>
+              <Panel title="Fee Breakdown by Condition">
+                <div className="space-y-4">
+                  {!isFlight && (
+                    <LabeledInput label="Default Room Count">
+                      <input type="number" min="1" value={form.roomCount} onChange={(event) => onChange("roomCount", event.target.value)} className="field-input w-32" />
                     </LabeledInput>
-                    <LabeledInput label="Room Count">
-                      <input type="number" min="1" value={form.roomCount} onChange={(event) => onChange("roomCount", event.target.value)} className="field-input" />
-                    </LabeledInput>
+                  )}
+                  <div className="space-y-3 mt-4">
+                    {(isFlight ? cabinClasses : starRatings).map(condition => {
+                      const feeData = form.fees[condition] || { enabled: false, feeType: "Fixed", feeValue: "" };
+                      return (
+                        <div key={condition} className="flex flex-col xl:flex-row xl:items-center gap-3 p-3 border rounded-xl bg-white shadow-sm">
+                          <label className="flex items-center gap-3 flex-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={feeData.enabled}
+                              onChange={(e) => {
+                                const newFees = { ...form.fees };
+                                newFees[condition] = { ...feeData, enabled: e.target.checked };
+                                onChange("fees", newFees);
+                              }}
+                              className="w-4 h-4 text-[#003399] rounded focus:ring-[#003399]"
+                            />
+                            <span className="text-sm font-black text-slate-700">{condition}</span>
+                          </label>
+                          {feeData.enabled && (
+                            <div className="flex items-center gap-3 w-full xl:w-auto">
+                              <SegmentedControl
+                                options={["Fixed", "Percentage"]}
+                                value={feeData.feeType}
+                                onChange={(val) => {
+                                  const newFees = { ...form.fees };
+                                  newFees[condition] = { ...feeData, feeType: val, feeValue: "" };
+                                  onChange("fees", newFees);
+                                }}
+                              />
+                              <div className="relative w-32 shrink-0">
+                                {feeData.feeType === "Fixed" ? <FaRupeeSign className="absolute left-3 top-1/2 -translate-y-1/2 text-[#003399]" size={12} /> : <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#003399] font-black text-xs">%</span>}
+                                <input
+                                  required
+                                  type="number"
+                                  min="0"
+                                  value={feeData.feeValue}
+                                  onChange={(e) => {
+                                    const newFees = { ...form.fees };
+                                    newFees[condition] = { ...feeData, feeValue: e.target.value };
+                                    onChange("fees", newFees);
+                                  }}
+                                  placeholder={feeData.feeType === "Fixed" ? "250" : "5"}
+                                  className="field-input"
+                                  style={{ paddingLeft: "2.5rem" }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </Panel>
-
-              <Panel title="Fee Configuration">
-                <SegmentedControl options={["Fixed", "Percentage"]} value={form.feeType} onChange={(value) => onChange("feeType", value)} />
-                <LabeledInput label={form.feeType === "Fixed" ? "Fixed Amount" : "Percentage"}>
-                  <div className="relative">
-                    {form.feeType === "Fixed" ? <FaRupeeSign className="absolute left-3 top-1/2 -translate-y-1/2 text-[#003399]" size={12} /> : <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#003399] font-black text-xs">%</span>}
-                    <input required type="number" min="0" value={form.feeValue} onChange={(event) => onChange("feeValue", event.target.value)} placeholder={form.feeType === "Fixed" ? "250" : "5"} className="field-input pl-9" />
-                  </div>
-                </LabeledInput>
+                </div>
               </Panel>
 
               <Panel title="Status">
@@ -602,7 +656,7 @@ function RuleFormModal({ form, loading, onClose, onSubmit, onChange, onProductTy
             color: #1e293b;
             outline: none;
           }
-          .field-input:focus {
+          .field-input:focus, .field-input:focus-within {
             border-color: #003399;
             box-shadow: 0 0 0 3px rgba(0, 51, 153, 0.08);
             background: white;
@@ -656,21 +710,50 @@ function SegmentedControl({ options, value, onChange }) {
 }
 
 function PreviewCard({ form }) {
+  const isFormState = form.fees !== undefined;
+  const isFlight = form.productType === "Flight";
+  const conditions = isFlight ? cabinClasses : starRatings;
+  const enabledConditions = isFormState 
+    ? conditions.filter(c => form.fees && form.fees[c]?.enabled)
+    : [isFlight ? form.cabinClass : form.starRating];
+
+  const getRuleName = () => {
+    if (form.ruleName) return form.ruleName;
+    if (isFormState) return `${form.tripType} ${form.productType} ${form.operation}`;
+    return buildRuleName(form);
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm sticky top-5">
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Rule Summary</p>
       <div className="space-y-3">
         <ProductPill type={form.productType} />
-        <h3 className="text-lg font-black text-slate-800 leading-tight">{form.ruleName || buildRuleName(form)}</h3>
+        <h3 className="text-lg font-black text-slate-800 leading-tight">{getRuleName()}</h3>
         <div className="grid grid-cols-2 gap-3">
           <InfoCell label="Operation" value={form.operation} />
           <InfoCell label="Trip Type" value={form.tripType} />
-          <InfoCell label={form.productType === "Flight" ? "Cabin" : "Star Rating"} value={form.productType === "Flight" ? form.cabinClass : form.starRating} />
         </div>
-        <div className="mt-5 rounded-2xl bg-slate-50 border border-slate-100 p-4">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fee</p>
-          <p className="text-2xl font-black text-[#003399] mt-1">{form.feeType === "Fixed" ? `Rs. ${Number(form.feeValue || 0).toLocaleString()}` : `${Number(form.feeValue || 0)}%`}</p>
-        </div>
+        
+        {enabledConditions.length > 0 && enabledConditions[0] ? (
+          <div className="mt-5 space-y-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fee Breakdown</p>
+            {enabledConditions.map(c => {
+              const feeData = isFormState ? form.fees[c] : form;
+              if (!feeData) return null;
+              const displayFee = feeData.feeType === "Fixed" ? `Rs. ${Number(feeData.feeValue || 0).toLocaleString()}` : `${Number(feeData.feeValue || 0)}%`;
+              return (
+                <div key={c} className="flex justify-between items-center rounded-xl bg-slate-50 border border-slate-100 p-3">
+                  <span className="text-xs font-bold text-slate-600">{c}</span>
+                  <span className="text-sm font-black text-[#003399]">{displayFee}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-2xl bg-slate-50 border border-slate-100 p-4 text-center">
+            <p className="text-xs font-bold text-slate-400">Enable a condition to see fees</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -770,4 +853,54 @@ function formatFee(rule) {
 function buildRuleName(rule) {
   const condition = rule.productType === "Flight" ? rule.cabinClass : rule.starRating;
   return `${rule.tripType} ${condition} ${rule.productType} ${rule.operation}`.trim();
+}
+
+function CustomDropdown({ value, onChange, options, className = "", formatOption = null }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const displayValue = formatOption ? formatOption(value) : value;
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between w-full text-left transition-colors ${className}`}
+      >
+        <span className="truncate">{displayValue}</span>
+        <FiChevronDown className={`shrink-0 ml-2 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1.5 bg-white border border-slate-100 rounded-xl shadow-lg max-h-60 overflow-y-auto py-1">
+          {options.map((option) => {
+            const optVal = option.value !== undefined ? option.value : option;
+            const optLabel = formatOption ? formatOption(optVal) : (option.label !== undefined ? option.label : option);
+            return (
+              <div
+                key={optVal}
+                className={`px-3 py-2 cursor-pointer text-sm transition-colors ${value === optVal ? "bg-[#003399]/5 font-black text-[#003399]" : "text-slate-600 font-bold hover:bg-slate-50"}`}
+                onClick={() => {
+                  onChange(optVal);
+                  setIsOpen(false);
+                }}
+              >
+                {optLabel}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }

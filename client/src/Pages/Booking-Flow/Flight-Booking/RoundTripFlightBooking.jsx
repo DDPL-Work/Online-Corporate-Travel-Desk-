@@ -159,8 +159,6 @@ export default function RoundTripFlightBooking() {
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired =
-    !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   const traceId = location.state?.traceId || localState?.traceId || reduxTraceId || null;
 
@@ -224,19 +222,19 @@ export default function RoundTripFlightBooking() {
   };
 
   const isRTSSRReady = useMemo(() => {
-    if (ssrLoading) return { onward: "loading", return: "loading" };
-
-    const checkSSR = (leg) => {
-      const data = ssrData?.[leg];
-      const hasSeats = (data?.seats?.length || 0) > 0;
-      const hasMeals = (data?.meals?.length || 0) > 0;
-      const hasBaggage = (data?.baggage?.length || 0) > 0;
-      return hasSeats || hasMeals || hasBaggage;
-    };
-
     return {
-      onward: checkSSR("onward") ? true : "none",
-      return: checkSSR("return") ? true : "none",
+      onward: (idx) => {
+        if (ssrLoading) return "loading";
+        const hasSeats = (ssrData?.onward?.seats?.[idx]?.seats?.length || 0) > 0;
+        if (!hasSeats) return "none";
+        return true;
+      },
+      return: (idx) => {
+        if (ssrLoading) return "loading";
+        const hasSeats = (ssrData?.return?.seats?.[idx]?.seats?.length || 0) > 0;
+        if (!hasSeats) return "none";
+        return true;
+      },
     };
   }, [ssrLoading, ssrData]);
 
@@ -749,10 +747,10 @@ export default function RoundTripFlightBooking() {
 
     const normalizedSSRForJourney = ssrData?.[ssrJourneyType];
 
-    if (isRTSSRReady[ssrJourneyType] === "none") {
+    if (isRTSSRReady[ssrJourneyType](segmentIndex) !== true) {
       ToastWithTimer({
         type: "info",
-        message: `No add-ons (Seats/Meals/Baggage) available for the ${journeyType} flight.`,
+        message: `No add-ons (Seats/Meals/Baggage) available for this flight segment.`,
       });
       return;
     }
@@ -973,6 +971,47 @@ export default function RoundTripFlightBooking() {
   );
 
   const totalPayableAmount = Math.ceil(uiTotalFare) + calculateSSRTotal();
+
+  const isAutoApprove = myPolicy?.approvalRequired === false;
+
+  let applicableLimit = 0;
+  let isUnlimitedLimit = true;
+  if (myPolicy?.flightLimits?.length) {
+    const isIntl =
+      rawFlightData?.onward?.Segments?.[0]?.[0]?.Origin?.Airport?.CountryCode !== "IN" ||
+      rawFlightData?.onward?.Segments?.[0]?.[0]?.Destination?.Airport?.CountryCode !== "IN" ||
+      rawFlightData?.return?.Segments?.[0]?.[0]?.Origin?.Airport?.CountryCode !== "IN" ||
+      rawFlightData?.return?.Segments?.[0]?.[0]?.Destination?.Airport?.CountryCode !== "IN" ||
+      rawFlightData?.Segments?.some((leg) =>
+        leg.some(
+          (s) =>
+            s?.Origin?.Airport?.CountryCode !== "IN" ||
+            s?.Destination?.Airport?.CountryCode !== "IN"
+        )
+      ) ||
+      selectedFlight?.Segments?.some((leg) =>
+        leg.some(
+          (s) =>
+            s?.Origin?.Airport?.CountryCode !== "IN" ||
+            s?.Destination?.Airport?.CountryCode !== "IN"
+        )
+      );
+    const loc = isIntl ? "International" : "Domestic";
+    
+    const rawCabin = rawFlightData?.onward?.Segments?.[0]?.[0]?.CabinClass || 
+                     rawFlightData?.Segments?.[0]?.[0]?.CabinClass || 
+                     selectedFlight?.Segments?.[0]?.[0]?.CabinClass || 2;
+    const cabinNum = Number(rawCabin) || 2;
+    
+    const limitObj = myPolicy.flightLimits.find(l => l.location === loc && l.cabinClass === cabinNum);
+    if (limitObj) {
+      applicableLimit = limitObj.limit;
+      isUnlimitedLimit = limitObj.isUnlimited !== false;
+    }
+  }
+
+  const isOverLimit = isAutoApprove && !isUnlimitedLimit && applicableLimit > 0 && totalPayableAmount > applicableLimit;
+  const approvalRequired = !isTravelAdmin && (!isAutoApprove || isOverLimit);
 
   const buildMealSSR = () => {
     const meals = [];
@@ -1550,7 +1589,8 @@ export default function RoundTripFlightBooking() {
         });
       } else {
         // ✅ Traditional approval workflow
-        if (!isTravelAdmin) {
+        const isApproverTravelAdmin = projectApproverData.approver?.role === "travel-admin";
+        if (!isTravelAdmin && !isApproverTravelAdmin) {
           await dispatch(
             selectManager({
               approverId: projectApproverData.approver?.id,
@@ -2031,7 +2071,7 @@ export default function RoundTripFlightBooking() {
           {/* RIGHT SIDEBAR */}
           <div className="lg:col-span-1">
             <div className="sticky top-6 space-y-6">
-              <ProjectApproverBlock onChange={setProjectApproverData} />
+              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} />
               <PriceSummary
                 parsedFlightData={{
                   baseFare: uiTotalFare,

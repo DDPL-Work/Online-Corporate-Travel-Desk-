@@ -136,18 +136,31 @@ export default function OnboardedCorporates() {
     });
   };
 
+  const mappedCorporates = useMemo(() => {
+    return (corporates || []).map((c) => {
+      if (c.status === "pending") {
+        const createdAt = new Date(c.createdAt || Date.now());
+        const diffInDays = (Date.now() - createdAt.getTime()) / (1000 * 3600 * 24);
+        if (diffInDays > 7) {
+          return { ...c, status: "expired" };
+        }
+      }
+      return c;
+    });
+  }, [corporates]);
+
   const stats = useMemo(() => {
-    const all = corporates || [];
+    const all = mappedCorporates;
     return {
       total: all.length,
       active: all.filter((c) => c.status === "active").length,
       pending: all.filter((c) => c.status === "pending").length,
       postpaid: all.filter((c) => c.classification === "postpaid").length,
     };
-  }, [corporates]);
+  }, [mappedCorporates]);
 
   const filtered = useMemo(() => {
-    let list = corporates || [];
+    let list = mappedCorporates;
     if (filter !== "all") list = list.filter((c) => c.status === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -162,7 +175,7 @@ export default function OnboardedCorporates() {
     }
     if (dateFilter) {
       list = list.filter((c) => {
-        const dateToCheck = c.status === "pending" ? c.createdAt : (c.onboardDate || c.updatedAt || c.createdAt);
+        const dateToCheck = c.status === "pending" || c.status === "expired" ? c.createdAt : (c.onboardDate || c.updatedAt || c.createdAt);
         if (!dateToCheck) return false;
         const d = new Date(dateToCheck);
         if (isNaN(d.getTime())) return false;
@@ -170,7 +183,7 @@ export default function OnboardedCorporates() {
       });
     }
     return list;
-  }, [corporates, filter, search, dateFilter]);
+  }, [mappedCorporates, filter, search, dateFilter]);
 
   const handleRefresh = () => dispatch(fetchCorporates());
 
@@ -252,6 +265,7 @@ export default function OnboardedCorporates() {
                 <option value="active">Active</option>
                 <option value="pending">Pending</option>
                 <option value="suspended">Suspended</option>
+                <option value="expired">Expired</option>
               </select>
             </div>
 
@@ -388,7 +402,7 @@ export default function OnboardedCorporates() {
                           >
                             <FiEye size={16} />
                           </button>
-                          {c.status !== "pending" && (
+                          {(c.status !== "pending" && c.status !== "expired") && (
                             <button
                               onClick={() => {
                                 navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });

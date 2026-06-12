@@ -867,7 +867,7 @@ exports.getManagerRequests = async (req, res) => {
     }
 
     // 🔒 2. FETCH ONLY SAME CORPORATE DATA
-    const requests = await ManagerRequest.find({
+    let requests = await ManagerRequest.find({
       corporateId: req.user.corporateId,
     })
       .populate({
@@ -879,6 +879,20 @@ exports.getManagerRequests = async (req, res) => {
         select: "email name role isTempManager",
       })
       .sort({ createdAt: -1 });
+
+    // 🔥 Expiry check (72 hours)
+    const now = Date.now();
+    const expiryMs = 72 * 60 * 60 * 1000;
+    
+    for (let i = 0; i < requests.length; i++) {
+      if (requests[i].status === "pending") {
+        const timeDiff = now - new Date(requests[i].createdAt).getTime();
+        if (timeDiff > expiryMs) {
+          requests[i].status = "expired";
+          await ManagerRequest.findByIdAndUpdate(requests[i]._id, { status: "expired" });
+        }
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -924,11 +938,11 @@ exports.reviewManagerRequest = async (req, res) => {
       });
     }
 
-    // 🔒 3. PREVENT DOUBLE ACTION
+    // 🔒 3. PREVENT DOUBLE ACTION OR EXPIRED ACTION
     if (request.status !== "pending") {
       return res.status(400).json({
         success: false,
-        message: "Request already processed",
+        message: request.status === "expired" ? "Request has expired" : "Request already processed",
       });
     }
 
@@ -996,14 +1010,6 @@ exports.reviewManagerRequest = async (req, res) => {
       name: _reviewedUserName,
       action,
       relatedId: request._id,
-    });
-
-    // ── Notify Travel Admin of the completed review ──────────
-    notify(EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL, {
-      corporateId: request.corporateId,
-      employeeName: request.employeeId?.name || _reviewedUserName,
-      managerName: request.managerName,
-      managerEmail: request.managerEmail,
     });
 
     return res.json({

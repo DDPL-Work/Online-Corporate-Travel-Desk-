@@ -60,8 +60,6 @@ export default function MultiCityFlightBooking() {
   const { myProfile } = useSelector((state) => state.employeeAction || {});
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired =
-    !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   useEffect(() => {
     if (user?.role === "employee" || user?.role === "manager" || user?.role === "travel-admin" || user?.role === "finance_team") {
@@ -526,6 +524,31 @@ export default function MultiCityFlightBooking() {
     return total;
   };
 
+  const grandTotal =
+    perAdultFare.base * travelers.length +
+    perAdultFare.tax * travelers.length +
+    calculateSSRTotal();
+
+  const isAutoApprove = myPolicy?.approvalRequired === false;
+
+  let applicableLimit = 0;
+  let isUnlimitedLimit = true;
+  if (myPolicy?.flightLimits?.length && parsedFlightData?.segments?.length > 0) {
+    const isIntl = parsedFlightData.segments.some(
+      (s) => s?.da?.countryCode !== "IN" || s?.aa?.countryCode !== "IN"
+    );
+    const loc = isIntl ? "International" : "Domestic";
+    const cabinNum = Number(parsedFlightData.segments[0]?.cabinClass) || 2;
+    const limitObj = myPolicy.flightLimits.find(l => l.location === loc && l.cabinClass === cabinNum);
+    if (limitObj) {
+      applicableLimit = limitObj.limit;
+      isUnlimitedLimit = limitObj.isUnlimited !== false;
+    }
+  }
+
+  const isOverLimit = isAutoApprove && !isUnlimitedLimit && applicableLimit > 0 && grandTotal > applicableLimit;
+  const approvalRequired = !isTravelAdmin && (!isAutoApprove || isOverLimit);
+
   const fullSegments =
     rawFlightData?.Segments?.flat()?.map((s, index) => ({
       segmentIndex: index,
@@ -807,10 +830,7 @@ export default function MultiCityFlightBooking() {
       // passportNumber validation: only if flight is international
       const isInternational = Boolean(
         parsedFlightData?.segments?.some(
-          (s) =>
-            s?.origin?.country &&
-            s?.destination?.country &&
-            s.origin.country !== s.destination.country,
+          (s) => s?.da?.countryCode !== "IN" || s?.aa?.countryCode !== "IN"
         ),
       );
 
@@ -1287,7 +1307,7 @@ export default function MultiCityFlightBooking() {
           {/* RIGHT */}
           <div className="space-y-6">
             <div className="sticky top-6 space-y-6">
-              <ProjectApproverBlock onChange={setProjectApproverData} />
+              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} />
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,

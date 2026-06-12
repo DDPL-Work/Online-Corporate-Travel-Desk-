@@ -128,11 +128,48 @@ exports.getHotels = asyncHandler(async (req, res) => {
     }
 
     if (search && search.trim() !== "") {
-        const regex = new RegExp(search.trim(), "i");
+        const searchTerm = search.trim();
+        const terms = searchTerm.split(/\s+/);
+
+        const exactRegex = new RegExp(searchTerm, "i");
+
+        const fuzzyPattern = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*');
+        const fuzzyRegex = new RegExp(fuzzyPattern, "i");
+
+        const andConditions = terms.map(term => {
+            const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            
+            // Instead of scattered individual characters, require at least 3 continuous characters to match
+            let continuousChunks = [];
+            if (escapedTerm.length >= 3) {
+                for (let i = 0; i <= escapedTerm.length - 3; i++) {
+                    continuousChunks.push(escapedTerm.substring(i, i + 3));
+                }
+            }
+            
+            const matchPattern = continuousChunks.length > 0 
+                ? `(${continuousChunks.join('|')})` 
+                : escapedTerm;
+                
+            const regex = new RegExp(matchPattern, "i");
+
+            return {
+                $or: [
+                    { hotelName: { $regex: regex } },
+                    { hotelCode: { $regex: regex } },
+                    { cityName: { $regex: regex } },
+                ]
+            };
+        });
+
         filter.$or = [
-            { hotelName: { $regex: regex } },
-            { hotelCode: { $regex: regex } },
-            { cityName: { $regex: regex } },
+            { hotelName: { $regex: exactRegex } },
+            { hotelCode: { $regex: exactRegex } },
+            { cityName: { $regex: exactRegex } },
+            { hotelName: { $regex: fuzzyRegex } },
+            { hotelCode: { $regex: fuzzyRegex } },
+            { cityName: { $regex: fuzzyRegex } },
+            { $and: andConditions }
         ];
     }
 

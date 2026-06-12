@@ -75,11 +75,11 @@ export default function CorporateMarkupConfiguration() {
     switch (cat) {
       case "Airline Wise": return { ...base, airline: "", airlineSearchTerm: "" };
       case "Cabin Wise": return { ...base, cabinClass: "" };
-      case "Sector Wise": return { ...base, origin: "", originSearchTerm: "", destination: "", destinationSearchTerm: "" };
+      case "Sector Wise": return { ...base, origin: "", originSearchTerm: "", destination: "", destinationSearchTerm: "", cabinClass: "" };
       case "Country Wise": return { ...base, country: "", countrySearchTerm: "" };
       case "City Wise": return { ...base, city: "", citySearchTerm: "" };
       case "Hotel Wise": return { ...base, hotelCityCode: "", hotelCitySearchTerm: "", hotel: "", hotelSearchTerm: "" };
-      case "Star Rating Wise": return { ...base, starRating: "" };
+      case "Star Rating Wise": return { ...base, starRating: "", locationLevel: "None", countrySearchTerm: "", citySearchTerm: "", country: "", city: "" };
       case "Fare Slab Based": return { fareSlabs: [{ from: "", to: "", value: "", method: "fixed" }] };
       default: return { ...base };
     }
@@ -173,7 +173,8 @@ export default function CorporateMarkupConfiguration() {
 
   // Debounced Country Search
   useEffect(() => {
-    if (activeCategory === "Country Wise" && activeRule?.countrySearchTerm !== undefined && activeDropdown?.type === 'country') {
+    if ((activeCategory === "Country Wise" && activeRule?.countrySearchTerm !== undefined && activeDropdown?.type === 'country') ||
+        (activeCategory === "Star Rating Wise" && activeRule?.countrySearchTerm !== undefined && activeDropdown?.type === 'country_star')) {
       const delayFn = setTimeout(() => {
         dispatch(fetchCountries({ search: activeRule.countrySearchTerm, limit: 100 }));
       }, 500);
@@ -183,7 +184,8 @@ export default function CorporateMarkupConfiguration() {
 
   // Debounced City Search
   useEffect(() => {
-    if (activeCategory === "City Wise" && activeRule?.citySearchTerm !== undefined && activeDropdown?.type === 'city') {
+    if ((activeCategory === "City Wise" && activeRule?.citySearchTerm !== undefined && activeDropdown?.type === 'city') ||
+        (activeCategory === "Star Rating Wise" && activeRule?.citySearchTerm !== undefined && activeDropdown?.type === 'city_star')) {
       const delayFn = setTimeout(() => {
         dispatch(fetchCities({ search: activeRule.citySearchTerm, limit: 100 }));
       }, 500);
@@ -278,6 +280,7 @@ export default function CorporateMarkupConfiguration() {
                   if (c.hotelStarRating) initialRule.hotelStarRating = c.hotelStarRating;
                 }
                 if (c.starRating) initialRule.starRating = c.starRating;
+                if (c.locationLevel) initialRule.locationLevel = c.locationLevel;
                 
                 newMap[cat].push(initialRule);
               });
@@ -364,6 +367,10 @@ export default function CorporateMarkupConfiguration() {
         }
         if (cat === "Cabin Wise") criteria.cabinClass = rule.cabinClass;
         if (cat === "Sector Wise") {
+          if (!rule.origin || !rule.destination || !rule.cabinClass) {
+            toast.error("Please fill Origin, Destination, and Cabin Class for Sector Wise rule");
+            return;
+          }
           criteria.origin = rule.origin;
           if (rule.originName) criteria.originName = rule.originName;
           if (rule.originCity) criteria.originCity = rule.originCity;
@@ -371,6 +378,8 @@ export default function CorporateMarkupConfiguration() {
           criteria.destination = rule.destination;
           if (rule.destinationName) criteria.destinationName = rule.destinationName;
           if (rule.destinationCity) criteria.destinationCity = rule.destinationCity;
+
+          criteria.cabinClass = rule.cabinClass;
         }
         if (cat === "Country Wise") {
           criteria.country = rule.country;
@@ -391,7 +400,26 @@ export default function CorporateMarkupConfiguration() {
           if (rule.hotelCountryCode) criteria.hotelCountryCode = rule.hotelCountryCode;
           if (rule.hotelStarRating) criteria.hotelStarRating = rule.hotelStarRating;
         }
-        if (cat === "Star Rating Wise") criteria.starRating = rule.starRating;
+        if (cat === "Star Rating Wise") {
+          criteria.starRating = rule.starRating;
+          criteria.locationLevel = rule.locationLevel || "None";
+          if (criteria.locationLevel === "Country" || criteria.locationLevel === "City") {
+            if (!rule.country) {
+              toast.error(`Please select a country for Star Rating Wise rule`);
+              return;
+            }
+            criteria.country = rule.country;
+            criteria.countryName = rule.countryName;
+          }
+          if (criteria.locationLevel === "City") {
+            if (!rule.city) {
+              toast.error(`Please select a city for Star Rating Wise rule`);
+              return;
+            }
+            criteria.city = rule.city;
+            criteria.cityName = rule.cityName;
+          }
+        }
 
         finalRules.push({
           category: cat,
@@ -556,7 +584,7 @@ export default function CorporateMarkupConfiguration() {
                     type="text"
                     readOnly
                     value={slab.method === "percentage" ? "Percentage (%)" : "Fixed Amount (₹)"}
-                    onFocus={() => setActiveDropdown({ type: 'fareSlabMethod', index })}
+                    onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'fareSlabMethod', index }); }} onFocus={() => setActiveDropdown({ type: 'fareSlabMethod', index })}
                     onBlur={() => setTimeout(() => { if (activeDropdown?.type === 'fareSlabMethod' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
                   />
@@ -628,7 +656,7 @@ export default function CorporateMarkupConfiguration() {
     }
 
     const getCategoryColSpan = () => {
-      if (["Hotel Wise", "Sector Wise", "Seasonal Markup", "Fare Slab Based"].includes(activeCategory)) {
+      if (["Hotel Wise", "Sector Wise", "Seasonal Markup", "Fare Slab Based", "Star Rating Wise"].includes(activeCategory)) {
         return "md:col-span-6";
       }
       return "md:col-span-4";
@@ -664,7 +692,7 @@ export default function CorporateMarkupConfiguration() {
                           <input
                             type="text"
                             value={rule.airlineSearchTerm || ""}
-                            onFocus={() => setActiveDropdown({ type: 'airline', index })}
+                            onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'airline', index }); }} onFocus={() => setActiveDropdown({ type: 'airline', index })}
                             onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'airline' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                             onChange={(e) => {
                               updateRule(index, 'airlineSearchTerm', e.target.value);
@@ -721,7 +749,7 @@ export default function CorporateMarkupConfiguration() {
                               rule.cabinClass === 5 ? "Premium Business" :
                               rule.cabinClass === 6 ? "First Class" : ""
                             }
-                            onFocus={() => setActiveDropdown({ type: 'cabin', index })}
+                            onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'cabin', index }); }} onFocus={() => setActiveDropdown({ type: 'cabin', index })}
                             onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'cabin' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                             className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
                             placeholder="Select Cabin..."
@@ -757,7 +785,7 @@ export default function CorporateMarkupConfiguration() {
                     );
                   case "Sector Wise":
                     return (
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Origin */}
                         <div className="space-y-2 relative">
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Origin</label>
@@ -765,7 +793,7 @@ export default function CorporateMarkupConfiguration() {
                             <input
                               type="text"
                               value={rule.originSearchTerm || ""}
-                              onFocus={() => setActiveDropdown({ type: 'origin', index })}
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'origin', index }); }} onFocus={() => setActiveDropdown({ type: 'origin', index })}
                               onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'origin' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                               onChange={(e) => {
                                 updateRule(index, 'originSearchTerm', e.target.value);
@@ -808,7 +836,7 @@ export default function CorporateMarkupConfiguration() {
                             <input
                               type="text"
                               value={rule.destinationSearchTerm || ""}
-                              onFocus={() => setActiveDropdown({ type: 'destination', index })}
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'destination', index }); }} onFocus={() => setActiveDropdown({ type: 'destination', index })}
                               onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'destination' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                               onChange={(e) => {
                                 updateRule(index, 'destinationSearchTerm', e.target.value);
@@ -844,6 +872,53 @@ export default function CorporateMarkupConfiguration() {
                             )}
                           </div>
                         </div>
+                        {/* Cabin Class */}
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cabin Class</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              readOnly
+                              value={
+                                rule.cabinClass === 2 ? "Economy" :
+                                rule.cabinClass === 3 ? "Premium Economy" :
+                                rule.cabinClass === 4 ? "Business" :
+                                rule.cabinClass === 5 ? "Premium Business" :
+                                rule.cabinClass === 6 ? "First Class" : ""
+                              }
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'sector_cabin', index }); }} onFocus={() => setActiveDropdown({ type: 'sector_cabin', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'sector_cabin' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
+                              placeholder="Select Cabin..."
+                            />
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                              {activeDropdown?.type === 'sector_cabin' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                            </div>
+                            {activeDropdown?.type === 'sector_cabin' && activeDropdown?.index === index && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
+                                {[
+                                  { value: 2, label: "Economy" },
+                                  { value: 3, label: "Premium Economy" },
+                                  { value: 4, label: "Business" },
+                                  { value: 5, label: "Premium Business" },
+                                  { value: 6, label: "First Class" }
+                                ].map((c) => (
+                                  <li
+                                    key={c.value}
+                                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      updateRule(index, 'cabinClass', c.value);
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    {c.label}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     );
                   case "Country Wise":
@@ -854,7 +929,7 @@ export default function CorporateMarkupConfiguration() {
                           <input
                             type="text"
                             value={rule.countrySearchTerm || ""}
-                            onFocus={() => setActiveDropdown({ type: 'country', index })}
+                            onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'country', index }); }} onFocus={() => setActiveDropdown({ type: 'country', index })}
                             onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'country' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                             onChange={(e) => {
                               updateRule(index, 'countrySearchTerm', e.target.value);
@@ -897,7 +972,7 @@ export default function CorporateMarkupConfiguration() {
                           <input
                             type="text"
                             value={rule.citySearchTerm || ""}
-                            onFocus={() => setActiveDropdown({ type: 'city', index })}
+                            onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'city', index }); }} onFocus={() => setActiveDropdown({ type: 'city', index })}
                             onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'city' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                             onChange={(e) => {
                               updateRule(index, 'citySearchTerm', e.target.value);
@@ -942,7 +1017,7 @@ export default function CorporateMarkupConfiguration() {
                             <input
                               type="text"
                               value={rule.hotelCitySearchTerm || ""}
-                              onFocus={() => setActiveDropdown({ type: 'hotelCity', index })}
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'hotelCity', index }); }} onFocus={() => setActiveDropdown({ type: 'hotelCity', index })}
                               onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'hotelCity' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                               onChange={(e) => {
                                 updateRule(index, 'hotelCitySearchTerm', e.target.value);
@@ -981,7 +1056,7 @@ export default function CorporateMarkupConfiguration() {
                             <input
                               type="text"
                               value={rule.hotelSearchTerm || ""}
-                              onFocus={() => setActiveDropdown({ type: 'hotel', index })}
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'hotel', index }); }} onFocus={() => setActiveDropdown({ type: 'hotel', index })}
                               onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'hotel' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                               onChange={(e) => {
                                 updateRule(index, 'hotelSearchTerm', e.target.value);
@@ -1023,40 +1098,189 @@ export default function CorporateMarkupConfiguration() {
                     );
                   case "Star Rating Wise":
                     return (
-                      <div className="space-y-2 relative">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Star Rating</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            readOnly
-                            value={rule.starRating ? `${rule.starRating} Star` : ""}
-                            onFocus={() => setActiveDropdown({ type: 'starRating', index })}
-                            onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'starRating' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
-                            placeholder="-- Select Star Rating --"
-                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
-                          />
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
-                            {activeDropdown?.type === 'starRating' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                      <div className={`grid grid-cols-1 ${
+                        rule.locationLevel === "None" ? "md:grid-cols-2" : "md:grid-cols-3"
+                      } gap-4`}>
+                        {/* 1. Location Filter */}
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest truncate">Location</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              readOnly
+                              value={
+                                rule.locationLevel === "Country" ? "Country" :
+                                rule.locationLevel === "City" ? "City" : "Any"
+                              }
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'locationLevel', index }); }} onFocus={() => setActiveDropdown({ type: 'locationLevel', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'locationLevel' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                              {activeDropdown?.type === 'locationLevel' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                            </div>
+                            {activeDropdown?.type === 'locationLevel' && activeDropdown?.index === index && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60]">
+                                {[
+                                  { value: "None", label: "Any" },
+                                  { value: "Country", label: "Country" },
+                                  { value: "City", label: "City" }
+                                ].map((loc) => (
+                                  <li
+                                    key={loc.value}
+                                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      updateRule(index, 'locationLevel', loc.value);
+                                      if (loc.value === "None") {
+                                         updateRule(index, 'countrySearchTerm', "");
+                                         updateRule(index, 'country', "");
+                                         updateRule(index, 'countryName', "");
+                                         updateRule(index, 'citySearchTerm', "");
+                                         updateRule(index, 'city', "");
+                                         updateRule(index, 'cityName', "");
+                                      } else if (loc.value === "Country") {
+                                         updateRule(index, 'citySearchTerm', "");
+                                         updateRule(index, 'city', "");
+                                         updateRule(index, 'cityName', "");
+                                      }
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    {loc.label}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
-                          {activeDropdown?.type === 'starRating' && activeDropdown?.index === index && (
-                            <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60]">
-                              {[1, 2, 3, 4, 5].map((stars) => (
-                                <li
-                                  key={`star-${stars}`}
-                                  className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-2"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    updateRule(index, 'starRating', stars);
-                                    setActiveDropdown(null);
-                                  }}
-                                >
-                                  <span className="text-amber-400">{"★".repeat(stars)}</span>
-                                  <span className="text-slate-300">{"★".repeat(5 - stars)}</span>
-                                  <span className="ml-2">{stars} Star</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
+                        </div>
+
+                        {/* 2. Country */}
+                        {rule.locationLevel === "Country" && (
+                          <div className="space-y-2 relative">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest truncate">Country</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={rule.countrySearchTerm || ""}
+                                onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'country_star', index }); }} onFocus={() => setActiveDropdown({ type: 'country_star', index })}
+                                onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'country_star' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                                onChange={(e) => {
+                                  updateRule(index, 'countrySearchTerm', e.target.value);
+                                  updateRule(index, 'country', e.target.value);
+                                  setActiveDropdown({ type: 'country_star', index });
+                                }}
+                                placeholder="Country..."
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                              />
+                              {activeDropdown?.type === 'country_star' && activeDropdown?.index === index && countries && countries.length > 0 && (
+                                <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60] min-w-[200px]">
+                                  {countries.map((c) => {
+                                    const displayStr = `${c.Code} - ${c.Name}`;
+                                    return (
+                                      <li
+                                        key={c._id || c.Code}
+                                        className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          updateRule(index, 'countrySearchTerm', displayStr);
+                                          updateRule(index, 'country', c.Code);
+                                          updateRule(index, 'countryName', c.Name);
+                                          setActiveDropdown(null);
+                                        }}
+                                      >
+                                        {displayStr}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 3. City */}
+                        {rule.locationLevel === "City" && (
+                          <div className="space-y-2 relative">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest truncate">City</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={rule.citySearchTerm || ""}
+                                onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'city_star', index }); }} onFocus={() => setActiveDropdown({ type: 'city_star', index })}
+                                onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'city_star' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                                onChange={(e) => {
+                                  updateRule(index, 'citySearchTerm', e.target.value);
+                                  updateRule(index, 'city', e.target.value);
+                                  setActiveDropdown({ type: 'city_star', index });
+                                }}
+                                placeholder="City..."
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white"
+                              />
+                              {activeDropdown?.type === 'city_star' && activeDropdown?.index === index && cities && cities.length > 0 && (
+                                <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60] min-w-[200px] right-0">
+                                  {cities.map((c) => {
+                                    const displayStr = `${c.cityName} (${c.cityCode}) - ${c.countryName}`;
+                                    return (
+                                      <li
+                                        key={c._id || c.cityCode}
+                                        className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          updateRule(index, 'citySearchTerm', displayStr);
+                                          updateRule(index, 'city', c.cityCode);
+                                          updateRule(index, 'cityName', c.cityName);
+                                          updateRule(index, 'countryName', c.countryName);
+                                          updateRule(index, 'countrySearchTerm', `${c.countryCode} - ${c.countryName}`);
+                                          updateRule(index, 'country', c.countryCode);
+                                          setActiveDropdown(null);
+                                        }}
+                                      >
+                                        {displayStr}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 4. Star Rating */}
+                        <div className="space-y-2 relative">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest truncate">Star Rating</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              readOnly
+                              value={rule.starRating ? `${rule.starRating} Star` : ""}
+                              onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'starRating', index }); }} onFocus={() => setActiveDropdown({ type: 'starRating', index })}
+                              onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'starRating' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
+                              placeholder="Rating"
+                              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                              {activeDropdown?.type === 'starRating' && activeDropdown?.index === index ? <FaChevronUp /> : <FaChevronDown />}
+                            </div>
+                            {activeDropdown?.type === 'starRating' && activeDropdown?.index === index && (
+                              <ul className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-[60] min-w-[150px] right-0">
+                                {[1, 2, 3, 4, 5].map((stars) => (
+                                  <li
+                                    key={`star-${stars}`}
+                                    className="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium border-b border-slate-100 last:border-0 flex items-center gap-2"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      updateRule(index, 'starRating', stars);
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    <span className="text-amber-400">{"★".repeat(stars)}</span>
+                                    <span className="text-slate-300">{"★".repeat(5 - stars)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1084,7 +1308,7 @@ export default function CorporateMarkupConfiguration() {
                   type="text"
                   readOnly
                   value={(rule.method || 'percentage') === 'percentage' ? 'Percentage (%)' : 'Fixed Amount (₹)'}
-                  onFocus={() => setActiveDropdown({ type: 'method', index })}
+                  onClick={(e) => { e.target.select(); setActiveDropdown({ type: 'method', index }); }} onFocus={() => setActiveDropdown({ type: 'method', index })}
                   onBlur={() => setTimeout(() => { if(activeDropdown?.type === 'method' && activeDropdown?.index === index) setActiveDropdown(null); }, 200)}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-[#003399] bg-white cursor-pointer"
                 />

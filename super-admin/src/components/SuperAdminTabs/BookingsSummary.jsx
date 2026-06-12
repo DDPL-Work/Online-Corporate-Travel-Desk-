@@ -370,7 +370,10 @@ export default function GlobalBookingsDashboard() {
         b.paymentId?.toLowerCase().includes(searchText) ||
         b.empId?.toLowerCase().includes(searchText) ||
         b.bookingRef?.toLowerCase?.().includes(searchText) ||
-        formatDisplayDateTime(b.bookedDate).toLowerCase().includes(searchText);
+        b.corporate?.toLowerCase().includes(searchText) ||
+        b.pnr?.toLowerCase().includes(searchText) ||
+        formatDisplayDateTime(b.bookedDate).toLowerCase().includes(searchText) ||
+        formatDisplayDate(b.bookedDate).toLowerCase().includes(searchText);
 
       let dateMatch = true;
       if (activeTab === "Flight" && travelDate) {

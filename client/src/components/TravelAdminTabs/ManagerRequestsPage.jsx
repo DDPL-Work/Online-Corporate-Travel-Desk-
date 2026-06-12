@@ -235,7 +235,8 @@ const ManagerRequestsPage = () => {
                 { label: "All Requests", value: "all" },
                 { label: "Pending Verification", value: "pending" },
                 { label: "Approved Approvers", value: "approved" },
-                { label: "Rejected Requests", value: "rejected" }
+                { label: "Rejected Requests", value: "rejected" },
+                { label: "Expired Requests", value: "expired" }
               ]} />
             </LabeledField>
             <div className="flex items-end lg:col-span-3">
@@ -350,8 +351,8 @@ const ManagerRequestsPage = () => {
                           </div>
                        ) : (
                           <div className="flex justify-center">
-                             <div className={`p-2 rounded-lg border flex items-center justify-center ${req.status === "approved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"}`}>
-                                {req.status === "approved" ? <MdVerifiedUser size={16} /> : <FiXCircle size={16} />}
+                             <div className={`p-2 rounded-lg border flex items-center justify-center ${req.status === "approved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : req.status === "expired" ? "bg-slate-50 text-slate-500 border-slate-200" : "bg-red-50 text-red-600 border-red-100"}`}>
+                                {req.status === "approved" ? <MdVerifiedUser size={16} /> : req.status === "expired" ? <FiClock size={16} /> : <FiXCircle size={16} />}
                              </div>
                           </div>
                        )}

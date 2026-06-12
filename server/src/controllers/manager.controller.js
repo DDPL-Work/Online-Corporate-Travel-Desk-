@@ -3,6 +3,8 @@ const Employee = require('../models/Employee');
 const ManagerRequest = require('../models/ManagerRequest');
 const HotelBookingRequest = require('../models/hotelBookingRequest.model');
 const BookingRequest = require('../models/BookingRequest');
+const { notify } = require('../notifications/orchestrator');
+const EVENTS = require('../events/eventConstants');
 
 exports.handleManagerSelection = async (req, res) => {
   try {
@@ -184,6 +186,13 @@ exports.handleManagerSelection = async (req, res) => {
       orderId,
 
       corporateId: req.user.corporateId,
+    });
+
+    notify(EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL, {
+      corporateId: req.user.corporateId,
+      employeeName,
+      managerName: `${managerUser.name.firstName} ${managerUser.name.lastName}`.trim(),
+      managerEmail: managerUser.email,
     });
 
     return res.json({

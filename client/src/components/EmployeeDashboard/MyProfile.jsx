@@ -99,6 +99,10 @@ export default function MyProfile() {
 
   const updateField = (key, value) => setLocalProfile((prev) => ({ ...prev, [key]: value }));
 
+  const handleRefresh = () => {
+    dispatch(fetchMyProfile());
+  };
+
   const handleSave = async () => {
     const fullName = `${localProfile.firstName || ""} ${localProfile.lastName || ""}`.trim();
     const payload = {
@@ -166,9 +170,9 @@ export default function MyProfile() {
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => navigate(-1)} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
-               <div className={`p-3 rounded-xl bg-white/10 border border-white/10 ${loading ? "animate-spin" : ""}`}>
-                  <FiRefreshCw size={20} />
-               </div>
+               <button onClick={handleRefresh} disabled={loading} className={`p-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <FiRefreshCw size={20} className={loading ? "animate-spin" : ""} />
+               </button>
              </div>
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">

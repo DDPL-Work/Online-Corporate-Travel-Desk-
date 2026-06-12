@@ -145,6 +145,30 @@ export const transferApproval = createAsyncThunk(
   }
 );
 
+/**
+ * ================================
+ * VALIDATE REQUEST
+ * ================================
+ */
+export const validateApproval = createAsyncThunk(
+  "approvals/validate",
+  async ({ id, type = "flight" }, { rejectWithValue }) => {
+    try {
+      const url =
+        type === "hotel"
+          ? `/approvals/hotel/${id}/validate`
+          : `/approvals/${id}/validate`;
+
+      const { data } = await api.post(url);
+      return data.data; // { isValid, priceUpdated, newPrice, oldPrice, errorMessages }
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.error || err.response?.data?.message || "Validation failed"
+      );
+    }
+  }
+);
+
 export const selectApprovals = (state) => state.approvals.list;
 export const selectApprovalPagination = (state) => state.approvals.pagination;
 export const selectApprovalLoading = (state) => state.approvals.loading;

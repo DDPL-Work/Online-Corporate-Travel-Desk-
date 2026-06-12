@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { fetchManagerRequests } from "../../../Redux/Actions/travelAdmin.thunks";
+import { validateApproval } from "../../../Redux/Actions/approval.thunks";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
@@ -432,6 +433,30 @@ export const PendingHotelDetailsModal = ({
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
 
+  const [validationState, setValidationState] = useState("idle");
+  const [validationError, setValidationError] = useState(null);
+  const [updatedPrice, setUpdatedPrice] = useState(null);
+
+  const handleValidate = async () => {
+    setValidationState("loading");
+    setValidationError(null);
+    try {
+      const res = await dispatch(validateApproval({ id: booking._id, type: "hotel" })).unwrap();
+      if (!res.isValid) {
+        setValidationState("error");
+        setValidationError(res.errorMessages?.join(", ") || "Validation failed");
+      } else if (res.priceUpdated) {
+        setValidationState("validated_price_changed");
+        setUpdatedPrice(res.newPrice);
+      } else {
+        setValidationState("validated_ok");
+      }
+    } catch (err) {
+      setValidationState("error");
+      setValidationError(err?.message || err || "Failed to validate approval");
+    }
+  };
+
   const handleConfirmAction = (comments) => {
     if (actionModal.action === "approve") {
       onApprove(booking._id, "hotel", "approve", comments);
@@ -639,6 +664,19 @@ export const PendingHotelDetailsModal = ({
               </div>
             ) : (
               <>
+                {validationError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 w-full">
+                    <FiAlertCircle size={16} className="shrink-0" />
+                    {validationError}
+                  </div>
+                )}
+                {validationState === "validated_price_changed" && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs flex flex-col gap-1 w-full">
+                    <div className="flex items-center gap-2 font-bold"><FiAlertCircle size={16} /> Price Updated!</div>
+                    <p>The price has changed to ₹{updatedPrice}. Do you still want to approve?</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-3 ml-auto shrink-0 w-full justify-end">
                 {onTransfer && (
                   <button
                     onClick={() => setIsTransferModalOpen(true)}
@@ -657,15 +695,26 @@ export const PendingHotelDetailsModal = ({
                 >
                   Reject Request
                 </button>
-                <button
-                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
-                  disabled={!isVerified}
-                  className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
-                  title={!isVerified ? "Account pending verification" : ""}
-                >
-                  <FiCheckCircle size={14} />
-                  Approve & Proceed
-                </button>
+
+                {validationState === "idle" || validationState === "error" || validationState === "loading" ? (
+                  <button
+                    onClick={handleValidate}
+                    disabled={!isVerified || validationState === "loading"}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified || validationState === "loading" ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    {validationState === "loading" ? "Validating..." : "Validate Price"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActionModal({ isOpen: true, action: "approve" })}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    <FiCheckCircle size={14} />
+                    {validationState === "validated_price_changed" ? "Approve Updated Price" : "Approve & Proceed"}
+                  </button>
+                )}
+                </div>
               </>
             )}
           </div>
@@ -1326,6 +1375,30 @@ export const PendingFlightDetailsModal = ({
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
 
+  const [validationState, setValidationState] = useState("idle");
+  const [validationError, setValidationError] = useState(null);
+  const [updatedPrice, setUpdatedPrice] = useState(null);
+
+  const handleValidate = async () => {
+    setValidationState("loading");
+    setValidationError(null);
+    try {
+      const res = await dispatch(validateApproval({ id: booking._id, type: "flight" })).unwrap();
+      if (!res.isValid) {
+        setValidationState("error");
+        setValidationError(res.errorMessages?.join(", ") || "Validation failed");
+      } else if (res.priceUpdated) {
+        setValidationState("validated_price_changed");
+        setUpdatedPrice(res.newPrice);
+      } else {
+        setValidationState("validated_ok");
+      }
+    } catch (err) {
+      setValidationState("error");
+      setValidationError(err?.message || err || "Failed to validate approval");
+    }
+  };
+
   const handleConfirmAction = (comments) => {
     if (actionModal.action === "approve") {
       onApprove(booking._id, "flight", "approve", comments);
@@ -1540,6 +1613,19 @@ export const PendingFlightDetailsModal = ({
               </div>
             ) : (
               <>
+                {validationError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 w-full">
+                    <FiAlertCircle size={16} className="shrink-0" />
+                    {validationError}
+                  </div>
+                )}
+                {validationState === "validated_price_changed" && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs flex flex-col gap-1 w-full">
+                    <div className="flex items-center gap-2 font-bold"><FiAlertCircle size={16} /> Price Updated!</div>
+                    <p>The price has changed to ₹{updatedPrice}. Do you still want to approve?</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-3 ml-auto shrink-0 w-full justify-end">
                 {onTransfer && (
                   <button
                     onClick={() => setIsTransferModalOpen(true)}
@@ -1558,15 +1644,26 @@ export const PendingFlightDetailsModal = ({
                 >
                   Reject Request
                 </button>
-                <button
-                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
-                  disabled={!isVerified}
-                  className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
-                  title={!isVerified ? "Account pending verification" : ""}
-                >
-                  <FiCheckCircle size={14} />
-                  Approve & Proceed
-                </button>
+
+                {validationState === "idle" || validationState === "error" || validationState === "loading" ? (
+                  <button
+                    onClick={handleValidate}
+                    disabled={!isVerified || validationState === "loading"}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified || validationState === "loading" ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    {validationState === "loading" ? "Validating..." : "Validate Price"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActionModal({ isOpen: true, action: "approve" })}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    <FiCheckCircle size={14} />
+                    {validationState === "validated_price_changed" ? "Approve Updated Price" : "Approve & Proceed"}
+                  </button>
+                )}
+                </div>
               </>
             )}
           </div>

@@ -93,7 +93,7 @@ function SearchDropdown({
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Block                                                      */
 /* ─────────────────────────────────────────────────────────────── */
-export function ProjectApproverBlock({ onChange, errors = {} }) {
+export function ProjectApproverBlock({ onChange, errors = {}, approvalRequired }) {
   const getDisplayName = (item) => {
     if (!item) return "Unnamed";
     if (typeof item.name === "string") return item.name || "Unnamed";
@@ -132,7 +132,6 @@ export function ProjectApproverBlock({ onChange, errors = {} }) {
   const corporateId = user?.corporateId;
 
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired = !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   useEffect(() => {
     if (corporateId) {

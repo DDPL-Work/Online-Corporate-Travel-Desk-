@@ -20,6 +20,7 @@ import MarkupRevenueAndAudit from "../components/SuperAdminTabs/MarkupRevenueAnd
 import CreditStatusAlerts from "../components/SuperAdminTabs/CreditStatusAlerts";
 import WalletRechargeLogs from "../components/SuperAdminTabs/WalletRechargeLogs";
 import CorporateAccessControl from "../components/SuperAdminTabs/CorporateAccessControl";
+import EditCorporatePage from "../components/SuperAdminTabs/EditCorporatePage";
 import PendingAmendments from "../components/SuperAdminTabs/PendingAmendments";
 import CommissionSettings from "../components/SuperAdminTabs/CommissionSettings";
 import ApiConfigurations from "../components/SuperAdminTabs/ApiConfigurations";
@@ -74,6 +75,7 @@ export const appRouter = createBrowserRouter([
           { path: "/corporate-markup-list/:id", element: <CorporateMarkupList /> },
           { path: "/financial-approvals", element: <Navigate to="/corporate-revenue" replace /> },
           { path: "/corporate-access-control", element: <CorporateAccessControl /> },
+          { path: "/edit-corporate/:id", element: <EditCorporatePage /> },
           { path: "/cancellation-queries", element: <CancellationQueries /> },
           { path: "/credit-status-alerts", element: <CreditStatusAlerts /> },
 

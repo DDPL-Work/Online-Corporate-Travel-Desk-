@@ -48,6 +48,7 @@ export const statusStyles = {
   pending_approval: { background: `${C.amber}10`, color: C.amber, boxShadow: `0 0 0 1px ${C.amber}30` },
   approved: { background: `${C.emerald}10`, color: C.emerald, boxShadow: `0 0 0 1px ${C.emerald}30` },
   rejected: { background: "#FEF2F2", color: "#DC2626", boxShadow: "0 0 0 1px #FEE2E2" },
+  expired: { background: "#FEF2F2", color: "#DC2626", boxShadow: "0 0 0 1px #FEE2E2" },
   Cancelled: { background: "#FEF2F2", color: "#DC2626", boxShadow: "0 0 0 1px #FEE2E2" },
 };
 export const dotStyles = {
@@ -57,6 +58,7 @@ export const dotStyles = {
   pending_approval: { background: C.amber },
   approved: { background: C.emerald },
   rejected: { background: "#EF4444" },
+  expired: { background: "#EF4444" },
   Cancelled: { background: "#EF4444" },
 };
 

@@ -139,6 +139,32 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   if (!travellers?.length)
     throw new ApiError(400, "At least one guest required");
 
+  // ── BALANCE CHECK START ──
+  const env = process.env.TBO_ENV || "live";
+  const requiredAmount = Number(pricingSnapshot?.totalAmount || 0);
+
+  const { getAgencyBalance } = require("../services/tboBalance.service");
+  const balance = await getAgencyBalance(env);
+
+  if (balance.availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`
+    );
+  }
+
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
+  }
+  // ── BALANCE CHECK END ──
+
   /* ================= APPROVER RESOLUTION ================= */
   let resolvedApproverId = approverId;
   let resolvedApproverName = approverName;
@@ -479,7 +505,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         IsVoucherBooking: true,
         GuestNationality: transformedHotelRequest.guestNationality,
         EndUserIp: process.env.TBO_END_USER_IP,
-        NetAmount: hotelRequest?.selectedRoom?.supplierFare || transformedHotelRequest.selectedRoom.rawRoomData?.supplierFare || bookingRequest?.markupSnapshot?.supplierFare || transformedHotelRequest.selectedRoom.rawRoomData?.TotalFare || transformedHotelRequest.selectedRoom.totalFare,
+        NetAmount: hotelRequest?.preBookResponse?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
         ClientReferenceId: bookingRequest.bookingReference,
         TraceId: hotelRequest.traceId || hotelRequest.TraceId,
         HotelRoomsDetails,
@@ -1035,6 +1061,37 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Booking not approved");
   }
 
+  // ── BALANCE CHECK START ──
+  const corporate = await Corporate.findById(booking.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
+
+  const env = process.env.TBO_ENV || "live";
+  const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+
+  const { getAgencyBalance } = require("../services/tboBalance.service");
+  const balance = await getAgencyBalance(env);
+
+  if (balance.availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`
+    );
+  }
+
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
+  }
+  // ── BALANCE CHECK END ──
+
   booking.executionStatus = "booking_initiated";
   await booking.save();
 
@@ -1091,7 +1148,7 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       throw new ApiError(500, "PreBook failed - BookingCode missing");
     }
 
-    const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.supplierFare || preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare || preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
+    const netAmount = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount;
 
     // 🔥 TBO PREBOOK SUCCESS CHECK (CORRECT)
     if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {

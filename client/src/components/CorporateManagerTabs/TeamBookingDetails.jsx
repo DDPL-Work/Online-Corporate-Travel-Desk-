@@ -1356,6 +1356,7 @@ export default function TeamBookingDetails() {
     ? getOfflineReissueBadgeMeta(bookingOfflineRequest.status)
     : null;
 
+  const bookingAmendmentStatus = booking?.amendment?.status || "";
   const cancelRequested =
     sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
   const isCancelled =

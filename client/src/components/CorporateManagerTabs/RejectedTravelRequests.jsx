@@ -19,9 +19,9 @@ import {
   getRejectedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
 import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
+  PendingFlightDetailsModal,
+  PendingHotelDetailsModal,
+} from "./Modal/PendingHotelDetailsModal";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import {
   dateCls,
@@ -258,7 +258,7 @@ function FlightSection({ data, loading }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selectedRequest && <FlightBookingModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
+      {selectedRequest && <PendingFlightDetailsModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
     </div>
   );
 }
@@ -410,7 +410,7 @@ function HotelSection({ data, loading }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selectedRequest && <HotelBookingModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
+      {selectedRequest && <PendingHotelDetailsModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
     </div>
   );
 }

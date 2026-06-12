@@ -53,6 +53,13 @@ router.post(
   approvalController.approveRequest
 );
 
+// ✅ Validate booking request (ADMIN/MANAGER/SECOND APPROVER)
+router.post(
+  '/:id/validate',
+  authorizeRoles('travel-admin', 'manager', 'employee'),
+  approvalController.validateFlightApproval
+);
+
 // ✅ Reject booking request (ADMIN/MANAGER/SECOND APPROVER)
 router.post(
   '/:id/reject',
@@ -85,6 +92,13 @@ router.post(
   "/hotel/:id/approve",
   authorizeRoles("travel-admin", "manager", "employee"),
   approvalController.approveHotelRequest
+);
+
+// ✅ Validate HOTEL request
+router.post(
+  "/hotel/:id/validate",
+  authorizeRoles("travel-admin", "manager", "employee"),
+  approvalController.validateHotelApproval
 );
 
 // ✅ Reject HOTEL request

@@ -83,6 +83,27 @@ class MarkupResolverService {
         }
         
         if (reqOrigin === flightOrigin && reqDest === flightDest) {
+          // If a cabin class is required by the rule, ensure at least one segment matches it
+          if (criteria.cabinClass) {
+            const targetCabin = Number(criteria.cabinClass);
+            if (isNaN(targetCabin)) return false;
+
+            let cabinMatch = false;
+            if (flight.Segments && Array.isArray(flight.Segments)) {
+              for (const leg of flight.Segments) {
+                if (Array.isArray(leg)) {
+                  for (const segment of leg) {
+                    if (Number(segment.CabinClass) === targetCabin) {
+                      cabinMatch = true;
+                      break;
+                    }
+                  }
+                }
+                if (cabinMatch) break;
+              }
+            }
+            if (!cabinMatch) return false;
+          }
           return true;
         }
         return false;
@@ -176,10 +197,31 @@ class MarkupResolverService {
         return false;
 
       case "star_rating_wise":
-        if (Number(hotel.StarRating) === Number(criteria.starRating)) {
-          return true;
+        if (Number(hotel.StarRating) !== Number(criteria.starRating)) {
+          return false;
         }
-        return false;
+
+        if (criteria.locationLevel === "Country" && criteria.country) {
+          const targetCountry = criteria.country.toUpperCase();
+          if (hotel.CountryCode?.toUpperCase() !== targetCountry && hotel.CountryName?.toUpperCase() !== targetCountry) {
+            return false;
+          }
+        }
+
+        if (criteria.locationLevel === "City" && (criteria.hotelCityCode || criteria.city)) {
+          const targetCity = (criteria.hotelCityCode || criteria.city).toUpperCase();
+          if (hotel.CityCode?.toUpperCase() !== targetCity && hotel.CityName?.toUpperCase() !== targetCity) {
+            return false;
+          }
+          if (criteria.country) {
+            const targetCountry = criteria.country.toUpperCase();
+            if (hotel.CountryCode?.toUpperCase() !== targetCountry && hotel.CountryName?.toUpperCase() !== targetCountry) {
+              return false;
+            }
+          }
+        }
+
+        return true;
 
       case "room_type_wise":
       case "generic":

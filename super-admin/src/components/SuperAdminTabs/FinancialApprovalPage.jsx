@@ -136,7 +136,15 @@ export default function FinancialApprovalPage() {
   };
 
   const resetFeeDraft = () => {
-    setFeeDraft(emptyServiceFeeDraft);
+    setFeeDraft(prev => ({
+      ...emptyServiceFeeDraft,
+      productType: prev.productType,
+      operation: prev.operation,
+      tripType: prev.tripType,
+      cabinClass: prev.productType === "Flight" ? prev.cabinClass : "",
+      starRating: prev.productType === "Hotel" ? prev.starRating : "",
+      roomCount: prev.productType === "Hotel" ? prev.roomCount : 1,
+    }));
     setEditingFeeRuleId(null);
   };
 
@@ -174,6 +182,11 @@ export default function FinancialApprovalPage() {
         ? prev.serviceFeeRules.map(rule => rule.id === editingFeeRuleId ? nextRule : rule)
         : [nextRule, ...prev.serviceFeeRules],
     }));
+    
+    // Switch the list tab to show the newly added rule's category
+    setActiveProductTab(nextRule.productType);
+    setActiveOperationTab(nextRule.operation);
+    
     resetFeeDraft();
   };
 

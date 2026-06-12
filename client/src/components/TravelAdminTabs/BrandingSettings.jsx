@@ -10,6 +10,8 @@ import {
   FiEdit3,
   FiArrowRight,
   FiRefreshCw,
+  FiLink,
+  FiCopy,
 } from "react-icons/fi";
 import { FaBuilding } from "react-icons/fa";
 import { toast } from "sonner";
@@ -51,8 +53,9 @@ export default function BrandingSettings() {
         corporateName: branding.corporateName || "",
         landingPageTitle: bObj.landingPageTitle || DEFAULTS.landingPageTitle,
         welcomeMessage: bObj.welcomeMessage || DEFAULTS.welcomeMessage,
-        companyType: branding.classification || DEFAULTS.companyType,
+        companyType: bObj.companyType || DEFAULTS.companyType,
         logo: null,
+        corporateUrl: branding.corporateUrl || "",
       });
       setLogoPreview(bObj.logo?.url || null);
     }
@@ -84,20 +87,23 @@ export default function BrandingSettings() {
         corporateName: branding.corporateName || "",
         landingPageTitle: bObj.landingPageTitle || DEFAULTS.landingPageTitle,
         welcomeMessage: bObj.welcomeMessage || DEFAULTS.welcomeMessage,
-        companyType: branding.classification || DEFAULTS.companyType,
+        companyType: bObj.companyType || DEFAULTS.companyType,
         logo: null,
+        corporateUrl: branding.corporateUrl || "",
       });
       setLogoPreview(bObj.logo?.url || null);
     }
     setIsEditing(!isEditing);
   };
 
+  const handleRefresh = () => {
+    dispatch(getBrandingDetails());
+  };
+
   const handleSubmit = async () => {
     const data = new FormData();
-    data.append("corporateName", formData.corporateName);
     data.append("landingPageTitle", formData.landingPageTitle);
     data.append("welcomeMessage", formData.welcomeMessage);
-    data.append("companyType", formData.companyType);
     if (formData.logo) {
       data.append("companyLogo", formData.logo);
     }
@@ -133,9 +139,9 @@ export default function BrandingSettings() {
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => window.history.back()} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
-               <div className={`p-3 rounded-xl bg-white/10 border border-white/10 ${isLoading ? "animate-spin" : ""}`}>
-                  <FiRefreshCw size={20} />
-               </div>
+               <button onClick={handleRefresh} disabled={isLoading} className={`p-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <FiRefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
+               </button>
              </div>
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">
@@ -234,7 +240,7 @@ export default function BrandingSettings() {
                       label="Organization Name"
                       name="corporateName"
                       value={formData.corporateName}
-                      editing={isEditing}
+                      editing={false} // Strictly read-only
                       onChange={handleInputChange}
                       icon={FaBuilding}
                     />
@@ -256,6 +262,32 @@ export default function BrandingSettings() {
                         icon={FiType}
                         type="textarea"
                       />
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="flex flex-col gap-2 text-left">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                          <FiLink size={10} style={{ color: C.gold }} />
+                          Corporate Portal Link
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <div className="w-full px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all truncate cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+                            {branding?.corporateUrl || <span className="text-slate-400 italic font-bold">Not generated yet</span>}
+                          </div>
+                          {branding?.corporateUrl && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(branding.corporateUrl);
+                                toast.success("Portal link copied to clipboard");
+                              }}
+                              className="p-3.5 shrink-0 rounded-[1.25rem] border hover:-translate-y-0.5 transition-all shadow-sm"
+                              style={{ backgroundColor: C.navy, color: C.white, borderColor: C.navy }}
+                              title="Copy Link"
+                            >
+                              <FiCopy size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                </div>
@@ -280,25 +312,9 @@ export default function BrandingSettings() {
                       <FiDroplet size={10} style={{ color: C.gold }} />
                       Company Classification
                     </label>
-                    {isEditing ? (
-                      <select
-                        name="companyType"
-                        value={formData.companyType}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm"
-                        style={{ backgroundColor: C.gold + "11", borderColor: C.gold + "44" }}
-                      >
-                        <option value="Private Limited">Private Limited</option>
-                        <option value="Limited">Limited</option>
-                        <option value="Proprietorship">Proprietorship</option>
-                        <option value="NGO">NGO</option>
-                        <option value="Government">Government</option>
-                      </select>
-                    ) : (
-                      <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
-                        {formData.companyType || "—"}
-                      </div>
-                    )}
+                    <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+                      {formData.companyType || "—"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -350,7 +366,7 @@ function Field({ label, name, value, editing, onChange, icon: Icon, type = "text
           />
         )
       ) : (
-        <div className={`px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all ${type === "textarea" ? "items-start" : ""}`} style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+        <div className={`px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all ${type === "textarea" ? "items-start" : ""} cursor-not-allowed opacity-80`} style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
           {value || <span className="text-slate-400 italic font-bold">Not configured</span>}
         </div>
       )}

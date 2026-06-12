@@ -260,6 +260,18 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     internationalHotel: Number(serviceCharges?.internationalHotel || 0),
   };
 
+  if (req.body.serviceFeeRules) {
+    corporate.serviceFeeRules = req.body.serviceFeeRules.map(rule => ({
+      ...rule,
+      cabinClass: rule.productType === "Flight" && typeof rule.cabinClass === "string"
+        ? ({"economy":2,"premium economy":3,"business":4,"premium business":5,"first class":6}[rule.cabinClass.toLowerCase()] || 2)
+        : rule.cabinClass,
+      starRating: rule.productType === "Hotel" && typeof rule.starRating === "string"
+        ? (parseInt(rule.starRating.match(/\d+/)?.[0] || 3, 10))
+        : rule.starRating
+    }));
+  }
+
   // ----------------------------
   // 🔹 Activate Corporate
   // ----------------------------
@@ -457,11 +469,69 @@ exports.getCorporate = asyncHandler(async (req, res) => {
 // UPDATE CORPORATE
 // -----------------------------------------------------
 exports.updateCorporate = asyncHandler(async (req, res) => {
-  const updated = await Corporate.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
+  if (req.body.serviceFeeRules) {
+    req.body.serviceFeeRules = req.body.serviceFeeRules.map(rule => ({
+      ...rule,
+      cabinClass: rule.productType === "Flight" && typeof rule.cabinClass === "string"
+        ? ({"economy":2,"premium economy":3,"business":4,"premium business":5,"first class":6}[rule.cabinClass.toLowerCase()] || 2)
+        : rule.cabinClass,
+      starRating: rule.productType === "Hotel" && typeof rule.starRating === "string"
+        ? (parseInt(rule.starRating.match(/\d+/)?.[0] || 3, 10))
+        : rule.starRating
+    }));
+  }
+
+  // Handle Base64 file uploads for documents
+  if (req.body.gstFileBase64) {
+    const result = await cloudinary.uploader.upload(req.body.gstFileBase64, {
+      folder: "corporates/gst",
+      resource_type: "auto",
+    });
+    req.body.gstCertificate = {
+      publicId: result.public_id,
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+    delete req.body.gstFileBase64;
+  }
+
+  if (req.body.panFileBase64) {
+    const result = await cloudinary.uploader.upload(req.body.panFileBase64, {
+      folder: "corporates/pan",
+      resource_type: "auto",
+    });
+    req.body.panCard = {
+      ...req.body.panCard,
+      publicId: result.public_id,
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+    delete req.body.panFileBase64;
+  }
+
+  const corporate = await Corporate.findById(req.params.id);
+  if (!corporate) throw new ApiError(404, "Corporate not found");
+
+  const updatableFields = [
+    "corporateName", "corporateType", "classification", "billingCycle", "customBillingDays", 
+    "dueDays", "creditLimit", "walletBalance", "serviceFeeRules"
+  ];
+  
+  updatableFields.forEach(field => {
+    if (req.body[field] !== undefined) corporate[field] = req.body[field];
   });
 
-  if (!updated) throw new ApiError(404, "Corporate not found");
+  const nestedFields = ["primaryContact", "registeredAddress", "billingDepartment", "gstDetails", "gstCertificate", "panCard"];
+  nestedFields.forEach(field => {
+    if (req.body[field]) {
+      const existing = typeof corporate[field]?.toObject === "function" ? corporate[field].toObject() : (corporate[field] || {});
+      corporate[field] = { ...existing, ...req.body[field] };
+    }
+  });
+
+  const updated = await corporate.save();
 
   // ── Notify Super Admin if updated by OPS member ──────────────────
   if (req.user.role === 'ops-member') {

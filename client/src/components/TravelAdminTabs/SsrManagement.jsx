@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -24,6 +25,9 @@ import {
   FiInfo,
   FiClock,
   FiArrowRight,
+  FiMap,
+  FiBriefcase,
+  FiX,
 } from "react-icons/fi";
 import {
   MdAirlineSeatReclineNormal,
@@ -187,6 +191,89 @@ function PriceRangeInput({
   );
 }
 
+function LimitDropdown({ isUnlimited, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-[110px] px-3 py-1.5 border rounded-lg text-[11px] font-bold text-slate-600 bg-white shadow-sm transition-all hover:bg-slate-50 focus:ring-2 focus:ring-[#B8860B]/20"
+        style={{ borderColor: C.border }}
+      >
+        <span>{isUnlimited !== false ? "No Limit" : "Set Limit"}</span>
+        <FiChevronRight size={12} className={`transition-transform duration-200 ${isOpen ? "rotate-90" : "rotate-0"}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-full bg-white border shadow-lg rounded-xl overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-100" style={{ borderColor: C.border }}>
+          <button
+            className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-slate-50 ${isUnlimited !== false ? "text-[#000D26] bg-slate-50" : "text-slate-500"}`}
+            onClick={() => { onChange(true); setIsOpen(false); }}
+          >
+            No Limit
+          </button>
+          <button
+            className={`w-full text-left px-3 py-2 text-[11px] font-bold transition-all hover:bg-slate-50 ${isUnlimited === false ? "text-[#000D26] bg-slate-50" : "text-slate-500"}`}
+            onClick={() => { onChange(false); setIsOpen(false); }}
+          >
+            Set Limit
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LimitsGrid({ data, location, updateLimit, updateIsUnlimited, title, conditionsKey, formatCondition }) {
+  const items = data.filter((d) => d.location === location);
+  return (
+    <div className="space-y-3">
+      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-2">
+        <FiMap size={12} className="text-[#B8860B]" />
+        {location} {title}
+      </h4>
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center justify-between p-2 rounded-xl border bg-slate-50 shadow-sm" style={{ borderColor: C.border }}>
+          <span className="text-xs font-bold text-slate-600 pl-2">{formatCondition ? formatCondition(item[conditionsKey]) : item[conditionsKey]}</span>
+          <div className="flex items-center gap-2">
+            <LimitDropdown 
+              isUnlimited={item.isUnlimited} 
+              onChange={(val) => updateIsUnlimited(location, item[conditionsKey], val)} 
+            />
+            
+            {item.isUnlimited === false && (
+              <div className="relative w-28 animate-in fade-in zoom-in-95 duration-200">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={item.limit || ""}
+                  onChange={(e) => updateLimit(location, item[conditionsKey], e.target.value === "" ? 0 : Math.max(1, Number(e.target.value)))}
+                  className="w-full pl-7 pr-3 py-1.5 border rounded-lg text-xs font-black outline-none focus:ring-2 focus:ring-[#B8860B]/20 transition-all bg-white"
+                  style={{ borderColor: C.border, color: C.navy }}
+                  placeholder="e.g. 5000"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatusBadge({ text, color }) {
   const cls = {
     green: { bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0" },
@@ -309,8 +396,11 @@ function PolicyDetailModal({ policy, onClose }) {
         <div className="p-8 text-center text-white" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.gold})` }}>
            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4"><FiShield size={32} /></div>
            <h2 className="text-2xl font-black tracking-tight">{policy.employeeEmail}</h2>
-           <div className="mt-3 flex items-center justify-center gap-3">
+           <div className="mt-3 flex flex-col items-center justify-center gap-2">
               <StatusBadge text={policy.approvalRequired ? "Approval Required" : "Auto-Approved"} color={policy.approvalRequired ? "amber" : "green"} />
+              {!policy.approvalRequired && (
+                <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded border border-white/30">Custom Limits Applied</span>
+              )}
            </div>
         </div>
         
@@ -479,6 +569,46 @@ export default function SsrManagement() {
   const [bagMax, setBagMax] = useState(99999);
 
   const [approvalRequired, setApprovalRequired] = useState(true);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState("flights");
+
+  const CABIN_NAMES = {
+    1: "All",
+    2: "Economy",
+    3: "Premium Economy",
+    4: "Business",
+    5: "Premium Business",
+    6: "First Class"
+  };
+
+  const defaultFlightLimits = [
+    { location: "Domestic", cabinClass: 2, isUnlimited: true, limit: 0 },
+    { location: "Domestic", cabinClass: 3, isUnlimited: true, limit: 0 },
+    { location: "Domestic", cabinClass: 4, isUnlimited: true, limit: 0 },
+    { location: "Domestic", cabinClass: 5, isUnlimited: true, limit: 0 },
+    { location: "Domestic", cabinClass: 6, isUnlimited: true, limit: 0 },
+    { location: "International", cabinClass: 2, isUnlimited: true, limit: 0 },
+    { location: "International", cabinClass: 3, isUnlimited: true, limit: 0 },
+    { location: "International", cabinClass: 4, isUnlimited: true, limit: 0 },
+    { location: "International", cabinClass: 5, isUnlimited: true, limit: 0 },
+    { location: "International", cabinClass: 6, isUnlimited: true, limit: 0 },
+  ];
+
+  const defaultHotelLimits = [
+    { location: "Domestic", starRating: 1, isUnlimited: true, limit: 0 },
+    { location: "Domestic", starRating: 2, isUnlimited: true, limit: 0 },
+    { location: "Domestic", starRating: 3, isUnlimited: true, limit: 0 },
+    { location: "Domestic", starRating: 4, isUnlimited: true, limit: 0 },
+    { location: "Domestic", starRating: 5, isUnlimited: true, limit: 0 },
+    { location: "International", starRating: 1, isUnlimited: true, limit: 0 },
+    { location: "International", starRating: 2, isUnlimited: true, limit: 0 },
+    { location: "International", starRating: 3, isUnlimited: true, limit: 0 },
+    { location: "International", starRating: 4, isUnlimited: true, limit: 0 },
+    { location: "International", starRating: 5, isUnlimited: true, limit: 0 },
+  ];
+
+  const [flightLimits, setFlightLimits] = useState(defaultFlightLimits);
+  const [hotelLimits, setHotelLimits] = useState(defaultHotelLimits);
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
@@ -500,6 +630,8 @@ export default function SsrManagement() {
     setBagMin(p.baggagePriceRange?.min ?? 0);
     setBagMax(p.baggagePriceRange?.max ?? 99999);
     setApprovalRequired(p.approvalRequired ?? true);
+    setFlightLimits(p.flightLimits?.length ? p.flightLimits : defaultFlightLimits);
+    setHotelLimits(p.hotelLimits?.length ? p.hotelLimits : defaultHotelLimits);
   }, [lookedUp]);
 
   useEffect(() => {
@@ -520,6 +652,19 @@ export default function SsrManagement() {
       Swal.fire("Invalid Range", "Min price cannot exceed max price.", "warning");
       return;
     }
+
+    // Validate that no limit is 0 when set_limit is selected
+    const invalidFlight = flightLimits.find(l => l.isUnlimited === false && (!l.limit || l.limit <= 0));
+    if (invalidFlight) {
+      Swal.fire("Invalid Limit", `Please set a valid limit for ${invalidFlight.location} ${invalidFlight.cabinClass} flights.`, "warning");
+      return;
+    }
+
+    const invalidHotel = hotelLimits.find(l => l.isUnlimited === false && (!l.limit || l.limit <= 0));
+    if (invalidHotel) {
+      Swal.fire("Invalid Limit", `Please set a valid limit for ${invalidHotel.location} ${invalidHotel.starRating} Star hotels.`, "warning");
+      return;
+    }
     dispatch(upsertSSRPolicy({
       employeeEmail: emailInput.trim().toLowerCase(),
       allowSeat, allowMeal, allowBaggage,
@@ -527,6 +672,8 @@ export default function SsrManagement() {
       mealPriceRange: { min: mealMin, max: mealMax },
       baggagePriceRange: { min: bagMin, max: bagMax },
       approvalRequired,
+      flightLimits,
+      hotelLimits,
     }));
   };
 
@@ -635,7 +782,28 @@ export default function SsrManagement() {
                           <SectionHeader icon={FiShield} title="Approval Workflow" sub="Define authorization hierarchy" />
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                              <Toggle label="Manual Approval" description="Admin intervention required" icon={FiClock} enabled={approvalRequired} onChange={setApprovalRequired} />
-                             <Toggle label="Auto Approved" description="Skip workflow if in budget" icon={FiCheckCircle} enabled={!approvalRequired} onChange={(v) => setApprovalRequired(!v)} />
+                             <div className="flex flex-col gap-3">
+                               <Toggle 
+                                 label="Auto Approved" 
+                                 description="Skip workflow if in budget" 
+                                 icon={FiCheckCircle} 
+                                 enabled={!approvalRequired} 
+                                 onChange={(v) => {
+                                   setApprovalRequired(!v);
+                                   if (v) setIsLimitModalOpen(true);
+                                 }} 
+                               />
+                               {!approvalRequired && (
+                                 <div className="mt-2 text-right">
+                                   <button 
+                                     onClick={() => setIsLimitModalOpen(true)}
+                                     className="text-xs font-bold text-[#003399] hover:underline flex items-center justify-end gap-1 w-full"
+                                   >
+                                     <FiSettings size={12} /> Edit Booking Limits
+                                   </button>
+                                 </div>
+                               )}
+                             </div>
                           </div>
                        </div>
                     </div>
@@ -678,7 +846,117 @@ export default function SsrManagement() {
         )}
       </div>
 
-      {viewPolicy && <PolicyDetailModal policy={viewPolicy} onClose={() => setViewPolicy(null)} />}
+      {viewPolicy && typeof document !== "undefined" && createPortal(<PolicyDetailModal policy={viewPolicy} onClose={() => setViewPolicy(null)} />, document.body)}
+
+      {isLimitModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border relative" style={{ borderColor: C.border }}>
+            {/* Header matching main page */}
+            <div className="p-8 border-b flex flex-col md:flex-row md:items-center justify-between sticky top-0 z-20 bg-gradient-to-br from-[#003399] to-[#000d26] text-white">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl border border-white/10 bg-white/10 text-white">
+                  <FiBriefcase size={24} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight leading-none">Booking Limits</h2>
+                  <p className="text-[10px] mt-1.5 font-bold uppercase tracking-[2px] opacity-60">Configure Custom Booking Thresholds</p>
+                </div>
+              </div>
+              <button onClick={() => setIsLimitModalOpen(false)} className="absolute top-6 right-6 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white">
+                <FiX size={18} />
+              </button>
+            </div>
+            
+            <div className="px-6 pb-32 pt-0 space-y-6 relative">
+              {/* Tabs matching main page */}
+              <div className="flex justify-center w-full mt-[-20px] mb-8 relative z-30">
+                <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+                  <button 
+                    onClick={() => setActiveModalTab("flights")}
+                    className={`px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeModalTab === "flights" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Flights
+                  </button>
+                  <button 
+                    onClick={() => setActiveModalTab("hotels")}
+                    className={`px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeModalTab === "hotels" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Hotels
+                  </button>
+                </div>
+              </div>
+
+              {/* Flights Section */}
+              {activeModalTab === "flights" && (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-700 flex items-center gap-2 border-b pb-2">
+                    <span className="w-2 h-2 rounded-full" style={{ background: C.navy }}></span> Flight Thresholds
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <LimitsGrid 
+                      data={flightLimits} 
+                      location="Domestic" 
+                      title="Flights" 
+                      conditionsKey="cabinClass"
+                      formatCondition={(val) => CABIN_NAMES[val] || val}
+                      updateIsUnlimited={(loc, cond, val) => setFlightLimits(prev => prev.map(p => p.location === loc && p.cabinClass === cond ? { ...p, isUnlimited: val, limit: (!val && p.limit === 0) ? "" : p.limit } : p))}
+                      updateLimit={(loc, cond, val) => setFlightLimits(prev => prev.map(p => p.location === loc && p.cabinClass === cond ? { ...p, limit: val } : p))}
+                    />
+                    <LimitsGrid 
+                      data={flightLimits} 
+                      location="International" 
+                      title="Flights" 
+                      conditionsKey="cabinClass"
+                      formatCondition={(val) => CABIN_NAMES[val] || val}
+                      updateIsUnlimited={(loc, cond, val) => setFlightLimits(prev => prev.map(p => p.location === loc && p.cabinClass === cond ? { ...p, isUnlimited: val, limit: (!val && p.limit === 0) ? "" : p.limit } : p))}
+                      updateLimit={(loc, cond, val) => setFlightLimits(prev => prev.map(p => p.location === loc && p.cabinClass === cond ? { ...p, limit: val } : p))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Hotels Section */}
+              {activeModalTab === "hotels" && (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-700 flex items-center gap-2 border-b pb-2">
+                    <span className="w-2 h-2 rounded-full" style={{ background: C.gold }}></span> Hotel Thresholds
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <LimitsGrid 
+                      data={hotelLimits} 
+                      location="Domestic" 
+                      title="Hotels" 
+                      conditionsKey="starRating"
+                      formatCondition={(rating) => `${rating} Star`}
+                      updateIsUnlimited={(loc, cond, val) => setHotelLimits(prev => prev.map(p => p.location === loc && p.starRating === cond ? { ...p, isUnlimited: val, limit: (!val && p.limit === 0) ? "" : p.limit } : p))}
+                      updateLimit={(loc, cond, val) => setHotelLimits(prev => prev.map(p => p.location === loc && p.starRating === cond ? { ...p, limit: val } : p))}
+                    />
+                    <LimitsGrid 
+                      data={hotelLimits} 
+                      location="International" 
+                      title="Hotels" 
+                      conditionsKey="starRating"
+                      formatCondition={(rating) => `${rating} Star`}
+                      updateIsUnlimited={(loc, cond, val) => setHotelLimits(prev => prev.map(p => p.location === loc && p.starRating === cond ? { ...p, isUnlimited: val, limit: (!val && p.limit === 0) ? "" : p.limit } : p))}
+                      updateLimit={(loc, cond, val) => setHotelLimits(prev => prev.map(p => p.location === loc && p.starRating === cond ? { ...p, limit: val } : p))}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-slate-50 flex justify-end sticky bottom-0 z-10">
+              <button 
+                onClick={() => setIsLimitModalOpen(false)} 
+                className="px-8 py-3 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg"
+                style={{ background: C.navy }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      , document.body)}
     </div>
   );
 }

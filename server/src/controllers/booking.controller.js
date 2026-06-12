@@ -294,20 +294,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Valid FareQuote is required");
   }
 
-  /* ================= BALANCE CHECK ================= */
-  const env = process.env.TBO_ENV || "live";
-
-  const balance = await getAgencyBalance(env);
-
-  const availableBalance = balance.availableBalance;
-  const requiredAmount = Number(pricingSnapshot.totalAmount);
-
-  if (availableBalance < requiredAmount) {
-    throw new ApiError(
-      400,
-      `Insufficient agency balance. Available ₹${availableBalance}, Required ₹${requiredAmount}`,
-    );
-  }
+  /* ================= BALANCE CHECK REMOVED FOR APPROVAL REQUEST ================= */
 
   let bookingSnapshot;
 
@@ -756,13 +743,27 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
 
   /* ================= BALANCE CHECK ================= */
   const env = process.env.TBO_ENV || "live";
-  const balance = await getAgencyBalance(env);
   const requiredAmount = Number(pricingSnapshot.totalAmount);
+
+  // 1. Check Agency Balance
+  const balance = await getAgencyBalance(env);
   if (balance.availableBalance < requiredAmount) {
     throw new ApiError(
       400,
       `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`,
     );
+  }
+
+  // 2. Check Corporate Wallet / Credit Balance
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
   }
 
   /* ================= PREPARE SNAPSHOT ================= */
@@ -2067,14 +2068,44 @@ const getExecutionMessage = (status) => {
 exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
-  const bookingOwner = await BookingRequest.findById(bookingId).select("userId");
-  if (!bookingOwner) {
+  const booking = await BookingRequest.findById(bookingId);
+  if (!booking) {
     throw new ApiError(404, "Booking not found");
   }
 
-  if (bookingOwner.userId.toString() !== req.user._id.toString()) {
+  if (booking.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Not authorized to execute this booking");
   }
+
+  // ── BALANCE CHECK START ──
+  const corporate = await Corporate.findById(booking.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
+
+  const env = process.env.TBO_ENV || "live";
+  const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+
+  const balance = await getAgencyBalance(env);
+
+  if (balance.availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`
+    );
+  }
+
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
+  }
+  // ── BALANCE CHECK END ──
 
   const orchestrationResult = await flightOrchestrationService.processBooking({
     bookingId,
@@ -2093,20 +2124,20 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     ),
   );
 
-  const booking = await BookingRequest.findById(bookingId);
-  if (!booking) throw new ApiError(404, "Booking not found");
+  const legacyBooking = await BookingRequest.findById(bookingId);
+  if (!legacyBooking) throw new ApiError(404, "Booking not found");
 
   const intent = await BookingIntent.findOne({
-    bookingRequestId: booking._id,
+    bookingRequestId: legacyBooking._id,
     approvalStatus: "approved",
   });
   if (!intent) throw new ApiError(400, "No approved booking intent found");
 
-  if (booking.requestStatus !== "approved")
+  if (legacyBooking.requestStatus !== "approved")
     throw new ApiError(400, "Booking not approved");
 
-  const corporate = await Corporate.findById(booking.corporateId);
-  if (!corporate) throw new ApiError(404, "Corporate not found");
+  const legacyCorporate = await Corporate.findById(legacyBooking.corporateId);
+  if (!legacyCorporate) throw new ApiError(404, "Corporate not found");
 
   const leadPassenger =
     booking.travellers.find((t) => t.isLeadPassenger) || booking.travellers[0];

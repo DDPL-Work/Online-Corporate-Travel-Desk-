@@ -20,7 +20,7 @@ router.use(verifyToken);
  * 🧑‍💼 ADMIN ACCESS ONLY (TRAVEL ADMIN / CORPORATE ADMIN)
  * ============================================================
  */
-router.use(authorizeRoles("travel-admin", "corporate-admin", "employee", "manager"));
+router.use(authorizeRoles("travel-admin", "finance_team", "employee", "manager"));
 
 /**
  * ============================================================

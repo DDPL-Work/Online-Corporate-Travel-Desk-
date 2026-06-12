@@ -67,6 +67,7 @@ const corporateMarkupSchema = new mongoose.Schema(
         hotelCountryCode: { type: String },
         hotelStarRating: { type: Number },
         starRating: { type: Number, enum: [1, 2, 3, 4, 5] },
+        locationLevel: { type: String, enum: ["None", "Country", "City"] },
         flightType: { type: String, enum: ["domestic", "international"] }
       }
     }],

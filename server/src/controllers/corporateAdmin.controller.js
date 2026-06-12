@@ -23,11 +23,18 @@ exports.getMyCorporateProfile = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Corporate context not found");
   }
 
-  const corporate = await Corporate.findById(corporateId);
+  const corporate = await Corporate.findById(corporateId).lean();
 
   if (!corporate) {
     throw new ApiError(404, "Corporate not found");
   }
+
+  const financeMembers = await User.find({
+    corporateId: corporateId,
+    role: "finance_team",
+  }).select("name email mobile role isVerified status");
+
+  corporate.financeMembers = financeMembers;
 
   res.status(200).json(
     new ApiResponse(200, corporate, "Corporate profile fetched successfully")

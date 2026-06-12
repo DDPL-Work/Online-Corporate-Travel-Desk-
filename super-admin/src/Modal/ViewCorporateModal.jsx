@@ -32,7 +32,17 @@ export default function ViewCorporateModal({ corporate, onClose }) {
     .filter(Boolean)
     .join(", ");
 
-  const isPending = corporate.status === "pending";
+  let displayStatus = corporate.status;
+  if (corporate.status === "pending") {
+    const createdAt = new Date(corporate.createdAt || Date.now());
+    const diffInDays = (Date.now() - createdAt.getTime()) / (1000 * 3600 * 24);
+    if (diffInDays > 7) {
+      displayStatus = "expired";
+    }
+  }
+
+  const isPending = displayStatus === "pending";
+  const isActionable = displayStatus === "pending";
 
   const handleReject = () => {
     // In a real implementation, dispatch a rejection action here
@@ -49,7 +59,7 @@ export default function ViewCorporateModal({ corporate, onClose }) {
   const tabs = [
     { id: "overview", label: "Overview", icon: <FiInfo /> },
     { id: "contacts", label: "Contacts", icon: <FiUsers /> },
-    ...(!isPending ? [{ id: "financial", label: "Financial & Policy", icon: <FiDollarSign /> }] : []),
+    ...((displayStatus === "active" || displayStatus === "suspended") ? [{ id: "financial", label: "Financial & Policy", icon: <FiDollarSign /> }] : []),
     { id: "documents", label: "Documents", icon: <FiFileText /> },
   ];
 
@@ -88,17 +98,18 @@ export default function ViewCorporateModal({ corporate, onClose }) {
                   </span>
                   <span className="w-1 h-1 rounded-full bg-white/30"></span>
                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
-                    corporate.status === "active" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" :
-                    corporate.status === "pending" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse" :
+                    displayStatus === "active" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" :
+                    displayStatus === "pending" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse" :
+                    displayStatus === "expired" ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" :
                     "bg-white/10 text-white/70 border border-white/20"
                   }`}>
-                    {corporate.status}
+                    {displayStatus}
                   </span>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {isPending && (
+              {isActionable && (
                 <>
                   <button 
                     onClick={handleReject}

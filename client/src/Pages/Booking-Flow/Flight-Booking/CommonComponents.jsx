@@ -173,6 +173,7 @@ export const parseOneWayData = (result) => {
         eT: seg.Craft,
       },
 
+      cabinClass: seg.CabinClass,
       duration: seg.Duration,
 
       layoverTime: next
@@ -360,18 +361,20 @@ export const FlightTimeline = ({
                           {segment.fD?.eT || "Aircraft"}
                         </p>
                         {(() => {
+                          const currentSeatReady = typeof isSeatReady === 'function' ? isSeatReady(idx) : (Array.isArray(isSeatReady) ? isSeatReady[idx] : isSeatReady);
+
                           const getSeatButtonText = () => {
-                            if (isSeatReady === "loading")
-                              return "SSR loading…";
-                            if (isSeatReady === "error")
-                              return "Unable to load ssr";
-                            if (isSeatReady === "none")
-                              return "No ssr available";
-                            if (isSeatReady === true) return "Select SSR";
-                            return "SSR loading…";
+                            if (currentSeatReady === "loading")
+                              return "Seat loading…";
+                            if (currentSeatReady === "error")
+                              return "Unable to load seat map";
+                            if (currentSeatReady === "none" || currentSeatReady === false)
+                              return "Seat map not available";
+                            if (currentSeatReady === true) return "Select Seat";
+                            return "Seat loading…";
                           };
 
-                          const seatDisabled = isSeatReady !== true;
+                          const seatDisabled = currentSeatReady !== true;
 
                           return (
                             <button
@@ -454,7 +457,6 @@ export const RoundTripFlightTimeline = ({
   onwardCount = 0,
 }) => {
   const journeyType = isReturnJourney ? "return" : "onward";
-  const seatReady = Boolean(isSeatReady);
 
   if (!segments.length) return null;
 
@@ -467,7 +469,7 @@ export const RoundTripFlightTimeline = ({
       openSeatModal={(segmentIndex) =>
         openSeatModal(segments[segmentIndex], segmentIndex, journeyType)
       }
-      isSeatReady={seatReady}
+      isSeatReady={isSeatReady}
     />
   );
 };

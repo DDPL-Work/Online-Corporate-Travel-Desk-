@@ -109,7 +109,16 @@ export default function PendingCorporates() {
   }, [dispatch]);
 
   const baseCorporates = useMemo(
-    () => corporates.filter((c) => c.status === "pending"),
+    () => corporates.map((c) => {
+      if (c.status === "pending") {
+        const createdAt = new Date(c.createdAt || Date.now());
+        const diffInDays = (Date.now() - createdAt.getTime()) / (1000 * 3600 * 24);
+        if (diffInDays > 7) {
+          return { ...c, status: "expired" };
+        }
+      }
+      return c;
+    }).filter((c) => c.status === "pending" || c.status === "expired"),
     [corporates]
   );
 
@@ -424,13 +433,15 @@ export default function PendingCorporates() {
                           >
                             <FiEye size={16} />
                           </button>
-                          <button
-                            onClick={() => handleApprove(c)}
-                            title="Approve Corporate"
-                            className="p-2 rounded hover:bg-emerald-100 text-emerald-600 transition-colors cursor-pointer"
-                          >
-                            <FiCheckCircle size={16} />
-                          </button>
+                          {c.status === "pending" && (
+                            <button
+                              onClick={() => handleApprove(c)}
+                              title="Approve Corporate"
+                              className="p-2 rounded hover:bg-emerald-100 text-emerald-600 transition-colors cursor-pointer"
+                            >
+                              <FiCheckCircle size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
