@@ -29,6 +29,7 @@ const flightOrchestrationService = require("../services/booking/flightOrchestrat
 const { resolvePnr } = require("../utils/bookingResolver.util");
 const { resolveBookingContext } = require("../utils/activeBookingResolver.util");
 const MarkupAccountingService = require("../modules/markup/services/markupAccounting.service");
+const serviceFeeService = require("../services/serviceFee.service");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -292,6 +293,34 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
 
   if (!fareResult) {
     throw new ApiError(400, "Valid FareQuote is required");
+  }
+
+  /* ================= SERVICE FEE CALCULATION ================= */
+  let serviceFeeDetails = null;
+  if (bookingType === "flight" && flightRequest) {
+    const firstSeg = flightRequest.segments?.[0];
+    const lastSeg = flightRequest.segments?.[flightRequest.segments.length - 1];
+    
+    const isIndia = (code) => {
+      if (!code) return false;
+      const c = code.toLowerCase();
+      return c === "in" || c === "ind" || c === "india";
+    };
+    const isDomesticFlight = isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country);
+    
+    const serviceFeePayload = {
+      productType: "Flight",
+      operation: "Book",
+      tripType: isDomesticFlight ? "Domestic" : "International",
+      cabinClass: firstSeg?.cabinClass,
+      baseFare: Number(pricingSnapshot.totalAmount)
+    };
+
+    serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
+    if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
+      pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + serviceFeeDetails.feeAmount;
+      pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
+    }
   }
 
   /* ================= BALANCE CHECK REMOVED FOR APPROVAL REQUEST ================= */
@@ -741,6 +770,33 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   );
   if (!fareResult) throw new ApiError(400, "Valid FareQuote is required");
 
+  /* ================= SERVICE FEE CALCULATION ================= */
+  const firstSeg = flightRequest.segments?.[0];
+  const lastSeg = flightRequest.segments?.[flightRequest.segments.length - 1];
+  
+  const isIndia = (code) => {
+    if (!code) return false;
+    const c = code.toLowerCase();
+    return c === "in" || c === "ind" || c === "india";
+  };
+  const isDomesticFlight = isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country);
+  
+  const serviceFeePayload = {
+    productType: "Flight",
+    operation: "Book",
+    tripType: isDomesticFlight ? "Domestic" : "International",
+    cabinClass: firstSeg?.cabinClass,
+    baseFare: Number(pricingSnapshot.totalAmount)
+  };
+
+  const serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
+  let totalServiceFee = 0;
+  if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
+    totalServiceFee = serviceFeeDetails.feeAmount;
+    pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + totalServiceFee;
+    pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
+  }
+
   /* ================= BALANCE CHECK ================= */
   const env = process.env.TBO_ENV || "live";
   const requiredAmount = Number(pricingSnapshot.totalAmount);
@@ -965,6 +1021,7 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
       totalAmount: pricingSnapshot.totalAmount,
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
+      serviceFeeDetails: pricingSnapshot.serviceFeeDetails || null,
     },
     markupSnapshot: req.body.markupSnapshot || (bookingType === "flight" && flightRequest?.fareSnapshot?.markupAmount > 0 ? {
       supplierFare: flightRequest.fareSnapshot.supplierFare || 0,
@@ -1134,6 +1191,36 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
           error: err.message,
         });
       });
+
+      if (bookingRequest.pricingSnapshot?.serviceFeeDetails) {
+        try {
+          await serviceFeeService.applyServiceFee(
+            corporate._id,
+            user._id,
+            bookingRequest._id,
+            bookingRequest.orderId,
+            {
+              productType: "Flight",
+              operation: "Book",
+              tripType: (() => {
+                const f = bookingRequest.flightRequest;
+                if (!f) return "Domestic";
+                const firstSeg = f.segments?.[0];
+                const lastSeg = f.segments?.[f.segments.length - 1];
+                const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+                return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+              })()
+            },
+            null,
+            true // skipWalletDeduction
+          );
+        } catch (feeErr) {
+          logger.error("Failed to apply service fee ledger record", {
+            bookingId: bookingRequest._id,
+            error: feeErr.message,
+          });
+        }
+      }
 
       logger.info("✅ Instant flight booking executed successfully", {
         bookingId: bookingRequest._id,

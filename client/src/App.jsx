@@ -12,6 +12,7 @@ function App() {
         position="top-right"
         expand
         closeButton
+        duration={5000}
         toastOptions={{
           unstyled: true,
           classNames: {

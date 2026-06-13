@@ -32,7 +32,6 @@ const emptyServiceFeeDraft = {
   tripType: "Domestic",
   cabinClass: "Economy",
   starRating: "3 Star",
-  roomCount: 1,
   feeType: "Fixed",
   feeValue: "",
   status: "Active",
@@ -128,7 +127,10 @@ export default function EditCorporatePage() {
       panNumber: corp.panCard?.number || "",
       panUrl: corp.panCard?.url || "",
       classification: corp.classification || "prepaid",
-      serviceFeeRules: corp.serviceFeeRules || []
+      serviceFeeRules: (corp.serviceFeeRules || []).map(rule => ({
+        ...rule,
+        id: rule.id || rule._id
+      }))
     });
   };
 
@@ -165,7 +167,6 @@ export default function EditCorporatePage() {
       tripType: prev.tripType,
       cabinClass: prev.productType === "Flight" ? prev.cabinClass : "",
       starRating: prev.productType === "Hotel" ? prev.starRating : "",
-      roomCount: prev.productType === "Hotel" ? prev.roomCount : 1,
     }));
     setEditingFeeRuleId(null);
   };
@@ -182,8 +183,8 @@ export default function EditCorporatePage() {
       rule.operation === feeDraft.operation &&
       rule.tripType === feeDraft.tripType &&
       (feeDraft.productType === "Flight" 
-        ? rule.cabinClass === feeDraft.cabinClass 
-        : (rule.starRating === feeDraft.starRating && rule.roomCount === feeDraft.roomCount))
+        ? String(rule.cabinClass) === String(feeDraft.cabinClass) || parseInt(rule.cabinClass) === parseInt(feeDraft.cabinClass) || rule.cabinClass === {"Economy": 2, "Premium Economy": 3, "Business": 4, "Premium Business": 5, "First Class": 6}[feeDraft.cabinClass]
+        : String(rule.starRating) === String(feeDraft.starRating) || parseInt(rule.starRating) === parseInt(feeDraft.starRating))
     );
 
     if (isDuplicate) {
@@ -195,7 +196,6 @@ export default function EditCorporatePage() {
       ...feeDraft,
       id: editingFeeRuleId || Date.now(),
       feeValue: Number(feeDraft.feeValue || 0),
-      roomCount: feeDraft.productType === "Hotel" ? Number(feeDraft.roomCount || 1) : "",
     };
 
     setForm(prev => ({
@@ -215,7 +215,6 @@ export default function EditCorporatePage() {
       ...emptyServiceFeeDraft,
       ...rule,
       feeValue: String(rule.feeValue),
-      roomCount: rule.productType === "Hotel" ? rule.roomCount || 1 : "",
     });
     setEditingFeeRuleId(rule.id);
     document.getElementById("scenario-builder")?.scrollIntoView({ behavior: "smooth" });
@@ -235,13 +234,17 @@ export default function EditCorporatePage() {
   const submit = async () => {
     setSaving(true);
     
-    const serviceFeeRulesFormatted = form.serviceFeeRules.map(rule => ({
-      ...rule,
-      feeValue: Number(rule.feeValue || 0),
-      roomCount: rule.productType === "Hotel" ? Number(rule.roomCount || 1) : undefined,
-      cabinClass: rule.productType === "Flight" ? rule.cabinClass : undefined,
-      starRating: rule.productType === "Hotel" ? rule.starRating : undefined,
-    }));
+    const serviceFeeRulesFormatted = form.serviceFeeRules.map(rule => {
+      const isObjectId = typeof rule.id === "string" && rule.id.length === 24;
+      const cabinMap = { "Economy": 2, "Premium Economy": 3, "Business": 4, "Premium Business": 5, "First Class": 6 };
+      return {
+        ...rule,
+        _id: isObjectId ? rule.id : undefined,
+        feeValue: Number(rule.feeValue || 0),
+        cabinClass: rule.productType === "Flight" ? cabinMap[rule.cabinClass] || rule.cabinClass : undefined,
+        starRating: rule.productType === "Hotel" ? parseInt(rule.starRating) : undefined,
+      };
+    });
 
     const payload = {
       corporateName: form.corporateName,
@@ -657,7 +660,7 @@ export default function EditCorporatePage() {
                           </div>
                           <div className="text-left">
                             <span className={`block font-black text-sm uppercase tracking-widest ${active ? isFlight ? "text-[#003399]" : "text-[#d97706]" : "text-slate-600"}`}>{type}</span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase">{isFlight ? "Cabin based rules" : "Star & room based rules"}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase">{isFlight ? "Cabin based rules" : "Star based rules"}</span>
                           </div>
                           {active && <FaCheckCircle className={`ml-auto ${isFlight ? "text-[#003399]" : "text-[#d97706]"}`} size={18} />}
                         </button>
@@ -705,7 +708,7 @@ export default function EditCorporatePage() {
 
                     {feeDraft.productType === "Hotel" && (
                       <Field label="Room Count">
-                        <Input type="number" value={feeDraft.roomCount} onChange={v => updateFeeDraft("roomCount", v)} />
+                        <input type="text" value="1" disabled={true} className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 text-slate-500 font-bold shadow-sm cursor-not-allowed" />
                       </Field>
                     )}
 
@@ -847,7 +850,7 @@ export default function EditCorporatePage() {
                             </div>
                             <p className="text-sm font-bold text-slate-600">{rule.tripType}</p>
                             <p className="text-sm font-bold text-slate-600">
-                              {rule.productType === "Flight" ? rule.cabinClass : `${rule.starRating} | ${rule.roomCount} Rm`}
+                              {rule.productType === "Flight" ? rule.cabinClass : `${rule.starRating} Star`}
                             </p>
                             <p className="text-sm font-black text-[#003399]">
                               {rule.feeType === "Fixed" ? `₹${rule.feeValue}` : `${rule.feeValue}%`}

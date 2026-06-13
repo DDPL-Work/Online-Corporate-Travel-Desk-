@@ -457,6 +457,45 @@ export default function CorporateWallet() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => exportExcel({
+                  pageHeader: activeTab === "booking" ? "Asset Consumption Ledger" : "Wallet Recharge Ledger",
+                  statCards: [
+                    { label: "Available Asset", value: loading ? "..." : `${currency || "₹"} ${(balance || 0).toLocaleString()}` },
+                    { label: "Total Capital In", value: `₹${totalCredit.toLocaleString()}` },
+                    ...(activeTab !== "recharge" ? [{ label: "Total Capital Out", value: `₹${totalDebit.toLocaleString()}` }] : []),
+                    { label: "Ledger Entries", value: filteredTransactions.length }
+                  ],
+                  appliedFilters: [
+                    { label: "Universal Search", value: searchTerm || "None" },
+                    { label: "Ledger Period", value: `${startDate || "Any"} to ${endDate || "Any"}` },
+                    { label: "Execution Status", value: statusFilter }
+                  ],
+                  data: filteredTransactions,
+                  columns: [
+                    { header: "Date", value: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
+                    { header: "Description", value: (tx) => tx.description || "—" },
+                    { header: "Asset Reference", value: (tx) => tx.orderId || tx.reference || tx._id || tx.bookingId || "—" },
+                    ...(activeTab === "recharge" ? [{ header: "Payment ID", value: (tx) => tx.paymentGateway?.paymentId || "—" }] : []),
+                    { header: "Type", value: (tx) => tx.type || "—" },
+                    { header: "Amount", value: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
+                    { header: "Status", value: (tx) => getTransactionStatus(tx) }
+                  ],
+                  filenamePrefix: "wallet_ledger"
+                })}
+                disabled={isExporting}
+                className="inline-flex shrink-0 items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-wait"
+                style={{ background: C.navy, color: C.white }}
+              >
+                {isExporting ? (
+                   <span className="w-3.5 h-3.5 border-2 border-[currentColor] border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                   <FiDownload size={13} />
+                )}
+                <span>{isExporting ? "Exporting..." : "Export Excel"}</span>
+              </button>
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleScroll("left")}
@@ -479,34 +518,7 @@ export default function CorporateWallet() {
           </div>
 
           <ResponsiveDataTable
-            exportLabel="Export Excel"
-            exportLoading={isExporting}
-            exportDisabled={isExporting}
-            onExport={() => exportExcel({
-              pageHeader: activeTab === "booking" ? "Asset Consumption Ledger" : "Wallet Recharge Ledger",
-              statCards: [
-                { label: "Available Asset", value: loading ? "..." : `${currency || "₹"} ${(balance || 0).toLocaleString()}` },
-                { label: "Total Capital In", value: `₹${totalCredit.toLocaleString()}` },
-                ...(activeTab !== "recharge" ? [{ label: "Total Capital Out", value: `₹${totalDebit.toLocaleString()}` }] : []),
-                { label: "Ledger Entries", value: filteredTransactions.length }
-              ],
-              appliedFilters: [
-                { label: "Universal Search", value: searchTerm || "None" },
-                { label: "Ledger Period", value: `${startDate || "Any"} to ${endDate || "Any"}` },
-                { label: "Execution Status", value: statusFilter }
-              ],
-              data: filteredTransactions,
-              columns: [
-                { header: "Date", value: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
-                { header: "Description", value: (tx) => tx.description || "—" },
-                { header: "Asset Reference", value: (tx) => tx.orderId || tx.reference || tx._id || tx.bookingId || "—" },
-                ...(activeTab === "recharge" ? [{ header: "Payment ID", value: (tx) => tx.paymentGateway?.paymentId || "—" }] : []),
-                { header: "Type", value: (tx) => tx.type || "—" },
-                { header: "Amount", value: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
-                { header: "Status", value: (tx) => getTransactionStatus(tx) }
-              ],
-              filenamePrefix: "wallet_ledger"
-            })}
+            showToolbar={false}
             wrapperClass="!border-none !shadow-none"
           >
             <div className="overflow-x-auto" ref={ledgerScrollRef}>

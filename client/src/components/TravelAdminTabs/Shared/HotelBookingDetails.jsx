@@ -51,18 +51,31 @@ import {
 } from "../../../Redux/Actions/hotelAmendment.thunks";
 import { generateHotelVoucher } from "../../../Redux/Actions/hotelBooking.thunks";
 
-
 const getVoucherDate = (b) => {
   if (b.voucheredAt) return b.voucheredAt;
-  const tboVoucherDate = b.bookingResult?.providerResponse?.VoucherDate || b.bookingResult?.providerResponse?.Response?.VoucherDate;
+  const tboVoucherDate =
+    b.bookingResult?.providerResponse?.VoucherDate ||
+    b.bookingResult?.providerResponse?.Response?.VoucherDate;
   if (tboVoucherDate) return tboVoucherDate;
-  if (["voucher_generated", "confirmed", "booked"].includes((b.executionStatus || "").toLowerCase())) return b.updatedAt;
+  if (
+    ["voucher_generated", "confirmed", "booked"].includes(
+      (b.executionStatus || "").toLowerCase(),
+    )
+  )
+    return b.updatedAt;
   return null;
 };
 
 function BookingHistory({ booking }) {
-  const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
-  const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
+  const isCancelled =
+    ["cancelled", "cancel_requested"].includes(
+      (booking.executionStatus || "").toLowerCase(),
+    ) || !!booking.cancellation;
+  const isConfirmed =
+    ["voucher_generated", "confirmed", "booked"].includes(
+      (booking.executionStatus || "").toLowerCase(),
+    ) ||
+    (isCancelled && !!booking.bookingResult?.hotelBookingId);
 
   const steps = [
     {
@@ -74,47 +87,73 @@ function BookingHistory({ booking }) {
     },
     {
       label: "Approval Status",
-      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
+      date:
+        booking.approvedAt ||
+        booking.rejectedAt ||
+        (["approved", "rejected"].includes(booking.requestStatus)
+          ? booking.updatedAt
+          : null),
       desc: (() => {
-        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
-        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
-        
+        const isRejected =
+          booking.rejectedAt || booking.requestStatus === "rejected";
+        const isApproved =
+          booking.approvedAt || booking.requestStatus === "approved";
+
         if (isRejected) {
           return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
         }
         if (isApproved) {
-          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
+          const reqEmail =
+            booking.userId?.email || booking.requesterDetails?.email;
           const appEmail = booking.approvedBy?.email || booking.approverEmail;
           const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
           if (booking.approverName === "Auto Approve" || isSameUser) {
-             return "Auto Approved by System (Travel Policy)";
+            return "Auto Approved by System (Travel Policy)";
           }
           return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
         }
         return "Waiting for manager approval";
       })(),
       icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+      active: !!(
+        booking.approvedAt ||
+        booking.rejectedAt ||
+        ["approved", "rejected"].includes(booking.requestStatus)
+      ),
     },
     {
       label: "Voucher Issued",
       date: getVoucherDate(booking),
-      desc: isConfirmed ? "Hotel voucher generated and sent" : "Final confirmation pending",
+      desc: isConfirmed
+        ? "Hotel voucher generated and sent"
+        : "Final confirmation pending",
       icon: <FiTag size={14} />,
       active: isConfirmed,
     },
     {
       label: "Cancellation",
       date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
-      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
+      desc: isCancelled
+        ? "Booking has been cancelled"
+        : "No cancellation requested",
       icon: <FiXCircle size={14} />,
       active: isCancelled,
       isLast: true,
     },
   ];
 
-  const formatDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const formatTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const formatDate = (d) =>
+    new Date(d).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  const formatTime = (d) =>
+    new Date(d).toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
 
   return (
     <div className="bg-white border border-[#EAE4D9] p-8 mb-8">
@@ -123,8 +162,12 @@ function BookingHistory({ booking }) {
           <FiRefreshCw size={18} className="text-[#B5862A]" />
         </div>
         <div>
-          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">Booking Lifecycle</h3>
-          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">Audit Trail & Timeline</p>
+          <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
+            Booking Lifecycle
+          </h3>
+          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-[0.2em] mt-1">
+            Audit Trail & Timeline
+          </p>
         </div>
       </div>
 
@@ -135,15 +178,21 @@ function BookingHistory({ booking }) {
         <div className="space-y-10">
           {steps.map((step, idx) => (
             <div key={idx} className="relative flex gap-8">
-              <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
-                step.active ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg" : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
-              }`}>
+              <div
+                className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border transition-colors duration-500 ${
+                  step.active
+                    ? "bg-[#B5862A] border-[#B5862A] text-white shadow-lg"
+                    : "bg-white border-[#EAE4D9] text-[#EAE4D9]"
+                }`}
+              >
                 {step.icon}
               </div>
 
               <div className="flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                  <p className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}>
+                  <p
+                    className={`text-[12px] font-bold uppercase tracking-[0.15em] ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}
+                  >
                     {step.label}
                   </p>
                   {step.date && (
@@ -152,7 +201,9 @@ function BookingHistory({ booking }) {
                     </span>
                   )}
                 </div>
-                <p className="text-[13px] text-[#7A7068] leading-relaxed font-medium">{step.desc}</p>
+                <p className="text-[13px] text-[#7A7068] leading-relaxed font-medium">
+                  {step.desc}
+                </p>
               </div>
             </div>
           ))}
@@ -165,7 +216,10 @@ function BookingHistory({ booking }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
 /* ─────────────────────────────────────────────────────────────── */
-function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) {
+function fmtDate(
+  d,
+  opts = { day: "2-digit", month: "short", year: "numeric" },
+) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-GB", opts);
 }
@@ -175,7 +229,11 @@ function fmtDay(d) {
 }
 function fmtTime(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(d).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 function nightsCount(ci, co) {
   if (!ci || !co) return 1;
@@ -199,7 +257,8 @@ function StatusPill({ status }) {
   };
   const label = labelMap[s] || status;
   const isAmendment = s.startsWith("amendment_");
-  const isCancelled = ["cancelled", "cancel_requested"].includes(s) || isAmendment;
+  const isCancelled =
+    ["cancelled", "cancel_requested"].includes(s) || isAmendment;
   const isConfirmed = ["confirmed", "voucher_generated", "booked"].includes(s);
 
   const colors = isCancelled
@@ -256,8 +315,6 @@ function SectionHeader({ num, title }) {
   );
 }
 
-
-
 /* ─────────────────────────────────────────────────────────────── */
 /*  Hero / Confirmation Block                                      */
 /* ─────────────────────────────────────────────────────────────── */
@@ -274,7 +331,11 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   const selectedRoom = hotelReq?.selectedRoom || {};
   const selectedHotel = hotelReq?.selectedHotel || {};
 
-  const hotelName = detail?.HotelName || snapshot?.hotelName || selectedHotel?.hotelName || "Hotel";
+  const hotelName =
+    detail?.HotelName ||
+    snapshot?.hotelName ||
+    selectedHotel?.hotelName ||
+    "Hotel";
   const city = detail?.City || selectedHotel?.city || "";
   const address = detail?.AddressLine1 || selectedHotel?.address || "";
   const starRating = detail?.StarRating || selectedHotel?.starRating || 0;
@@ -283,8 +344,8 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   const nights = nightsCount(checkIn, checkOut);
   // Room name: allRooms[].name[] is an array of strings in the new API
   const roomType =
-    (hotelReq.allRooms?.[0]?.name?.[0]) ||
-    (hotelReq.selectedRoom?.rawRoomData?.[0]?.Name?.[0]) ||
+    hotelReq.allRooms?.[0]?.name?.[0] ||
+    hotelReq.selectedRoom?.rawRoomData?.[0]?.Name?.[0] ||
     rooms[0]?.RoomTypeName ||
     "Standard Room";
 
@@ -298,17 +359,28 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   }
 
   const confirmationNo = detail?.ConfirmationNo || result?.hotelBookingId || "";
-  const invoiceNo = detail?.InvoiceNo || result?.providerResponse?.BookResult?.InvoiceNumber || "";
-  const bookingRefNo = detail?.BookingRefNo || result?.providerResponse?.BookResult?.BookingRefNo || "";
+  const invoiceNo =
+    detail?.InvoiceNo ||
+    result?.providerResponse?.BookResult?.InvoiceNumber ||
+    "";
+  const bookingRefNo =
+    detail?.BookingRefNo ||
+    result?.providerResponse?.BookResult?.BookingRefNo ||
+    "";
   const tboRef = detail?.TBOReferenceNo || "";
   const executionStatus = booking?.executionStatus || "";
-  const isCancelled = ["cancelled", "cancel_requested"].includes((executionStatus || "").toLowerCase());
+  const isCancelled = ["cancelled", "cancel_requested"].includes(
+    (executionStatus || "").toLowerCase(),
+  );
 
   const issuedDate = booking?.approvedAt || booking?.createdAt;
 
   useEffect(() => {
     if (!images.length) return;
-    const interval = setInterval(() => setActiveIndex((p) => (p + 1) % images.length), 2000);
+    const interval = setInterval(
+      () => setActiveIndex((p) => (p + 1) % images.length),
+      2000,
+    );
     return () => clearInterval(interval);
   }, [images]);
 
@@ -337,9 +409,13 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
         {/* Image */}
         <div className="relative min-h-[320px] overflow-hidden bg-[#E8E0D0]">
           {images.length > 0 ? (
-            <img src={images[activeIndex]}
+            <img
+              src={images[activeIndex]}
               alt={hotelName}
-              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700" loading="lazy" decoding="async" />
+              className="w-full h-full object-cover block absolute inset-0 transition-opacity duration-700"
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <div className="w-full h-full min-h-[320px] flex items-center justify-center bg-[#E8E0D0]">
               <MdHotel size={48} className="text-[#EAE4D9]" />
@@ -354,7 +430,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
             <h1 className="font-['Cormorant_Garamond'] text-[36px] font-bold leading-[1.1] text-[#1A1714] mb-2">
               {isCancelled
                 ? "Your trip was cancelled."
-                : (location.state?.isPastTrip || source === "past")
+                : location.state?.isPastTrip || source === "past"
                   ? "Your trip is completed."
                   : hotelName}
             </h1>
@@ -375,11 +451,13 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
             {executionStatus && (
               <div className="mt-[10px] flex items-center gap-2 flex-wrap">
                 <StatusPill status={executionStatus} />
-                {booking?.amendment?.status && 
-                 booking.amendment.status !== "completed" && 
-                 booking.amendment.status !== "not_requested" && (
-                  <StatusPill status={`amendment_${booking.amendment.status}`} />
-                )}
+                {booking?.amendment?.status &&
+                  booking.amendment.status !== "completed" &&
+                  booking.amendment.status !== "not_requested" && (
+                    <StatusPill
+                      status={`amendment_${booking.amendment.status}`}
+                    />
+                  )}
               </div>
             )}
           </div>
@@ -481,10 +559,7 @@ function PaymentStatusCard({
       icon: isConfirmed ? (
         <MdVerifiedUser size={13} />
       ) : (
-        <FiRefreshCw
-          size={13}
-          className="animate-spin"
-        />
+        <FiRefreshCw size={13} className="animate-spin" />
       ),
     },
     {
@@ -496,10 +571,19 @@ function PaymentStatusCard({
     {
       label: "Guests",
       value: (() => {
-        const adults = hotelReq.roomGuests?.reduce((acc, r) => acc + (r.noOfAdults || 0), 0) || 0;
-        const children = hotelReq.roomGuests?.reduce((acc, r) => acc + (r.noOfChild || 0), 0) || 0;
+        const adults =
+          hotelReq.roomGuests?.reduce(
+            (acc, r) => acc + (r.noOfAdults || 0),
+            0,
+          ) || 0;
+        const children =
+          hotelReq.roomGuests?.reduce(
+            (acc, r) => acc + (r.noOfChild || 0),
+            0,
+          ) || 0;
         let str = `${adults} ${adults === 1 ? "Adult" : "Adults"}`;
-        if (children > 0) str += `, ${children} ${children === 1 ? "Child" : "Children"}`;
+        if (children > 0)
+          str += `, ${children} ${children === 1 ? "Child" : "Children"}`;
         return str;
       })(),
       ok: null,
@@ -551,7 +635,13 @@ function PaymentStatusCard({
 /* ─────────────────────────────────────────────────────────────── */
 /*  Room Section                                                   */
 /* ─────────────────────────────────────────────────────────────── */
-function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoom = {}, noOfRooms = 1 }) {
+function RoomSection({
+  rooms = [],
+  preBookRooms = [],
+  allRooms = [],
+  selectedRoom = {},
+  noOfRooms = 1,
+}) {
   if (!rooms || rooms.length === 0) return null;
 
   return (
@@ -560,21 +650,46 @@ function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoo
         const descriptionHtml = room.RoomDescription || room.Description || "";
 
         const preBookRoom = preBookRooms[index] || {};
-        const allRoomMatch = allRooms.find(r => r.name === room.Name?.[0] || r.name === room.Name || r.name === room.roomTypeName) || allRooms[index] || {};
-        
-        let isRefundable = room.IsRefundable !== undefined ? room.IsRefundable : room.isRefundable;
+        const allRoomMatch =
+          allRooms.find(
+            (r) =>
+              r.name === room.Name?.[0] ||
+              r.name === room.Name ||
+              r.name === room.roomTypeName,
+          ) ||
+          allRooms[index] ||
+          {};
+
+        let isRefundable =
+          room.IsRefundable !== undefined
+            ? room.IsRefundable
+            : room.isRefundable;
         if (preBookRoom.IsRefundable !== undefined) {
           isRefundable = preBookRoom.IsRefundable;
         } else if (allRoomMatch.isRefundable !== undefined) {
           isRefundable = allRoomMatch.isRefundable;
         }
 
-        const inclusionStr = room.Inclusion || room.inclusion || selectedRoom.inclusion || preBookRoom.Inclusion || "";
+        const inclusionStr =
+          room.Inclusion ||
+          room.inclusion ||
+          selectedRoom.inclusion ||
+          preBookRoom.Inclusion ||
+          "";
         const inclusions = inclusionStr
           ? inclusionStr.split(",").filter((i) => i.trim())
           : [];
-        const promotions = room.RoomPromotion || room.roomPromotion || preBookRoom.RoomPromotion || [];
-        const supplements = room.Supplements || room.supplements || preBookRoom.Supplements || selectedRoom.Supplements || [];
+        const promotions =
+          room.RoomPromotion ||
+          room.roomPromotion ||
+          preBookRoom.RoomPromotion ||
+          [];
+        const supplements =
+          room.Supplements ||
+          room.supplements ||
+          preBookRoom.Supplements ||
+          selectedRoom.Supplements ||
+          [];
 
         return (
           <div key={index}>
@@ -585,34 +700,39 @@ function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoo
                   Selected Room Type
                 </div>
                 <h3 className="font-['Cormorant_Garamond'] text-[26px] font-semibold text-[#1A1714]">
-                  {noOfRooms > 1 && <span className="text-[#B5862A]">{noOfRooms} x </span>}
+                  {noOfRooms > 1 && (
+                    <span className="text-[#B5862A]">{noOfRooms} x </span>
+                  )}
                   {room.RoomTypeName ||
                     (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
                     `Room ${index + 1}`}
                 </h3>
               </div>
               <div className="flex gap-3 items-center">
-
                 <div className="flex gap-2 flex-wrap">
                   {room.MealType && (
                     <span className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-wider">
                       {room.MealType.replace(/_/g, " ")}
                     </span>
                   )}
-                  {isRefundable !== undefined && (() => {
-                    const isRefBool = isRefundable === true || isRefundable === "true" || isRefundable === "True";
-                    return (
-                      <span
-                        className={`inline-flex items-center gap-[5px] px-[10px] py-1 border text-[10px] font-bold uppercase tracking-wider ${
-                          isRefBool
-                            ? "border-[#2C7A4B] text-[#2C7A4B] bg-[#EDF7F2]"
-                            : "border-[#B5341A] text-[#B5341A] bg-[#FDF1EE]"
-                        }`}
-                      >
-                        {isRefBool ? "Refundable" : "Non-Refundable"}
-                      </span>
-                    );
-                  })()}
+                  {isRefundable !== undefined &&
+                    (() => {
+                      const isRefBool =
+                        isRefundable === true ||
+                        isRefundable === "true" ||
+                        isRefundable === "True";
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-[5px] px-[10px] py-1 border text-[10px] font-bold uppercase tracking-wider ${
+                            isRefBool
+                              ? "border-[#2C7A4B] text-[#2C7A4B] bg-[#EDF7F2]"
+                              : "border-[#B5341A] text-[#B5341A] bg-[#FDF1EE]"
+                          }`}
+                        >
+                          {isRefBool ? "Refundable" : "Non-Refundable"}
+                        </span>
+                      );
+                    })()}
                 </div>
               </div>
             </div>
@@ -621,7 +741,10 @@ function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoo
             {promotions.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {promotions.map((promo, i) => (
-                  <span key={`promo-${i}`} className="inline-flex items-center gap-[6px] px-[12px] py-[6px] border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-widest rounded-sm shadow-sm">
+                  <span
+                    key={`promo-${i}`}
+                    className="inline-flex items-center gap-[6px] px-[12px] py-[6px] border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-widest rounded-sm shadow-sm"
+                  >
                     <FiTag size={11} /> {promo}
                   </span>
                 ))}
@@ -642,56 +765,64 @@ function RoomSection({ rooms = [], preBookRooms = [], allRooms = [], selectedRoo
                       __html: descriptionHtml.replace(/<p><\/p>/g, ""),
                     }}
                   />
-                  </div>
-                )}
+                </div>
+              )}
 
-                {/* Inclusions */}
-                {inclusions.length > 0 && (
-                  <div className="bg-white p-6 border-t border-[#EAE4D9]">
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
-                      Inclusions
-                    </div>
-                    <ul className="list-none p-0 m-0 flex flex-col gap-2">
-                      {inclusions.map((inc, i) => (
-                        <li key={`inc-${i}`} className="flex gap-2 items-center text-[13px] text-[#7A7068]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#2C7A4B]" />
-                          {inc.trim()}
-                        </li>
-                      ))}
-                    </ul>
+              {/* Inclusions */}
+              {inclusions.length > 0 && (
+                <div className="bg-white p-6 border-t border-[#EAE4D9]">
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                    Inclusions
                   </div>
-                )}
+                  <ul className="list-none p-0 m-0 flex flex-col gap-2">
+                    {inclusions.map((inc, i) => (
+                      <li
+                        key={`inc-${i}`}
+                        className="flex gap-2 items-center text-[13px] text-[#7A7068]"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2C7A4B]" />
+                        {inc.trim()}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-                {/* Amenities */}
-                {room.Amenities && room.Amenities.length > 0 && (
-                  <div className="bg-white p-6 border-t border-[#EAE4D9]">
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
-                      Room Amenities
-                    </div>
-                    <AmenitiesSection amenities={room.Amenities} />
+              {/* Amenities */}
+              {room.Amenities && room.Amenities.length > 0 && (
+                <div className="bg-white p-6 border-t border-[#EAE4D9]">
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                    Room Amenities
                   </div>
-                )}
+                  <AmenitiesSection amenities={room.Amenities} />
+                </div>
+              )}
 
-                {/* Supplements */}
-                {supplements.length > 0 && (
-                  <div className="bg-white p-6 border-t border-[#EAE4D9]">
-                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
-                      Room Supplements
-                    </div>
-                    <ul className="list-none p-0 m-0 grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {supplements.map((s, si) => (
-                        <li key={`supp-${si}`} className="text-[12px] text-[#7A7068] bg-[#FAF8F4] p-3 border border-[#EAE4D9] flex justify-between items-center">
-                          <div className="font-bold text-[#1A1714]">{s.Type || s.type || "Extra"}</div>
-                          {(s.SuppAmount || s.Price) > 0 && (
-                            <div className="text-[#B5862A] font-bold">
-                              ₹{(s.SuppAmount || s.Price).toLocaleString()}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+              {/* Supplements */}
+              {supplements.length > 0 && (
+                <div className="bg-white p-6 border-t border-[#EAE4D9]">
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                    Room Supplements
                   </div>
-                )}
+                  <ul className="list-none p-0 m-0 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {supplements.map((s, si) => (
+                      <li
+                        key={`supp-${si}`}
+                        className="text-[12px] text-[#7A7068] bg-[#FAF8F4] p-3 border border-[#EAE4D9] flex justify-between items-center"
+                      >
+                        <div className="font-bold text-[#1A1714]">
+                          {s.Type || s.type || "Extra"}
+                        </div>
+                        {(s.SuppAmount || s.Price) > 0 && (
+                          <div className="text-[#B5862A] font-bold">
+                            ₹{(s.SuppAmount || s.Price).toLocaleString()}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -712,7 +843,7 @@ function AmenitiesSection({ amenities = [] }) {
     "free wi-fi": <FiWifi size={20} />,
     "wi-fi": <FiWifi size={20} />,
     "air conditioning": "❄",
-    "pool": "≋",
+    pool: "≋",
     "king bed": <MdKingBed size={20} />,
   };
   const featured = amenities.slice(0, 4);
@@ -773,9 +904,7 @@ function AmenitiesSection({ amenities = [] }) {
 /*  Check-in Instructions (Hotel Policies)                         */
 /* ─────────────────────────────────────────────────────────────── */
 function CheckInInstructions({ conditions = [] }) {
-  const filtered = conditions.filter(
-    (c) => c && c.trim(),
-  );
+  const filtered = conditions.filter((c) => c && c.trim());
   if (!filtered.length) return null;
 
   const decodeHtml = (html) => {
@@ -788,10 +917,7 @@ function CheckInInstructions({ conditions = [] }) {
     <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-[1px] bg-[#EAE4D9]">
       <div className="bg-[#FDF8EE] p-6 border-l-[3px] border-[#B5862A]">
         <div className="flex gap-[10px] items-start">
-          <FiInfo
-            size={15}
-            className="text-[#B5862A] mt-[2px] shrink-0"
-          />
+          <FiInfo size={15} className="text-[#B5862A] mt-[2px] shrink-0" />
           <p className="text-[12px] text-[#8A6200] leading-[1.6]">
             Read carefully. Failure to comply with property policy may result in
             entry being declined at check-in.
@@ -805,7 +931,7 @@ function CheckInInstructions({ conditions = [] }) {
               <span className="font-['DM_Mono'] text-[10px] text-[#B5862A] font-medium min-w-[18px] pt-[2px]">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <div 
+              <div
                 className="text-[13px] text-[#7A7068] leading-[1.6] checkin-html-content"
                 dangerouslySetInnerHTML={{ __html: decodeHtml(c) }}
               />
@@ -843,10 +969,7 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
     <div>
       {lastCancellationDate && (
         <div className="flex items-center gap-[10px] padding-[12px_16px] bg-[#EDF7F2] border border-[#C3E4D2] mb-4">
-          <FiCheckCircle
-            size={14}
-            className="text-[#2C7A4B]"
-          />
+          <FiCheckCircle size={14} className="text-[#2C7A4B]" />
           <span className="text-[13px] text-[#2C7A4B]">
             <strong>Free cancellation</strong> until{" "}
             <strong>{fmtDate(lastCancellationDate)}</strong>
@@ -873,15 +996,18 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
         <tbody>
           {policies.map((p, i) => {
             const nextPolicy = policies[i + 1];
-            const displayToDate = p.ToDate || nextPolicy?.FromDate || "Check-in";
+            const displayToDate =
+              p.ToDate || nextPolicy?.FromDate || "Check-in";
 
             const fromDateObj = parseDate(p.FromDate);
-            const toDateObj = parseDate(displayToDate === "Check-in" ? null : displayToDate);
-            
+            const toDateObj = parseDate(
+              displayToDate === "Check-in" ? null : displayToDate,
+            );
+
             const fromTime = fromDateObj?.getTime() || 0;
             const toTime = toDateObj?.getTime() || Infinity;
             const nowTime = now.getTime();
-            
+
             const isActive = nowTime >= fromTime && nowTime < toTime;
 
             return (
@@ -902,29 +1028,29 @@ function CancellationPolicySection({ policies = [], lastCancellationDate }) {
                 <td className="p-[14px_12px] border-b border-[#EAE4D9] text-[13px] text-[#A89F94]">
                   {displayToDate}
                 </td>
-              <td className="p-[14px_12px] border-b border-[#EAE4D9]">
-                <span
-                  className={`text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-[2px] ${
-                    p.CancellationCharge === 0
-                      ? "bg-[#EDF7F2] text-[#2C7A4B]"
-                      : "bg-[#FDF1EE] text-[#B5341A]"
-                  }`}
-                >
-                  {typeLabel(p.ChargeType)}
-                </span>
-              </td>
-              <td className="p-[14px_12px] border-b border-[#EAE4D9] text-right font-semibold text-[14px]">
-                {p.CancellationCharge === 0 ? (
-                  <span className="text-[#2C7A4B]">Free</span>
-                ) : (
-                  <span className="text-[#1A1714]">
-                    {p.ChargeType === 2 || p.ChargeType === "Percentage"
-                      ? `${p.CancellationCharge}%`
-                      : `₹${Number(p.CancellationCharge).toLocaleString("en-IN")}`}
+                <td className="p-[14px_12px] border-b border-[#EAE4D9]">
+                  <span
+                    className={`text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-[2px] ${
+                      p.CancellationCharge === 0
+                        ? "bg-[#EDF7F2] text-[#2C7A4B]"
+                        : "bg-[#FDF1EE] text-[#B5341A]"
+                    }`}
+                  >
+                    {typeLabel(p.ChargeType)}
                   </span>
-                )}
-              </td>
-            </tr>
+                </td>
+                <td className="p-[14px_12px] border-b border-[#EAE4D9] text-right font-semibold text-[14px]">
+                  {p.CancellationCharge === 0 ? (
+                    <span className="text-[#2C7A4B]">Free</span>
+                  ) : (
+                    <span className="text-[#1A1714]">
+                      {p.ChargeType === 2 || p.ChargeType === "Percentage"
+                        ? `${p.CancellationCharge}%`
+                        : `₹${Number(p.CancellationCharge).toLocaleString("en-IN")}`}
+                    </span>
+                  )}
+                </td>
+              </tr>
             );
           })}
         </tbody>
@@ -995,7 +1121,9 @@ function BookingReferencesSection({ booking, bookingDetail, result }) {
         </span>
         <span className="text-[11px] text-[#A89F94]">
           <span className="text-[#7A7068] font-medium">Booking Date</span> ·{" "}
-          {bookingDetail?.BookingDate ? fmtDate(bookingDetail.BookingDate) : "—"}
+          {bookingDetail?.BookingDate
+            ? fmtDate(bookingDetail.BookingDate)
+            : "—"}
         </span>
       </div>
     </div>
@@ -1093,7 +1221,7 @@ function GuestSection({ travellers = [] }) {
                     {new Date(t.Dob || t.dob).toLocaleDateString("en-GB", {
                       day: "2-digit",
                       month: "short",
-                      year: "numeric"
+                      year: "numeric",
                     })}
                   </div>
                 </div>
@@ -1121,7 +1249,10 @@ function FareBreakdownSection({ priceBreakUp, totalFare }) {
         <div className="flex flex-col gap-3">
           <div className="flex justify-between items-center text-[14px]">
             <span className="text-[#1A1714] font-bold">
-              Total Paid <span className="font-normal text-slate-500 text-[11px] ml-1">(incl. all taxes and service fee)</span>
+              Total Paid{" "}
+              <span className="font-normal text-slate-500 text-[11px] ml-1">
+                (incl. all taxes and service fee)
+              </span>
             </span>
             <span className="font-bold text-[#B5341A] text-[20px]">
               ₹{Number(totalFare).toLocaleString("en-IN")}
@@ -1189,7 +1320,9 @@ function CancellationSection({
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { amendmentStatus, statusLoading } = useSelector((state) => state.hotelAmendment);
+  const { amendmentStatus, statusLoading } = useSelector(
+    (state) => state.hotelAmendment,
+  );
 
   const providerStatusRaw =
     amendmentStatus?.response?.HotelChangeRequestStatusResult ||
@@ -1309,9 +1442,7 @@ function CancellationSection({
       refund: Math.max(0, totalFare - chargeAmount),
       isFree: chargeAmount === 0,
       policy: applicablePolicy,
-      note: `Policy in effect since ${
-        applicablePolicy.FromDate.split(" ")[0]
-      }`,
+      note: `Policy in effect since ${applicablePolicy.FromDate.split(" ")[0]}`,
     };
   };
 
@@ -1346,14 +1477,13 @@ function CancellationSection({
     booking.amendment?.providerResponse?.HotelChangeRequestResult;
 
   // New: deeper extraction based on the provided JSON structure
-  const hotelChangeResult = providerStatusObj?.HotelChangeRequestResult || providerStatusObj;
-  
+  const hotelChangeResult =
+    providerStatusObj?.HotelChangeRequestResult || providerStatusObj;
+
   const cancelStatusRaw = booking.raw?.CancellationStatus?.[0] || {};
 
   const totalRefund = Number(
-    hotelChangeResult?.RefundedAmount ??
-      booking.amendment?.refundedAmount ??
-      0,
+    hotelChangeResult?.RefundedAmount ?? booking.amendment?.refundedAmount ?? 0,
   );
   const totalCharge = Number(
     hotelChangeResult?.CancellationCharge ??
@@ -1361,37 +1491,39 @@ function CancellationSection({
       0,
   );
 
-  const cancellationFees = hotelChangeResult?.CancellationChargeBreakUp?.CancellationFees || 0;
-  const serviceCharge = hotelChangeResult?.CancellationChargeBreakUp?.CancellationServiceCharge || 0;
+  const cancellationFees =
+    hotelChangeResult?.CancellationChargeBreakUp?.CancellationFees || 0;
+  const serviceCharge =
+    hotelChangeResult?.CancellationChargeBreakUp?.CancellationServiceCharge ||
+    0;
   const totalServiceCharge = hotelChangeResult?.TotalServiceCharge || 0;
   const totalPrice = hotelChangeResult?.TotalPrice || 0;
-  
+
   const creditNote = hotelChangeResult?.CreditNoteNo || "";
   const creditNoteDate = hotelChangeResult?.CreditNoteCreatedOn || "";
   const zendeskId = hotelChangeResult?.ZendeskTicketId || "";
-  
+
   const gst = hotelChangeResult?.GST || {};
 
-  const providerRemarks = hotelChangeResult?.Remarks || hotelChangeResult?.Error?.ErrorMessage || "Successful";
-  
+  const providerRemarks =
+    hotelChangeResult?.Remarks ||
+    hotelChangeResult?.Error?.ErrorMessage ||
+    "Successful";
+
   const cancelledOn =
     booking.cancellation?.cancelledAt ||
     booking.amendment?.requestedAt ||
     booking.updatedAt;
-    
+
   const changeRequestId =
     hotelChangeResult?.ChangeRequestId ||
     booking.amendment?.changeRequestId ||
     "—";
 
   let displayStatusLabel = booking.amendment?.status || "Cancelled";
-  if (
-    hotelChangeResult?.ChangeRequestStatus === 3
-  )
+  if (hotelChangeResult?.ChangeRequestStatus === 3)
     displayStatusLabel = "Approved";
-  if (
-    hotelChangeResult?.ChangeRequestStatus === 4
-  )
+  if (hotelChangeResult?.ChangeRequestStatus === 4)
     displayStatusLabel = "Rejected";
 
   // ── Already cancelled ──
@@ -1461,10 +1593,7 @@ function CancellationSection({
         <div className="bg-white p-6 grid grid-cols-2 gap-6">
           <div className="flex gap-3 items-start">
             <div className="w-8 h-8 bg-[#FAF8F4] border border-[#EAE4D9] flex items-center justify-center shrink-0">
-              <FiAlertCircle
-                size={14}
-                className="text-[#A89F94]"
-              />
+              <FiAlertCircle size={14} className="text-[#A89F94]" />
             </div>
             <div>
               <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
@@ -1482,10 +1611,7 @@ function CancellationSection({
           {providerRemarks && (
             <div className="flex gap-3 items-start">
               <div className="w-8 h-8 bg-[#EEF4FD] border border-[#C0D4F0] flex items-center justify-center shrink-0">
-                <FiInfo
-                  size={14}
-                  className="text-[#1A4A7A]"
-                />
+                <FiInfo size={14} className="text-[#1A4A7A]" />
               </div>
               <div>
                 <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
@@ -1567,17 +1693,18 @@ function CancellationSection({
                   )}
                 </div>
 
-                {mappedStatus === "rejected" && cancelRequest?.approverComments && (
-                  <div className="mt-3 flex gap-2 bg-[#FDF1EE] border border-[#F0C4BA] p-[10px_14px] items-start">
-                    <FiMessageCircle
-                      size={13}
-                      className="text-[#B5341A] mt-[2px] shrink-0"
-                    />
-                    <p className="text-[13px] text-[#B5341A] font-medium">
-                      {cancelRequest.approverComments}
-                    </p>
-                  </div>
-                )}
+                {mappedStatus === "rejected" &&
+                  cancelRequest?.approverComments && (
+                    <div className="mt-3 flex gap-2 bg-[#FDF1EE] border border-[#F0C4BA] p-[10px_14px] items-start">
+                      <FiMessageCircle
+                        size={13}
+                        className="text-[#B5341A] mt-[2px] shrink-0"
+                      />
+                      <p className="text-[13px] text-[#B5341A] font-medium">
+                        {cancelRequest.approverComments}
+                      </p>
+                    </div>
+                  )}
                 {mappedStatus === "approved" && (
                   <div className="mt-3 flex flex-col gap-3 bg-[#EDF7F2] border border-[#C3E4D2] p-[16px_20px]">
                     <div className="flex justify-between items-center">
@@ -1590,20 +1717,31 @@ function CancellationSection({
                           Refund will be processed within 5–7 business days
                         </p>
                       </div>
-                      {providerStatus?.RefundedAmount === 0 && providerStatus?.ChangeRequestStatus === 3 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase">
-                            Not Refunded
-                          </span>
-                          <button
-                            onClick={() => dispatch(getHotelAmendmentStatus({ bookingId: booking?.bookingId || booking?._id }))}
-                            className="text-[10px] text-amber-700 hover:underline flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
-                          >
-                            <FiRefreshCw size={10} className={statusLoading ? "animate-spin" : ""} />
-                            Check Status
-                          </button>
-                        </div>
-                      )}
+                      {providerStatus?.RefundedAmount === 0 &&
+                        providerStatus?.ChangeRequestStatus === 3 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase">
+                              Not Refunded
+                            </span>
+                            <button
+                              onClick={() =>
+                                dispatch(
+                                  getHotelAmendmentStatus({
+                                    bookingId:
+                                      booking?.bookingId || booking?._id,
+                                  }),
+                                )
+                              }
+                              className="text-[10px] text-amber-700 hover:underline flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
+                            >
+                              <FiRefreshCw
+                                size={10}
+                                className={statusLoading ? "animate-spin" : ""}
+                              />
+                              Check Status
+                            </button>
+                          </div>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4 mt-1">
                       <div>
@@ -1654,7 +1792,8 @@ function CancellationSection({
                 )}
                 {cancelRequest?.requestedAt && (
                   <p className="mt-3 text-[11px] text-[#A89F94]">
-                    Submitted on {fmtDate(cancelRequest.requestedAt)} · {fmtTime(cancelRequest.requestedAt)}
+                    Submitted on {fmtDate(cancelRequest.requestedAt)} ·{" "}
+                    {fmtTime(cancelRequest.requestedAt)}
                   </p>
                 )}
               </div>
@@ -1695,10 +1834,7 @@ function CancellationSection({
             {/* Form header */}
             <div className="p-[16px_24px] border-b border-[#F0C4BA] flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <MdCancel
-                  size={14}
-                  className="text-[#B5341A]"
-                />
+                <MdCancel size={14} className="text-[#B5341A]" />
                 <span className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#B5341A]">
                   Cancellation Request
                 </span>
@@ -1711,10 +1847,7 @@ function CancellationSection({
                 }}
                 className="w-7 h-7 bg-[#F0C4BA] border-none cursor-pointer flex items-center justify-center"
               >
-                <FiX
-                  size={13}
-                  className="text-[#B5341A]"
-                />
+                <FiX size={13} className="text-[#B5341A]" />
               </button>
             </div>
 
@@ -1762,10 +1895,7 @@ function CancellationSection({
                   >
                     <option value="">Select a reason…</option>
                     {CANCEL_REASONS.map((r) => (
-                      <option
-                        key={r}
-                        value={r}
-                      >
+                      <option key={r} value={r}>
                         {r}
                       </option>
                     ))}
@@ -1817,10 +1947,7 @@ function CancellationSection({
                 >
                   {submitting ? (
                     <>
-                      <FiRefreshCw
-                        size={12}
-                        className="animate-spin"
-                      />{" "}
+                      <FiRefreshCw size={12} className="animate-spin" />{" "}
                       Submitting…
                     </>
                   ) : (
@@ -1847,10 +1974,7 @@ function CancellationSection({
       {/* Not eligible */}
       {!canRequest && !isCancelled && !cancelRequest && !submitted && (
         <div className="flex items-center gap-2 p-[14px_20px] bg-white border border-[#EAE4D9]">
-          <FiInfo
-            size={14}
-            className="text-[#A89F94]"
-          />
+          <FiInfo size={14} className="text-[#A89F94]" />
           <p className="text-[13px] text-[#7A7068]">
             {isPastCheckIn
               ? "Cancellation is no longer possible as the check-in date has passed."
@@ -2000,15 +2124,17 @@ export default function HotelBookingDetails() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAF8F4] font-['DM_Sans'] p-6 text-center">
         <FiAlertCircle size={40} className="text-[#B5341A] opacity-50" />
-        <h2 className="text-[16px] font-semibold text-[#1A1714]">Failed to load booking</h2>
+        <h2 className="text-[16px] font-semibold text-[#1A1714]">
+          Failed to load booking
+        </h2>
         <p className="text-[13px] text-[#A89F94] max-w-xs">{error}</p>
-        <button 
+        <button
           onClick={() => dispatch(getHotelBookingByIdAdmin(id))}
           className="mt-2 px-6 py-2 bg-[#B5862A] text-white text-[12px] font-semibold uppercase tracking-wider hover:bg-[#966b1d] transition-colors"
         >
           Retry
         </button>
-        <button 
+        <button
           onClick={() => navigate(backPath)}
           className="text-[12px] text-[#7A7068] hover:underline"
         >
@@ -2027,33 +2153,54 @@ export default function HotelBookingDetails() {
   const bookingResult = booking?.bookingResult || {};
   const result = bookingResult; // alias for JSX compatibility
 
-
   // Room data from the actual API response structure
   const allRooms = hotelReq.allRooms || [];
   const rawData = hotelReq.selectedRoom?.rawRoomData;
-  const selectedRoomRaw = Array.isArray(rawData) ? (rawData[0] || {}) : (rawData || allRooms[0] || {});
+  const selectedRoomRaw = Array.isArray(rawData)
+    ? rawData[0] || {}
+    : rawData || allRooms[0] || {};
 
-  const rooms = (Array.isArray(booking?.rooms) && booking.rooms.length > 0)
-    ? booking.rooms
-    : (Array.isArray(rawData) ? rawData : (rawData ? [rawData] : allRooms));
+  const rooms =
+    Array.isArray(booking?.rooms) && booking.rooms.length > 0
+      ? booking.rooms
+      : Array.isArray(rawData)
+        ? rawData
+        : rawData
+          ? [rawData]
+          : allRooms;
 
-  const cancelPolicies = hotelReq.selectedRoom?.cancelPolicies || selectedRoomRaw?.CancelPolicies || [];
+  const cancelPolicies =
+    hotelReq.selectedRoom?.cancelPolicies ||
+    selectedRoomRaw?.CancelPolicies ||
+    [];
   const amenities = selectedRoomRaw?.Amenities || [];
 
   const travellers = booking?.travellers || [];
   const bookingDetail = null; // no raw TBO detail in this API
   const detailRoom = selectedRoomRaw;
   const preBookResult = hotelReq?.preBookResponse?.HotelResult?.[0] || {};
-  const rateConditions = hotelReq.selectedRoom?.RateConditions || selectedRoomRaw?.RateConditions || preBookResult?.RateConditions || [];
-  const rawSupplements = hotelReq.selectedRoom?.Supplements || selectedRoomRaw?.Supplements || preBookResult?.Rooms?.[0]?.Supplements || [];
-  const supplements = Array.isArray(rawSupplements[0]) ? rawSupplements.flat() : rawSupplements;
+  const rateConditions =
+    hotelReq.selectedRoom?.RateConditions ||
+    selectedRoomRaw?.RateConditions ||
+    preBookResult?.RateConditions ||
+    [];
+  const rawSupplements =
+    hotelReq.selectedRoom?.Supplements ||
+    selectedRoomRaw?.Supplements ||
+    preBookResult?.Rooms?.[0]?.Supplements ||
+    [];
+  const supplements = Array.isArray(rawSupplements[0])
+    ? rawSupplements.flat()
+    : rawSupplements;
 
   const paymentSuccessful = booking?.payment?.status === "completed";
   const executionStatus = booking?.executionStatus || "";
   const bookingAmendmentStatus = booking?.amendment?.status || "";
 
   // Combined status: if amendment is pending, show that; otherwise use executionStatus
-  const displayStatus = ["requested", "in_progress"].includes(bookingAmendmentStatus)
+  const displayStatus = ["requested", "in_progress"].includes(
+    bookingAmendmentStatus,
+  )
     ? `amendment_${bookingAmendmentStatus}`
     : executionStatus;
 
@@ -2064,14 +2211,15 @@ export default function HotelBookingDetails() {
   const isCancelled = ["cancelled", "cancel_requested"].includes(
     executionStatus.toLowerCase(),
   );
-  const isAmendmentPending = bookingAmendmentStatus === "requested" || bookingAmendmentStatus === "in_progress";
+  const isAmendmentPending =
+    bookingAmendmentStatus === "requested" ||
+    bookingAmendmentStatus === "in_progress";
 
   const totalFare =
     pricing?.totalAmount ||
     selectedRoomRaw?.TotalFare ||
     allRooms[0]?.totalFare ||
     0;
-
 
   return (
     <div className="bg-[#FAF8F4] min-h-screen font-['DM_Sans'] selection:bg-[#B5862A20] selection:text-[#B5862A]">
@@ -2117,7 +2265,6 @@ export default function HotelBookingDetails() {
                 </button>
               </div>
             )}
-            
           </div>
         </div>
 
@@ -2154,17 +2301,24 @@ export default function HotelBookingDetails() {
         {/* ── Dynamic Header ── */}
         {(() => {
           let label = "Reservation";
-          let title = isCancelled ? "The trip is cancelled." : location.state?.isPastTrip ? "The trip is completed." : "The trip is confirmed.";
-          let subtitle = "A clean, single-page record of the itinerary, guests and payment.";
+          let title = isCancelled
+            ? "The trip is cancelled."
+            : location.state?.isPastTrip
+              ? "The trip is completed."
+              : "The trip is confirmed.";
+          let subtitle =
+            "A clean, single-page record of the itinerary, guests and payment.";
 
           if (activeTab === "room_details") {
             label = "Room Details";
             title = "Accommodation Info";
-            subtitle = "Detailed breakdown of the reserved rooms, amenities, and meal plans.";
+            subtitle =
+              "Detailed breakdown of the reserved rooms, amenities, and meal plans.";
           } else if (activeTab === "rules") {
             label = "Rules & Policies";
             title = "Hotel Policies";
-            subtitle = "Important guidelines, cancellation policies, and hotel rules.";
+            subtitle =
+              "Important guidelines, cancellation policies, and hotel rules.";
           } else if (activeTab === "guest") {
             label = "Guest Information";
             title = "Guests";
@@ -2172,11 +2326,13 @@ export default function HotelBookingDetails() {
           } else if (activeTab === "amendment") {
             label = "Modifications";
             title = "Amendments & Options";
-            subtitle = "Manage cancellations, reissues, and support queries for this booking.";
+            subtitle =
+              "Manage cancellations, reissues, and support queries for this booking.";
           } else if (activeTab === "history") {
             label = "Audit Trail";
             title = "Booking Life Cycle";
-            subtitle = "Chronological history of status changes and events for this reservation.";
+            subtitle =
+              "Chronological history of status changes and events for this reservation.";
           }
 
           return (
@@ -2198,26 +2354,28 @@ export default function HotelBookingDetails() {
 
         {activeTab === "hotel_details" && (
           <div className="space-y-6">
-           <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
-             <div>
-               <HotelHeroCard
-                 booking={booking}
-                 bookingDetail={bookingDetail}
-                 paymentSuccessful={paymentSuccessful}
-               />
-             </div>
-             <div>
-               <FareSummaryCard 
-                 totalFare={totalFare} 
-                 currency={pricing?.currency || priceBreakUp?.Currency || "INR"} 
-                 isRefundable={
-                   selectedRoomRaw?.Refundable !== undefined 
-                     ? selectedRoomRaw?.Refundable 
-                     : !selectedRoomRaw?.IsNonRefundable
-                 } 
-               />
-             </div>
-           </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+              <div>
+                <HotelHeroCard
+                  booking={booking}
+                  bookingDetail={bookingDetail}
+                  paymentSuccessful={paymentSuccessful}
+                />
+              </div>
+              <div>
+                <FareSummaryCard
+                  totalFare={totalFare}
+                  currency={
+                    pricing?.currency || priceBreakUp?.Currency || "INR"
+                  }
+                  isRefundable={
+                    selectedRoomRaw?.Refundable !== undefined
+                      ? selectedRoomRaw?.Refundable
+                      : !selectedRoomRaw?.IsNonRefundable
+                  }
+                />
+              </div>
+            </div>
 
             <div className=" gap-6">
               <div className="space-y-6">
@@ -2251,20 +2409,25 @@ export default function HotelBookingDetails() {
                 <p className="text-gray-500">No room details available.</p>
               </div>
             )}
-            
+
             {supplements.length > 0 && (
               <section className="mb-12">
                 <SectionHeader num={2} title="Mandatory Supplements" />
                 <div className="bg-white border border-[#EAE4D9] p-5">
                   <ul className="space-y-3 m-0 p-0 list-none">
                     {supplements.map((s, i) => (
-                      <li key={i} className="flex justify-between items-center pb-3 border-b border-gray-100 last:border-0 last:pb-0">
+                      <li
+                        key={i}
+                        className="flex justify-between items-center pb-3 border-b border-gray-100 last:border-0 last:pb-0"
+                      >
                         <div>
                           <div className="text-[11px] font-bold text-[#1A1714] uppercase tracking-wide">
                             {s.Type || s.type || "Supplement"}
                           </div>
                           <div className="text-[12px] text-[#7A7068]">
-                            {s.Description || s.description || "Additional Charge"}
+                            {s.Description ||
+                              s.description ||
+                              "Additional Charge"}
                           </div>
                         </div>
                         <div className="text-right">
@@ -2298,7 +2461,10 @@ export default function HotelBookingDetails() {
 
             {rateConditions.length > 0 && (
               <section className="mb-12">
-                <SectionHeader num={3} title="Rate Conditions & Hotel Policies" />
+                <SectionHeader
+                  num={3}
+                  title="Rate Conditions & Hotel Policies"
+                />
                 <CheckInInstructions conditions={rateConditions} />
               </section>
             )}

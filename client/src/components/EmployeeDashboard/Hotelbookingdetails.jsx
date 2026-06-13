@@ -23,6 +23,7 @@ import {
   FiShield,
   FiInfo,
   FiX,
+  FiPlusCircle,
   FiStar,
   FiWifi,
   FiCoffee,
@@ -200,6 +201,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   let images =
     booking?.images ||
     selectedHotel?.images ||
+    booking?.hotelDetails?.Images ||
+    booking?.raw?.HotelDetails?.Images ||
+    booking?.raw?.Images ||
     hotelReq?.selectedRoom?.rawRoomData?.[0]?.images ||
     [];
   if (snapshot?.hotelImage && !images.includes(snapshot.hotelImage)) {
@@ -215,11 +219,14 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
 
   const issuedDate = booking?.approvedAt || booking?.createdAt;
 
+  const numImages = images.length;
   useEffect(() => {
-    if (!images.length) return;
-    const interval = setInterval(() => setActiveIndex((p) => (p + 1) % images.length), 2000);
+    if (!numImages) return;
+    const interval = setInterval(() => {
+      setActiveIndex((p) => (p + 1) % numImages);
+    }, 2500);
     return () => clearInterval(interval);
-  }, [images]);
+  }, [numImages]);
 
   return (
     <div className="bg-white border border-[#EAE4D9]">
@@ -397,17 +404,19 @@ function PaymentStatusCard({
     },
     {
       label: "Rooms",
-      value: hotelReq.noOfRooms || 1,
+      value: booking?.bookingSnapshot?.roomCount || booking?.raw?.NoOfRooms || booking?.rooms?.length || hotelReq?.noOfRooms || 1,
       ok: null,
       icon: <MdHotel size={13} />,
     },
     {
       label: "Guests",
-      value: `${hotelReq.roomGuests?.[0]?.noOfAdults || 0} Adults${
-        hotelReq.roomGuests?.[0]?.noOfChild > 0
-          ? `, ${hotelReq.roomGuests[0].noOfChild} Child`
-          : ""
-      }`,
+      value: booking?.travellers?.length 
+        ? `${booking.travellers.length} Guests` 
+        : `${hotelReq.roomGuests?.[0]?.noOfAdults || 0} Adults${
+            hotelReq.roomGuests?.[0]?.noOfChild > 0
+              ? `, ${hotelReq.roomGuests[0].noOfChild} Child`
+              : ""
+          }`,
       ok: null,
       icon: <FiUsers size={13} />,
     },
@@ -420,9 +429,9 @@ function PaymentStatusCard({
   ].filter((item) => !item.hidden);
 
   return (
-    <div className="grid grid-cols-4 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
+    <div className="grid grid-cols-2 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
       {items.map((item, i) => (
-        <div key={i} className="bg-white p-5">
+        <div key={i} className={`bg-white p-5 ${item.label === "Purpose" ? "col-span-2" : ""}`}>
           <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
             {item.label}
           </div>
@@ -468,13 +477,13 @@ function RoomSection({ rooms, selectedRoom }) {
 
   return (
     <div className="flex flex-col gap-8">
-      {rooms.map((room, index) => {
+      {rooms.slice(0, 1).map((room, index) => {
         const descriptionHtml = room.RoomDescription || "";
         const inclusions = room.Inclusion ? room.Inclusion.split(',') : [];
-        const promotions = room.RoomPromotion || [];
+        const promotions = room.RoomPromotion ? (Array.isArray(room.RoomPromotion) ? room.RoomPromotion : [room.RoomPromotion]) : [];
         const amenities = room.Amenities || [];
-        const isExpanded = expandedAmenities[index];
-        const visibleAmenities = isExpanded ? amenities : amenities.slice(0, 10);
+        const supplements = room.Supplements || [];
+        const roomCount = rooms.length;
 
         return (
           <div key={index} className="border border-[#EAE4D9] bg-white overflow-hidden">
@@ -485,13 +494,20 @@ function RoomSection({ rooms, selectedRoom }) {
                   Selected Room Type
                 </div>
                 <h3 className="font-['Cormorant_Garamond'] text-[26px] font-semibold text-[#1A1714]">
+                  <span className="text-[#B5862A] font-['Cormorant_Garamond'] text-[26px] font-semibold ">{roomCount > 1 ? `${roomCount} X ` : ""}</span>
                   {room.RoomTypeName ||
                     (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
-                    `Room ${index + 1}`}
+                    `Room`}
                 </h3>
               </div>
               <div className="flex gap-3 items-center">
                 <div className="flex gap-2 flex-wrap">
+                  {promotions.map((promo, i) => (
+                    <span key={`promo-${i}`} className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FFFBF0] uppercase tracking-wider">
+                      <FiStar size={10} />
+                      {promo}
+                    </span>
+                  ))}
                   {room.MealType && (
                     <span className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-wider">
                       {room.MealType.replace(/_/g, " ")}
@@ -529,11 +545,11 @@ function RoomSection({ rooms, selectedRoom }) {
                 </div>
               )}
 
-              {/* Inclusions + Promotions */}
-              {(inclusions.length > 0 || promotions.length > 0) && (
+              {/* Inclusions */}
+              {inclusions.length > 0 && (
                 <div className="bg-white p-6">
                   <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
-                    Inclusions & Promotions
+                    Inclusions
                   </div>
                   <ul className="list-none p-0 m-0 flex flex-col gap-2">
                     {inclusions.map((inc, i) => (
@@ -542,13 +558,48 @@ function RoomSection({ rooms, selectedRoom }) {
                         {inc.trim()}
                       </li>
                     ))}
-                    {promotions.map((promo, i) => (
-                      <li key={`promo-${i}`} className="flex gap-2 items-center text-[13px] text-[#B5862A]">
-                        <FiStar className="text-[#B5862A] shrink-0" size={14} />
-                        {promo}
-                      </li>
-                    ))}
                   </ul>
+                </div>
+              )}
+              
+              {/* Supplements */}
+              {supplements.length > 0 && (
+                <div className="bg-white p-6">
+                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-4">
+                    Supplements
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {supplements.map((supp, i) => (
+                      <div key={`supp-${i}`} className="flex justify-between items-center p-4 border border-[#EAE4D9] bg-[#FAF8F4] transition-colors hover:bg-[#F3EFEA]">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-white p-2 border border-[#EAE4D9] shrink-0 text-[#B5862A]">
+                            <FiPlusCircle size={16} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[13px] font-semibold text-[#1A1714]">
+                              {supp.Description || `Supplement Type ${supp.Type}`}
+                            </span>
+                            <span className="text-[10px] text-[#7A7068] tracking-widest uppercase mt-0.5">
+                              Room Add-on
+                            </span>
+                          </div>
+                        </div>
+                        {supp.Price > 0 ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[14px] font-bold text-[#2C7A4B]">
+                              +{supp.Price} {supp.Currency}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-end">
+                            <span className="text-[12px] font-bold tracking-widest text-[#B5862A] uppercase">
+                              Included
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -559,22 +610,12 @@ function RoomSection({ rooms, selectedRoom }) {
                     Room Amenities
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {visibleAmenities.map((amenity, i) => (
+                    {amenities.map((amenity, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-[#B5862A] shrink-0" />
                         <span className="text-[13px] text-[#7A7068] leading-tight">{amenity}</span>
                       </div>
                     ))}
-                    {amenities.length > 10 && (
-                      <div className="col-span-full mt-2">
-                        <button
-                          onClick={() => toggleAmenities(index)}
-                          className="text-[12px] text-[#B5862A] font-semibold hover:underline"
-                        >
-                          {isExpanded ? "Show Less" : `+ ${amenities.length - 10} more amenities available (click to show all)`}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -973,7 +1014,7 @@ function GuestSection({ travellers = [] }) {
 /*  08 Fare Breakdown (Travel Admin Only)                          */
 /* ─────────────────────────────────────────────────────────────── */
 function FareBreakdownSection({ priceBreakUp, totalFare }) {
-  if (!priceBreakUp) return null;
+  if (!totalFare) return null;
 
   return (
     <div className="bg-white border border-[#EAE4D9] p-6">
@@ -2106,7 +2147,7 @@ export default function HotelBookingDetails() {
                   <MdVerifiedUser size={11} /> Voucher Issued
                 </span>
                 <button
-                  onClick={() => dispatch(generateHotelVoucher(booking._id))}
+                  onClick={() => dispatch(generateHotelVoucher(booking.bookingId || booking._id))}
                   className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
                 >
                   <FiDownload size={11} /> Download Voucher
@@ -2224,33 +2265,20 @@ export default function HotelBookingDetails() {
 
         {/* Tab Contents */}
         {activeTab === "hotel_details" && (
-          <div className={`grid grid-cols-1 gap-6 ${isTravelAdmin ? "lg:grid-cols-3" : ""}`}>
-            <div className={`space-y-6 ${isTravelAdmin ? "lg:col-span-2" : ""}`}>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
               <HotelHeroCard
                 booking={booking}
                 bookingDetail={bookingDetail}
                 paymentSuccessful={paymentSuccessful}
               />
-              <PaymentStatusCard
-                booking={booking}
-                paymentSuccessful={paymentSuccessful}
-                isConfirmed={isConfirmed}
-                hotelReq={hotelReq}
-                isTravelAdmin={isTravelAdmin}
-              />
-              <section>
-                <SectionHeader num={4} title="Booking Summry" />
-                <BookingReferencesSection
-                  booking={booking}
-                  bookingDetail={bookingDetail}
-                  result={result}
-                />
-              </section>
+             
             </div>
             
-            {/* Fare Breakdown for Travel Admin */}
-            {isTravelAdmin && priceBreakUp && (
-              <div className="lg:col-span-1">
+            {/* Right Side Column */}
+            <div className="lg:col-span-1 space-y-7">
+              {/* Fare Breakdown for Travel Admin */}
+              {isTravelAdmin && totalFare > 0 && (
                 <section>
                   <SectionHeader num={7} title="Fare Breakdown" />
                   <FareBreakdownSection
@@ -2258,8 +2286,18 @@ export default function HotelBookingDetails() {
                     totalFare={totalFare}
                   />
                 </section>
-              </div>
-            )}
+              )}
+              
+              <section>
+                <PaymentStatusCard
+                booking={booking}
+                paymentSuccessful={paymentSuccessful}
+                isConfirmed={isConfirmed}
+                hotelReq={hotelReq}
+                isTravelAdmin={isTravelAdmin}
+              />
+              </section>
+            </div>
           </div>
         )}
 
@@ -2291,15 +2329,16 @@ export default function HotelBookingDetails() {
             <section>
               <SectionHeader title="Cancellation Policies" />
               <div className="space-y-6">
-                {rooms.map((room, idx) => {
+                {rooms.slice(0, 1).map((room, idx) => {
                   const policies = room.CancelPolicies || [];
                   const policyText = room.CancellationPolicy || "";
                   if (!policies.length && !policyText) return null;
+                  const roomCount = rooms.length;
 
                   return (
                     <div key={idx} className="bg-white p-6 border border-[#EAE4D9]">
                       <div className="text-[12px] font-semibold text-[#1A1714] mb-4">
-                        Room {idx + 1}: {room.RoomTypeName || (Array.isArray(room.Name) ? room.Name[0] : room.Name)}
+                        {roomCount > 1 ? `${roomCount} X ` : ""} {room.RoomTypeName || (Array.isArray(room.Name) ? room.Name[0] : room.Name) || "Room"}
                       </div>
                       
                       {policies.length > 0 && (

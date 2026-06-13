@@ -22,7 +22,6 @@ const emptyServiceFeeDraft = {
   tripType: "Domestic",
   cabinClass: "Economy",
   starRating: "3 Star",
-  roomCount: 1,
   feeType: "Fixed",
   feeValue: "",
   status: "Active",
@@ -91,13 +90,17 @@ export default function FinancialApprovalPage() {
     }
     setForm(prev => ({ ...prev, isSubmitting: true }));
 
-    const serviceFeeRules = form.serviceFeeRules.map(rule => ({
-      ...rule,
-      feeValue: Number(rule.feeValue || 0),
-      roomCount: rule.productType === "Hotel" ? Number(rule.roomCount || 1) : undefined,
-      cabinClass: rule.productType === "Flight" ? rule.cabinClass : undefined,
-      starRating: rule.productType === "Hotel" ? rule.starRating : undefined,
-    }));
+    const serviceFeeRules = form.serviceFeeRules.map(rule => {
+      const isObjectId = typeof rule.id === "string" && rule.id.length === 24;
+      const cabinMap = { "Economy": 2, "Premium Economy": 3, "Business": 4, "Premium Business": 5, "First Class": 6 };
+      return {
+        ...rule,
+        _id: isObjectId ? rule.id : undefined,
+        feeValue: Number(rule.feeValue || 0),
+        cabinClass: rule.productType === "Flight" ? cabinMap[rule.cabinClass] || rule.cabinClass : undefined,
+        starRating: rule.productType === "Hotel" ? parseInt(rule.starRating) : undefined,
+      };
+    });
 
     const payload = {
       classification: form.classification,
@@ -143,7 +146,6 @@ export default function FinancialApprovalPage() {
       tripType: prev.tripType,
       cabinClass: prev.productType === "Flight" ? prev.cabinClass : "",
       starRating: prev.productType === "Hotel" ? prev.starRating : "",
-      roomCount: prev.productType === "Hotel" ? prev.roomCount : 1,
     }));
     setEditingFeeRuleId(null);
   };
@@ -160,8 +162,8 @@ export default function FinancialApprovalPage() {
       rule.operation === feeDraft.operation &&
       rule.tripType === feeDraft.tripType &&
       (feeDraft.productType === "Flight" 
-        ? rule.cabinClass === feeDraft.cabinClass 
-        : (rule.starRating === feeDraft.starRating && rule.roomCount === feeDraft.roomCount))
+        ? String(rule.cabinClass) === String(feeDraft.cabinClass) || parseInt(rule.cabinClass) === parseInt(feeDraft.cabinClass) || rule.cabinClass === {"Economy": 2, "Premium Economy": 3, "Business": 4, "Premium Business": 5, "First Class": 6}[feeDraft.cabinClass]
+        : String(rule.starRating) === String(feeDraft.starRating) || parseInt(rule.starRating) === parseInt(feeDraft.starRating))
     );
 
     if (isDuplicate) {
@@ -173,7 +175,6 @@ export default function FinancialApprovalPage() {
       ...feeDraft,
       id: editingFeeRuleId || Date.now(),
       feeValue: Number(feeDraft.feeValue || 0),
-      roomCount: feeDraft.productType === "Hotel" ? Number(feeDraft.roomCount || 1) : "",
     };
 
     setForm(prev => ({
@@ -195,7 +196,6 @@ export default function FinancialApprovalPage() {
       ...emptyServiceFeeDraft,
       ...rule,
       feeValue: String(rule.feeValue),
-      roomCount: rule.productType === "Hotel" ? rule.roomCount || 1 : "",
     });
     setEditingFeeRuleId(rule.id);
   };
@@ -495,7 +495,7 @@ export default function FinancialApprovalPage() {
                             </div>
                             <div className="text-left">
                               <span className={`block font-black text-xs uppercase tracking-widest ${active ? isFlight ? "text-[#003399]" : "text-[#d97706]" : "text-slate-500"}`}>{type}</span>
-                              <span className="text-[9px] text-slate-400 font-bold uppercase">{isFlight ? "Cabin based rules" : "Star & room based rules"}</span>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase">{isFlight ? "Cabin based rules" : "Star based rules"}</span>
                             </div>
                             {active && <FaCheckCircle className={`ml-auto ${isFlight ? "text-[#003399]" : "text-[#d97706]"}`} />}
                           </button>
@@ -559,7 +559,7 @@ export default function FinancialApprovalPage() {
 
                       {feeDraft.productType === "Hotel" && (
                         <LabeledField label="Room Count">
-                          <input type="number" min="1" className="fam-input !py-2.5" value={feeDraft.roomCount} onChange={e => updateFeeDraft("roomCount", e.target.value)} />
+                          <input type="text" className="fam-input !py-2.5 opacity-60 cursor-not-allowed bg-slate-100" value="1" disabled />
                         </LabeledField>
                       )}
 
@@ -824,7 +824,7 @@ function StatusPill({ status }) {
 
 function getRuleCondition(rule) {
   if (rule.productType === "Flight") return rule.cabinClass || "Any Cabin";
-  return `${rule.starRating || "Any Star"}${rule.roomCount ? ` / ${rule.roomCount} Room${Number(rule.roomCount) > 1 ? "s" : ""}` : ""}`;
+  if (rule.productType === "Hotel") return `${rule.starRating || "Any Star"}`;
 }
 
 function formatFeeValue(rule) {

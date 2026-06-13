@@ -317,6 +317,32 @@ else {
       },
     });
 
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Cancel",
+          tripType: (() => {
+            const f = booking.flightRequest;
+            if (!f) return "Domestic";
+            const firstSeg = f.segments?.[0];
+            const lastSeg = f.segments?.[f.segments.length - 1];
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+          })(),
+          cabinClass: booking.flightRequest?.segments?.[0]?.cabinClass,
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for cancellation:", err.message);
+    }
+
     return res.json({
       success: true,
       isRoundTrip: bookingIds.length > 1,
@@ -505,6 +531,32 @@ exports.partialCancellation = async (req, res) => {
       },
     });
 
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Cancel",
+          tripType: (() => {
+            const f = booking.flightRequest;
+            if (!f) return "Domestic";
+            const firstSeg = f.segments?.[0];
+            const lastSeg = f.segments?.[f.segments.length - 1];
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+          })(),
+          cabinClass: booking.flightRequest?.segments?.[0]?.cabinClass,
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for partial cancellation:", err.message);
+    }
+
     return res.json(result);
   } catch (error) {
     console.error("Partial Cancellation Error:", error.message);
@@ -573,6 +625,32 @@ exports.amendBooking = async (req, res) => {
         createdAt: new Date(),
       },
     });
+
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Re-Issue",
+          tripType: (() => {
+            const f = booking.flightRequest;
+            if (!f) return "Domestic";
+            const firstSeg = f.segments?.[0];
+            const lastSeg = f.segments?.[f.segments.length - 1];
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+          })(),
+          cabinClass: booking.flightRequest?.segments?.[0]?.cabinClass,
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for Re-Issue:", err.message);
+    }
 
     return res.json(result);
   } catch (error) {

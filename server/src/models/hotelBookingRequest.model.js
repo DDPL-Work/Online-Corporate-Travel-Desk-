@@ -222,6 +222,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       plbEarned: Number,
       incentiveEarned: Number,
       taxTdsDetails: mongoose.Schema.Types.Mixed,
+      serviceFeeDetails: mongoose.Schema.Types.Mixed,
     },
 
     markupSnapshot: {

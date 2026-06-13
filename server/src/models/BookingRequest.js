@@ -145,6 +145,7 @@ const bookingRequestSchema = new mongoose.Schema(
       totalAmount: Number,
       currency: { type: String, default: "INR" },
       capturedAt: Date,
+      serviceFeeDetails: mongoose.Schema.Types.Mixed,
     },
 
     markupSnapshot: {
