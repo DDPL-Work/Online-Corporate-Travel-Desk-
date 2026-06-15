@@ -226,7 +226,7 @@ export default function CorporateRevenue() {
       key: "corporate_revenue_transactions",
       pageHeader: corpName,
       statCards: [
-        { label: "Corporate Spent", value: inr(totalSelectedRev) },
+        { label: "Company Spent", value: inr(totalSelectedRev) },
         { label: "Detailed Bookings", value: filteredDrillDownData.length },
         { label: "Date Range", value: formattedDateRange }
       ],
@@ -270,7 +270,7 @@ export default function CorporateRevenue() {
         { label: "Start Date", value: startDate || "Any" },
         { label: "End Date", value: endDate || "Any" },
         { label: "Booking Type", value: bookingType },
-        { label: "Corporate", value: selectedCorporate }
+        { label: "Company", value: selectedCorporate }
       ],
       data: exportData,
       columns: corporateRevenueLeaderboardExportTemplate,
@@ -403,7 +403,7 @@ export default function CorporateRevenue() {
       companyWise.find((c) => c.corporateId === drillDownId) ||
       {};
     const corpName =
-      corp.corporateName || corp.companyName || "Corporate Details";
+      corp.corporateName || corp.companyName || "Company Details";
     const totalSelectedRev = filteredDrillDownData.reduce(
       (sum, b) => sum + b.amount,
       0,
@@ -516,7 +516,7 @@ export default function CorporateRevenue() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <KPICard
-            label="Corporate Spent"
+            label="Company Spent"
             value={inr(totalSelectedRev)}
             icon={<FaRupeeSign />}
             borderCls="border-[#000D26]"
@@ -551,7 +551,7 @@ export default function CorporateRevenue() {
                 Transaction History
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1.5">
-                Granular view of corporate activity
+                Granular view of company activity
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -802,7 +802,7 @@ export default function CorporateRevenue() {
                 <FaChartLine size={28} />
               </div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight leading-none">Corporate Revenue</h1>
+                <h1 className="text-3xl font-black tracking-tight leading-none">Company Revenue</h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
                   Financial analytics & reporting
                 </p>
@@ -906,7 +906,7 @@ export default function CorporateRevenue() {
             </div>
 
             <div className={`flex flex-col gap-1.5 ${dateRange === "custom" ? "lg:col-span-3" : "lg:col-span-5"}`}>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Corporate</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Company</label>
               <CustomSelect
                 value={selectedCorporate}
                 onChange={setSelectedCorporate}
@@ -1102,7 +1102,7 @@ export default function CorporateRevenue() {
               Market Share
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2 leading-none">
-              Leading Corporates by Volume
+              Leading Companies by Volume
             </p>
           </div>
           <div className="flex-1 w-full min-h-70 relative">
@@ -1174,7 +1174,7 @@ export default function CorporateRevenue() {
         <div className="px-6 py-4 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">
-              Corporate Leaderboard
+              Company Leaderboard
             </h3>
             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
               Ranking based on transaction volume
@@ -1220,7 +1220,7 @@ export default function CorporateRevenue() {
                     <div className="flex flex-col items-center">
                       <FiActivity size={40} className="text-slate-200 mb-3" />
                       <p className="text-slate-400 font-bold uppercase text-xs">
-                        No corporate data available
+                        No company data available
                       </p>
                     </div>
                   </td>

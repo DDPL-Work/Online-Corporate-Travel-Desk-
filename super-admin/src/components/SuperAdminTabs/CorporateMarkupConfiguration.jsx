@@ -55,7 +55,7 @@ export default function CorporateMarkupConfiguration() {
 
   const corporate = location.state?.corporate || {
     _id: id,
-    corporateName: "Corporate Account",
+    corporateName: "Company",
     corporateCode: "CORP-" + id?.substring(0, 4)?.toUpperCase() || "CORP-001",
     status: "active"
   };
@@ -1395,7 +1395,7 @@ export default function CorporateMarkupConfiguration() {
                 <FiSettings size={28} />
               </div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight leading-none">Corporate Markup Configuration</h1>
+                <h1 className="text-3xl font-black tracking-tight leading-none">Company Markup</h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
                   Configure pricing rules and markup strategies
                 </p>
@@ -1405,7 +1405,7 @@ export default function CorporateMarkupConfiguration() {
           
           {/* Corporate Info */}
           <div className="flex flex-col md:items-end text-left md:text-right shrink-0">
-            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Selected Corporate</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Selected Company</p>
             <div className="flex items-center gap-2">
               <MdBusiness size={18} className="text-white/80" />
               <p className="text-lg font-black text-white truncate max-w-[280px]" title={corporate.corporateName}>

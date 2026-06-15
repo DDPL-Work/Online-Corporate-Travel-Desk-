@@ -2009,7 +2009,7 @@ function TotalPriceBar({ totalFare, onDownload, isCancelled }) {
 /* ─────────────────────────────────────────────────────────────── */
 function FareSummaryCard({ totalFare, currency, isRefundable }) {
   return (
-    <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-6 space-y-6">
+    <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-6 space-y-6 lg:sticky lg:top-[140px]">
       <div className="flex items-center gap-2 text-[#B5862A] border-b border-[#EAE4D9] pb-4">
         <FiCreditCard size={16} />
         <span className="text-[11px] font-bold tracking-[0.15em] uppercase">
@@ -2047,6 +2047,196 @@ function FareSummaryCard({ totalFare, currency, isRefundable }) {
           ₹{Number(totalFare).toLocaleString("en-IN")}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CorporateAuditSection({ booking }) {
+  const isConfirmed =
+    booking.executionStatus === "voucher_generated" ||
+    booking.executionStatus === "confirmed" ||
+    booking.executionStatus === "booked";
+
+  const approverName = (() => {
+    const requesterId = booking.userId?._id || booking.userId;
+    const approverId =
+      booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+    if (
+      booking.approverName === "Auto Approve" ||
+      (requesterId &&
+        approverId &&
+        requesterId.toString() === approverId.toString())
+    ) {
+      return "Auto Approved (System)";
+    }
+    return booking.approvedBy?.name
+      ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}`
+      : booking.approverName || "—";
+  })();
+
+  const requesterName =
+    booking.requesterDetails?.name ||
+    (booking.userId?.name
+      ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}`
+      : booking.travellers?.[0]
+        ? `${booking.travellers[0].firstName} ${booking.travellers[0].lastName}`
+        : "—");
+
+  const sections = [
+    {
+      heading: "Project Information",
+      fields: [
+        {
+          label: "Order ID",
+          value: booking.orderId || "—",
+          icon: <FiHash size={11} />,
+        },
+        {
+          label: "Project Name",
+          value: booking.projectName || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+        {
+          label: "Project Code",
+          value: booking.projectId || booking.projectCodeId || "—",
+          icon: <FiTag size={11} />,
+        },
+        {
+          label: "Project Client",
+          value: booking.projectClient || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
+    },
+    {
+      heading: "Requester Details",
+      fields: [
+        {
+          label: "Requester Name",
+          value: requesterName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Requester Email",
+          value:
+            booking.requesterDetails?.email ||
+            booking.userId?.email ||
+            booking.travellers?.[0]?.email ||
+            "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Purpose of Travel",
+          value: booking.purposeOfTravel || booking.purpose || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
+    },
+    {
+      heading: "Approval Details",
+      fields: [
+        {
+          label: "Selected Approver",
+          value: approverName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Approver Email",
+          value: booking.approverEmail || booking.approvedBy?.email || "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Approver Role",
+          value: booking.approverRole
+            ? booking.approverRole
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+            : "—",
+          icon: <FiShield size={11} />,
+        },
+        ...(booking.approvedBy?.name
+          ? [
+              {
+                label: "Approved By",
+                value:
+                  `${booking.approvedBy.name.firstName || ""} ${booking.approvedBy.name.lastName || ""}`.trim() ||
+                  "—",
+                icon: <FiUser size={11} />,
+              },
+              {
+                label: "Approved By Email",
+                value: booking.approvedBy?.email || "—",
+                icon: <FiMail size={11} />,
+                isEmail: true,
+              },
+              {
+                label: "Approved By Role",
+                value: booking.approvedBy?.role
+                  ? booking.approvedBy.role
+                      .replace(/-/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—",
+                icon: <FiShield size={11} />,
+              },
+            ]
+          : []),
+        ...(booking.approverComments
+          ? [
+              {
+                label: "Approver Comments",
+                value: booking.approverComments,
+                icon: <FiMessageSquare size={11} />,
+              },
+            ]
+          : []),
+        ...(isConfirmed && getVoucherDate(booking)
+          ? [
+              {
+                label: "Vouchered At",
+                value: `${fmtDate(getVoucherDate(booking))} ${fmtTime(getVoucherDate(booking))}`,
+                icon: <FiClock size={11} />,
+              },
+            ]
+          : []),
+      ],
+    },
+  ];
+
+  return (
+    <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+      {sections.map((section, si) => (
+        <div key={si} className={si > 0 ? "border-t border-[#EAE4D9]" : ""}>
+          <div className="px-6 pt-5 pb-3 bg-[#FAF8F4]">
+            <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A]">
+              {section.heading}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[#EAE4D9]">
+            {section.fields.map((field, fi) => (
+              <div
+                key={fi}
+                className={`px-6 py-5 ${
+                  fi % 3 !== 2 ? "sm:border-r border-[#EAE4D9]" : ""
+                } ${fi >= 3 ? "border-t border-[#EAE4D9]" : ""}`}
+              >
+                <div className="flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                  <span className="text-[#B5862A]">{field.icon}</span>
+                  {field.label}
+                </div>
+                <div
+                  className={`text-[13px] font-semibold text-[#1A1714] leading-snug ${
+                    field.isEmail ? "break-all" : ""
+                  }`}
+                >
+                  {field.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2232,7 +2422,7 @@ export default function HotelBookingDetails() {
         {/* Top Row */}
         <div className="flex items-center gap-4 w-full">
           <button
-            onClick={() => navigate(backPath)}
+            onClick={() => navigate(backPath, { state: location.state })}
             className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
           >
             <FiArrowLeft size={14} />
@@ -2273,6 +2463,7 @@ export default function HotelBookingDetails() {
           {[
             { id: "hotel_details", label: "Hotel Details" },
             { id: "room_details", label: "Room Details" },
+            { id: "project", label: "Project Details" },
             { id: "rules", label: "Rules and Policies" },
             { id: "guest", label: "Guest" },
             { id: "amendment", label: "Amendment" },
@@ -2314,6 +2505,11 @@ export default function HotelBookingDetails() {
             title = "Accommodation Info";
             subtitle =
               "Detailed breakdown of the reserved rooms, amenities, and meal plans.";
+          } else if (activeTab === "project") {
+            label = "Project Details";
+            title = "Project & Approvals";
+            subtitle =
+              "Information about the project code and the approval workflow for this trip.";
           } else if (activeTab === "rules") {
             label = "Rules & Policies";
             title = "Hotel Policies";
@@ -2388,6 +2584,15 @@ export default function HotelBookingDetails() {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === "project" && (
+          <div className="space-y-6">
+            <section>
+              <SectionHeader num={null} title="Corporate Audit" />
+              <CorporateAuditSection booking={booking} />
+            </section>
           </div>
         )}
 

@@ -193,7 +193,7 @@ function ProjectExpenseModal({ project, onClose }) {
             </div>
             <div>
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                Project Audit Ledger
+                Project Expenses
               </h2>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">
                 {project.projectName || project.name} <span className="mx-2 opacity-30">/</span> <span className="text-[#003399] font-mono">{project.projectCodeId || project.code}</span>
@@ -215,7 +215,7 @@ function ProjectExpenseModal({ project, onClose }) {
                 <HiCurrencyRupee className="w-8 h-8 text-[#003399]" />
               </div>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cumulative Spend</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spend</p>
                 <p className="text-3xl font-black text-slate-800 tabular-nums">₹{totalSpend.toLocaleString()}</p>
               </div>
             </div>
@@ -224,7 +224,7 @@ function ProjectExpenseModal({ project, onClose }) {
                 <HiCalendarDays className="w-8 h-8 text-emerald-500" />
               </div>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Deployments</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Bookings</p>
                 <p className="text-3xl font-black text-slate-800 tabular-nums">{totalBookings}</p>
               </div>
             </div>
@@ -233,7 +233,7 @@ function ProjectExpenseModal({ project, onClose }) {
                 <HiCalculator className="w-8 h-8 text-amber-500" />
               </div>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Efficiency Index</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Average Cost</p>
                 <p className="text-3xl font-black text-slate-800 tabular-nums">₹{(totalBookings > 0 ? totalSpend / totalBookings : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
@@ -289,7 +289,7 @@ function ProjectExpenseModal({ project, onClose }) {
 
           <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden relative">
             <div className="px-10 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Transaction Ledger</h3>
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Transactions</h3>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => { if(scrollRef.current) scrollRef.current.scrollBy({ left: -300, behavior: 'smooth' }); }}
@@ -308,26 +308,26 @@ function ProjectExpenseModal({ project, onClose }) {
             {expenses.loading ? (
                <div className="py-24 flex flex-col items-center justify-center">
                   <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Compiling Audit Trail...</p>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Transactions...</p>
                </div>
             ) : filtered.length === 0 ? (
                <div className="py-24 flex flex-col items-center justify-center text-center">
                   <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner text-slate-200">
                     <HiDocumentText size={48} />
                   </div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Zero Reconciliation Found</h3>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Adjust filters to re-scan the database</p>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight">No Transactions Found</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Adjust filters to search again</p>
                </div>
             ) : (
               <div ref={scrollRef} className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left min-w-[900px] border-collapse">
                   <thead>
                     <tr className="bg-slate-50/80 border-b border-slate-100">
-                      <Th className="!px-10 !py-6">Reference ID</Th>
-                      <Th className="!px-10 !py-6">Personnel</Th>
-                      <Th className="!px-10 !py-6">{activeTab === "flight" ? "Travel Date" : "Timeline"}</Th>
-                      <Th className="!px-10 !py-6">Authorization</Th>
-                      <Th className="!px-10 !py-6 text-right">Net Amount</Th>
+                      <Th className="!px-10 !py-6">Request ID</Th>
+                      <Th className="!px-10 !py-6">Employee</Th>
+                      <Th className="!px-10 !py-6">{activeTab === "flight" ? "Travel Date" : "Dates"}</Th>
+                      <Th className="!px-10 !py-6">Approved By</Th>
+                      <Th className="!px-10 !py-6 text-right">Amount</Th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -363,11 +363,11 @@ function ProjectExpenseModal({ project, onClose }) {
                           </td>
                           <td className="!px-10 !py-6">
                              {isAuto ? (
-                               <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-100">System Validated</span>
+                               <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-100">Auto Approved</span>
                              ) : (
                                <div>
                                  <p className="text-[11px] font-black text-slate-800">{approverName}</p>
-                                 <p className="text-[9px] text-slate-400 uppercase font-black tracking-tighter">{item.approvedBy?.role || "Unit Admin"}</p>
+                                 <p className="text-[9px] text-slate-400 uppercase font-black tracking-tighter">{item.approvedBy?.role || "Admin"}</p>
                                </div>
                              )}
                           </td>
@@ -388,7 +388,7 @@ function ProjectExpenseModal({ project, onClose }) {
         <div className="px-10 py-6 border-t border-slate-100 bg-white flex flex-col md:flex-row justify-between items-center gap-6">
            <div className="flex items-center gap-8">
              <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
-               Page {modalPage} of {totalPages || 1} <span className="mx-2">/</span> {totalBookings} Entries
+               Page {modalPage} of {totalPages || 1} <span className="mx-2">/</span> {totalBookings} Items
              </p>
              
              {totalPages > 1 && (
@@ -400,7 +400,7 @@ function ProjectExpenseModal({ project, onClose }) {
            </div>
 
            <button onClick={onClose} className="group bg-[#000D26] text-white px-10 py-4 rounded-[1.2rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center gap-3">
-             Exit Audit <FiX size={16} className="group-hover:rotate-90 transition-transform" />
+             Close <FiX size={16} className="group-hover:rotate-90 transition-transform" />
            </button>
         </div>
       </div>
@@ -601,8 +601,8 @@ export default function ProjectsTable({ projects, setProjects }) {
         const first = segs[0];
         const last = segs[segs.length - 1];
         return {
-          fromCode: first?.origin?.airportCode || "N/A",
-          toCode: last?.destination?.airportCode || "N/A",
+          fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+          toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
           fromCity: first?.origin?.city || "Unknown",
           toCity: last?.destination?.city || "Unknown",
         };
@@ -782,8 +782,8 @@ export default function ProjectsTable({ projects, setProjects }) {
                  <HiTableCells size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none uppercase">Projects Directory</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage, audit and track institutional project expenditures</p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none uppercase">Projects</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage and track project expenses</p>
                </div>
              </div>
           </div>
@@ -801,13 +801,13 @@ export default function ProjectsTable({ projects, setProjects }) {
             onClick={() => setActiveMainTab("directory")}
             className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeMainTab === "directory" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
           >
-            <HiTableCells size={14} /> Project Registry
+            <HiTableCells size={14} /> Projects
           </button>
           <button
             onClick={() => setActiveMainTab("bookings")}
             className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeMainTab === "bookings" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
           >
-            <FaClipboardList size={14} /> Project Bookings
+            <FaClipboardList size={14} /> Bookings
           </button>
         </div>
 
@@ -838,13 +838,13 @@ export default function ProjectsTable({ projects, setProjects }) {
                   </LabeledField>
                 </div>
                 <div className="md:col-span-4">
-                  <LabeledField label={<><HiUsers size={12} /> Client Segregation</>}>
+                  <LabeledField label={<><HiUsers size={12} /> Filter by Client</>}>
                     <CustomDropdown value={clientFilter} onChange={setClientFilter} options={clients} />
                   </LabeledField>
                 </div>
                 <div className="md:col-span-3">
                   <button onClick={() => { setSearch(""); setClientFilter("All Clients"); }} className="w-full py-4 rounded-2xl font-black text-[11px] text-slate-400 border-2 border-slate-50 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest">
-                    <FiX size={16} /> Reset Registry
+                    <FiX size={16} /> Reset Filters
                   </button>
                 </div>
               </div>
@@ -852,8 +852,8 @@ export default function ProjectsTable({ projects, setProjects }) {
 
             {/* Table */}
               <ResponsiveDataTable 
-                title="Project Registry" 
-                subtitle={`${filtered.length} entries located`} 
+                title="Projects" 
+                subtitle={`${filtered.length} found`} 
                 exportLabel="Export Excel"
                 exportLoading={isExporting}
                 exportDisabled={isExporting}
@@ -878,12 +878,12 @@ export default function ProjectsTable({ projects, setProjects }) {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                    <Th className="!px-8 !py-6">ID Protocol</Th>
-                    <Th className="!px-8 !py-6">Project Title</Th>
-                    <Th className="!px-8 !py-6">Client Entity</Th>
+                    <Th className="!px-8 !py-6">Project ID</Th>
+                    <Th className="!px-8 !py-6">Project Name</Th>
+                    <Th className="!px-8 !py-6">Client Name</Th>
                     <Th className="!px-8 !py-6">Bookings</Th>
-                    <Th className="!px-8 !py-6">Ingestion Date</Th>
-                    <Th className="!px-8 !py-6 text-center">Protocol Actions</Th>
+                    <Th className="!px-8 !py-6">Added On</Th>
+                    <Th className="!px-8 !py-6 text-center">Actions</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -914,8 +914,8 @@ export default function ProjectsTable({ projects, setProjects }) {
                         <td className="!px-8 !py-6 text-[11px] font-bold text-slate-400 uppercase">{fmtDate(createdAt)}</td>
                         <td className="!px-8 !py-6">
                           <div className="flex items-center justify-center gap-3">
-                            <button title="Audit Expenses" onClick={() => setSelectedProjectForExpenses(p)} className="w-10 h-10 rounded-xl bg-[#003399]10 text-[#003399] flex items-center justify-center hover:bg-[#003399] hover:text-white transition-all shadow-sm"><HiEye size={18} /></button>
-                            <button title="Purge Record" onClick={() => handleDeleteProject(p)} disabled={deleteLoading} className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-30"><HiTrash size={18} /></button>
+                            <button title="View Expenses" onClick={() => setSelectedProjectForExpenses(p)} className="w-10 h-10 rounded-xl bg-[#003399]10 text-[#003399] flex items-center justify-center hover:bg-[#003399] hover:text-white transition-all shadow-sm"><HiEye size={18} /></button>
+                            <button title="Delete Project" onClick={() => handleDeleteProject(p)} disabled={deleteLoading} className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-30"><HiTrash size={18} /></button>
                           </div>
                         </td>
                       </tr>
@@ -955,10 +955,9 @@ export default function ProjectsTable({ projects, setProjects }) {
               />
             </div>
 
-             {/* Selector Dropdown, Filters & Sub-Tabs */}
              <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
-                 <LabeledField label={<><HiTableCells size={10} /> Active Project Code</>} className="lg:col-span-2">
+                 <LabeledField label={<><HiTableCells size={10} /> Select Project</>} className="lg:col-span-2">
                    <CustomDropdown
                      value={selectedProjectId}
                      onChange={setSelectedProjectId}
@@ -967,7 +966,7 @@ export default function ProjectsTable({ projects, setProjects }) {
                    />
                  </LabeledField>
 
-                 <LabeledField label={<><HiUsers size={10} /> Personnel Filter</>} className="lg:col-span-3">
+                 <LabeledField label={<><HiUsers size={10} /> Filter by Employee</>} className="lg:col-span-3">
                    <CustomDropdown
                      value={selectedEmployeeEmail}
                      onChange={setSelectedEmployeeEmail}
@@ -976,7 +975,7 @@ export default function ProjectsTable({ projects, setProjects }) {
                    />
                  </LabeledField>
  
-                 <LabeledField label={<><HiMagnifyingGlass size={10} /> Search Manifest</>} className="lg:col-span-2">
+                 <LabeledField label={<><HiMagnifyingGlass size={10} /> Search Bookings</>} className="lg:col-span-2">
                    <SearchBar
                      value={bookingSearch}
                      onChange={setBookingSearch}
@@ -984,7 +983,7 @@ export default function ProjectsTable({ projects, setProjects }) {
                    />
                  </LabeledField>
  
-                 <LabeledField label="Booking Window" className="lg:col-span-3">
+                 <LabeledField label="Date Range" className="lg:col-span-3">
                    <div className="flex items-center gap-2">
                      <input
                        type="date"
@@ -1029,8 +1028,8 @@ export default function ProjectsTable({ projects, setProjects }) {
             <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
               {[
                 ["all", "All Bookings", FaClipboardList],
-                ["flight", "Flight Manifests", FaPlane],
-                ["hotel", "Hotel Stays", FaHotel],
+                ["flight", "Flight Bookings", FaPlane],
+                ["hotel", "Hotel Bookings", FaHotel],
               ].map(([k, lbl, Icon]) => (
                 <button
                   key={k}
@@ -1049,18 +1048,18 @@ export default function ProjectsTable({ projects, setProjects }) {
             {expenses?.loading ? (
               <div className="py-24 flex flex-col items-center justify-center bg-white rounded-[2.5rem] border border-slate-200/60 shadow-2xl">
                  <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
-                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Compiling Project Bookings...</p>
+                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Bookings...</p>
               </div>
             ) : (
               <ResponsiveDataTable
                 title={
                   bookingTypeFilter === "all"
-                    ? "Combined Project Ledger"
+                    ? "All Bookings"
                     : bookingTypeFilter === "flight"
-                    ? "Project Flight Manifests"
-                    : "Project Hotel Manifests"
+                    ? "Flight Bookings"
+                    : "Hotel Bookings"
                 }
-                subtitle={`${filteredBookings.length} deployment entries mapped`}
+                subtitle={`${filteredBookings.length} bookings found`}
                 exportLabel="Export Excel"
                 exportLoading={isExporting}
                 exportDisabled={isExporting}
@@ -1095,14 +1094,14 @@ export default function ProjectsTable({ projects, setProjects }) {
                   <thead>
                     <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                       <Th className="!px-6 !py-5">Type</Th>
-                      <Th className="!px-6 !py-5">Order Reference</Th>
-                      <Th className="!px-6 !py-5">Personnel</Th>
-                      <Th className="!px-6 !py-5">Deployment Details</Th>
-                      <Th className="!px-6 !py-5">Email Identifier</Th>
-                      <Th className="!px-6 !py-5">Ingestion Date</Th>
+                      <Th className="!px-6 !py-5">Request ID</Th>
+                      <Th className="!px-6 !py-5">Employee</Th>
+                      <Th className="!px-6 !py-5">Details</Th>
+                      <Th className="!px-6 !py-5">Email</Th>
+                      <Th className="!px-6 !py-5">Added On</Th>
                       <Th className="!px-6 !py-5">Status</Th>
-                      <Th className="!px-6 !py-5">Net Outlay</Th>
-                      <Th className="!px-6 !py-5 !text-center">Audits</Th>
+                      <Th className="!px-6 !py-5">Amount</Th>
+                      <Th className="!px-6 !py-5 !text-center">Action</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1211,7 +1210,7 @@ export default function ProjectsTable({ projects, setProjects }) {
                               <FiSearch size={32} />
                             </div>
                             <p className="text-sm font-bold text-slate-400">
-                              No active deployments mapped to this project scope.
+                              No bookings found for this project.
                             </p>
                           </div>
                         </td>

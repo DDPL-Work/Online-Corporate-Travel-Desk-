@@ -128,7 +128,7 @@ export default function WalletRechargeLogs() {
       .filter((n) => n !== "—");
     const allNames = new Set([...fromOnboarded, ...namesFromLogs]);
     return [
-      { label: "All Corporates", value: "All" },
+      { label: "All Companies", value: "All" },
       ...Array.from(allNames).sort().map((n) => ({ label: n, value: n })),
     ];
   }, [onboardedCorporates, normalizedLogs]);
@@ -173,7 +173,7 @@ export default function WalletRechargeLogs() {
       { label: "Search", value: searchTerm || "None" },
       { label: "From Date", value: startDate || "Any" },
       { label: "To Date", value: endDate || "Any" },
-      { label: "Corporate", value: corporate },
+      { label: "Company", value: corporate },
       { label: "Status", value: status },
     ];
 
@@ -341,7 +341,7 @@ export default function WalletRechargeLogs() {
             {/* Corporate */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <MdBusiness size={12} /> Corporate
+                <MdBusiness size={12} /> Company
               </label>
               <CustomSelect
                 value={corporate}
@@ -424,7 +424,7 @@ export default function WalletRechargeLogs() {
                 <thead>
                   <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">Date</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">Corporate</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">Company</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">Amount</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">Method</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 whitespace-nowrap">Order ID</th>

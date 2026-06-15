@@ -265,3 +265,22 @@ export const promoteEmployeeToFinanceAdmin = createAsyncThunk(
     }
   }
 );
+
+/**
+ * ============================================================
+ * 💼 FETCH FINANCE TEAM MEMBERS (ADMIN)
+ * ============================================================
+ */
+export const getFinanceTeamAdmin = createAsyncThunk(
+  "adminBooking/getFinanceTeamAdmin",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/travel-admin/finance-team");
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch finance team"
+      );
+    }
+  }
+);

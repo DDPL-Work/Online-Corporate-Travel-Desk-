@@ -31,7 +31,7 @@ export default function CorporateMarkupList() {
 
   const corporate = location.state?.corporate || {
     _id: id,
-    corporateName: "Corporate Account",
+    corporateName: "Company",
     corporateCode: "CORP-" + id?.substring(0, 4)?.toUpperCase() || "CORP-001",
   };
 
@@ -207,7 +207,7 @@ export default function CorporateMarkupList() {
           </div>
           
           <div className="flex flex-col md:items-end text-left md:text-right shrink-0">
-            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Selected Corporate</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Selected Company</p>
             <div className="flex items-center gap-2">
               <MdBusiness size={18} className="text-white/80" />
               <p className="text-lg font-black text-white truncate max-w-[280px]" title={corporate.corporateName}>
@@ -237,7 +237,7 @@ export default function CorporateMarkupList() {
             </div>
             <h3 className="text-lg font-black text-slate-700 mb-2">No Markups Configured</h3>
             <p className="text-sm text-slate-500 max-w-md">
-              There are currently no active markup rules configured for this corporate account.
+              There are currently no active markup rules configured for this company.
             </p>
             <button
               onClick={() => navigate(`/corporate-markup/${id}`, { state: { corporate } })}
@@ -384,7 +384,7 @@ export default function CorporateMarkupList() {
               <p className="text-sm text-slate-500 mt-1">
                 {deleteModal.type === 'rule' 
                   ? "Are you sure you want to delete this specific rule? This action cannot be undone."
-                  : `Are you sure you want to delete ALL ${deleteModal.productType} rules for this corporate? This action cannot be undone.`}
+                  : `Are you sure you want to delete ALL ${deleteModal.productType} rules for this company? This action cannot be undone.`}
               </p>
             </div>
             

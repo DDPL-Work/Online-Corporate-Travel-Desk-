@@ -42,6 +42,14 @@ const hotelOperations = ["Book", "Cancel"];
 const cabinClasses = ["Economy", "Premium Economy", "Business", "Premium Business", "First Class"];
 const starRatings = ["1 Star", "2 Star", "3 Star", "4 Star", "5 Star"];
 
+const CABIN_CLASS_MAP = {
+  2: "Economy",
+  3: "Premium Economy",
+  4: "Business",
+  5: "Premium Business",
+  6: "First Class"
+};
+
 export default function EditCorporatePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -315,10 +323,10 @@ export default function EditCorporatePage() {
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight leading-none mb-1">
-                  Corporate Management
+                  Company Management
                 </h1>
                 <p className="text-[9px] font-bold uppercase tracking-[2px] text-slate-300">
-                  Editing Corporate Profile
+                  Editing Company Profile
                 </p>
               </div>
             </div>
@@ -359,7 +367,7 @@ export default function EditCorporatePage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl p-5 shadow-sm border-b-4 border-[#001f5c] flex justify-between items-center">
             <div className="truncate pr-2">
-              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 truncate">Corporate Name</p>
+              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 truncate">Company Name</p>
               <p className="text-xl font-black text-slate-900 truncate">{corporate.corporateName || "N/A"}</p>
             </div>
             <div className="w-10 h-10 shrink-0 rounded-lg bg-[#001f5c]/10 flex items-center justify-center text-[#001f5c]">
@@ -377,7 +385,7 @@ export default function EditCorporatePage() {
           </div>
           <div className="bg-white rounded-xl p-5 shadow-sm border-b-4 border-amber-400 flex justify-between items-center">
             <div className="truncate pr-2">
-              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 truncate">Corporate Type</p>
+              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 truncate">Company Type</p>
               <p className="text-xl font-black text-slate-900 truncate capitalize">{corporate.corporateType || "B2B"}</p>
             </div>
             <div className="w-10 h-10 shrink-0 rounded-lg bg-amber-400/10 flex items-center justify-center text-amber-500">
@@ -400,7 +408,7 @@ export default function EditCorporatePage() {
           {activeTab === "overview" && (
             <div className="space-y-6 animate-fadeIn">
               <Section title="Basic Information" color="navy">
-                <Field label="Corporate Name" span={1}>
+                <Field label="Company Name" span={1}>
                   <Input value={form.corporateName} onChange={v => setForm({ ...form, corporateName: v })} />
                 </Field>
                 <Field label="Company Type" span={1}>
@@ -844,13 +852,13 @@ export default function EditCorporatePage() {
                                 </span>
                                 <div>
                                   <p className="text-sm font-black text-slate-800">{rule.productType} / {rule.operation}</p>
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">Corporate Rule</p>
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">Company Rule</p>
                                 </div>
                               </div>
                             </div>
                             <p className="text-sm font-bold text-slate-600">{rule.tripType}</p>
                             <p className="text-sm font-bold text-slate-600">
-                              {rule.productType === "Flight" ? rule.cabinClass : `${rule.starRating} Star`}
+                              {rule.productType === "Flight" ? (CABIN_CLASS_MAP[rule.cabinClass] || rule.cabinClass) : `${rule.starRating} Star`}
                             </p>
                             <p className="text-sm font-black text-[#003399]">
                               {rule.feeType === "Fixed" ? `₹${rule.feeValue}` : `${rule.feeValue}%`}

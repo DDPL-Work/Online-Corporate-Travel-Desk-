@@ -115,7 +115,7 @@ export default function FinancialApprovalPage() {
 
     try {
       await dispatch(approveCorporate({ id: corporate._id, payload })).unwrap();
-      toast.success("Corporate account approved & activated successfully!");
+      toast.success("Company approved & activated successfully!");
       navigate(location.state?.from || "/pending-corporates", { replace: true });
     } catch (err) {
       toast.error(err || "Failed to approve corporate");
@@ -310,7 +310,7 @@ export default function FinancialApprovalPage() {
           
           {/* Corporate Info */}
           <div className="flex flex-col md:items-end text-left md:text-right shrink-0">
-            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Selected Corporate</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">Selected Company</p>
             <div className="flex items-center gap-2">
               <MdBusiness size={18} className="text-white/80" />
               <p className="text-lg font-black text-white truncate max-w-[280px]" title={corporate?.corporateName}>
@@ -362,7 +362,7 @@ export default function FinancialApprovalPage() {
                       <FaBuilding size={14} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Corporate</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Company</p>
                       <p className="text-sm font-black text-slate-800 truncate">{corporate?.corporateName || "N/A"}</p>
                     </div>
                   </div>
@@ -602,7 +602,7 @@ export default function FinancialApprovalPage() {
 
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                        Define every applicable service fee scenario during corporate onboarding.
+                        Define every applicable service fee scenario during company onboarding.
                       </p>
                       <div className="flex items-center gap-2">
                         {editingFeeRuleId && (
@@ -689,7 +689,7 @@ export default function FinancialApprovalPage() {
                                   </span>
                                   <div>
                                     <p className="text-xs font-black text-slate-800">{rule.productType} / {rule.operation}</p>
-                                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Corporate onboarding rule</p>
+                                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Company onboarding rule</p>
                                   </div>
                                 </div>
                               </div>

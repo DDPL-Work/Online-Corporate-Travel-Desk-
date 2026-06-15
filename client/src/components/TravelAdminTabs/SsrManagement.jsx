@@ -460,6 +460,15 @@ function PolicyList({
   onRefresh,
 }) {
   const { exportExcel, isExporting } = useExcelExporter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, policies.length]);
+
+  const totalPages = Math.ceil(policies.length / itemsPerPage);
+  const paginatedPolicies = policies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (listLoading) return <div className="grid gap-4">{[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-2xl border animate-pulse" />)}</div>;
 
@@ -483,21 +492,21 @@ function PolicyList({
         filenamePrefix: "ssr_policies"
       })}
       wrapperClass="!border-none !shadow-none"
-      toolbarRight={onRefresh && <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all" style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}><FiRefreshCw size={14} /> Sync Policies</button>}
+      toolbarRight={onRefresh && <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all" style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}><FiRefreshCw size={14} /> Sync</button>}
     >
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-            <Th className="!px-6 !py-5">Employee Ledger</Th>
+            <Th className="!px-6 !py-5">Employee</Th>
             <Th className="!px-6 !py-5 !text-center">Seat Access</Th>
             <Th className="!px-6 !py-5 !text-center">Meal Access</Th>
             <Th className="!px-6 !py-5 !text-center">Baggage Access</Th>
-            <Th className="!px-6 !py-5 !text-center">Auth Flow</Th>
-            <Th className="!px-6 !py-5 !text-center">Management</Th>
+            <Th className="!px-6 !py-5 !text-center">Approval</Th>
+            <Th className="!px-6 !py-5 !text-center">Actions</Th>
           </tr>
         </thead>
         <tbody>
-          {policies.map((p, i) => (
+          {paginatedPolicies.map((p, i) => (
             <tr key={p._id} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
               <td className="!px-6 !py-5">
                  <div className="flex items-center gap-4">
@@ -534,6 +543,30 @@ function PolicyList({
           ))}
         </tbody>
       </table>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 p-4 border-t" style={{ borderColor: C.border }}>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-xl transition-all disabled:opacity-50"
+            style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}
+          >
+            <FiChevronRight className="rotate-180" size={16} />
+          </button>
+          <span className="text-xs font-bold text-slate-500">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-xl transition-all disabled:opacity-50"
+            style={{ background: C.white, borderColor: C.border, color: C.navy, border: "1px solid" }}
+          >
+            <FiChevronRight size={16} />
+          </button>
+        </div>
+      )}
     </ResponsiveDataTable>
   );
 }
@@ -718,9 +751,9 @@ export default function SsrManagement() {
                  <FiShield size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">SSR Governance</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Booking Policies</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Configure Paid Seat, Meal & Baggage Policies
+                   Configure Seat, Meal & Baggage Limits
                  </p>
                </div>
              </div>
@@ -747,7 +780,7 @@ export default function SsrManagement() {
         {activeTab === "configure" ? (
           <div className="w-full space-y-8 animate-in slide-in-from-bottom-4 duration-300">
                <div className="bg-white rounded-2xl border shadow-sm p-8" style={{ borderColor: C.border }}>
-                  <SectionHeader icon={FiSearch} title="Policy Lookup" sub="Identify employee for configuration" />
+                  <SectionHeader icon={FiSearch} title="Find Employee" sub="Search by email to manage limits" />
                   <div className="flex flex-col sm:flex-row gap-4 items-start">
                      <CustomAutocomplete employees={employees} value={emailInput} onChange={setEmailInput} placeholder="Select employee by email..." icon={FiMail} />
                      <button onClick={handleLookup} disabled={lookupLoading} className="w-full sm:w-auto px-10 py-4 bg-navy rounded-2xl text-white font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50" style={{ background: C.navy }}>
@@ -758,10 +791,10 @@ export default function SsrManagement() {
                </div>
 
                {lookedUp && (
-                 <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500" style={{ borderColor: C.border }}>
+                <div className="bg-white rounded-2xl border shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500" style={{ borderColor: C.border }}>
                     <div className="p-8 space-y-10">
                        <div>
-                          <SectionHeader icon={FiToggleRight} title="Entitlement Matrix" sub="Define what services are pre-approved" />
+                          <SectionHeader icon={FiToggleRight} title="Allowed Services" sub="Select which services are allowed" />
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                              <Toggle label="Paid Seat" description="Pre-select seating" icon={MdAirlineSeatReclineNormal} enabled={allowSeat} onChange={setAllowSeat} />
                              <Toggle label="Paid Meal" description="In-flight catering" icon={MdLunchDining} enabled={allowMeal} onChange={setAllowMeal} />
@@ -770,7 +803,7 @@ export default function SsrManagement() {
                        </div>
 
                        <div>
-                          <SectionHeader icon={FiDollarSign} title="Cost Thresholds" sub="Set price caps for automated approval" />
+                          <SectionHeader icon={FiDollarSign} title="Price Limits" sub="Set maximum prices for auto-approval" />
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                              <PriceRangeInput label="Seat" icon={MdAirlineSeatReclineNormal} minVal={seatMin} maxVal={seatMax} onMinChange={setSeatMin} onMaxChange={setSeatMax} disabled={!allowSeat} />
                              <PriceRangeInput label="Meal" icon={MdLunchDining} minVal={mealMin} maxVal={mealMax} onMinChange={setMealMin} onMaxChange={setMealMax} disabled={!allowMeal} />
@@ -779,9 +812,9 @@ export default function SsrManagement() {
                        </div>
 
                        <div>
-                          <SectionHeader icon={FiShield} title="Approval Workflow" sub="Define authorization hierarchy" />
+                          <SectionHeader icon={FiShield} title="Approval Rules" sub="Set who needs to approve bookings" />
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <Toggle label="Manual Approval" description="Admin intervention required" icon={FiClock} enabled={approvalRequired} onChange={setApprovalRequired} />
+                             <Toggle label="Manual Approval" description="Admin must approve" icon={FiClock} enabled={approvalRequired} onChange={setApprovalRequired} />
                              <div className="flex flex-col gap-3">
                                <Toggle 
                                  label="Auto Approved" 
@@ -824,7 +857,7 @@ export default function SsrManagement() {
             {/* Filters */}
             <div className="bg-white rounded-2xl p-6 border shadow-sm animate-in fade-in duration-300" style={{ borderColor: C.border }}>
               <div className="grid grid-cols-1 gap-6">
-                <LabeledField label={<><FiSearch size={10} /> Search Governance Ledger</>}>
+                <LabeledField label={<><FiSearch size={10} /> Search Policies</>}>
                   <SearchBar value={search} onChange={(val) => setSearch(val)} placeholder="Search employee email..." />
                 </LabeledField>
               </div>
@@ -836,8 +869,8 @@ export default function SsrManagement() {
               onDelete={handleDelete}
               onView={setViewPolicy}
               onEdit={handleEdit}
-              title="Active Governance Ledger"
-              subtitle={`${filteredPolicies.length} custom policies in effect`}
+              title="Active Policies"
+              subtitle={`${filteredPolicies.length} policies found`}
               searchQuery={search}
               onRefresh={() => dispatch(fetchAllSSRPolicies())}
 
@@ -851,25 +884,24 @@ export default function SsrManagement() {
       {isLimitModalOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border relative" style={{ borderColor: C.border }}>
-            {/* Header matching main page */}
-            <div className="p-8 border-b flex flex-col md:flex-row md:items-center justify-between sticky top-0 z-20 bg-gradient-to-br from-[#003399] to-[#000d26] text-white">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl border border-white/10 bg-white/10 text-white">
-                  <FiBriefcase size={24} />
+            {/* Sticky Header & Tabs */}
+            <div className="sticky top-0 z-30">
+              <div className="p-8 border-b flex flex-col md:flex-row md:items-center justify-between bg-gradient-to-br from-[#003399] to-[#000d26] text-white pb-12">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl border border-white/10 bg-white/10 text-white">
+                    <FiBriefcase size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black tracking-tight leading-none">Booking Limits</h2>
+                    <p className="text-[10px] mt-1.5 font-bold uppercase tracking-[2px] opacity-60">Configure Custom Booking Thresholds</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black tracking-tight leading-none">Booking Limits</h2>
-                  <p className="text-[10px] mt-1.5 font-bold uppercase tracking-[2px] opacity-60">Configure Custom Booking Thresholds</p>
-                </div>
+                <button onClick={() => setIsLimitModalOpen(false)} className="absolute top-6 right-6 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white">
+                  <FiX size={18} />
+                </button>
               </div>
-              <button onClick={() => setIsLimitModalOpen(false)} className="absolute top-6 right-6 p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 text-white">
-                <FiX size={18} />
-              </button>
-            </div>
-            
-            <div className="px-6 pb-32 pt-0 space-y-6 relative">
-              {/* Tabs matching main page */}
-              <div className="flex justify-center w-full mt-[-20px] mb-8 relative z-30">
+              
+              <div className="flex justify-center w-full mt-[-24px] relative z-40">
                 <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
                   <button 
                     onClick={() => setActiveModalTab("flights")}
@@ -885,12 +917,15 @@ export default function SsrManagement() {
                   </button>
                 </div>
               </div>
+            </div>
+            
+            <div className="px-6 pb-32 pt-8 space-y-6 relative">
 
               {/* Flights Section */}
               {activeModalTab === "flights" && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-700 flex items-center gap-2 border-b pb-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: C.navy }}></span> Flight Thresholds
+                    <span className="w-2 h-2 rounded-full" style={{ background: C.navy }}></span> Flight Limits
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <LimitsGrid 
@@ -919,7 +954,7 @@ export default function SsrManagement() {
               {activeModalTab === "hotels" && (
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-700 flex items-center gap-2 border-b pb-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: C.gold }}></span> Hotel Thresholds
+                    <span className="w-2 h-2 rounded-full" style={{ background: C.gold }}></span> Hotel Limits
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <LimitsGrid 

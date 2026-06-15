@@ -24,7 +24,6 @@ import EditCorporatePage from "../components/SuperAdminTabs/EditCorporatePage";
 import PendingAmendments from "../components/SuperAdminTabs/PendingAmendments";
 import CommissionSettings from "../components/SuperAdminTabs/CommissionSettings";
 import ApiConfigurations from "../components/SuperAdminTabs/ApiConfigurations";
-import SystemLogs from "../components/SuperAdminTabs/SystemLogs";
 import CancellationDashboard from "../components/SuperAdminTabs/CancelledBookingsSummary";
 import CancellationQueries from "../components/SuperAdminTabs/CancellationQueries";
 import AllReissueRequests from "../components/SuperAdminTabs/AllReissueRequests";
@@ -96,7 +95,6 @@ export const appRouter = createBrowserRouter([
           { path: "/pending-amendments", element: <PendingAmendments /> },
           { path: "/commission-settings", element: <CommissionSettings /> },
           { path: "/api-configurations", element: <ApiConfigurations /> },
-          { path: "/system-logs", element: <SystemLogs /> },
           { path: "/ops-management", element: <OpsTeamManagement /> },
           { path: "/profile", element: <ProfileSettings /> },
           {

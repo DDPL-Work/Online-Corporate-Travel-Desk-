@@ -209,16 +209,16 @@ export default function MyTeam() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard label="Total Reportees" value={stats.total} Icon={FiUsers} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-          <StatCard label="Unit Managers" value={stats.managers} Icon={FiShield} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
-          <StatCard label="Access Active" value={stats.active} Icon={FiUserCheck} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-          <StatCard label="Suspended" value={stats.suspended} Icon={FiUserX} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+          <StatCard label="Total People" value={stats.total} Icon={FiUsers} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+          <StatCard label="Managers" value={stats.managers} Icon={FiShield} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+          <StatCard label="Active Access" value={stats.active} Icon={FiUserCheck} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+          <StatCard label="Suspended Access" value={stats.suspended} Icon={FiUserX} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
         </div>
 
         {/* Filters */}
         <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
           <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-4 items-end">
-            <LabeledField label={<><FiSearch size={10} /> Search Directory</>} className="md:col-span-3 lg:col-span-3">
+            <LabeledField label={<><FiSearch size={10} /> Search Team</>} className="md:col-span-3 lg:col-span-3">
               <SearchBar value={search} onChange={(val) => { setSearch(val); setCurrentPage(1); }} placeholder="Search name, email, department..." />
             </LabeledField>
             <LabeledField label="Project Code" className="md:col-span-3 lg:col-span-2">
@@ -227,10 +227,10 @@ export default function MyTeam() {
             <LabeledField label="Department" className="md:col-span-2 lg:col-span-2">
               <CustomDropdown value={deptFilter} onChange={(val) => { setDeptFilter(val); setCurrentPage(1); }} options={departments} />
             </LabeledField>
-            <LabeledField label="Organizational Role" className="md:col-span-2 lg:col-span-2">
+            <LabeledField label="Role" className="md:col-span-2 lg:col-span-2">
               <CustomDropdown value={roleFilter} onChange={(val) => { setRoleFilter(val); setCurrentPage(1); }} options={["All", "Manager", "Employee"]} />
             </LabeledField>
-            <LabeledField label="System Access" className="md:col-span-2 lg:col-span-2">
+            <LabeledField label="Access Status" className="md:col-span-2 lg:col-span-2">
               <CustomDropdown value={statusFilter} onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }} options={["All", "Active", "Inactive"]} />
             </LabeledField>
             <div className="flex items-end md:col-span-6 lg:col-span-1">
@@ -254,19 +254,19 @@ export default function MyTeam() {
 
         {/* Data Table */}
         <ResponsiveDataTable
-          title="My Team Directory"
-          subtitle={`${filtered.length} reportees active`}
+          title="Team Members"
+          subtitle={`${filtered.length} active people`}
           wrapperClass="!border-none !shadow-none"
           exportLabel="Export Excel"
           exportLoading={isExporting}
           exportDisabled={isExporting}
           onExport={() => exportExcel({
-            pageHeader: "My Team Directory",
+            pageHeader: "Team Members",
             statCards: [
-              { label: "Total Reportees", value: stats.total },
-              { label: "Unit Managers", value: stats.managers },
-              { label: "Access Active", value: stats.active },
-              { label: "Suspended", value: stats.suspended }
+              { label: "Total People", value: stats.total },
+              { label: "Managers", value: stats.managers },
+              { label: "Active Access", value: stats.active },
+              { label: "Suspended Access", value: stats.suspended }
             ],
             appliedFilters: [
               { label: "Search", value: search || "None" },
@@ -285,11 +285,11 @@ export default function MyTeam() {
             <thead>
               <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                 <Th className="px-6! py-5!">Employee</Th>
-                <Th className="px-6! py-5!">Credentials & Department</Th>
-                <Th className="px-6! py-5!">Assigned Project</Th>
-                <Th className="px-6! py-5!">Designated Role</Th>
-                <Th className="px-6! py-5!">Access Status</Th>
-                <Th className="px-6! py-5!">Joining Date</Th>
+                <Th className="px-6! py-5!">Email & Department</Th>
+                <Th className="px-6! py-5!">Project</Th>
+                <Th className="px-6! py-5!">Role</Th>
+                <Th className="px-6! py-5!">Status</Th>
+                <Th className="px-6! py-5!">Date Joined</Th>
               </tr>
             </thead>
             <tbody>
@@ -363,7 +363,7 @@ export default function MyTeam() {
                       <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                         <FiUsers size={32} />
                       </div>
-                      <p className="text-sm font-bold text-slate-400">No reportees found matching the criteria.</p>
+                      <p className="text-sm font-bold text-slate-400">No people found matching your search.</p>
                     </div>
                   </td>
                 </tr>

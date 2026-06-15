@@ -125,7 +125,7 @@ function FlightSection() {
       const resolveCode = (val) => {
         if (!val) return "N/A";
         if (typeof val === "string") return val;
-        return val.airportCode || val.city || "N/A";
+        return val.code || val.airportCode || val.city || "N/A";
       };
       const resolveCity = (val) => {
         if (!val) return "Unknown";
@@ -172,7 +172,7 @@ function FlightSection() {
     const q = search.toLowerCase();
     return formattedBookings.filter(b => {
       // Basic visibility logic from original MyBookings
-      if (["failed","cancelled","not_started"].includes(b.executionStatus?.toLowerCase())) {
+      if ((["failed","cancelled","not_started"].includes(b.executionStatus?.toLowerCase()) || b.latestReissueBookingId)) {
         return false;
       }
 
@@ -402,7 +402,7 @@ function HotelSection() {
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="px-6! py-5!">Order ID</Th>
-              <Th className="px-6! py-5!">Hotel Detail</Th>
+              <Th className="px-6! py-5!">Hotel Name</Th>
               <Th className="px-6! py-5!">Stay Period</Th>
               <Th className="px-6! py-5!">Booked Date</Th>
               <Th className="px-6! py-5!">Status</Th>
@@ -524,10 +524,8 @@ export default function MyBookings() {
                  <FiList size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">My Travel Registry</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Personal Travel Ledger & Booking Management Console
-                 </p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">My Bookings</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View all your bookings (Hotel & Flight)</p>
                </div>
              </div>
           </div>

@@ -264,6 +264,7 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
   const [searchTerm, setSearchTerm] = useState("");
   const [remark, setRemark] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [financeTeamUsers, setFinanceTeamUsers] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedApprover, setSelectedApprover] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -280,32 +281,42 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
   }, []);
 
   useEffect(() => {
-    if (!searchTerm) {
+    if (isOpen) {
+      const fetchUsers = async () => {
+        setIsSearching(true);
+        try {
+          const { data } = await api.get("/travel-admin/finance-team");
+          setFinanceTeamUsers(data.data || []);
+        } catch (err) {
+          console.error("Failed to fetch finance team", err);
+        } finally {
+          setIsSearching(false);
+        }
+      };
+      fetchUsers();
+    } else {
+      setSearchTerm("");
+      setFinanceTeamUsers([]);
       setSearchResults([]);
+      setDropdownOpen(false);
+      setRemark("");
+      setSelectedApprover(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setSearchResults(financeTeamUsers);
       return;
     }
-    const delayDebounceFn = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const { data } = await api.get("/travel-admin/all-employees");
-        const users = data.employees || [];
-        const filtered = users.filter(
-          (u) =>
-            u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setSearchResults(filtered);
-        setDropdownOpen(true);
-      } catch (err) {
-        console.error("Failed to fetch employees", err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+    const filtered = financeTeamUsers.filter(
+      (u) =>
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setSearchResults(filtered);
+  }, [searchTerm, financeTeamUsers]);
 
   if (!isOpen) return null;
 
@@ -318,6 +329,7 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setSelectedApprover(null);
+    setDropdownOpen(true);
   };
 
   const handleSubmit = () => {
@@ -354,6 +366,7 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
                 type="text"
                 value={searchTerm}
                 onChange={handleSearchChange}
+                onFocus={() => setDropdownOpen(true)}
                 placeholder="Search by name or email..."
                 className="w-full pl-10 pr-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700"
               />
@@ -374,9 +387,14 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
                 ))}
               </div>
             )}
-            {dropdownOpen && searchTerm && searchResults.length === 0 && !isSearching && (
+            {dropdownOpen && searchResults.length === 0 && !isSearching && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
                 <p className="text-sm font-medium text-slate-500">No users found.</p>
+              </div>
+            )}
+            {dropdownOpen && isSearching && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
+                <p className="text-sm font-medium text-slate-500 animate-pulse">Loading finance team...</p>
               </div>
             )}
           </div>

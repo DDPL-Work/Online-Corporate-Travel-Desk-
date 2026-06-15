@@ -1,5 +1,6 @@
 const Corporate = require("../models/Corporate");
 const WalletTransaction = require("../models/Wallet");
+const ServiceFeeLedger = require("../models/ServiceFeeLedger");
 const paymentService = require("../services/payment.service");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -80,6 +81,64 @@ exports.getBookingTransactions = asyncHandler(async (req, res) => {
       { transactions },
       "Booking transactions fetched successfully",
     ),
+  );
+});
+
+exports.getServiceChargeTransactions = asyncHandler(async (req, res) => {
+  const { dateFrom, dateTo } = req.query;
+
+  logger.info("getServiceChargeTransactions request payload", {
+    corporateId: req.user.corporateId,
+    query: req.query
+  });
+
+  const query = { 
+    corporateId: req.user.corporateId,
+    type: "service_fee_deduction"
+  };
+
+  if (dateFrom || dateTo) {
+    query.createdAt = {};
+    if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+    if (dateTo) query.createdAt.$lte = new Date(dateTo);
+  }
+
+  const transactions = await WalletTransaction.find(query)
+    .populate("bookingId", "orderId status pricingSnapshot")
+    .populate("processedBy", "name email profilePicture")
+    .sort({ createdAt: -1 });
+
+  logger.info("getServiceChargeTransactions response", {
+    count: transactions.length,
+    transactions: transactions
+  });
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      { transactions },
+      "Service charge transactions fetched successfully",
+    ),
+  );
+});
+
+exports.getServiceChargeDetails = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { operationType } = req.query;
+  
+  if (!bookingId) {
+    throw new ApiError(400, "Booking ID is required");
+  }
+
+  const query = { corporateId: req.user.corporateId, bookingId };
+  if (operationType) {
+    query.action = operationType;
+  }
+
+  const details = await ServiceFeeLedger.findOne(query);
+
+  res.status(200).json(
+    new ApiResponse(200, details, "Service charge details fetched successfully")
   );
 });
 

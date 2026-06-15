@@ -1400,12 +1400,6 @@ function FareRulesSection({ bookingResult }) {
 
   if (!rules.length) return null;
 
-  const staticNotes = [
-    "GST, RAF and any other applicable charges are extra.",
-    "Fees are indicative per pax and per sector.",
-    "Domestic: submit cancellation/reissue request at least 2 hours before the airline policy time limit.",
-    "International: submit cancellation/reissue request at least 4 hours before the airline policy time limit.",
-  ];
 
   return (
     <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
@@ -1576,20 +1570,6 @@ function FareRulesSection({ bookingResult }) {
             );
           })}
 
-          {/* Static policy notes */}
-          {/* <ul className="space-y-2 border-t border-[#E0D8C8] pt-4">
-            {staticNotes.map((note, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2.5 text-[13px] text-gray-600"
-              >
-                <span className="text-[#A07840] mt-0.5 shrink-0 text-xs">
-                  ●
-                </span>
-                {note}
-              </li>
-            ))}
-          </ul> */}
         </>
     </div>
   );

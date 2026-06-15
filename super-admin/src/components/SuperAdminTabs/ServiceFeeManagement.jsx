@@ -277,9 +277,9 @@ export default function ServiceFeeManagement() {
               <FiSliders size={28} />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight leading-none">Service Fee Management</h1>
+              <h1 className="text-3xl font-black tracking-tight leading-none">Service Fees</h1>
               <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                Configure and manage service fee rules for Flights and Hotels.
+                Manage fees for flights and hotels
               </p>
             </div>
           </div>
@@ -325,7 +325,7 @@ export default function ServiceFeeManagement() {
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search service fee rules..."
+                  placeholder="Search fees..."
                   value={filters.search}
                   onChange={(event) => updateFilter("search", event.target.value)}
                   className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 focus:border-[#003399]"
@@ -348,7 +348,7 @@ export default function ServiceFeeManagement() {
         <div className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: C.border }}>
           <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: C.border }}>
             <div>
-              <h2 className="font-black text-slate-800 tracking-tight text-lg">Service Fee Rule List</h2>
+              <h2 className="font-black text-slate-800 tracking-tight text-lg">Fee Rules</h2>
               <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>
                 {filteredRules.length} rule{filteredRules.length !== 1 ? "s" : ""} found
               </p>
@@ -524,7 +524,7 @@ function RuleFormModal({ form, loading, onClose, onSubmit, onChange, onProductTy
         <div className="px-6 py-5 bg-gradient-to-r from-[#003399] to-[#000d26] text-white flex items-center justify-between">
           <div>
             <h2 className="text-lg font-black uppercase tracking-tight">{form.id ? "Update Rule" : "Create Rule"}</h2>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mt-1">Service fee configuration</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mt-1">Fee settings</p>
           </div>
           <button type="button" onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close">
             <FiX size={20} />
@@ -780,7 +780,7 @@ function ConfirmDeleteModal({ rule, onCancel, onConfirm }) {
     <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(event) => event.stopPropagation()}>
         <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4"><FiTrash2 size={22} /></div>
-        <h2 className="text-xl font-black text-slate-800">Delete Service Fee Rule?</h2>
+        <h2 className="text-xl font-black text-slate-800">Delete Fee Rule?</h2>
         <p className="text-sm font-medium text-slate-500 mt-2">This action cannot be undone. The rule "{rule.ruleName}" will be removed.</p>
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onCancel} className="px-5 py-2.5 border border-slate-200 text-slate-500 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-50">Cancel</button>
@@ -807,7 +807,7 @@ function EmptyState({ onCreate }) {
       <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
         <FiInbox size={32} />
       </div>
-      <p className="text-sm font-bold text-slate-400">No service fee rules configured yet.</p>
+      <p className="text-sm font-bold text-slate-400">No fee rules found.</p>
       <button onClick={onCreate} className="px-4 py-2 bg-[#003399] text-white rounded-lg text-xs font-black uppercase tracking-widest">Create First Rule</button>
     </div>
   );

@@ -378,17 +378,17 @@ function PaymentStatusCard({
   isTravelAdmin,
 }) {
   const items = [
-    {
-      label: "Payment",
-      value: paymentSuccessful ? "Completed" : "Pending",
-      ok: paymentSuccessful,
-      icon: paymentSuccessful ? (
-        <FiCheckCircle size={13} />
-      ) : (
-        <FiAlertCircle size={13} />
-      ),
-      hidden: !isTravelAdmin,
-    },
+    // {
+    //   label: "Payment",
+    //   value: paymentSuccessful ? "Completed" : "Pending",
+    //   ok: paymentSuccessful,
+    //   icon: paymentSuccessful ? (
+    //     <FiCheckCircle size={13} />
+    //   ) : (
+    //     <FiAlertCircle size={13} />
+    //   ),
+    //   hidden: !isTravelAdmin,
+    // },
     {
       label: "Invoice",
       value: isConfirmed ? "Issued" : "Processing…",
@@ -429,9 +429,9 @@ function PaymentStatusCard({
   ].filter((item) => !item.hidden);
 
   return (
-    <div className="grid grid-cols-2 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9]">
       {items.map((item, i) => (
-        <div key={i} className={`bg-white p-5 ${item.label === "Purpose" ? "col-span-2" : ""}`}>
+        <div key={i} className={`bg-white p-5 `}>
           <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
             {item.label}
           </div>
@@ -1013,24 +1013,52 @@ function GuestSection({ travellers = [] }) {
 /* ─────────────────────────────────────────────────────────────── */
 /*  08 Fare Breakdown (Travel Admin Only)                          */
 /* ─────────────────────────────────────────────────────────────── */
-function FareBreakdownSection({ priceBreakUp, totalFare }) {
+function FareBreakdownSection({ priceBreakUp, totalFare, bookingDetail }) {
   if (!totalFare) return null;
 
+  const room =
+    bookingDetail?.HotelRoomsDetails?.[0] ||
+    bookingDetail?.RoomGuests?.[0] ||
+    {};
+  const isRefundable = room?.IsRefundable;
+  const currency = priceBreakUp?.Currency || "INR";
+
   return (
-    <div className="bg-white border border-[#EAE4D9] p-6">
-      <div className="max-w-[600px]">
-        <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-4">
-          Fare Details
+    <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-6">
+      <div className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-5 flex items-center gap-2">
+        <FiCreditCard size={14} className="text-[#B5862A]" /> Fare Summary
+      </div>
+      <div className="grid grid-cols-1 gap-x-6">
+        <div className="flex flex-col gap-1 py-3 border-b border-[#EAE4D9] last:border-0">
+          <span className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+            Currency
+          </span>
+          <span className="text-[13px] font-medium text-[#1A1714]">
+            {currency}
+          </span>
         </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-between items-center text-[14px]">
-            <span className="text-[#1A1714] font-bold">
-              Total Paid <span className="font-normal text-slate-500 text-[11px] ml-1">(incl. all taxes and service fee)</span>
-            </span>
-            <span className="font-bold text-[#B5341A] text-[20px]">
-              ₹{Number(totalFare).toLocaleString("en-IN")}
-            </span>
+        <div className="flex flex-col gap-1 py-3 border-b border-[#EAE4D9] last:border-0">
+          <span className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+            Refundable
+          </span>
+          <span className={`text-[13px] font-medium ${isRefundable ? "text-[#B5862A]" : "text-[#1A1714]"}`}>
+            {isRefundable !== undefined ? (isRefundable ? "Yes" : "No") : "-"}
+          </span>
+        </div>
+      </div>
+
+      {/* Total area */}
+      <div className="mt-5 pt-4 border-t border-[#EAE4D9] flex justify-between items-end">
+        <div>
+          <div className="text-[12px] font-bold text-[#1A1714]">
+            Total Paid
           </div>
+          <div className="text-[10px] text-[#A89F94] mt-0.5">
+            incl. taxes & fees
+          </div>
+        </div>
+        <div className="text-[20px] font-bold text-[#1A1714] font-['DM_Mono']">
+          ₹{Number(totalFare).toLocaleString("en-IN")}
         </div>
       </div>
     </div>
@@ -2265,40 +2293,38 @@ export default function HotelBookingDetails() {
 
         {/* Tab Contents */}
         {activeTab === "hotel_details" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
+          <>
+          <div className="flex flex-col lg:flex-row items-start gap-6">
+            <div className="w-full lg:w-2/3 space-y-6 min-w-0">
               <HotelHeroCard
                 booking={booking}
                 bookingDetail={bookingDetail}
                 paymentSuccessful={paymentSuccessful}
               />
-             
             </div>
-            
+             
             {/* Right Side Column */}
-            <div className="lg:col-span-1 space-y-7">
+            <div className="w-full lg:w-1/3 lg:sticky lg:top-[200px]">
               {/* Fare Breakdown for Travel Admin */}
               {isTravelAdmin && totalFare > 0 && (
-                <section>
-                  <SectionHeader num={7} title="Fare Breakdown" />
-                  <FareBreakdownSection
-                    priceBreakUp={priceBreakUp}
-                    totalFare={totalFare}
-                  />
-                </section>
+                <FareBreakdownSection
+                  priceBreakUp={priceBreakUp}
+                  totalFare={totalFare}
+                  bookingDetail={bookingDetail}
+                />
               )}
-              
-              <section>
-                <PaymentStatusCard
-                booking={booking}
-                paymentSuccessful={paymentSuccessful}
-                isConfirmed={isConfirmed}
-                hotelReq={hotelReq}
-                isTravelAdmin={isTravelAdmin}
-              />
-              </section>
             </div>
           </div>
+          <div className="mt-6">
+            <PaymentStatusCard
+                  booking={booking}
+                  paymentSuccessful={paymentSuccessful}
+                  isConfirmed={isConfirmed}
+                  hotelReq={hotelReq}
+                  isTravelAdmin={isTravelAdmin}
+                />
+          </div>
+          </>
         )}
 
         {/* Project Details Tab */}

@@ -18,6 +18,8 @@ router.get("/balance", walletController.getWalletBalance);
 router.get("/transactions", walletController.getWalletTransactions);
 router.get("/transactions/recharge", walletController.getRechargeHistory);
 router.get("/transactions/booking", walletController.getBookingTransactions);
+router.get("/transactions/service-charges", walletController.getServiceChargeTransactions);
+router.get("/transactions/service-charges/:bookingId/details", walletController.getServiceChargeDetails);
 router.get("/payment-options", walletController.getPaymentOptions);
 router.get(
   "/payment-status/:orderId",

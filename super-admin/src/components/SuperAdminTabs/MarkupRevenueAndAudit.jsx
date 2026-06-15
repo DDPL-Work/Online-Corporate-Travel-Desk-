@@ -229,7 +229,7 @@ export default function MarkupRevenueAndAudit() {
       ],
       appliedFilters: [
         { label: "Search", value: searchQuery || "None" },
-        { label: "Corporate", value: selectedCorporate === "All" ? "All Corporates" : (corporates.find(c => String(c._id) === selectedCorporate)?.companyName || selectedCorporate) },
+        { label: "Company", value: selectedCorporate === "All" ? "All Companies" : (corporates.find(c => String(c._id) === selectedCorporate)?.companyName || selectedCorporate) },
         { label: "Category", value: productType }
       ],
       data: filteredAudit.map(a => {
@@ -241,7 +241,7 @@ export default function MarkupRevenueAndAudit() {
 
         return {
           "Order ID": a.orderId || "—",
-          "Corporate Name": corpName,
+          "Company Name": corpName,
           "Booking Date": new Date(bookingDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
           "Category": a.productType === "flight" ? "Flight" : "Hotel",
           "Supplier Fare (Before)": inr(beforeAmount),
@@ -251,7 +251,7 @@ export default function MarkupRevenueAndAudit() {
       }),
       columns: [
         { header: "Order ID", key: "Order ID", width: 20 },
-        { header: "Corporate Name", key: "Corporate Name", width: 30 },
+        { header: "Company Name", key: "Company Name", width: 30 },
         { header: "Booking Date", key: "Booking Date", width: 20 },
         { header: "Category", key: "Category", width: 15 },
         { header: "Supplier Fare (Before)", key: "Supplier Fare (Before)", width: 25 },
@@ -371,7 +371,7 @@ export default function MarkupRevenueAndAudit() {
 
           <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col h-full lg:col-span-2">
             <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none mb-6">
-              Top 5 Corporates by Markup
+              Top 5 Companies by Markup
             </h3>
             <div className="flex-1 min-h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -418,7 +418,7 @@ export default function MarkupRevenueAndAudit() {
               <div className="relative w-full sm:w-64">
                 <input
                   type="text"
-                  placeholder="Order ID or Corporate..."
+                  placeholder="Order ID or Company..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] bg-slate-50 hover:bg-white"
@@ -432,7 +432,7 @@ export default function MarkupRevenueAndAudit() {
                   onChange={(val) => { setSelectedCorporate(val); setPage(1); }}
                   icon={<FaBuilding size={14} />}
                   options={[
-                    { label: "All Corporates", value: "All" },
+                    { label: "All Companies", value: "All" },
                     ...corporates.map(c => ({ label: c.companyName || c.corporateName, value: String(c._id) }))
                   ]}
                 />
@@ -539,7 +539,7 @@ export default function MarkupRevenueAndAudit() {
                 <thead>
                   <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Order ID</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Corporate</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Company</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Booking Date</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 text-center">Category</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 text-right">Supplier Fare</th>

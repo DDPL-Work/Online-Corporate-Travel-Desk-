@@ -91,17 +91,17 @@ function FlightSection({ onSelect }) {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Rejected Flights" value={filtered.length} Icon={FiXCircle} borderCls="border-[#003399]" iconBgCls="bg-slate-50" iconColorCls="text-[#003399]" />
-        <StatCard label="Awaiting Revision" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Policy Violations" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
-        <StatCard label="Rejected Assets" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Needs Updates" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Out of Policy" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Total Rejected" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Rejections</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Destination, ID..." />
           </LabeledField>
-          <LabeledField label="Rejection Date" className="lg:col-span-6">
+          <LabeledField label="Date Range" className="lg:col-span-6">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -116,7 +116,7 @@ function FlightSection({ onSelect }) {
 
       <ResponsiveDataTable 
         title="Rejection Ledger" 
-        subtitle={`${filtered.length} denied authorizations`} 
+        subtitle={`${filtered.length} rejected requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
@@ -124,13 +124,13 @@ function FlightSection({ onSelect }) {
           pageHeader: "Flight Rejection Ledger",
           statCards: [
             { label: "Rejected Flights", value: filtered.length },
-            { label: "Awaiting Revision", value: filtered.length },
-            { label: "Policy Violations", value: filtered.length },
-            { label: "Rejected Assets", value: filtered.length }
+            { label: "Needs Updates", value: filtered.length },
+            { label: "Out of Policy", value: filtered.length },
+            { label: "Total Rejected", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Rejection Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: myRejectedFlightsExportTemplate,
@@ -226,18 +226,18 @@ function HotelSection({ onSelect }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Rejected Stays" value={filtered.length} Icon={FiXCircle} borderCls="border-[#003399]" iconBgCls="bg-slate-50" iconColorCls="text-[#003399]" />
-        <StatCard label="Awaiting Revision" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Policy Violations" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
-        <StatCard label="Rejected Assets" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Rejected Hotels" value={filtered.length} Icon={FiXCircle} borderCls="border-[#003399]" iconBgCls="bg-slate-50" iconColorCls="text-[#003399]" />
+        <StatCard label="Needs Updates" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Out of Policy" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Total Rejected" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Rejections</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel Name, ID..." />
           </LabeledField>
-          <LabeledField label="Rejection Date" className="lg:col-span-6">
+          <LabeledField label="Date Range" className="lg:col-span-6">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -252,21 +252,21 @@ function HotelSection({ onSelect }) {
 
       <ResponsiveDataTable 
         title="Hotel Rejection Ledger" 
-        subtitle={`${filtered.length} denied authorizations`} 
+        subtitle={`${filtered.length} rejected requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Hotel Rejection Ledger",
           statCards: [
-            { label: "Rejected Stays", value: filtered.length },
-            { label: "Awaiting Revision", value: filtered.length },
-            { label: "Policy Violations", value: filtered.length },
-            { label: "Rejected Assets", value: filtered.length }
+            { label: "Rejected Hotels", value: filtered.length },
+            { label: "Needs Updates", value: filtered.length },
+            { label: "Out of Policy", value: filtered.length },
+            { label: "Total Rejected", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Rejection Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: myRejectedHotelsExportTemplate,
@@ -279,7 +279,7 @@ function HotelSection({ onSelect }) {
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="!px-6 !py-5">Request ID</Th>
-              <Th className="!px-6 !py-5">Hotel Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Rejection Date</Th>
               <Th className="!px-6 !py-5">Reason</Th>
               <Th className="!px-6 !py-5">Status</Th>
@@ -354,7 +354,7 @@ export default function MyRejectedRequests() {
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiXCircle size={28} /></div>
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Rejected Requests</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Archive of Denied Authorizations and Compliance Feedback Ledger</p>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View all your rejected requests (Hotel & Flight)</p>
                </div>
              </div>
           </div>

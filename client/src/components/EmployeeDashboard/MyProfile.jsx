@@ -46,7 +46,7 @@ const PERSONAL_FIELDS = [
 const CORPORATE_FIELDS = [
   { key: "employeeId", label: "Employee ID", icon: FiHash, type: "text", editable: true },
   { key: "department", label: "Department", icon: FiLayers, type: "text", editable: true },
-  { key: "designation", label: "Corporate Role", icon: FiBriefcase, type: "text", editable: true },
+  { key: "designation", label: "Role", icon: FiBriefcase, type: "text", editable: true },
 ];
 
 function getInitials(firstName = "", lastName = "") {
@@ -178,8 +178,8 @@ export default function MyProfile() {
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiUser size={28} /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Identity Hub</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage your corporate credentials, authorization matrix & documents</p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">My Profile</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage your personal details and approval hierarchy</p>
                </div>
              </div>
           </div>
@@ -251,7 +251,7 @@ export default function MyProfile() {
                     </div>
                     <div>
                       <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Profile Information</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Personal & Work Identity Registry</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Personal Details</p>
                     </div>
                   </div>
                   
@@ -298,8 +298,8 @@ export default function MyProfile() {
                     <FiShield />
                   </div>
                   <div>
-                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Project Approval Matrix</h3>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Designated Managers per Project Assignment</p>
+                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Project Approvers</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Managers that you select as your approver</p>
                   </div>
                 </div>
 
@@ -358,7 +358,7 @@ export default function MyProfile() {
                          <tr className="bg-slate-50/50">
                            <td className="px-8 py-10">
                              <div className="flex flex-col gap-2">
-                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Target Project</label>
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Project</label>
                                <select
                                   value={localProfile.projectId || ""}
                                   onChange={(e) => updateField("projectId", e.target.value)}
@@ -373,7 +373,7 @@ export default function MyProfile() {
                            </td>
                            <td className="px-8 py-10">
                              <div className="flex flex-col gap-2">
-                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assign Manager</label>
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Manager</label>
                                <select
                                   value={localProfile.managerId || ""}
                                   onChange={(e) => updateField("managerId", e.target.value)}
@@ -407,8 +407,8 @@ export default function MyProfile() {
                   <FiShield />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Designated Authorities</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Direct Organizational Approval Hierarchy</p>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">My Travel Admin</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Your Final approver for travel requests</p>
                 </div>
               </div>
 
@@ -416,7 +416,7 @@ export default function MyProfile() {
                  <table className="w-full text-left border-collapse min-w-[600px]">
                    <thead>
                      <tr className="bg-slate-50/50">
-                       <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Authority Name</th>
+                       <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Manager Name</th>
                        <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">Email Address</th>
                        <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-100 text-right">Role</th>
                      </tr>

@@ -142,8 +142,8 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
 
   // ── SERVICE FEE CALCULATION ──
   const b = req.body;
-  const cCode = (b.CountryCode || b.countryCode || b.country || b.CountryName || b.countryName || hotelRequest?.countryCode || hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || hotelRequest?.hotelDetails?.CountryCode || hotelRequest?.hotelDetails?.CountryName || "").toLowerCase();
-  const isDomesticHotel = cCode === "in" || cCode === "ind" || cCode === "india";
+  const cCode = (b.CountryCode || b.countryCode || b.country || b.CountryName || b.countryName || hotelRequest?.countryCode || hotelRequest?.selectedHotel?.country || hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || hotelRequest?.hotelDetails?.CountryCode || hotelRequest?.hotelDetails?.CountryName || "in").toLowerCase();
+  const isDomesticHotel = ["in", "ind", "india"].includes(cCode);
   const sRating = b.StarRating || b.starRating || hotelRequest?.selectedHotel?.starRating || hotelRequest?.selectedHotel?.StarRating || hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || hotelRequest?.starRating || hotelRequest?.hotelDetails?.StarRating || 1; // Default to 1 if unknown, though better to pass it.
 
   const serviceFeePayload = {
@@ -339,19 +339,27 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   let finalApproverName = approverName;
   let finalApprovedAt = null;
 
-  try {
-    const ssrPolicy = await EmployeeSsrPolicy.findOne({
-      corporateId: corporate._id,
-      employeeEmail: user.email?.toLowerCase().trim(),
-    }).lean();
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
 
-    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
-      requestStatus = "approved";
-      finalApproverName = "Auto Approve";
-      finalApprovedAt = new Date();
+  if (isAutoApproveIntent && user.role === "travel-admin") {
+    requestStatus = "approved";
+    finalApproverName = "Auto Approve (Travel Admin)";
+    finalApprovedAt = new Date();
+  } else {
+    try {
+      const ssrPolicy = await EmployeeSsrPolicy.findOne({
+        corporateId: corporate._id,
+        employeeEmail: user.email?.toLowerCase().trim(),
+      }).lean();
+
+      if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
+        requestStatus = "approved";
+        finalApproverName = "Auto Approve";
+        finalApprovedAt = new Date();
+      }
+    } catch (policyErr) {
+      // Safe fallback
     }
-  } catch (policyErr) {
-    // Safe fallback
   }
 
   const orderId = await generateSequentialOrderId("hotel");
@@ -569,30 +577,30 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
           logger.error("Failed to record markup revenue for instant hotel booking", err);
         });
 
-        if (bookingRequest.pricingSnapshot?.serviceFeeDetails) {
-          try {
-            await serviceFeeService.applyServiceFee(
-              corporate._id,
-              user._id,
-              bookingRequest._id,
-              bookingRequest.orderId,
-              {
-                productType: "Hotel",
-                operation: "Book",
-                tripType: ["in", "ind", "india"].includes((bookingRequest.hotelRequest?.countryCode || bookingRequest.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || bookingRequest.hotelRequest?.hotelDetails?.CountryCode || bookingRequest.hotelRequest?.hotelDetails?.CountryName || "").toLowerCase()) ? "Domestic" : "International",
-                starRating: bookingRequest.hotelRequest?.selectedHotel?.starRating || bookingRequest.hotelRequest?.selectedHotel?.StarRating || bookingRequest.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || bookingRequest.hotelRequest?.hotelDetails?.StarRating || bookingRequest.hotelRequest?.starRating,
-                roomCount: bookingRequest.hotelRequest?.noOfRooms || bookingRequest.hotelRequest?.roomGuests?.length || bookingRequest.hotelRequest?.roomDetails?.length || 1,
-                baseFare: Number(bookingRequest.pricingSnapshot?.totalAmount)
-              },
-              null,
-              // true // skipWalletDeduction
-            );
-          } catch (feeErr) {
-            logger.error("Failed to apply service fee ledger for hotel booking", {
-              bookingId: bookingRequest._id,
-              error: feeErr.message,
-            });
-          }
+        try {
+          await serviceFeeService.applyServiceFee(
+            corporate._id,
+            user._id,
+            bookingRequest._id,
+            bookingRequest.orderId,
+            {
+              productType: "Hotel",
+              operation: "Book",
+              tripType: (() => {
+                const cCode = (bookingRequest.hotelRequest?.countryCode || bookingRequest.hotelRequest?.selectedHotel?.country || bookingRequest.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || bookingRequest.hotelRequest?.hotelDetails?.CountryCode || bookingRequest.hotelRequest?.hotelDetails?.CountryName || bookingRequest.bookingSnapshot?.country || "in").toLowerCase();
+                return ["in", "ind", "india"].includes(cCode) ? "Domestic" : "International";
+              })(),
+              starRating: bookingRequest.hotelRequest?.selectedHotel?.starRating || bookingRequest.hotelRequest?.selectedHotel?.StarRating || bookingRequest.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || bookingRequest.hotelRequest?.hotelDetails?.StarRating || bookingRequest.hotelRequest?.starRating || 1,
+              roomCount: bookingRequest.hotelRequest?.noOfRooms || bookingRequest.hotelRequest?.roomGuests?.length || bookingRequest.hotelRequest?.roomDetails?.length || 1,
+              baseFare: Number(bookingRequest.pricingSnapshot?.totalAmount || 0)
+            },
+            null
+          );
+        } catch (feeErr) {
+          logger.error("Failed to apply service fee ledger for hotel booking", {
+            bookingId: bookingRequest._id,
+            error: feeErr.message,
+          });
         }
 
         await notificationService.sendBookingNotification(
@@ -906,19 +914,27 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   let finalApproverName = approverName;
   let finalApprovedAt = null;
 
-  try {
-    const ssrPolicy = await EmployeeSsrPolicy.findOne({
-      corporateId: corporate._id,
-      employeeEmail: user.email?.toLowerCase().trim(),
-    }).lean();
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
 
-    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
-      requestStatus = "approved";
-      finalApproverName = "Auto Approve";
-      finalApprovedAt = new Date();
+  if (isAutoApproveIntent && user.role === "travel-admin") {
+    requestStatus = "approved";
+    finalApproverName = "Auto Approve (Travel Admin)";
+    finalApprovedAt = new Date();
+  } else {
+    try {
+      const ssrPolicy = await EmployeeSsrPolicy.findOne({
+        corporateId: corporate._id,
+        employeeEmail: user.email?.toLowerCase().trim(),
+      }).lean();
+
+      if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
+        requestStatus = "approved";
+        finalApproverName = "Auto Approve";
+        finalApprovedAt = new Date();
+      }
+    } catch (policyErr) {
+      // Safe fallback
     }
-  } catch (policyErr) {
-    // Safe fallback — keep pending_approval
   }
 
   const orderId = await generateSequentialOrderId("hotel");
@@ -1521,27 +1537,27 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
       console.error("Failed to record markup revenue for approved hotel booking", err);
     });
 
-    if (booking.pricingSnapshot?.serviceFeeDetails) {
-      try {
-        await serviceFeeService.applyServiceFee(
-          corporate._id,
-          booking.userId,
-          booking._id,
-          booking.orderId,
-          {
-            productType: "Hotel",
-            operation: "Book",
-            tripType: ["in", "ind", "india"].includes((booking.hotelRequest?.countryCode || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryName || "").toLowerCase()) ? "Domestic" : "International",
-            starRating: booking.hotelRequest?.selectedHotel?.starRating || booking.hotelRequest?.selectedHotel?.StarRating || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || booking.hotelRequest?.hotelDetails?.StarRating || booking.hotelRequest?.starRating || 1,
-            roomCount: booking.hotelRequest?.noOfRooms || booking.hotelRequest?.roomGuests?.length || booking.hotelRequest?.roomDetails?.length || 1,
-            baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
-          },
-          null,
-          true // skipWalletDeduction
-        );
-      } catch (feeErr) {
-        console.error("Failed to apply service fee ledger for approved hotel booking:", feeErr.message);
-      }
+    try {
+      await serviceFeeService.applyServiceFee(
+        corporate._id,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Hotel",
+          operation: "Book",
+          tripType: (() => {
+            const cCode = (booking.hotelRequest?.countryCode || booking.hotelRequest?.selectedHotel?.country || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryName || booking.bookingSnapshot?.country || "in").toLowerCase();
+            return ["in", "ind", "india"].includes(cCode) ? "Domestic" : "International";
+          })(),
+          starRating: booking.hotelRequest?.selectedHotel?.starRating || booking.hotelRequest?.selectedHotel?.StarRating || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || booking.hotelRequest?.hotelDetails?.StarRating || booking.hotelRequest?.starRating || 1,
+          roomCount: booking.hotelRequest?.noOfRooms || booking.hotelRequest?.roomGuests?.length || booking.hotelRequest?.roomDetails?.length || 1,
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        },
+        null
+      );
+    } catch (feeErr) {
+      console.error("Failed to apply service fee ledger for approved hotel booking:", feeErr.message);
     }
 
     // Notify User

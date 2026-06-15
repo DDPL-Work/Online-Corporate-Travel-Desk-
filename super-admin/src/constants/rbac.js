@@ -91,7 +91,6 @@ const ROUTE_RULES = Object.freeze([
       "/credit-status",
       "/commission-settings",
       "/api-configurations",
-      "/system-logs",
       "/ops-management",
     ],
     superAdminOnly: true,

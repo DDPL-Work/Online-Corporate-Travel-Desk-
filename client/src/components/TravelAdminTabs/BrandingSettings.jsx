@@ -123,7 +123,7 @@ export default function BrandingSettings() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.offWhite }}>
          <div className="flex flex-col items-center gap-4">
             <FiRefreshCw className="animate-spin" size={32} style={{ color: C.gold }} />
-            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Synchronizing Branding...</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Loading Branding...</p>
          </div>
       </div>
     );
@@ -148,7 +148,7 @@ export default function BrandingSettings() {
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiLayout size={28} /></div>
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Branding & Identity</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Configure your organization's look and feel for employees</p>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Set up your portal's look and feel</p>
                </div>
              </div>
           </div>
@@ -209,8 +209,8 @@ export default function BrandingSettings() {
                       <FiType style={{ color: C.navy }} />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Portal Personalization</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Configure Display Text & Messaging</p>
+                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Portal Settings</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Change Text & Messages</p>
                     </div>
                   </div>
                   
@@ -300,8 +300,8 @@ export default function BrandingSettings() {
                   <FiDroplet />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Corporate Classification</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Organization Type for Billing & Analytics</p>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Company Type</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Your Organization's Type</p>
                 </div>
               </div>
 
@@ -324,10 +324,10 @@ export default function BrandingSettings() {
             <div className="rounded-[2rem] p-8 border border-gold/20" style={{ background: `${C.gold}08` }}>
               <div className="flex items-center gap-3 mb-2">
                 <FiImage style={{ color: C.gold }} size={20} />
-                <h4 className="font-black text-sm uppercase tracking-widest" style={{ color: C.navy }}>Why Branding Matters?</h4>
+                <h4 className="font-black text-sm uppercase tracking-widest" style={{ color: C.navy }}>Why Branding is Important</h4>
               </div>
               <p className="text-xs leading-relaxed font-medium" style={{ color: C.muted }}>
-                Consistent branding builds trust within your organization. Your logo and portal title will be visible to all employees throughout their booking journey.
+                A consistent look helps build trust. Your logo and title will be seen by all employees when they book travel.
               </p>
             </div>
 

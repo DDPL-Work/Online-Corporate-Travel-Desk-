@@ -1815,91 +1815,189 @@ function CorporateAuditSection({ booking }) {
     booking.executionStatus === "confirmed" ||
     booking.executionStatus === "booked";
 
-  const auditFields = [
+  const approverName = (() => {
+    const requesterId = booking.userId?._id || booking.userId;
+    const approverId =
+      booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+    if (
+      booking.approverName === "Auto Approve" ||
+      (requesterId &&
+        approverId &&
+        requesterId.toString() === approverId.toString())
+    ) {
+      return "Auto Approved (System)";
+    }
+    return booking.approvedBy?.name
+      ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}`
+      : booking.approverName || "—";
+  })();
+
+  const requesterName =
+    booking.requesterDetails?.name ||
+    (booking.userId?.name
+      ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}`
+      : booking.travellers?.[0]
+        ? `${booking.travellers[0].firstName} ${booking.travellers[0].lastName}`
+        : "—");
+
+  const sections = [
     {
-      label: "Project Name",
-      value: booking.projectName || "—",
-      icon: <FiBriefcase size={12} />,
+      heading: "Project Information",
+      fields: [
+        {
+          label: "Order ID",
+          value: booking.orderId || "—",
+          icon: <FiHash size={11} />,
+        },
+        {
+          label: "Project Name",
+          value: booking.projectName || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+        {
+          label: "Project Code",
+          value: booking.projectId || booking.projectCodeId || "—",
+          icon: <FiTag size={11} />,
+        },
+        {
+          label: "Project Client",
+          value: booking.projectClient || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
     },
     {
-      label: "Project Code",
-      value: booking.projectCodeId || "—",
-      icon: <FiTag size={12} />,
+      heading: "Requester Details",
+      fields: [
+        {
+          label: "Requester Name",
+          value: requesterName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Requester Email",
+          value:
+            booking.requesterDetails?.email ||
+            booking.userId?.email ||
+            booking.travellers?.[0]?.email ||
+            "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Purpose of Travel",
+          value: booking.purposeOfTravel || booking.purpose || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
     },
     {
-      label: "Project Client",
-      value: booking.projectClient || "—",
-      icon: <FiBriefcase size={12} />,
+      heading: "Approval Details",
+      fields: [
+        {
+          label: "Selected Approver",
+          value: approverName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Approver Email",
+          value: booking.approverEmail || booking.approvedBy?.email || "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Approver Role",
+          value: booking.approverRole
+            ? booking.approverRole
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+            : "—",
+          icon: <FiShield size={11} />,
+        },
+        ...(booking.approvedBy?.name
+          ? [
+              {
+                label: "Approved By",
+                value:
+                  `${booking.approvedBy.name.firstName || ""} ${booking.approvedBy.name.lastName || ""}`.trim() ||
+                  "—",
+                icon: <FiUser size={11} />,
+              },
+              {
+                label: "Approved By Email",
+                value: booking.approvedBy?.email || "—",
+                icon: <FiMail size={11} />,
+                isEmail: true,
+              },
+              {
+                label: "Approved By Role",
+                value: booking.approvedBy?.role
+                  ? booking.approvedBy.role
+                      .replace(/-/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—",
+                icon: <FiShield size={11} />,
+              },
+            ]
+          : []),
+        ...(booking.approverComments
+          ? [
+              {
+                label: "Approver Comments",
+                value: booking.approverComments,
+                icon: <FiMessageSquare size={11} />,
+              },
+            ]
+          : []),
+        ...(isConfirmed && getVoucherDate(booking)
+          ? [
+              {
+                label: "Vouchered At",
+                value: `${fmtDate(getVoucherDate(booking))} ${fmtTime(getVoucherDate(booking))}`,
+                icon: <FiClock size={11} />,
+              },
+            ]
+          : []),
+      ],
     },
-    {
-      label: "Requester Name",
-      value: booking.userId?.name ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}` : "—",
-      icon: <FiUser size={12} />,
-    },
-    {
-      label: "Requester Email",
-      value: booking.userId?.email || "—",
-      icon: <FiMail size={12} />,
-    },
-    {
-      label: "Selected Approver",
-      value: (() => {
-        const requesterId = booking.userId?._id || booking.userId;
-        const approverId = booking.approverId;
-        if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
-          return "Auto Approved (System)";
-        }
-        return booking.approverName || "—";
-      })(),
-      icon: <FiUser size={12} />,
-    },
-    {
-      label: "Approver Email",
-      value: booking.approverEmail || "—",
-      icon: <FiMail size={12} />,
-    },
-    {
-      label: "Approver Role",
-      value: booking.approverRole || "—",
-      icon: <FiShield size={12} />,
-    },
-    {
-      label: "Approved By",
-      value: booking.approvedBy?.name ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}` : "—",
-      icon: <FiUser size={12} />,
-    },
-    {
-      label: "Approved By Email",
-      value: booking.approvedBy?.email || "—",
-      icon: <FiMail size={12} />,
-    },
-    {
-      label: "Approved By Role",
-      value: booking.approvedBy?.role || "—",
-      icon: <FiShield size={12} />,
-    },
-    ...(isConfirmed ? [{
-      label: "Vouchered At",
-      value: getVoucherDate(booking) ? `${fmtDate(getVoucherDate(booking))} ${fmtTime(getVoucherDate(booking))}` : "—",
-      icon: <FiClock size={12} />,
-    }] : []),
   ];
 
   return (
-    <div className="bg-white border border-[#EAE4D9] p-8">
-      <div className="grid grid-cols-4 gap-y-8 gap-x-6">
-        {auditFields.map((field, i) => (
-          <div key={i}>
-            <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2 flex items-center gap-1.5">
-              <span className="text-[#B5862A]">{field.icon}</span>
-              {field.label}
-            </div>
-            <div className="text-[14px] font-semibold text-[#1A1714]">
-              {field.value}
+    <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+      {sections.map((section, si) => (
+        <div key={si} className={si > 0 ? "border-t border-[#EAE4D9]" : ""}>
+          {/* Section heading */}
+          <div className="px-6 pt-5 pb-3 bg-[#FAF8F4]">
+            <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A]">
+              {section.heading}
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[#EAE4D9]">
+            {section.fields.map((field, fi) => (
+              <div
+                key={fi}
+                className={`px-6 py-5 ${
+                  fi % 3 !== 2 ? "sm:border-r border-[#EAE4D9]" : ""
+                } ${fi >= 3 ? "border-t border-[#EAE4D9]" : ""}`}
+              >
+                <div className="flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                  <span className="text-[#B5862A]">{field.icon}</span>
+                  {field.label}
+                </div>
+                <div
+                  className={`text-[13px] font-semibold text-[#1A1714] leading-snug ${
+                    field.isEmail ? "break-all" : ""
+                  }`}
+                >
+                  {field.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2161,14 +2259,6 @@ export default function TeamHotelBookingDetails() {
                 hotelReq={hotelReq}
                 isTravelAdmin={isTravelAdmin}
               />
-              <section>
-                <SectionHeader num={4} title="Booking Summry" />
-                <BookingReferencesSection
-                  booking={booking}
-                  bookingDetail={bookingDetail}
-                  result={result}
-                />
-              </section>
             </div>
             
             {/* Fare Breakdown for Travel Admin */}

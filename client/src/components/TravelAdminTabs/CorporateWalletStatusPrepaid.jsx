@@ -35,9 +35,11 @@ import {
   fetchBookingTransactions,
   fetchWalletPaymentStatus,
   initiateWalletRecharge,
+  fetchServiceChargeTransactions,
+  fetchServiceChargeDetails,
 } from "../../Redux/Slice/walletSlice";
 import { C } from "../Shared/color";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 
@@ -92,12 +94,19 @@ const StatusBadge = ({ status }) => {
 export default function CorporateWallet() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { balance, currency, transactions, loading, rechargeOrder } =
     useSelector((state) => state.wallet);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [activeTab, setActiveTab] = useState("booking"); // booking | recharge
+  const [activeTab, setActiveTab] = useState(
+    location.state?.returnToWalletFeeTx 
+      ? "serviceCharge" 
+      : location.state?.returnToWalletTab 
+        ? location.state.returnToWalletTab 
+        : "booking"
+  ); // booking | recharge | serviceCharge
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showRecharge, setShowRecharge] = useState(false);
@@ -151,11 +160,29 @@ export default function CorporateWallet() {
       dateTo: endDate || undefined,
     };
     if (activeTab === "recharge") dispatch(fetchRechargeHistory(params));
+    else if (activeTab === "serviceCharge") dispatch(fetchServiceChargeTransactions(params));
     else dispatch(fetchBookingTransactions(params));
     setSearchTerm("");
     setStatusFilter("All");
     setCurrentPage(1);
-  }, [dispatch, activeTab, startDate, endDate]);
+  }, [activeTab, startDate, endDate, dispatch]);
+
+  useEffect(() => {
+    const txId = location.state?.returnToWalletFeeTx || location.state?.returnToWalletTx;
+    if (txId && transactions?.length > 0) {
+      const tx = transactions.find((t) => t._id === txId);
+      if (tx) {
+        setSelectedTx(tx);
+        setShowDetails(true);
+        // Clear the state so it doesn't reopen if the user refreshes the page manually
+        const stateCopy = { ...location.state };
+        delete stateCopy.returnToWalletFeeTx;
+        delete stateCopy.returnToWalletTx;
+        delete stateCopy.returnToWalletTab;
+        navigate(location.pathname, { replace: true, state: stateCopy });
+      }
+    }
+  }, [location.state?.returnToWalletFeeTx, location.state?.returnToWalletTx, transactions, navigate, location.pathname, location.state]);
 
   const getTransactionStatus = (tx) =>
     tx.status ? tx.status.toLowerCase() : "success";
@@ -205,13 +232,14 @@ export default function CorporateWallet() {
         dateTo: endDate || undefined,
       };
       if (activeTab === "recharge") dispatch(fetchRechargeHistory(params));
+      else if (activeTab === "serviceCharge") dispatch(fetchServiceChargeTransactions(params));
       else dispatch(fetchBookingTransactions(params));
     };
     syncPendingStatuses();
     return () => {
       cancelled = true;
     };
-  }, [dispatch, transactions, activeTab, startDate, endDate]);
+  }, [dispatch, transactions, activeTab, startDate, endDate]);   
 
   const filteredTransactions = useMemo(() => {
     let filtered = transactions || [];
@@ -221,7 +249,8 @@ export default function CorporateWallet() {
         (tx) =>
           tx.description?.toLowerCase().includes(term) ||
           tx._id?.toLowerCase().includes(term) ||
-          tx.bookingId?.toLowerCase().includes(term),
+          tx.bookingId?.orderId?.toLowerCase().includes(term) ||
+          (typeof tx.bookingId === 'string' && tx.bookingId.toLowerCase().includes(term)),
       );
     }
     if (statusFilter !== "All")
@@ -242,7 +271,7 @@ export default function CorporateWallet() {
     .filter((tx) => tx.type === "credit")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
   const totalDebit = filteredTransactions
-    .filter((tx) => tx.type === "debit")
+    .filter((tx) => tx.type === "debit" || tx.type === "service_fee_deduction")
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
   const { exportExcel, isExporting } = useExcelExporter();
@@ -265,6 +294,21 @@ export default function CorporateWallet() {
     setRechargeAmount("");
   };
 
+  const handleRefresh = async () => {
+    const params = {
+      dateFrom: startDate || undefined,
+      dateTo: endDate || undefined,
+    };
+    await Promise.all([
+      dispatch(fetchWalletBalance()),
+      activeTab === "recharge"
+        ? dispatch(fetchRechargeHistory(params))
+        : activeTab === "serviceCharge"
+        ? dispatch(fetchServiceChargeTransactions(params))
+        : dispatch(fetchBookingTransactions(params))
+    ]);
+  };
+
   return (
     <div
       className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6"
@@ -281,7 +325,7 @@ export default function CorporateWallet() {
                 <FiArrowRight className="rotate-180" size={20} />
               </button>
               <button
-                onClick={() => dispatch(fetchWalletBalance())}
+                onClick={handleRefresh}
                 className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
                 disabled={loading}
               >
@@ -302,8 +346,7 @@ export default function CorporateWallet() {
                   Corporate Wallet
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Comprehensive Oversight of all Corporate Fund Deployments and
-                  Capital Management
+                  Manage corporate funds and capital
                 </p>
               </div>
             </div>
@@ -314,7 +357,7 @@ export default function CorporateWallet() {
               onClick={() => setShowRecharge(true)}
               className="px-8 py-3.5 rounded-xl font-black text-[11px] bg-gold text-navy hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2.5 uppercase tracking-widest"
             >
-              <FiPlusCircle size={16} /> Initiate Recharge
+              <FiPlusCircle size={16} /> Recharge Wallet
             </button>
           </div>
         </div>
@@ -323,8 +366,9 @@ export default function CorporateWallet() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           {[
-            ["booking", "Consumption Ledger", FiArrowUpRight],
-            ["recharge", "Wallet Recharge Ledger", FiArrowDownLeft],
+            ["booking", "Bookings", FiArrowUpRight],
+            ["recharge", "Recharges", FiArrowDownLeft],
+            ["serviceCharge", "Service Charges", FiHash],
           ].map(([k, lbl, Icon]) => (
             <button
               key={k}
@@ -336,9 +380,9 @@ export default function CorporateWallet() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <StatCard
-            label="Available Asset"
+            label="Available Balance"
             value={
               loading
                 ? "..."
@@ -349,18 +393,20 @@ export default function CorporateWallet() {
             iconBgCls="bg-slate-100"
             iconColorCls="text-[#000D26]"
           />
-          <StatCard
-            label="Total Capital In"
-            value={`₹${totalCredit.toLocaleString()}`}
-            Icon={FiArrowDownLeft}
-            borderCls="border-emerald-500"
-            iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
-          />
+          {activeTab === "recharge" && (
+            <StatCard
+              label="Total Recharged"
+              value={`₹${totalCredit.toLocaleString()}` }
+              Icon={FiArrowDownLeft}
+              borderCls="border-emerald-500"
+              iconBgCls="bg-emerald-50"
+              iconColorCls="text-emerald-600"
+            />
+          )}
           {activeTab !== "recharge" && (
             <StatCard
-              label="Total Capital Out"
-              value={`₹${totalDebit.toLocaleString()}`}
+              label="Total Spent"
+              value={`₹${totalDebit.toLocaleString()}` }
               Icon={FiArrowUpRight}
               borderCls="border-amber-500"
               iconBgCls="bg-amber-50"
@@ -368,7 +414,7 @@ export default function CorporateWallet() {
             />
           )}
           <StatCard
-            label="Ledger Entries"
+            label="Transactions"
             value={filteredTransactions.length}
             Icon={FiActivity}
             borderCls="border-gold"
@@ -383,16 +429,16 @@ export default function CorporateWallet() {
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
             <div className="lg:col-span-4">
-              <LabeledField label="Universal Search">
+              <LabeledField label="Search">
                 <SearchBar
                   value={searchTerm}
                   onChange={setSearchTerm}
-                  placeholder="Ref ID, booking or description..."
+                  placeholder="Search transactions..."
                 />
               </LabeledField>
             </div>
             <div className="lg:col-span-4">
-              <LabeledField label="Ledger Period">
+              <LabeledField label="Date Range">
                 <div className="flex items-center gap-3">
                   <input
                     type="date"
@@ -415,7 +461,7 @@ export default function CorporateWallet() {
               </LabeledField>
             </div>
             <div className="lg:col-span-2">
-              <LabeledField label="Execution Status">
+              <LabeledField label="Status">
                 <CustomDropdown
                   value={statusFilter}
                   onChange={setStatusFilter}
@@ -438,7 +484,7 @@ export default function CorporateWallet() {
                   color: C.muted,
                 }}
               >
-                <FiX /> Reset Ledger
+                <FiX /> Reset Filters
               </button>
             </div>
           </div>
@@ -448,12 +494,12 @@ export default function CorporateWallet() {
           <div className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black" style={{ color: C.navy }}>
-                {activeTab === "booking"
-                  ? "Asset Consumption Ledger"
-                  : "Wallet Recharge Ledger"}
+                {activeTab === "booking" && "Booking Transactions"}
+                {activeTab === "recharge" && "Recharge Transactions"}
+                {activeTab === "serviceCharge" && "Service Charges Applied"}
               </h2>
               <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
-                {filteredTransactions.length} records processed
+                {filteredTransactions.length} records found
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -476,10 +522,13 @@ export default function CorporateWallet() {
                   columns: [
                     { header: "Date", value: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
                     { header: "Description", value: (tx) => tx.description || "—" },
-                    { header: "Asset Reference", value: (tx) => tx.orderId || tx.reference || tx._id || tx.bookingId || "—" },
+                    { header: "Reference", value: (tx) => tx.bookingId?.orderId || tx.orderId || tx.reference || (typeof tx.bookingId === 'string' ? tx.bookingId : null) || tx._id || "—" },
                     ...(activeTab === "recharge" ? [{ header: "Payment ID", value: (tx) => tx.paymentGateway?.paymentId || "—" }] : []),
                     { header: "Type", value: (tx) => tx.type || "—" },
-                    { header: "Amount", value: (tx) => `${tx.type === "credit" ? "+" : "-"} ₹${(tx.amount || 0).toLocaleString()}` },
+                    { header: "Amount", value: (tx) => {
+                        const amt = tx.amount || 0;
+                        return `${tx.type === "credit" ? "+" : "-"} ₹${amt.toLocaleString()}`;
+                    } },
                     { header: "Status", value: (tx) => getTransactionStatus(tx) }
                   ],
                   filenamePrefix: "wallet_ledger"
@@ -525,12 +574,12 @@ export default function CorporateWallet() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                  <Th className="!px-6 !py-5">Deployment Date</Th>
-                  <Th className="!px-6 !py-5">Mission Protocol</Th>
-                  <Th className="!px-6 !py-5">Asset Reference</Th>
-                  {/* <Th className="!px-6 !py-5">Category</Th> */}
-                  <Th className="!px-6 !py-5">Matrix Type</Th>
-                  <Th className="!px-6 !py-5">Capital Flow</Th>
+                  <Th className="!px-6 !py-5">Date</Th>
+                  <Th className="!px-6 !py-5">Description</Th>
+                  <Th className="!px-6 !py-5">Reference</Th>
+                  {activeTab !== "recharge" && <Th className="!px-6 !py-5">Category</Th>}
+                  <Th className="!px-6 !py-5">Type</Th>
+                  <Th className="!px-6 !py-5">Amount</Th>
                   <Th className="!px-6 !py-5">Status</Th>
                   <Th className="!px-6 !py-5 text-right">Actions</Th>
                 </tr>
@@ -572,7 +621,7 @@ export default function CorporateWallet() {
                           className="text-xs font-black"
                           style={{ color: C.navy }}
                         >
-                          {tx.description || "Travel Asset Procurement"}
+                          {tx.description || "Travel Booking"}
                         </p>
                       </td>
                       <td className="px-6 py-5">
@@ -584,25 +633,20 @@ export default function CorporateWallet() {
                             color: C.muted,
                           }}
                         >
-                          {tx.orderId || tx.reference || tx._id}
+                          {tx.bookingId?.orderId || tx.orderId || tx.reference || (typeof tx.bookingId === 'string' ? tx.bookingId : null) || tx._id}
                         </code>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                          <FiCreditCard size={10} className="text-gold" />{" "}
-                          {gatewayInfo}
-                        </p>
                       </td>
-                      {/* <td className="px-6 py-5">
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase text-navy border border-slate-200/60 shadow-sm block w-fit mb-1">
-                          {tx.bookingModel === "HotelBookingRequest"
-                            ? "Hotel"
-                            : "Flight"}
-                        </span>
-                        {tx.bookingId?.orderId && (
-                          <p className="text-[9px] font-bold text-gold uppercase tracking-tight">
-                            {tx.bookingId.orderId}
-                          </p>
-                        )}
-                      </td> */}
+                      {activeTab !== "recharge" && (
+                        <td className="px-6 py-5">
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase text-navy border border-slate-200/60 shadow-sm block w-fit mb-1">
+                            {tx.bookingModel === "HotelBookingRequest"
+                              ? "Hotel"
+                              : tx.bookingModel === "BookingRequest" 
+                              ? "Flight" 
+                              : tx.type === "credit" ? "Recharge" : "Other"}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-6 py-5">
                         <span
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm"
@@ -626,7 +670,7 @@ export default function CorporateWallet() {
                           ) : (
                             <FiArrowUpRight />
                           )}{" "}
-                          {tx.type}
+                          {tx.type === "service_fee_deduction" ? "Service Fee" : tx.type}
                         </span>
                       </td>
                       <td className="px-6 py-5 font-black text-xs text-left">
@@ -651,7 +695,7 @@ export default function CorporateWallet() {
                         <button
                           onClick={() => handleOpenDetails(tx)}
                           className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-[#003399] transition-all border border-slate-100 hover:border-[#003399]/20"
-                          title="View Protocol Details"
+                          title="View Details"
                         >
                           <FiEye size={16} />
                         </button>
@@ -697,7 +741,7 @@ export default function CorporateWallet() {
                 Wallet Recharge
               </h3>
               <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.3em]">
-                Authorized Recharge Protocol
+                Add funds to your wallet
               </p>
             </div>
 
@@ -759,7 +803,7 @@ export default function CorporateWallet() {
                   className="flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border transition-all hover:bg-slate-50"
                   style={{ borderColor: C.border, color: C.muted }}
                 >
-                  Abstain
+                  Cancel
                 </button>
                 <button
                   onClick={handleRecharge}
@@ -768,7 +812,7 @@ export default function CorporateWallet() {
                     background: `linear-gradient(to right, ${C.navy}, ${C.navyMid})`,
                   }}
                 >
-                  Initialize Protocol
+                  Proceed to Pay
                 </button>
               </div>
             </div>
@@ -777,17 +821,35 @@ export default function CorporateWallet() {
         document.body
       )}
       {/* Recharge Details Modal */}
-      {showDetails && selectedTx && (
+      {showDetails && selectedTx && selectedTx.type !== "service_fee_deduction" && (
         <RechargeDetailsModal tx={selectedTx} onClose={handleCloseDetails} />
+      )}
+      {/* Service Fee Details Modal */}
+      {showDetails && selectedTx && selectedTx.type === "service_fee_deduction" && (
+        <ServiceFeeDetailsModal tx={selectedTx} onClose={handleCloseDetails} />
       )}
     </div>
   );
 }
 
 const RechargeDetailsModal = ({ tx, onClose }) => {
+  const navigate = useNavigate();
   const processorName = tx.processedBy?.name
     ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
     : "System Protocol";
+
+  const handleViewBooking = () => {
+    if (!tx.bookingId?._id) return;
+    const route =
+      tx.bookingModel === "HotelBookingRequest"
+        ? `/employee-hotel-booking/${tx.bookingId._id}?source=wallet`
+        : `/employee-flight-booking/${tx.bookingId._id}?source=wallet`;
+    // We pass returnToWalletTx and returnToWalletTab so the ledger can reopen this tx
+    navigate(route, {
+      state: { returnToWalletTx: tx._id, returnToWalletTab: "booking" } // Assuming credit/deductions mostly show in booking tab
+    });
+    onClose();
+  };
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -819,7 +881,7 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
                     color: C.gold,
                   }}
                 >
-                  Financial Protocol
+                  Transaction
                 </div>
                 <div
                   className="px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest"
@@ -839,10 +901,10 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
                 </div>
               </div>
               <h2 className="text-2xl font-black tracking-tight leading-none">
-                Recharge Registry Details
+                Transaction Details
               </h2>
               <p className="text-white/60 text-[10px] font-bold mt-2 uppercase tracking-[2px]">
-                Internal Audit Log Reference: {tx._id}
+                Transaction ID: {tx._id}
               </p>
             </div>
             <button
@@ -865,13 +927,13 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
               isCode
             />
             <DetailItem
-              label="Amount Processed"
+              label="Amount"
               value={`₹${(tx.amount || 0).toLocaleString()}`}
               icon={<FiActivity style={{ color: C.emerald }} />}
               isBold
             />
             <DetailItem
-              label="Execution Date"
+              label="Date & Time"
               value={new Date(tx.createdAt).toLocaleString("en-IN", {
                 day: "2-digit",
                 month: "long",
@@ -909,7 +971,7 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
                     className="text-[10px] font-black uppercase tracking-widest mb-1"
                     style={{ color: C.muted }}
                   >
-                    Authorizing Administrator
+                    Processed By
                   </p>
                   <p className="text-sm font-black" style={{ color: C.navy }}>
                     {processorName}
@@ -977,7 +1039,7 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
                 className="text-xs font-black uppercase tracking-wider"
                 style={{ color: C.navy }}
               >
-                Protocol Metadata
+                Metadata
               </h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
@@ -1009,15 +1071,278 @@ const RechargeDetailsModal = ({ tx, onClose }) => {
 
         {/* Footer */}
         <div
-          className="p-6 border-t flex justify-end"
+          className="p-6 border-t flex justify-end gap-3"
           style={{ background: C.offWhite, borderColor: C.border }}
         >
+          {tx.bookingId?._id && (
+            <button
+              onClick={handleViewBooking}
+              className="px-6 py-3 rounded-xl border font-black text-xs uppercase tracking-[2px] transition-all hover:bg-slate-50"
+              style={{ borderColor: C.border, color: C.navy }}
+            >
+              View Booking
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-8 py-3 rounded-xl text-white font-black text-xs uppercase tracking-[2px] shadow-xl hover:scale-105 transition-all active:scale-95"
             style={{ background: C.navy }}
           >
-            Acknowledge Protocol
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+const ServiceFeeDetailsModal = ({ tx, onClose }) => {
+  const navigate = useNavigate();
+  const processorName = tx.processedBy?.name
+    ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
+    : "System Protocol";
+
+  const dispatch = useDispatch();
+  const [serviceDetails, setServiceDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleViewBooking = () => {
+    if (!tx.bookingId?._id) return;
+    
+    if (tx.bookingModel === "HotelBookingRequest") {
+      navigate(`/employee-hotel-booking/${tx.bookingId._id}?source=wallet`, { state: { returnToWalletFeeTx: tx._id } });
+    } else {
+      navigate(`/employee-flight-booking/${tx.bookingId._id}?source=wallet`, { state: { returnToWalletFeeTx: tx._id } });
+    }
+    onClose();
+  };
+
+  useEffect(() => {
+    if (tx.bookingId?._id) {
+      setLoadingDetails(true);
+      dispatch(fetchServiceChargeDetails({ 
+        bookingId: tx.bookingId._id, 
+        operationType: tx.operationType 
+      }))
+        .unwrap()
+        .then((res) => {
+          setServiceDetails(res);
+          setLoadingDetails(false);
+        })
+        .catch(() => {
+          setLoadingDetails(false);
+        });
+    }
+  }, [tx, dispatch]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-300"
+        style={{ background: `${C.navy}99` }}
+        onClick={onClose}
+      />
+
+      <div
+        className="relative w-full max-w-4xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border"
+        style={{ background: C.white, borderColor: `${C.white}33` }}
+      >
+        {/* Header */}
+        <div
+          className="p-8 text-white relative"
+          style={{
+            background: `linear-gradient(135deg, ${C.navyMid}, ${C.navy})`,
+          }}
+        >
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    background: `${C.gold}33`,
+                    borderColor: `${C.gold}4D`,
+                    color: C.gold,
+                  }}
+                >
+                  Transaction
+                </div>
+                <div
+                  className="px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest"
+                  style={{
+                    background: `${C.emerald}33`,
+                    borderColor: `${C.emerald}4D`,
+                    color: C.emerald,
+                  }}
+                >
+                  {tx.status}
+                </div>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight leading-none">
+                Service Fee Details
+              </h2>
+              <p className="text-white/60 text-[10px] font-bold mt-2 uppercase tracking-[2px]">
+                Order ID: {tx.bookingId?.orderId || "N/A"}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/10"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh]">
+          {/* Main Info Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <DetailItem
+              label="Order ID"
+              value={tx.bookingId?.orderId || "N/A"}
+              icon={<FiHash style={{ color: C.gold }} />}
+              isCode
+            />
+            <DetailItem
+              label="Amount"
+              value={`₹${(tx.amount || 0).toLocaleString()}`}
+              icon={<FiActivity style={{ color: C.emerald }} />}
+              isBold
+            />
+            <DetailItem
+              label="Date & Time"
+              value={new Date(tx.createdAt).toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              icon={<FiClock className="text-blue-500" />}
+            />
+          </div>
+
+          {/* User Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div
+              className="rounded-2xl p-6 border"
+              style={{ background: C.offWhite, borderColor: C.border }}
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-lg"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.navyMid}, ${C.navy})`,
+                  }}
+                >
+                  {tx.processedBy?.name?.firstName?.[0] || "S"}
+                  {tx.processedBy?.name?.lastName?.[0] || "P"}
+                </div>
+                <div>
+                  <p
+                    className="text-[10px] font-black uppercase tracking-widest mb-1"
+                    style={{ color: C.muted }}
+                  >
+                    Processed By
+                  </p>
+                  <p className="text-sm font-black" style={{ color: C.navy }}>
+                    {processorName}
+                  </p>
+                  <p
+                    className="text-[11px] font-bold"
+                    style={{ color: C.muted }}
+                  >
+                    {tx.processedBy?.email ||
+                      "system.protocol@corporate.travel"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Service Fee Rule Snapshot */}
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-1.5 h-4 rounded-full"
+                style={{ background: C.emerald }}
+              />
+              <h3
+                className="text-xs font-black uppercase tracking-wider"
+                style={{ color: C.navy }}
+              >
+                Service Fee Rule Applied
+              </h3>
+            </div>
+
+            <div
+              className="rounded-2xl p-6 border text-xs"
+              style={{ background: C.offWhite, borderColor: C.border }}
+            >
+              {loadingDetails ? (
+                <p className="text-slate-400 font-bold uppercase tracking-widest animate-pulse">
+                  Loading rule details...
+                </p>
+              ) : serviceDetails?.ruleSnapshot ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Action</p>
+                    <p className="font-bold text-navy">{serviceDetails.action}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Product</p>
+                    <p className="font-bold text-navy">{serviceDetails.ruleSnapshot.productType}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Trip Type</p>
+                    <p className="font-bold text-navy">{serviceDetails.ruleSnapshot.tripType}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Fee Type / Value</p>
+                    <p className="font-bold text-navy">
+                      {serviceDetails.ruleSnapshot.feeType}
+                      <span className="opacity-50 mx-1">|</span>
+                      {serviceDetails.ruleSnapshot.feeType === "Percentage"
+                        ? `${serviceDetails.ruleSnapshot.feeValue}%`
+                        : `₹${parseFloat(serviceDetails.ruleSnapshot.feeValue || 0).toLocaleString()}`}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Notes</p>
+                    <p className="font-bold text-navy">{serviceDetails.notes || "None"}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-slate-400 font-bold uppercase tracking-widest">
+                  No rule details available
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="p-6 border-t flex justify-end gap-3"
+          style={{ background: C.offWhite, borderColor: C.border }}
+        >
+          {tx.bookingId?._id && (
+            <button
+              onClick={handleViewBooking}
+              className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-[2px] shadow-sm hover:scale-105 transition-all active:scale-95 flex items-center gap-2"
+              style={{ background: C.white, color: C.navy, border: `1px solid ${C.border}` }}
+            >
+              View Details <FiArrowRight size={14} />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="px-8 py-3 rounded-xl text-white font-black text-xs uppercase tracking-[2px] shadow-xl hover:scale-105 transition-all active:scale-95"
+            style={{ background: C.navy }}
+          >
+            Close
           </button>
         </div>
       </div>

@@ -192,14 +192,14 @@ export default function TboCommissionsTaxes() {
       appliedFilters: [
         { label: "Search", value: searchTerm || "None" },
         { label: "Product", value: productFilter },
-        { label: "Corporate", value: corporateFilter },
+        { label: "Company", value: corporateFilter },
         { label: "Date Range", value: formattedDateRange }
       ],
       data: filteredData.map(item => ({
         "Order ID": item.id,
         "Type": item.product,
         "Booking Date": item.date,
-        "Corporate": item.corporate,
+        "Company": item.corporate,
         "Gross Fare (₹)": item.grossFare,
         "Commission Earned (₹)": item.commissionEarned,
         "PLB Earned (₹)": item.hasPlbData ? item.plbEarned : "N/A",
@@ -213,7 +213,7 @@ export default function TboCommissionsTaxes() {
         { header: "Order ID", key: "Order ID" },
         { header: "Type", key: "Type" },
         { header: "Booking Date", key: "Booking Date" },
-        { header: "Corporate", key: "Corporate" },
+        { header: "Company", key: "Company" },
         { header: "Gross Fare (₹)", key: "Gross Fare (₹)" },
         { header: "Commission Earned (₹)", key: "Commission Earned (₹)" },
         { header: "PLB Earned (₹)", key: "PLB Earned (₹)" },
@@ -364,14 +364,14 @@ export default function TboCommissionsTaxes() {
             {/* Corporate Filter */}
             <div className="flex flex-col gap-1.5 xl:col-span-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Corporate
+                Company
               </label>
               <select
                 value={corporateFilter}
                 onChange={(e) => setCorporateFilter(e.target.value)}
                 className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
               >
-                <option value="All">All Corporates</option>
+                <option value="All">All Companies</option>
                 {corporates?.filter(c => c.status === 'active' || c.status === 'approved').map((corp) => (
                   <option key={corp._id} value={corp.corporateName}>
                     {corp.corporateName}
@@ -487,7 +487,7 @@ export default function TboCommissionsTaxes() {
                 <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Order ID</th>
                 <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Type</th>
                 <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Booking Date</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Corporate</th>
+                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Company</th>
                 <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Gross Fare</th>
                 <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">Commission Earned</th>
                 <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-white/90 whitespace-nowrap text-left">PLB Earned</th>
@@ -611,7 +611,7 @@ export default function TboCommissionsTaxes() {
                   <p className="text-sm font-bold text-slate-800">{selectedBooking.product}</p>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Corporate</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Company</p>
                   <p className="text-sm font-bold text-slate-800 truncate" title={selectedBooking.corporate}>{selectedBooking.corporate}</p>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">

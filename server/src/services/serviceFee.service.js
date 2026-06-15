@@ -119,6 +119,7 @@ exports.applyServiceFee = async (corporateId, userId, bookingId, orderId, payloa
         balanceBefore,
         balanceAfter,
         description: `Service fee for ${payload.productType} ${payload.operation} (${payload.tripType})`,
+        operationType: `${payload.productType}-${payload.operation}`,
         reference: orderId,
         bookingId: bookingId,
         bookingModel: payload.productType === "Hotel" ? "HotelBookingRequest" : "BookingRequest",

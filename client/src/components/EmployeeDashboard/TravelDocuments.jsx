@@ -36,7 +36,7 @@ const DOC_TYPES = [
   { id: "passport", label: "Passport", icon: FiGlobe, color: "#003399" },
   { id: "visa", label: "Visa", icon: FiFileText, color: "#003399" },
   { id: "pan", label: "Pan card", icon: FiCreditCard, color: "#003399" },
-  { id: "upload", label: "Deposit Asset", icon: FiPlus, color: "#E7C695" },
+  { id: "upload", label: "Add Document", icon: FiPlus, color: "#E7C695" },
 ];
 
 const STATUS_MAP = {
@@ -156,8 +156,8 @@ export default function TravelDocuments() {
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiCreditCard size={28} /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Travel Vault</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage authorized credentials and identity assets</p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">My Documents</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage your travel documents</p>
                </div>
              </div>
           </div>
@@ -219,8 +219,8 @@ export default function TravelDocuments() {
                        <FiPlus size={24} />
                     </div>
                     <div>
-                       <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none">Deposit New Asset</h2>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Authorize and upload travel credentials</p>
+                       <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none">Add New Document</h2>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Upload a new travel document</p>
                     </div>
                  </div>
 
@@ -228,7 +228,7 @@ export default function TravelDocuments() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div className="space-y-6">
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Category</label>
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Document Type</label>
                              <div className="grid grid-cols-3 gap-3">
                                 {DOC_TYPES.filter(t => t.id !== "upload").map(type => (
                                    <button
@@ -382,7 +382,7 @@ export default function TravelDocuments() {
                       </div>
                       <div>
                          <h2 className="text-xl font-black text-[#003399] tracking-tight leading-none">{DOC_TYPES.find(t => t.id === activeTab)?.label}</h2>
-                         <p className="text-[10px] font-bold text-[#003399]/60 uppercase tracking-widest mt-2">Vault Registry / {filteredDocs.length} Active Records</p>
+                         <p className="text-[10px] font-bold text-[#003399]/60 uppercase tracking-widest mt-2">{filteredDocs.length} Documents</p>
                       </div>
                    </div>
                    <button 

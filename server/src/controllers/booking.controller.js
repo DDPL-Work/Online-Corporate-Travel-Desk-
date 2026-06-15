@@ -298,21 +298,34 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   /* ================= SERVICE FEE CALCULATION ================= */
   let serviceFeeDetails = null;
   if (bookingType === "flight" && flightRequest) {
-    const firstSeg = flightRequest.segments?.[0];
-    const lastSeg = flightRequest.segments?.[flightRequest.segments.length - 1];
-    
     const isIndia = (code) => {
       if (!code) return false;
       const c = code.toLowerCase();
       return c === "in" || c === "ind" || c === "india";
     };
-    const isDomesticFlight = isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country);
+
+    const segments = flightRequest.segments || [];
+    const isDomesticFlight = segments.length > 0 && segments.every(seg => 
+      isIndia(seg.origin?.countryCode || seg.origin?.country) && 
+      isIndia(seg.destination?.countryCode || seg.destination?.country)
+    );
+
+    let cabinClassCode = segments[0]?.cabinClass;
+    if (cabinClassCode == null) {
+      try {
+        cabinClassCode = flightRequest.fareQuote?.Results?.[0]?.Segments?.[0]?.[0]?.CabinClass 
+                         || flightRequest.fareQuote?.onward?.Response?.Results?.Segments?.[0]?.[0]?.CabinClass
+                         || 2;
+      } catch (e) {
+        cabinClassCode = 2; // Default Economy
+      }
+    }
     
     const serviceFeePayload = {
       productType: "Flight",
       operation: "Book",
       tripType: isDomesticFlight ? "Domestic" : "International",
-      cabinClass: firstSeg?.cabinClass,
+      cabinClass: cabinClassCode,
       baseFare: Number(pricingSnapshot.totalAmount)
     };
 
@@ -459,32 +472,40 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 
   let requestStatus = "pending_approval"; // default
-
-  try {
-        const ssrPolicy = await EmployeeSsrPolicy.findOne({
-          corporateId: corporate._id,
-      employeeEmail: user.email?.toLowerCase().trim(),
-        }).lean();
-
-    // If policy exists and approvalRequired is false → auto-approve
-        if (ssrPolicy && ssrPolicy.approvalRequired === false) {
-          requestStatus = "approved";
-          finalApproverName = "Auto Approve";
-          finalApprovedAt = new Date();
-          logger.info("✅ SSR Policy: Auto-approving booking for employee", {
-        email: user.email,
-            corporateId: corporate._id,
-          });
-        }
-    } catch (policyErr) {
-    // If policy lookup fails, fall back to pending_approval (safe default)
-    logger.warn("⚠️ SSR Policy lookup failed, defaulting to pending_approval", {
-          error: policyErr.message,
-    });
-  }
-
   let finalApproverName = approverName;
   let finalApprovedAt = null;
+
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
+
+  if (isAutoApproveIntent && user.role === "travel-admin") {
+    requestStatus = "approved";
+    finalApproverName = "Auto Approve (Travel Admin)";
+    finalApprovedAt = new Date();
+    logger.info("✅ SSR Policy: Auto-approving for Travel Admin", { email: user.email });
+  } else {
+    try {
+      const ssrPolicy = await EmployeeSsrPolicy.findOne({
+        corporateId: corporate._id,
+        employeeEmail: user.email?.toLowerCase().trim(),
+      }).lean();
+
+      // If policy exists and approvalRequired is false AND intent is auto-approve
+      if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
+        requestStatus = "approved";
+        finalApproverName = "Auto Approve";
+        finalApprovedAt = new Date();
+        logger.info("✅ SSR Policy: Auto-approving booking for employee", {
+          email: user.email,
+          corporateId: corporate._id,
+        });
+      }
+    } catch (policyErr) {
+      // If policy lookup fails, fall back to pending_approval (safe default)
+      logger.warn("⚠️ SSR Policy lookup failed, defaulting to pending_approval", {
+        error: policyErr.message,
+      });
+    }
+  }
 
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
@@ -523,8 +544,7 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     hotelRequest: bookingType === "hotel" ? hotelRequest : undefined,
 
     pricingSnapshot: {
-      totalAmount: pricingSnapshot.totalAmount,
-      currency: pricingSnapshot.currency || "INR",
+      ...pricingSnapshot,
       capturedAt: new Date(),
     },
     markupSnapshot: req.body.markupSnapshot || (bookingType === "flight" && flightRequest?.fareSnapshot?.markupAmount > 0 ? {
@@ -771,21 +791,33 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   if (!fareResult) throw new ApiError(400, "Valid FareQuote is required");
 
   /* ================= SERVICE FEE CALCULATION ================= */
-  const firstSeg = flightRequest.segments?.[0];
-  const lastSeg = flightRequest.segments?.[flightRequest.segments.length - 1];
-  
   const isIndia = (code) => {
     if (!code) return false;
     const c = code.toLowerCase();
     return c === "in" || c === "ind" || c === "india";
   };
-  const isDomesticFlight = isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country);
-  
+  const segments = flightRequest?.segments || [];
+  const isDomesticFlight = segments.length > 0 && segments.every(seg => 
+    isIndia(seg.origin?.countryCode || seg.origin?.country) && 
+    isIndia(seg.destination?.countryCode || seg.destination?.country)
+  );
+
+  let cabinClassCode = segments[0]?.cabinClass;
+  if (cabinClassCode == null) {
+    try {
+      cabinClassCode = flightRequest?.fareQuote?.Results?.[0]?.Segments?.[0]?.[0]?.CabinClass 
+                       || flightRequest?.fareQuote?.onward?.Response?.Results?.Segments?.[0]?.[0]?.CabinClass
+                       || 2;
+    } catch (e) {
+      cabinClassCode = 2;
+    }
+  }
+
   const serviceFeePayload = {
     productType: "Flight",
     operation: "Book",
     tripType: isDomesticFlight ? "Domestic" : "International",
-    cabinClass: firstSeg?.cabinClass,
+    cabinClass: cabinClassCode,
     baseFare: Number(pricingSnapshot.totalAmount)
   };
 
@@ -946,8 +978,10 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   let finalApproverName = approverName;
   let finalApprovedAt = null;
 
-  // 1. Travel Admin Exception
-  if (user.role === "travel-admin") {
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
+
+  // 1. Travel Admin Exception (if intent is auto-approve)
+  if (isAutoApproveIntent && user.role === "travel-admin") {
     requestStatus = "approved";
     finalApproverName = "Auto Approve (Travel Admin)";
     finalApprovedAt = new Date();
@@ -967,7 +1001,7 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
           employeeEmail: lookupEmail,
         }).lean();
 
-        if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+        if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
           requestStatus = "approved";
           finalApproverName = "Auto Approve";
           finalApprovedAt = new Date();
@@ -1202,17 +1236,22 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
             {
               productType: "Flight",
               operation: "Book",
+              cabinClass: (() => {
+                const segCabin = bookingRequest.flightRequest?.segments?.[0]?.cabinClass;
+                if (segCabin != null) return segCabin;
+                const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+                return map[bookingRequest.bookingSnapshot?.cabinClass] || 2;
+              })(),
               tripType: (() => {
-                const f = bookingRequest.flightRequest;
-                if (!f) return "Domestic";
-                const firstSeg = f.segments?.[0];
-                const lastSeg = f.segments?.[f.segments.length - 1];
+                const segments = bookingRequest.flightRequest?.segments || [];
+                if (segments.length === 0) return "Domestic";
                 const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
-                return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+                const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+                return isDom ? "Domestic" : "International";
               })()
             },
-            null,
-            true // skipWalletDeduction
+            null
+            // true // skipWalletDeduction
           );
         } catch (feeErr) {
           logger.error("Failed to apply service fee ledger record", {
@@ -2199,6 +2238,46 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     actorId: req.user._id,
     confirmPendingRevalidation: req.body?.confirmPendingRevalidation === true,
   });
+
+  if (
+    orchestrationResult.status === "SUCCESS" &&
+    !orchestrationResult.idempotent &&
+    booking.pricingSnapshot?.serviceFeeDetails
+  ) {
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        corporate._id,
+        req.user._id,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Book",
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
+          tripType: (() => {
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
+          })(),
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        },
+        null,
+      );
+    } catch (feeErr) {
+      logger.error("Failed to apply service fee ledger record for approved flight booking", {
+        bookingId: booking._id,
+        error: feeErr.message,
+      });
+    }
+  }
 
   const orchestrationStatusCode =
     orchestrationResult.status === "PROCESSING" ? 202 : 200;

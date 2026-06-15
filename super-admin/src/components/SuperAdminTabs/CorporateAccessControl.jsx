@@ -167,7 +167,7 @@ export default function CorporateAccessControl() {
     if (loading) return;
 
     const statCards = [
-      { label: "Total Corporates", value: stats.total },
+      { label: "Total Companies", value: stats.total },
       { label: "Active", value: stats.active },
       { label: "Inactive", value: stats.inactive },
       {
@@ -180,11 +180,11 @@ export default function CorporateAccessControl() {
       { label: "Search Directory", value: search || "None" },
       { label: "Filter Status", value: filter },
       {
-        label: "Corporate",
+        label: "Company",
         value:
           selectedCorporateId !== "all"
             ? selectedCorporateId
-            : "All Corporates",
+            : "All Companies",
       },
       { label: "Start Date", value: startDate || "Any" },
       { label: "End Date", value: endDate || "Any" },
@@ -192,14 +192,14 @@ export default function CorporateAccessControl() {
 
     exportExcel({
       key: "corporate_access",
-      pageHeader: "Corporate Access Control",
+      pageHeader: "Company Access",
       statCards,
       appliedFilters,
       data: filtered,
       columns: corporateAccessExportTemplate,
       filenamePrefix: "corporate_access_export",
-      emptyMessage: "No corporates available to export",
-      successMessage: "Corporate list exported",
+      emptyMessage: "No companies available to export",
+      successMessage: "Company list exported",
     });
   };
 
@@ -260,9 +260,9 @@ export default function CorporateAccessControl() {
     try {
       const res = await dispatch(fetchCorporateById(id)).unwrap();
       setViewCorporate(res);
-      setIsViewOpen(true);
+      setOpenViewModal(true);
     } catch (err) {
-      toast.error(err);
+      toast.error(err?.message || typeof err === 'string' ? err : "An error occurred while fetching corporate details");
     }
   };
 
@@ -307,10 +307,10 @@ export default function CorporateAccessControl() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Corporate Access Control
+                  Company Access
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Manage corporate profiles & permissions
+                  Manage company profiles & permissions
                 </p>
               </div>
             </div>
@@ -322,7 +322,7 @@ export default function CorporateAccessControl() {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
-            label="Total Corporates"
+            label="Total Companies"
             value={stats.total}
             Icon={FiUsers}
             borderCls="border-[#000D26]"
@@ -397,14 +397,14 @@ export default function CorporateAccessControl() {
 
             <div className="flex flex-col gap-1.5 lg:col-span-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                <MdBusiness size={12} /> Corporate
+                <MdBusiness size={12} /> Company
               </label>
               <select
                 className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
                 value={selectedCorporateId}
                 onChange={(e) => setSelectedCorporateId(e.target.value)}
               >
-                <option value="all">All Corporates</option>
+                <option value="all">All Companies</option>
                 {baseCorporates.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.corporateName}
@@ -490,7 +490,7 @@ export default function CorporateAccessControl() {
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">
-                    Corporate Entity
+                    Company
                   </th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">
                     Primary Contact
@@ -521,7 +521,7 @@ export default function CorporateAccessControl() {
                           <FiRefreshCw size={32} />
                         </div>
                         <p className="text-sm font-bold text-slate-400">
-                          Loading corporates...
+                          Loading companies...
                         </p>
                       </div>
                     </td>
@@ -634,7 +634,7 @@ export default function CorporateAccessControl() {
                           <div className="flex gap-2 items-center justify-center">
                             <button
                               onClick={() => handleView(c._id)}
-                              title="View Corporate"
+                              title="View Company"
                               className="p-2 rounded hover:bg-white/60 text-[#003399] transition-colors cursor-pointer"
                             >
                               <FiEye size={16} />
@@ -647,7 +647,7 @@ export default function CorporateAccessControl() {
                                     state: { corporate: c },
                                   });
                                 }}
-                                title="Edit Corporate"
+                                title="Edit Company"
                                 className="p-2 rounded hover:bg-blue-100 text-blue-600 transition-colors cursor-pointer"
                               >
                                 <FiEdit2 size={16} />
@@ -657,7 +657,7 @@ export default function CorporateAccessControl() {
                             {c.status === "pending" && (
                               <button
                                 onClick={() => handleApprove(c)}
-                                title="Approve Corporate"
+                                title="Approve Company"
                                 className="p-2 rounded hover:bg-emerald-100 text-emerald-600 transition-colors cursor-pointer"
                               >
                                 <FiCheckCircle size={16} />
@@ -701,7 +701,7 @@ export default function CorporateAccessControl() {
                           <FiInbox size={32} />
                         </div>
                         <p className="text-sm font-bold text-slate-400">
-                          No corporates found matching the criteria.
+                          No companies found matching the criteria.
                         </p>
                       </div>
                     </td>

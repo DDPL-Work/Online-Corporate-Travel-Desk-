@@ -116,8 +116,8 @@ function FlightSection() {
       const first = segs[0]; 
       const last = segs[segs.length - 1];
       return {
-        fromCode: first?.origin?.airportCode || "N/A",
-        toCode: last?.destination?.airportCode || "N/A",
+        fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+        toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
         fromCity: first?.origin?.city || "Unknown",
         toCity: last?.destination?.city || "Unknown"
       };
@@ -177,24 +177,24 @@ function FlightSection() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Flight Manifest" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Ticketed Assets" value={filtered.filter(b => b.status === "Confirmed").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Total Bookings" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Ticketed Flights" value={filtered.filter(b => b.status === "Confirmed").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
         <StatCard label="Pending Sync" value={filtered.filter(b => b.status === "Pending").length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Capital Outlay" value={`₹${totalSpend.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Spend" value={`₹${totalSpend.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-3">
+          <LabeledField label={<><FiSearch size={10} /> Search Bookings</>} className="lg:col-span-3">
             <SearchBar value={search} onChange={setSearch} placeholder="PNR, Name or ID..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-2">
+          <LabeledField label="Employee Name" className="lg:col-span-2">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employees} />
           </LabeledField>
           <LabeledField label="Status" className="lg:col-span-2">
             <CustomDropdown value={statusFilter} onChange={setStatus} options={["All", "Confirmed", "Pending"]} />
           </LabeledField>
-          <LabeledField label="Booking Window" className="lg:col-span-3">
+          <LabeledField label="Booking Date" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -208,24 +208,24 @@ function FlightSection() {
       </div>
 
       <ResponsiveDataTable 
-        title="Flight Ledger" 
+        title="Booked Flight Data" 
         subtitle={`${filtered.length} active deployments`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
-          pageHeader: "Flight Ledger",
+          pageHeader: "Booked Flight Data",
           statCards: [
-            { label: "Flight Manifest", value: filtered.length },
-            { label: "Ticketed Assets", value: filtered.filter(b => b.status === "Confirmed").length },
+            { label: "Total Bookings", value: filtered.length },
+            { label: "Ticketed Flights", value: filtered.filter(b => b.status === "Confirmed").length },
             { label: "Pending Sync", value: filtered.filter(b => b.status === "Pending").length },
-            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` }
+            { label: "Total Spend", value: `₹${totalSpend.toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
+            { label: "Employees", value: empFilter },
             { label: "Status", value: statusFilter },
-            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Booking Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: totalFlightsExportTemplate,
@@ -238,7 +238,7 @@ function FlightSection() {
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Route</Th>
               <Th className="!px-6 !py-5">Email Identifier</Th>
               <Th className="!px-6 !py-5">Status</Th>
@@ -352,18 +352,18 @@ function HotelSection() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Hotel Manifest" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Vouchered Assets" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Capital Outlay" value={`₹${totalSpend.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
-        <StatCard label="Unique Properties" value={new Set(filtered.map(b => b.hotelName)).size} Icon={FiList} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Total Bookings" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Vouchered Hotels" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Total Spend" value={`₹${totalSpend.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Unique Hotels" value={new Set(filtered.map(b => b.hotelName)).size} Icon={FiList} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} />Search Booking</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Guest Name or Order ID..." />
           </LabeledField>
-          <LabeledField label="Booking Window" className="lg:col-span-4">
+          <LabeledField label="Booking Date" className="lg:col-span-4">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -377,22 +377,22 @@ function HotelSection() {
       </div>
 
       <ResponsiveDataTable 
-        title="Hotel Ledger" 
+        title="Booked Hotel Data" 
         subtitle={`${filtered.length} active stays`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
-          pageHeader: "Hotel Ledger",
+          pageHeader: "Booked Hotel Data",
           statCards: [
-            { label: "Hotel Manifest", value: filtered.length },
-            { label: "Vouchered Assets", value: filtered.length },
-            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` },
-            { label: "Unique Properties", value: new Set(filtered.map(b => b.hotelName)).size }
+            { label: "Total Bookings", value: filtered.length },
+            { label: "Vouchered Hotels", value: filtered.length },
+            { label: "Total Spend", value: `₹${totalSpend.toLocaleString()}` },
+            { label: "Unique Hotels", value: new Set(filtered.map(b => b.hotelName)).size }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Booking Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: totalHotelsExportTemplate,
@@ -404,10 +404,10 @@ function HotelSection() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Order ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Booked Date</Th>
               <Th className="!px-6 !py-5">Status</Th>
               <Th className="!px-6 !py-5">Amount</Th>
@@ -518,13 +518,13 @@ export default function TotalBookings() {
              <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
              <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
                  <FiList size={32} />
                </div>
                <div>
-                 <h1 className="text-4xl font-black tracking-tight leading-none">Booking Registry</h1>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Team Bookings</h1>
                  <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">
-                   Enterprise Oversight & Team Deployment Analytics
+                   View all the bookings (Hotel & Flight) which were done by your team
                  </p>
                </div>
              </div>
@@ -535,7 +535,7 @@ export default function TotalBookings() {
       <div className="w-full px-4 md:px-10 -mt-12 space-y-10">
         {/* Tab Switcher - Premium Glassmorphism */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Manifest", FaPlane], ["hotel", "Hotel Manifest", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Flights", FaPlane], ["hotel", "Hotels", FaHotel]].map(([k, lbl, Icon]) => (
              <button 
                 key={k} 
                 onClick={() => setActiveTab(k)} 

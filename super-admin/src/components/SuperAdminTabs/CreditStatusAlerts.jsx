@@ -416,8 +416,8 @@ export default function CreditStatusAlerts() {
 
   const handleAlertsExport = () => {
     const statCards = [
-      { label: "Critical Corporates", value: stats.criticalCount },
-      { label: "Warning Corporates", value: stats.warningCount },
+      { label: "Critical Companies", value: stats.criticalCount },
+      { label: "Warning Companies", value: stats.warningCount },
       { label: stats.isHistory ? "Period Spend" : "Current Exposure", value: inr(stats.totalExposure) },
       { label: "Total Approved Limits", value: inr(stats.totalLimit) },
     ];
@@ -1100,7 +1100,7 @@ export default function CreditStatusAlerts() {
               Credit Alert Ledger
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
-              {filtered.length} postpaid corporate{filtered.length === 1 ? "" : "s"} in current view
+              {filtered.length} postpaid company{filtered.length === 1 ? "" : "s"} in current view
             </p>
           </div>
           <TableActionBar

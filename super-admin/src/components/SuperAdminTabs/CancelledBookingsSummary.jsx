@@ -199,10 +199,10 @@ const normalizeFlight = (booking = {}) => {
     corporate: corporateName(booking.corporateName || booking.corporate || booking.corporateId),
     corporateId: corporateKey(booking.corporateId || booking.corporate),
     people: travellers.length
-      ? travellers.map((t) => ({ name: joinName(t) || t.email || "Traveller", email: t.email || EMPTY_VALUE }))
+      ? travellers.map((t) => ({ name: joinName(t) || t.email || "Traveler", email: t.email || EMPTY_VALUE }))
       : Array.isArray(booking.travellerDetails) && booking.travellerDetails.length
-        ? booking.travellerDetails.map((t) => ({ name: t.name || t.email || "Traveller", email: t.email || EMPTY_VALUE }))
-        : [{ name: booking.employeeName || booking.travellerName || "Traveller", email: booking.employeeEmail || EMPTY_VALUE }],
+        ? booking.travellerDetails.map((t) => ({ name: t.name || t.email || "Traveler", email: t.email || EMPTY_VALUE }))
+        : [{ name: booking.employeeName || booking.travellerName || "Traveler", email: booking.employeeEmail || EMPTY_VALUE }],
     route: flightRoute(booking),
     airlineName,
     airlineCode,
@@ -458,9 +458,9 @@ function FlightCancellationTable({ rows, sort, onSort, onView }) {
       <thead>
         <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
           <TableHead>Order ID</TableHead>
-          <TableHead>Cancel Req. ID</TableHead>
-          <TableHead>Corporate</TableHead>
-          <TableHead>Traveller</TableHead>
+          <TableHead>Request ID</TableHead>
+          <TableHead>Company</TableHead>
+          <TableHead>Traveler</TableHead>
           <TableHead>Route / Airline</TableHead>
           <TableHead>
             <SortHeader label="Cancelled Date" sortKey="cancelledDate" sort={sort} onSort={onSort} />
@@ -536,8 +536,8 @@ function HotelCancellationTable({ rows, sort, onSort, onView }) {
       <thead>
         <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
           <TableHead>Order ID</TableHead>
-          <TableHead>Cancel Req. ID</TableHead>
-          <TableHead>Corporate</TableHead>
+          <TableHead>Request ID</TableHead>
+          <TableHead>Company</TableHead>
           <TableHead>Guest</TableHead>
           <TableHead>Hotel / City</TableHead>
           <TableHead>
@@ -759,7 +759,7 @@ export default function CancellationDashboard() {
     const appliedFilters = [
       { label: "Search", value: search || "None" },
       { label: "Status", value: status },
-      { label: "Corporate", value: corporate },
+      { label: "Company", value: corporate },
       { label: "From Date", value: fromDate || "Any" },
       { label: "To Date", value: toDate || "Any" },
       { label: "Active Tab", value: activeTab },
@@ -827,10 +827,10 @@ export default function CancellationDashboard() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Cancellation Summary
+                  Cancellations
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Flight &amp; Hotel Cancellation Management
+                  Manage flight and hotel cancellations
                 </p>
               </div>
             </div>
@@ -931,7 +931,7 @@ export default function CancellationDashboard() {
             {/* Corporate */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Corporate Account
+                Company
               </label>
               <select
                 value={corporate}
@@ -981,7 +981,7 @@ export default function CancellationDashboard() {
             {/* Left: title + count */}
             <div>
               <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-                {activeTab} Cancellation Report
+                {activeTab} Report
               </h2>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                 {sorted.length} records found

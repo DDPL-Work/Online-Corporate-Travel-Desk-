@@ -38,6 +38,10 @@ const walletTransactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    operationType: {
+      type: String,
+      trim: true,
+    },
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: "bookingModel",

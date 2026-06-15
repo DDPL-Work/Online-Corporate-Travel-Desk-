@@ -29,7 +29,7 @@ router.get(
 // ✅ Check for pending transferred requests
 router.get(
   '/second-approver/check',
-  authorizeRoles('travel-admin', 'manager', 'corporate-super-admin', 'finance_team','employee'),
+  authorizeRoles('finance_team'),
   approvalController.checkSecondApproverPending
 );
 

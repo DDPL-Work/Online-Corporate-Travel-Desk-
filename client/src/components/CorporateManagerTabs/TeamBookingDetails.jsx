@@ -277,7 +277,7 @@ function FlightCard({
   const supplierFare = resolveSupplierFare() || cabinClassLabel;
 
   const airlineInfo = [
-    segments.map((s) => `${s.origin?.airportCode}-${s.destination?.airportCode} ${s.airlineCode} ${s.flightNumber}`).join(" · "),
+    segments.map((s) => `${s.origin?.airportCode || s.origin?.code}-${s.destination?.airportCode || s.destination?.code} ${s.airlineCode} ${s.flightNumber}`).join(" · "),
     cabinClassLabel,
   ]
     .filter((v) => v && v !== "—")
@@ -290,7 +290,7 @@ function FlightCard({
       ? "Non-stop"
       : `${totalStops} Stop${totalStops > 1 ? "s" : ""} · ${segments
           .slice(0, -1)
-          .map((s) => s.destination?.airportCode)
+          .map((s) => s.destination?.airportCode || s.destination?.code)
           .join(", ")}`;
 
   // Overall journey duration: departure of first seg → arrival of last seg
@@ -312,7 +312,7 @@ function FlightCard({
     // 1. Check if already in segment (unlikely but safe)
     const segMatch = segments.find(
       (s) =>
-        (isOrigin ? s.origin?.airportCode : s.destination?.airportCode) ===
+        (isOrigin ? s.origin?.airportCode || s.origin?.code : s.destination?.airportCode || s.destination?.code) ===
         code,
     );
     const existing = isOrigin
@@ -358,11 +358,11 @@ function FlightCard({
   };
 
   const originAirportName = resolveAirportName(
-    journeyOrigin?.airportCode,
+    journeyOrigin?.airportCode || journeyOrigin?.code,
     true,
   );
   const destAirportName = resolveAirportName(
-    journeyDestination?.airportCode,
+    journeyDestination?.airportCode || journeyDestination?.code,
     false,
   );
 
@@ -430,7 +430,7 @@ function FlightCard({
                 {formatDate(firstSeg?.departureDateTime)}
               </div>
               <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
-                {originAirportName || journeyOrigin?.airportCode} <br /> Terminal: {journeyOrigin?.terminal || "Not Available"}
+                {originAirportName || journeyOrigin?.airportCode || journeyOrigin?.code} <br /> Terminal: {journeyOrigin?.terminal || "Not Available"}
               </div>
             </div>
 
@@ -970,127 +970,197 @@ function BookingHistory({ booking }) {
 /*  Booking Summary card (restyled)                               */
 /* ────────────────────────────────────────────────────────────── */
 function BookingSummaryCard({ booking, displayPnr }) {
-  const approvalStatus =
-    booking.approvalStatus || booking.status || booking.requestStatus;
-  const isApproved =
-    approvalStatus === "approved" ||
-    approvalStatus === "Approved" ||
-    booking.executionStatus === "ticketed";
-
-  const isTicketed =
+  const isConfirmed =
     booking.executionStatus === "ticketed" ||
     (booking.executionStatus === "cancelled" && !!booking.bookingResult?.pnr);
 
-  const topFields = [
+  const approverName = (() => {
+    const requesterId = booking.userId?._id || booking.userId;
+    const approverId =
+      booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+    if (
+      booking.approverName === "Auto Approve" ||
+      (requesterId &&
+        approverId &&
+        requesterId.toString() === approverId.toString())
+    ) {
+      return "Auto Approved (System)";
+    }
+    return booking.approvedBy?.name
+      ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}`
+      : booking.approverName || "—";
+  })();
+
+  const requesterName =
+    booking.requesterDetails?.name ||
+    (booking.userId?.name
+      ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}`
+      : booking.travellers?.[0]
+        ? `${booking.travellers[0].firstName} ${booking.travellers[0].lastName}`
+        : "—");
+
+  const sections = [
     {
-      icon: <FiHash size={11} className="text-[#A07840]" />,
-      label: "Order ID",
-      value: booking.orderId || "—",
-    },
-    ...(isTicketed ? [{
-      icon: <FiClock size={11} className="text-[#A07840]" />,
-      label: "Ticketed At",
-      value: getTicketDate(booking) ? `${formatDate(getTicketDate(booking))} ${formatTime(getTicketDate(booking))}` : "—",
-    }] : []),
-    {
-      icon: <FiUser size={11} className="text-[#A07840]" />,
-      label: "Requester Name",
-      value: booking.userId?.name ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}` : "—",
-    },
-    {
-      icon: <FiMail size={11} className="text-[#A07840]" />,
-      label: "Requester Email",
-      value: booking.userId?.email || "—",
-    },
-    {
-      icon: <FiBriefcase size={11} className="text-[#A07840]" />,
-      label: "Project Name",
-      value: booking.projectName,
-    },
-    {
-      icon: <FiTag size={11} className="text-[#A07840]" />,
-      label: "Project Code",
-      value: booking.projectCodeId,
-    },
-    {
-      icon: <FiBriefcase size={11} className="text-[#A07840]" />,
-      label: "Project Client",
-      value: booking.projectClient,
-    },
-    {
-      icon: <FiUser size={11} className="text-[#A07840]" />,
-      label: "Approver Name",
-      value: (() => {
-        const requesterId = booking.userId?._id || booking.userId;
-        const approverId = booking.approverId || booking.approvedBy?._id || booking.approvedBy;
-        if (booking.approverName === "Auto Approve" || (requesterId && approverId && requesterId.toString() === approverId.toString())) {
-          return "Auto Approved (System)";
-        }
-        return booking.approvedBy?.name ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}` : (booking.approverName || "—");
-      })(),
-    },
-    {
-      icon: <FiMail size={11} className="text-[#A07840]" />,
-      label: "Approver Email",
-      value: booking.approvedBy?.email || booking.approverEmail || "—",
+      heading: "Project Information",
+      fields: [
+        {
+          label: "Order ID",
+          value: booking.orderId || "—",
+          icon: <FiHash size={11} />,
+        },
+        {
+          label: "Project Name",
+          value: booking.projectName || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+        {
+          label: "Project Code",
+          value: booking.projectId || booking.projectCodeId || "—",
+          icon: <FiTag size={11} />,
+        },
+        {
+          label: "Project Client",
+          value: booking.projectClient || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
     },
     {
-      icon: <FiShield size={11} className="text-[#A07840]" />,
-      label: "Approver Role",
-      value: booking.approverRole,
+      heading: "Requester Details",
+      fields: [
+        {
+          label: "Requester Name",
+          value: requesterName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Requester Email",
+          value:
+            booking.requesterDetails?.email ||
+            booking.userId?.email ||
+            booking.travellers?.[0]?.email ||
+            "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Purpose of Travel",
+          value: booking.purposeOfTravel || booking.purpose || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
     },
     {
-      icon: <FiMessageSquare size={11} className="text-[#A07840]" />,
-      label: "Approver Comments",
-      value: booking.approverComments || "—",
+      heading: "Approval Details",
+      fields: [
+        {
+          label: "Selected Approver",
+          value: approverName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Approver Email",
+          value: booking.approverEmail || booking.approvedBy?.email || "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Approver Role",
+          value: booking.approverRole
+            ? booking.approverRole
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+            : "—",
+          icon: <FiShield size={11} />,
+        },
+        ...(booking.approvedBy?.name
+          ? [
+              {
+                label: "Approved By",
+                value:
+                  `${booking.approvedBy.name.firstName || ""} ${booking.approvedBy.name.lastName || ""}`.trim() ||
+                  "—",
+                icon: <FiUser size={11} />,
+              },
+              {
+                label: "Approved By Email",
+                value: booking.approvedBy?.email || "—",
+                icon: <FiMail size={11} />,
+                isEmail: true,
+              },
+              {
+                label: "Approved By Role",
+                value: booking.approvedBy?.role
+                  ? booking.approvedBy.role
+                      .replace(/-/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—",
+                icon: <FiShield size={11} />,
+              },
+            ]
+          : []),
+        ...(booking.approverComments
+          ? [
+              {
+                label: "Approver Comments",
+                value: booking.approverComments,
+                icon: <FiMessageSquare size={11} />,
+              },
+            ]
+          : []),
+        ...(isConfirmed && getTicketDate(booking)
+          ? [
+              {
+                label: "Ticketed At",
+                value: `${formatDate(getTicketDate(booking))} ${formatTime(getTicketDate(booking))}`,
+                icon: <FiClock size={11} />,
+              },
+            ]
+          : []),
+      ],
     },
   ];
 
-  // Payment info (bottom row)
-  const paymentStatus = booking.payment?.status || "—";
-  const amountPaid = booking.pricingSnapshot?.totalAmount
-    ? `₹${booking.pricingSnapshot.totalAmount}`
-    : booking.fare?.totalFare
-      ? `₹${booking.fare.totalFare}`
-      : "—";
-  const paymentMethod =
-    booking.payment?.method || booking.payment?.gateway || "—";
-
   return (
-    <div className="bg-white border border-[#EAE4D9] mb-10">
-      {/* ── Top: Booking Summary ── */}
-      <div className="p-8 pb-0">
-        <SectionHeader num={null} title="Booking Summary" />
-      </div>
-
-      <div className="p-8 pt-0">
-        <div className="flex justify-end mb-4 mt-[-40px]">
-          {isApproved && (
-            <span className="inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-[2px] border text-[10px] font-semibold tracking-[0.12em] uppercase bg-[#EDF7F2] text-[#2C7A4B] border-[#C3E4D2]">
-              <span className="w-[6px] h-[6px] rounded-full bg-[#2C7A4B]" />
-              Approved
-            </span>
-          )}
-        </div>
-
-        {/* 3-column fields grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-          {topFields.map((field, i) => (
-            <div key={i} className="py-2 border-b border-[#EAE4D9] last:border-0 md:border-0 md:py-0">
-              <div className="flex items-center gap-1 mb-1">
-                {field.icon}
-                <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#A89F94]">
-                  {field.label}
-                </span>
+    <section>
+      <SectionHeader num={null} title="Corporate Audit" />
+      <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+        {sections.map((section, si) => (
+          <div key={si} className={si > 0 ? "border-t border-[#EAE4D9]" : ""}>
+            {/* Section heading */}
+            <div className="px-6 pt-5 pb-3 bg-[#FAF8F4]">
+              <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A]">
+                {section.heading}
               </div>
-              <p className="text-[13px] font-medium text-[#1A1714] break-words leading-snug mt-1">
-                {field.value || "—"}
-              </p>
             </div>
-          ))}
-        </div>
+
+            {/* Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[#EAE4D9]">
+              {section.fields.map((field, fi) => (
+                <div
+                  key={fi}
+                  className={`px-6 py-5 ${
+                    fi % 3 !== 2 ? "sm:border-r border-[#EAE4D9]" : ""
+                  } ${fi >= 3 ? "border-t border-[#EAE4D9]" : ""}`}
+                >
+                  <div className="flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                    <span className="text-[#B5862A]">{field.icon}</span>
+                    {field.label}
+                  </div>
+                  <div
+                    className={`text-[13px] font-semibold text-[#1A1714] leading-snug ${
+                      field.isEmail ? "break-all" : ""
+                    }`}
+                  >
+                    {field.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -1289,24 +1359,7 @@ function FareRulesSection({ bookingResult, fareSnapshot, booking }) {
             </div>
           )}
 
-          <div className="pt-5 border-t border-dashed border-[#EAE4D9] mt-6">
-            <ul className="space-y-2">
-              {[
-                "GST, RAF and any other applicable charges are extra.",
-                "Fees are indicative per pax and per sector.",
-                "Domestic: submit cancellation/reissue request at least 2 hours before the airline policy time limit.",
-                "International: submit cancellation/reissue request at least 4 hours before the airline policy time limit.",
-              ].map((note, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-start gap-2 text-[11px] text-[#7A7068]"
-                >
-                  <span className="text-[#B5862A] mt-[2px]">●</span>
-                  {note}
-                </li>
-              ))}
-            </ul>
-          </div>
+
         </div>
     </div>
   );
@@ -1532,7 +1585,7 @@ export default function TeamBookingDetails() {
         <div className="flex items-center gap-6 overflow-x-auto w-full">
           {[
             { id: "flight_details", label: "Flight Details" },
-            { id: "project", label: "Project" },
+            { id: "project", label: "Project Details" },
             { id: "charges_rules", label: "Charges and rules" },
             { id: "passengers", label: "Passengers" },
             ...(upsellList && upsellList.length > 0 ? [{ id: "upsell_options", label: "Upsell Options" }] : []),
