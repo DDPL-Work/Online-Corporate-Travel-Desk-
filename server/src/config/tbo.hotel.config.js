@@ -4,9 +4,9 @@ module.exports = {
 
   /* ---------------- COMMON ---------------- */
   common: {
-    base: "https://HotelBE.tektravels.com",
+    base2: "https://HotelBE.tektravels.com",
     base1: "https://affiliate.tektravels.com",
-    base2: "https://hotelbe.tektravels.com",
+    // base2: "https://hotelbe.tektravels.com",
     sharedBase: "https://Sharedapi.tektravels.com",
     staticBase: "http://api.tbotechnology.in",
   },
@@ -64,18 +64,18 @@ module.exports = {
 
   /* ---------------- LIVE (FULL FLOW) ---------------- */
   live: {
-    base: "https://HotelBE.tektravels.com",
-    base1: "https://affiliate.tektravels.com",
-    base2: "https://hotelbe.tektravels.com",
+    // base: "https://HotelBE.tektravels.com",
+    base1: "https://affiliate.travelboutiqueonline.com/HotelAPI/",
+    base2: "https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest/",
     sharedBase: "https://Sharedapi.tektravels.com",
-    staticBase: "http://api.tbotechnology.in",
+    staticBase: "http://affiliate.travelboutiqueonline.com/TBOHolidays_HotelAPI",
 
     endUserIp: process.env.TBO_END_USER_IP,
 
     credentials: {
-      username: process.env.TBO_LIVE_USERNAME,
-      password: process.env.TBO_LIVE_PASSWORD,
-      clientId: process.env.TBO_LIVE_CLIENT_ID,
+      username: process.env.TBO_PROD_USERNAME,
+      password: process.env.TBO_PROD_PASSWORD,
+      clientId: process.env.TBO_PROD_CLIENT_ID,
       tboUSerName: process.env.TBO_STATIC_USERNAME,
       tboPassword: process.env.TBO_STATIC_PASSWORD,
     },
@@ -92,24 +92,25 @@ module.exports = {
       getAgencyBalance: "/SharedData.svc/rest/GetAgencyBalance",
 
       /* Hotel Static Data */
-      countryList: "/TBOHolidays_HotelAPI/CountryList",
-      cityLIst: "/TBOHolidays_HotelAPI/CityList",
-      hotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
-      hotelDetails: "/HotelAPI/Hoteldetails",
+      countryList: "/CountryList",
+      cityLIst: "/CityList",
+      tboHotelCodeList: "/TBOHotelCodeList",
+      hotelDetails: "/Hoteldetails",
+      hotelCodeList: "/hotelcodelist",
 
       /* Hotel Search */
-      hotelSearch: "/HotelAPI/Search",
+      hotelSearch: "/Search",
+      hotelPreBook: "/PreBook",
 
       /* Booking Flow */
-      hotelPreBook: "/HotelAPI/PreBook",
-      hotelBook: "/hotelservice.svc/rest/book",
-      generateVoucher: "/hotelservice.svc/rest/GenerateVoucher",
+      hotelBook: "/book",
+      generateVoucher: "/GenerateVoucher",
 
       /* Post Booking */
-      getBookingDetails: "/hotelservice.svc/rest/Getbookingdetail",
+      getBookingDetails: "/Getbookingdetail",
       getChangeRequestStatus:
-        "/hotelservice.svc/rest/GetChangeRequestStatus",
-      sendChangeRequest: "/hotelservice.svc/rest/SendChangeRequest",
+        "/GetChangeRequestStatus",
+      sendChangeRequest: "/SendChangeRequest",
     },
   },
 };
