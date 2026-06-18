@@ -67,7 +67,7 @@ module.exports = {
     // base: "https://HotelBE.tektravels.com",
     base1: "https://affiliate.travelboutiqueonline.com/HotelAPI",
     base2: "https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest",
-    sharedBase: "https://Sharedapi.tektravels.com",
+    sharedBase: "https://api.travelboutiqueonline.com/SharedAPI",
     staticBase: "http://affiliate.travelboutiqueonline.com/TBOHolidays_HotelAPI",
 
     endUserIp: process.env.TBO_END_USER_IP,
