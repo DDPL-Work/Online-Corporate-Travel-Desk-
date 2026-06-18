@@ -125,7 +125,7 @@ function FlightSection() {
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <LabeledField label={<><FiSearch size={10} /> Search Voided Trips</>}>
+          <LabeledField label={<><FiSearch size={10} /> Search Cancelled Flights</>}>
             <SearchBar value={search} onChange={setSearch} placeholder="PNR, Order ID..." />
           </LabeledField>
           <LabeledField label="Booked On">
@@ -146,14 +146,14 @@ function FlightSection() {
 
       <ResponsiveDataTable 
         title="Cancellation Ledger" 
-        subtitle={`${filtered.length} terminated bookings`} 
+        subtitle={`${filtered.length} cancelled flights`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Flight Cancellation Ledger",
           statCards: [
-            { label: "Terminated Bookings", value: filtered.length }
+            { label: "Cancelled Flights", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
@@ -261,7 +261,7 @@ function HotelSection() {
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <LabeledField label={<><FiSearch size={10} /> Search Voided Stays</>}>
+          <LabeledField label={<><FiSearch size={10} /> Search Cancelled Hotels</>}>
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel Name or Order ID..." />
           </LabeledField>
           <LabeledField label="Booked On">
@@ -282,14 +282,14 @@ function HotelSection() {
 
       <ResponsiveDataTable 
         title="Hotel Cancellation Ledger" 
-        subtitle={`${filtered.length} terminated stays`} 
+        subtitle={`${filtered.length} cancelled hotels`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Hotel Cancellation Ledger",
           statCards: [
-            { label: "Terminated Stays", value: filtered.length }
+            { label: "Cancelled Hotels", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
@@ -313,7 +313,7 @@ function HotelSection() {
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="px-6! py-5!">Order ID</Th>
-              <Th className="px-6! py-5!">Hotel Detail</Th>
+              <Th className="px-6! py-5!">Hotel Name</Th>
               <Th className="px-6! py-5!">Cancelled On</Th>
               <Th className="px-6! py-5!">Status</Th>
               {isAdmin ? <Th className="px-6! py-5!">Original Fare</Th> : <Th className="px-6! py-5!">Reason</Th>}
@@ -386,7 +386,7 @@ export default function MyCancelledBookings() {
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiXCircle size={28} /></div>
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Cancelled Bookings</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Archive of Terminated Travel Assets and Refund Status Tracking</p>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View all your cancelled bookings (Hotel & Flight)</p>
                </div>
              </div>
           </div>
@@ -394,7 +394,7 @@ export default function MyCancelledBookings() {
       </div>
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Voided Flights", FaPlane], ["hotel", "Voided Stays", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Cancelled Flights", FaPlane], ["hotel", "Cancelled Hotels", FaHotel]].map(([k, lbl, Icon]) => (
              <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#003399] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                 <Icon size={14} /> {lbl}
              </button>

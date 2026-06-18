@@ -25,11 +25,9 @@ export const fetchCorporateAdmin = createAsyncThunk(
   "corporateAdmin/fetchCorporateAdmin",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/corporate-admin/me");
-      console.log("API RESPONSE:", res.data); // 👈 ADD THIS
+      const res = await api.get("/corporate-admin/corporate-profile");
       return res.data.data;
     } catch (err) {
-      console.error("API ERROR:", err.response);
       return rejectWithValue(
         err.response?.data?.message ||
         "Failed to load corporate admin profile"

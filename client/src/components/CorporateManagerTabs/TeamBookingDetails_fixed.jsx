@@ -1144,24 +1144,7 @@ function FareRulesSection({ bookingResult }) {
             </div>
           ))}
 
-          <div className="pt-4 border-t border-dashed border-[#D8CEB8]">
-            <ul className="space-y-1.5">
-              {[
-                "GST, RAF and any other applicable charges are extra.",
-                "Fees are indicative per pax and per sector.",
-                "Domestic: submit cancellation/reissue request at least 2 hours before the airline policy time limit.",
-                "International: submit cancellation/reissue request at least 4 hours before the airline policy time limit.",
-              ].map((note, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-start gap-2 text-[11px] text-[#8B7355]"
-                >
-                  <span className="text-[#A07840] mt-0.5">•</span>
-                  {note}
-                </li>
-              ))}
-            </ul>
-          </div>
+
         </div>
       )}
     </div>

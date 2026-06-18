@@ -2073,6 +2073,7 @@ export default function BookedHotelDetails() {
       <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center gap-6 border-t border-[#EAE4D9] overflow-x-auto">
         {[
           { id: "hotel_details", label: "Hotel Details" },
+          ...(booking?.markupAudit ? [{ id: "markup", label: "Markup Details" }] : []),
           { id: "room_details", label: "Room Details" },
           { id: "passengers", label: "Guests" },
           { id: "cancellation", label: "Rules & Policy" },
@@ -2228,6 +2229,65 @@ export default function BookedHotelDetails() {
             <BookingHistory booking={booking} />
           </div>
         )}
+
+        {activeTab === "markup" && booking?.markupAudit && (() => {
+          const audit = booking.markupAudit;
+          const supplierFare = audit.fareBeforeMarkup?.supplierFare || audit.markupSnapshot?.supplierFare || 0;
+          const totalMarkup = audit.fareAfterMarkup?.markupAmount || audit.markupSnapshot?.markupAmount || 0;
+          const finalFare = audit.fareAfterMarkup?.finalFare || audit.markupSnapshot?.finalFare || 0;
+          const netRevenue = audit.earnings?.totalMarkupEarned || audit.earnings?.profitGenerated || totalMarkup;
+          const rules = audit.appliedMarkupRules?.length > 0 ? audit.appliedMarkupRules : (audit.markupSnapshot?.markupBreakdown || booking.hotelRequest?.selectedRoom?.rawRoomData?.markupBreakdown || []);
+
+          return (
+            <div className="space-y-6">
+              <div className="bg-white border border-[#EAE4D9] p-8 mb-8">
+                 <h3 className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714] mb-2 flex items-center gap-2">
+                   <FiTag size={20} className="text-[#B5862A]" />
+                   Markup Overview
+                 </h3>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 mt-6">
+                   <div className="bg-[#FAF8F4] p-5 border border-[#EAE4D9]">
+                     <p className="text-[10px] uppercase font-semibold tracking-[0.15em] text-[#A89F94] mb-2">Supplier Fare</p>
+                     <p className="text-[18px] font-bold text-[#1A1714]">₹{supplierFare}</p>
+                   </div>
+                   <div className="bg-[#EDF7F2] p-5 border border-[#C3E4D2]">
+                     <p className="text-[10px] uppercase font-semibold tracking-[0.15em] text-[#A89F94] mb-2">Total Markup</p>
+                     <p className="text-[18px] font-bold text-[#2C7A4B]">+ ₹{totalMarkup}</p>
+                   </div>
+                   <div className="bg-[#FAF8F4] p-5 border border-[#EAE4D9]">
+                     <p className="text-[10px] uppercase font-semibold tracking-[0.15em] text-[#A89F94] mb-2">Final Fare</p>
+                     <p className="text-[18px] font-bold text-[#1A1714]">₹{finalFare}</p>
+                   </div>
+                   <div className="bg-[#F0F4F8] p-5 border border-[#D1E0EE]">
+                     <p className="text-[10px] uppercase font-semibold tracking-[0.15em] text-[#A89F94] mb-2">Net Revenue</p>
+                     <p className="text-[18px] font-bold text-[#2A5C8A]">₹{netRevenue}</p>
+                   </div>
+                 </div>
+                 
+                 {rules.length > 0 && (
+                   <>
+                     <h3 className="font-['Cormorant_Garamond'] text-[20px] font-bold text-[#1A1714] mb-4 border-t border-[#EAE4D9] pt-6">Applied Rules</h3>
+                     <div className="grid gap-4 sm:grid-cols-2">
+                       {rules.map((rule, idx) => (
+                         <div key={idx} className="bg-white p-5 border border-[#EAE4D9] flex justify-between items-center transition hover:border-[#B5862A]">
+                           <div>
+                             <p className="text-[15px] font-bold text-[#1A1714]">{rule.category}</p>
+                             <p className="text-[11px] font-semibold text-[#A89F94] uppercase tracking-[0.1em] mt-1">
+                               {rule.markupMethod} • {rule.refundPolicy}
+                             </p>
+                           </div>
+                           <div className="text-right">
+                             <p className="text-[16px] font-bold text-[#1A1714]">₹{rule.calculatedAmount || rule.markupAmount}</p>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </>
+                 )}
+              </div>
+            </div>
+          );
+        })()}
       </main>
     </div>
   );

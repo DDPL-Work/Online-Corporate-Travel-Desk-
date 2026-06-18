@@ -111,8 +111,8 @@ export default function OnboardedCorporates() {
     if (loading) return;
 
     const statCards = [
-      { label: "Total Corporates", value: stats.total },
-      { label: "Active Corporates", value: stats.active },
+      { label: "Total Companies", value: stats.total },
+      { label: "Active Companies", value: stats.active },
       { label: "Pending Approval", value: stats.pending },
       { label: "Postpaid Accounts", value: stats.postpaid },
     ];
@@ -125,29 +125,42 @@ export default function OnboardedCorporates() {
 
     exportExcel({
       key: "onboarded_corporates",
-      pageHeader: "Onboarded Corporates",
+      pageHeader: "Onboarded Companies",
       statCards,
       appliedFilters,
       data: filtered,
       columns: onboardedCorporatesExportTemplate,
       filenamePrefix: "onboarded_corporates_export",
-      emptyMessage: "No corporates available to export",
-      successMessage: "Corporates exported",
+      emptyMessage: "No companies available to export",
+      successMessage: "Companies exported",
     });
   };
 
+  const mappedCorporates = useMemo(() => {
+    return (corporates || []).map((c) => {
+      if (c.status === "pending") {
+        const createdAt = new Date(c.createdAt || Date.now());
+        const diffInDays = (Date.now() - createdAt.getTime()) / (1000 * 3600 * 24);
+        if (diffInDays > 7) {
+          return { ...c, status: "expired" };
+        }
+      }
+      return c;
+    });
+  }, [corporates]);
+
   const stats = useMemo(() => {
-    const all = corporates || [];
+    const all = mappedCorporates;
     return {
       total: all.length,
       active: all.filter((c) => c.status === "active").length,
       pending: all.filter((c) => c.status === "pending").length,
       postpaid: all.filter((c) => c.classification === "postpaid").length,
     };
-  }, [corporates]);
+  }, [mappedCorporates]);
 
   const filtered = useMemo(() => {
-    let list = corporates || [];
+    let list = mappedCorporates;
     if (filter !== "all") list = list.filter((c) => c.status === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -162,7 +175,7 @@ export default function OnboardedCorporates() {
     }
     if (dateFilter) {
       list = list.filter((c) => {
-        const dateToCheck = c.status === "pending" ? c.createdAt : (c.onboardDate || c.updatedAt || c.createdAt);
+        const dateToCheck = c.status === "pending" || c.status === "expired" ? c.createdAt : (c.onboardDate || c.updatedAt || c.createdAt);
         if (!dateToCheck) return false;
         const d = new Date(dateToCheck);
         if (isNaN(d.getTime())) return false;
@@ -170,7 +183,7 @@ export default function OnboardedCorporates() {
       });
     }
     return list;
-  }, [corporates, filter, search, dateFilter]);
+  }, [mappedCorporates, filter, search, dateFilter]);
 
   const handleRefresh = () => dispatch(fetchCorporates());
 
@@ -205,9 +218,9 @@ export default function OnboardedCorporates() {
                  <MdBusiness size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Onboarded Corporates</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Onboarded Companies</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Manage your corporate partners and their classifications
+                   Manage your company partners and their classifications
                  </p>
                </div>
              </div>
@@ -218,8 +231,8 @@ export default function OnboardedCorporates() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard label="Total Corporates" value={stats.total} Icon={MdBusiness} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-          <StatCard label="Active Corporates" value={stats.active} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+          <StatCard label="Total Companies" value={stats.total} Icon={MdBusiness} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+          <StatCard label="Active Companies" value={stats.active} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
           <StatCard label="Pending Approval" value={stats.pending} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
           <StatCard label="Postpaid Accounts" value={stats.postpaid} Icon={FiUsers} borderCls="border-indigo-500" iconBgCls="bg-indigo-50" iconColorCls="text-indigo-600" />
         </div>
@@ -233,7 +246,7 @@ export default function OnboardedCorporates() {
                 <input
                   type="text"
                   className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
-                  placeholder="Corporate name, domain, or contact..."
+                  placeholder="Company name, domain, or contact..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -248,10 +261,11 @@ export default function OnboardedCorporates() {
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               >
-                <option value="all">All Corporates</option>
+                <option value="all">All Companies</option>
                 <option value="active">Active</option>
                 <option value="pending">Pending</option>
                 <option value="suspended">Suspended</option>
+                <option value="expired">Expired</option>
               </select>
             </div>
 
@@ -277,8 +291,8 @@ export default function OnboardedCorporates() {
         <div className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: C.border }}>
           <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: C.border, background: C.white }}>
             <div>
-              <h2 className="font-black text-slate-800 tracking-tight text-lg">Corporate Ledger</h2>
-              <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>{filtered.length} corporate records</p>
+              <h2 className="font-black text-slate-800 tracking-tight text-lg">Company Ledger</h2>
+              <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>{filtered.length} company records</p>
             </div>
             <TableActionBar
               scrollRef={tableScrollRef}
@@ -295,7 +309,7 @@ export default function OnboardedCorporates() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Corporate Entity</th>
+                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Company Entity</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Primary Contact</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Classification</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Financial Status</th>
@@ -312,7 +326,7 @@ export default function OnboardedCorporates() {
                         <div className="animate-spin text-[#003399]">
                           <FiRefreshCw size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">Loading corporates...</p>
+                        <p className="text-sm font-bold text-slate-400">Loading companies...</p>
                       </div>
                     </td>
                   </tr>
@@ -384,11 +398,11 @@ export default function OnboardedCorporates() {
                               setOpenViewModal(true);
                             }}
                             className="p-2 rounded hover:bg-[#003399]/10 text-[#003399] transition-colors cursor-pointer"
-                            title="View Corporate"
+                            title="View Company"
                           >
                             <FiEye size={16} />
                           </button>
-                          {c.status !== "pending" && (
+                          {(c.status !== "pending" && c.status !== "expired") && (
                             <button
                               onClick={() => {
                                 navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });
@@ -411,7 +425,7 @@ export default function OnboardedCorporates() {
                         <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                           <FiInbox size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">No corporates found matching the criteria.</p>
+                        <p className="text-sm font-bold text-slate-400">No companies found matching the criteria.</p>
                       </div>
                     </td>
                   </tr>

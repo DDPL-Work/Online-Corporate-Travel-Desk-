@@ -37,11 +37,12 @@ export const searchFlights = createAsyncThunk(
 /* ---------------- FARE QUOTE ---------------- */
 export const getFareQuote = createAsyncThunk(
   "flights/fareQuote",
-  async ({ traceId, resultIndex }, { rejectWithValue }) => {
+  async ({ traceId, resultIndex, snapshotId }, { rejectWithValue }) => {
     try {
       const { data } = await flightApi.post("/fare-quote", {
         traceId,
         resultIndex,
+        snapshotId,
       });
       return data.data;
     } catch (err) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiClock, FiX, FiCreditCard, FiPercent, FiInbox, FiCalendar } from "react-icons/fi";
+import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiClock, FiX, FiCreditCard, FiPercent, FiInbox, FiCalendar, FiEye } from "react-icons/fi";
 import { MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { FaChartLine } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
@@ -163,7 +163,7 @@ export default function MarkupEngine() {
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Markup Engine</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Manage global pricing strategies and corporate markups
+                   Manage global pricing strategies and company markups
                  </p>
                </div>
              </div>
@@ -174,7 +174,7 @@ export default function MarkupEngine() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard label="Total Corporates" value={stats.total} Icon={MdBusiness} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+          <StatCard label="Total Companies" value={stats.total} Icon={MdBusiness} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
           <StatCard label="Active Markups" value={stats.active} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
           <StatCard label="Postpaid Accounts" value={stats.postpaid} Icon={FiUsers} borderCls="border-indigo-500" iconBgCls="bg-indigo-50" iconColorCls="text-indigo-600" />
           <StatCard label="Prepaid Accounts" value={stats.prepaid} Icon={FiCreditCard} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
@@ -189,7 +189,7 @@ export default function MarkupEngine() {
                 <input
                   type="text"
                   className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
-                  placeholder="Corporate name, domain, or contact..."
+                  placeholder="Company name, domain, or contact..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -198,13 +198,13 @@ export default function MarkupEngine() {
             </div>
             
             <div className="flex flex-col gap-1.5 lg:col-span-4">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Select Corporate</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Select Company</label>
               <select
                 className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
                 value={corporateFilter}
                 onChange={(e) => setCorporateFilter(e.target.value)}
               >
-                <option value="">All Corporates</option>
+                <option value="">All Companies</option>
                 {activeCorporates.map(c => (
                   <option key={c._id} value={c._id}>{c.corporateName}</option>
                 ))}
@@ -224,7 +224,7 @@ export default function MarkupEngine() {
           <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: C.border, background: C.white }}>
             <div>
               <h2 className="font-black text-slate-800 tracking-tight text-lg">Markup Profiles</h2>
-              <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>Select a corporate to configure their markup settings</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>Select a company to configure their markup settings</p>
             </div>
           </div>
           
@@ -232,7 +232,7 @@ export default function MarkupEngine() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Corporate Entity</th>
+                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Company Entity</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Primary Contact</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Classification</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Date</th>
@@ -248,7 +248,7 @@ export default function MarkupEngine() {
                         <div className="animate-spin text-[#003399]">
                           <FiRefreshCw size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">Loading corporates...</p>
+                        <p className="text-sm font-bold text-slate-400">Loading companies...</p>
                       </div>
                     </td>
                   </tr>
@@ -308,6 +308,15 @@ export default function MarkupEngine() {
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => {
+                              navigate(`/corporate-markup-list/${c._id}`, { state: { corporate: c } });
+                            }}
+                            className="px-4 py-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
+                            title="View Markups"
+                          >
+                            <FiEye size={14} /> View
+                          </button>
+                          <button
+                            onClick={() => {
                               navigate(`/corporate-markup/${c._id}`, { state: { corporate: c } });
                             }}
                             className="px-4 py-2 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
@@ -327,7 +336,7 @@ export default function MarkupEngine() {
                         <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                           <FiInbox size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">No corporates found matching the criteria.</p>
+                        <p className="text-sm font-bold text-slate-400">No companies found matching the criteria.</p>
                       </div>
                     </td>
                   </tr>

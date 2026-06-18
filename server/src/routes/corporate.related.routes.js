@@ -115,6 +115,13 @@ router.get(
 // --------------------------------------------------
 
 router.get(
+  "/revenue/total-breakdown",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("View Finance"),
+  revenueController.getTotalRevenueBreakdown
+);
+
+router.get(
   "/revenue/summary",
   authorizeRoles("super-admin", "ops-member"),
   requireOpsPermission("View Finance"),
@@ -176,6 +183,16 @@ router.patch(
   authorizeRoles("super-admin", "ops-member", "travel-admin"),
   requireOpsPermission("Manage Cancellations"),
   corporateController.updateCancellationQueryStatus
+);
+
+// --------------------------------------------------
+// SUPER ADMIN : TBO COMMISSIONS & TAXES
+// --------------------------------------------------
+router.get(
+  "/tbo-commissions",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("View Finance"),
+  corporateController.getTboCommissionsAndTaxes
 );
 
 // Get Single Corporate

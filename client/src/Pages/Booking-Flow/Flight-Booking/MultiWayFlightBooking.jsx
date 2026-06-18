@@ -60,8 +60,6 @@ export default function MultiCityFlightBooking() {
   const { myProfile } = useSelector((state) => state.employeeAction || {});
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired =
-    !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   useEffect(() => {
     if (user?.role === "employee" || user?.role === "manager" || user?.role === "travel-admin" || user?.role === "finance_team") {
@@ -262,6 +260,7 @@ export default function MultiCityFlightBooking() {
       getFareQuote({
         traceId: searchParams.traceId, // ✅ REDUX traceId
         resultIndex: selectedFlight.ResultIndex,
+        snapshotId: selectedFlight?.SnapshotId,
       }),
     );
   }, [
@@ -279,12 +278,10 @@ export default function MultiCityFlightBooking() {
         errorMsg.toLowerCase().includes("expired") ||
         errorMsg.toLowerCase().includes("invalid");
 
-      Swal.fire({
-        title: isSessionExp ? "Session Expired" : "Fare Revalidation Failed",
-        text: isSessionExp ? "Your search session has expired. Please search again." : errorMsg,
-        icon: "warning",
-        confirmButtonColor: "#0A4D68",
-      }).then(() => {
+      if (isSessionExp) {
+        localStorage.setItem("sessionExpiredEvent", Date.now().toString());
+        sessionStorage.setItem("traceExpiredMsg", errorMsg);
+        sessionStorage.setItem("traceExpired", "true");
         window.close();
         setTimeout(() => {
           if (window.history.length > 1) {
@@ -293,7 +290,23 @@ export default function MultiCityFlightBooking() {
             navigate("/travel");
           }
         }, 300);
-      });
+      } else {
+        Swal.fire({
+          title: "Fare Revalidation Failed",
+          text: errorMsg,
+          icon: "warning",
+          confirmButtonColor: "#0A4D68",
+        }).then(() => {
+          window.close();
+          setTimeout(() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate("/travel");
+            }
+          }, 300);
+        });
+      }
     }
   }, [fareQuote, navigate]);
 
@@ -510,6 +523,31 @@ export default function MultiCityFlightBooking() {
 
     return total;
   };
+
+  const grandTotal =
+    perAdultFare.base * travelers.length +
+    perAdultFare.tax * travelers.length +
+    calculateSSRTotal();
+
+  const isAutoApprove = myPolicy?.approvalRequired === false;
+
+  let applicableLimit = 0;
+  let isUnlimitedLimit = true;
+  if (myPolicy?.flightLimits?.length && parsedFlightData?.segments?.length > 0) {
+    const isIntl = parsedFlightData.segments.some(
+      (s) => s?.da?.countryCode !== "IN" || s?.aa?.countryCode !== "IN"
+    );
+    const loc = isIntl ? "International" : "Domestic";
+    const cabinNum = Number(parsedFlightData.segments[0]?.cabinClass) || 2;
+    const limitObj = myPolicy.flightLimits.find(l => l.location === loc && l.cabinClass === cabinNum);
+    if (limitObj) {
+      applicableLimit = limitObj.limit;
+      isUnlimitedLimit = limitObj.isUnlimited !== false;
+    }
+  }
+
+  const isOverLimit = isAutoApprove && !isUnlimitedLimit && applicableLimit > 0 && grandTotal > applicableLimit;
+  const approvalRequired = !isTravelAdmin && (!isAutoApprove || isOverLimit);
 
   const fullSegments =
     rawFlightData?.Segments?.flat()?.map((s, index) => ({
@@ -792,16 +830,17 @@ export default function MultiCityFlightBooking() {
       // passportNumber validation: only if flight is international
       const isInternational = Boolean(
         parsedFlightData?.segments?.some(
-          (s) =>
-            s?.origin?.country &&
-            s?.destination?.country &&
-            s.origin.country !== s.destination.country,
+          (s) => s?.da?.countryCode !== "IN" || s?.aa?.countryCode !== "IN"
         ),
       );
 
       if (isInternational && !t.passportNumber?.trim()) {
         e.passportNumber =
           "Passport number is required for international flights";
+      }
+
+      if (isInternational && !t.dob) {
+        e.dob = "Date of Birth is required for international flights";
       }
 
       if (Object.keys(e).length > 0) {
@@ -1272,7 +1311,7 @@ export default function MultiCityFlightBooking() {
           {/* RIGHT */}
           <div className="space-y-6">
             <div className="sticky top-6 space-y-6">
-              <ProjectApproverBlock onChange={setProjectApproverData} />
+              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} />
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,

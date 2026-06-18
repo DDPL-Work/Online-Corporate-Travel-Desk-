@@ -403,6 +403,64 @@ class HotelService {
         },
       );
 
+       // Apply Markups
+      if (data?.HotelResult && params.corporateId) {
+         try {
+           const TBOHotel = require("../../models/TBOHotel");
+           const TBOHotelDetails = require("../../models/TBOHotelDetails");
+
+           const hotelCodes = data.HotelResult.map(h => h.HotelCode);
+           const [dbHotels, dbDetails] = await Promise.all([
+             TBOHotel.find({ hotelCode: { $in: hotelCodes } }).select('hotelCode starRating').lean(),
+             TBOHotelDetails.find({ hotelCode: { $in: hotelCodes } }).select('hotelCode hotelRating').lean()
+           ]);
+
+           const starRatingMap = {};
+           
+           const parseStarRating = (val) => {
+             if (!val) return 0;
+             if (typeof val === 'number') return val;
+             const str = String(val).toLowerCase();
+             if (str.includes('one')) return 1;
+             if (str.includes('two')) return 2;
+             if (str.includes('three')) return 3;
+             if (str.includes('four')) return 4;
+             if (str.includes('five')) return 5;
+             const parsed = parseInt(str.replace(/[^0-9]/g, ''), 10);
+             return isNaN(parsed) ? 0 : parsed;
+           };
+
+           dbHotels.forEach(dbH => {
+               if (dbH.starRating) {
+                   starRatingMap[dbH.hotelCode] = parseStarRating(dbH.starRating);
+               }
+           });
+
+           dbDetails.forEach(dbD => {
+               if (dbD.hotelRating) {
+                   starRatingMap[dbD.hotelCode] = parseStarRating(dbD.hotelRating);
+               }
+           });
+
+           data.HotelResult = data.HotelResult.map(hotel => {
+               const resolvedStarRating = hotel.StarRating ? parseStarRating(hotel.StarRating) : (starRatingMap[hotel.HotelCode] || 0);
+               return {
+                 ...hotel,
+                 StarRating: resolvedStarRating,
+                 CityCode: hotel.CityCode || params.CityCode || "",
+                 CityName: hotel.CityName || params.CityName || "",
+                 CountryCode: hotel.CountryCode || params.CountryCode || "",
+                 CountryName: hotel.CountryName || params.CountryName || ""
+               };
+           });
+           
+           const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+           data.HotelResult = await MarkupCalculatorService.applyHotelMarkup(data.HotelResult, params.corporateId);
+         } catch (err) {
+           logger.error("Failed to apply hotel markups", { error: err.message });
+         }
+      }
+
       // logger.info("[HOTEL SEARCH RESPONSE]", data);
 
       return data;
@@ -417,10 +475,71 @@ class HotelService {
   ====================================================== */
   async preBookHotel(payload) {
     logger.info("[PREBOOK HOTEL]", payload);
-    return this.affiliatePost(
+    const data = await this.affiliatePost(
       config[this.getEnv()].endpoints.hotelPreBook,
       payload,
     );
+
+    if (data?.HotelResult && payload.corporateId) {
+      try {
+        const TBOHotel = require("../../models/TBOHotel");
+        const TBOHotelDetails = require("../../models/TBOHotelDetails");
+
+        const hotelCodes = data.HotelResult.map(h => h.HotelCode);
+        const [dbHotels, dbDetails] = await Promise.all([
+          TBOHotel.find({ hotelCode: { $in: hotelCodes } }).select('hotelCode starRating cityCode cityName countryCode').lean(),
+          TBOHotelDetails.find({ hotelCode: { $in: hotelCodes } }).select('hotelCode hotelRating').lean()
+        ]);
+
+        const starRatingMap = {};
+        const cityCodeMap = {};
+        const cityNameMap = {};
+        const countryCodeMap = {};
+        
+        const parseStarRating = (val) => {
+          if (!val) return 0;
+          if (typeof val === 'number') return val;
+          const str = String(val).toLowerCase();
+          if (str.includes('one')) return 1;
+          if (str.includes('two')) return 2;
+          if (str.includes('three')) return 3;
+          if (str.includes('four')) return 4;
+          if (str.includes('five')) return 5;
+          const parsed = parseInt(str.replace(/[^0-9]/g, ''), 10);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
+        dbHotels.forEach(dbH => {
+            if (dbH.starRating) starRatingMap[dbH.hotelCode] = parseStarRating(dbH.starRating);
+            if (dbH.cityCode) cityCodeMap[dbH.hotelCode] = dbH.cityCode;
+            if (dbH.cityName) cityNameMap[dbH.hotelCode] = dbH.cityName;
+            if (dbH.countryCode) countryCodeMap[dbH.hotelCode] = dbH.countryCode;
+        });
+
+        dbDetails.forEach(dbD => {
+            if (dbD.hotelRating) starRatingMap[dbD.hotelCode] = parseStarRating(dbD.hotelRating);
+        });
+
+        data.HotelResult = data.HotelResult.map(hotel => {
+          const resolvedStarRating = hotel.StarRating ? parseStarRating(hotel.StarRating) : (starRatingMap[hotel.HotelCode] || 0);
+          return {
+            ...hotel,
+            StarRating: resolvedStarRating || payload.StarRating || 0,
+            CityCode: hotel.CityCode || cityCodeMap[hotel.HotelCode] || payload.CityCode || "",
+            CityName: hotel.CityName || cityNameMap[hotel.HotelCode] || payload.CityName || "",
+            CountryCode: hotel.CountryCode || countryCodeMap[hotel.HotelCode] || payload.CountryCode || "",
+            CountryName: hotel.CountryName || payload.CountryName || ""
+          };
+        });
+
+        const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+        data.HotelResult = await MarkupCalculatorService.applyHotelMarkup(data.HotelResult, payload.corporateId);
+      } catch (err) {
+        logger.error("Failed to apply hotel markups on prebook", { error: err.message });
+      }
+    }
+
+    return data;
   }
 
   /* =====================================================

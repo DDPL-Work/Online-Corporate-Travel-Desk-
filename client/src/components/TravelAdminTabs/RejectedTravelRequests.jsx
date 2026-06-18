@@ -31,6 +31,7 @@ import {
   CustomDropdown,
 } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { Pagination } from "./Shared/Pagination";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
@@ -100,26 +101,31 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
   const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Rejected Flights" value={filtered.length} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
-        <StatCard label="Est. Loss Value" value={`₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
-        <StatCard label="Critical Rejections" value={filtered.filter(r => r.reason.length > 50).length} Icon={FiAlertTriangle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Depts Affected" value={new Set(filtered.map(r => r.originalData?.userId?.department)).size} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Estimated Cost" value={`₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Detailed Reasons" value={filtered.filter(r => r.reason.length > 50).length} Icon={FiAlertTriangle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Departments" value={new Set(filtered.map(r => r.originalData?.userId?.department)).size} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Universal Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Reference, Route or Name..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-3">
+          <LabeledField label="Employee Name" className="lg:col-span-3">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField label="Rejection Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -134,7 +140,7 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
 
       <ResponsiveDataTable 
         title="Flight Rejection Ledger" 
-        subtitle={`${filtered.length} denied authorizations`} 
+        subtitle={`${filtered.length} rejected requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
@@ -142,35 +148,36 @@ function FlightRejectionsSection({ requests, refreshing, employeeOptions }) {
           pageHeader: "Flight Rejection Ledger",
           statCards: [
             { label: "Rejected Flights", value: filtered.length },
-            { label: "Est. Loss Value", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
-            { label: "Critical Rejections", value: filtered.filter(r => r.reason.length > 50).length }
+            { label: "Estimated Cost", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
+            { label: "Detailed Reasons", value: filtered.filter(r => r.reason.length > 50).length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
           ],
           data: filtered,
           columns: adminRejectedFlightsExportTemplate,
           filenamePrefix: "rejected_flight_requests"
         })}
         wrapperClass="!border-none !shadow-none"
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Request ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Reason for Denial</Th>
+              <Th className="!px-6 !py-5">Email</Th>
+              <Th className="!px-6 !py-5">Reason</Th>
               <Th className="!px-6 !py-5">Rejected Date & Time</Th>
               <Th className="!px-6 !py-5">Amount</Th>
-              <Th className="!px-6 !py-5 text-center">Action</Th>
+              <Th className="!px-6 !py-5 !text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map((r, i) => (
+            {paginated.length > 0 ? paginated.map((r, i) => (
               <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
                 <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
                 <td className="!px-6 !py-5">
@@ -245,30 +252,35 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
       return true;
     });
   }, [requests, search, empFilter, dateFrom, dateTo]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
   const { exportExcel, isExporting } = useExcelExporter();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Rejected Hotels" value={filtered.length} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
-        <StatCard label="Est. Revenue Loss" value={`₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
-        <StatCard label="Compliance Blocks" value={filtered.filter(r => r.reason.toLowerCase().includes('policy')).length} Icon={FiAlertTriangle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Assets Affected" value={new Set(filtered.map(r => r.hotelName)).size} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-[#000D26]10" iconColorCls="text-[#000D26]" />
+        <StatCard label="Estimated Cost" value={`₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Policy Issues" value={filtered.filter(r => r.reason.toLowerCase().includes('policy')).length} Icon={FiAlertTriangle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Hotels Affected" value={new Set(filtered.map(r => r.hotelName)).size} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-[#000D26]10" iconColorCls="text-[#000D26]" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Universal Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel, Personnel or ID..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-3">
+          <LabeledField label="Employee Name" className="lg:col-span-3">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField label="Rejection Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
-                <input type="date" value={dateFrom} onChange={setDateFrom} className={dateCls} style={{ borderColor: C.border }} />
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
-                <input type="date" value={dateTo} onChange={setDateTo} className={dateCls} style={{ borderColor: C.border }} />
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
              </div>
           </LabeledField>
           <div className="flex items-end lg:col-span-2">
@@ -279,7 +291,7 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
 
       <ResponsiveDataTable 
         title="Hotel Rejection Ledger" 
-        subtitle={`${filtered.length} denied authorizations`} 
+        subtitle={`${filtered.length} rejected requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
@@ -287,35 +299,36 @@ function HotelRejectionsSection({ requests, refreshing, employeeOptions }) {
           pageHeader: "Hotel Rejection Ledger",
           statCards: [
             { label: "Rejected Hotels", value: filtered.length },
-            { label: "Est. Revenue Loss", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
-            { label: "Compliance Blocks", value: filtered.filter(r => r.reason.toLowerCase().includes('policy')).length }
+            { label: "Estimated Cost", value: `₹${filtered.reduce((s, r) => s + r.estimatedCost, 0).toLocaleString()}` },
+            { label: "Policy Issues", value: filtered.filter(r => r.reason.toLowerCase().includes('policy')).length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Date Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
           ],
           data: filtered,
           columns: adminRejectedHotelsExportTemplate,
           filenamePrefix: "rejected_hotel_requests"
         })}
         wrapperClass="!border-none !shadow-none"
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Reason for Denial</Th>
+              <Th className="!px-6 !py-5">Request ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
+              <Th className="!px-6 !py-5">Email</Th>
+              <Th className="!px-6 !py-5">Reason</Th>
               <Th className="!px-6 !py-5">Rejected Date & Time</Th>
               <Th className="!px-6 !py-5">Amount</Th>
               <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map((r, i) => (
+            {paginated.length > 0 ? paginated.map((r, i) => (
               <tr key={r.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
                 <td className="!px-6 !py-5"><IdCell id={r.orderId} /></td>
                 <td className="!px-6 !py-5">
@@ -454,10 +467,10 @@ export default function RejectedTravelRequests() {
         const last = segs[segs.length - 1];
         return { 
           label, 
-          fromCity: first?.origin?.city || first?.origin?.airportCode || "N/A", 
-          toCity: last?.destination?.city || last?.destination?.airportCode || "N/A", 
-          fromCode: first?.origin?.airportCode || "", 
-          toCode: last?.destination?.airportCode || "" 
+          fromCity: first?.origin?.city || (first?.origin?.code || first?.origin?.airportCode) || "N/A", 
+          toCity: last?.destination?.city || (last?.destination?.code || last?.destination?.airportCode) || "N/A", 
+          fromCode: (first?.origin?.code || first?.origin?.airportCode) || "", 
+          toCode: (last?.destination?.code || last?.destination?.airportCode) || "" 
         };
       };
       const routes = []; 
@@ -507,10 +520,10 @@ export default function RejectedTravelRequests() {
                  <FiXCircle size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Denial Archive</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Analyze and Audit Rejected Corporate Travel Authorizations
-                 </p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Rejected Requests</h1>
+                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                  View all rejected travel requests
+                </p>
                </div>
              </div>
           </div>
@@ -520,7 +533,7 @@ export default function RejectedTravelRequests() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Tab Switcher */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Denials", FaPlane], ["hotel", "Hotel Denials", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Flight Rejected", FaPlane], ["hotel", "Hotel Rejected", FaHotel]].map(([k, lbl, Icon]) => (
              <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                 <Icon size={14} /> {lbl}
              </button>

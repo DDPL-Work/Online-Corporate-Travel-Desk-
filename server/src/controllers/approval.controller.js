@@ -11,6 +11,11 @@ const EVENTS = require("../events/eventConstants");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
+const logger = require("../utils/logger");
+
+const flightService = require("../services/tektravels/flight.service");
+const hotelService = require("../services/tektravels/hotel.service");
+const { getAgencyBalance } = require("../services/tboBalance.service");
 
 // @desc    Get booking requests by status
 // @route   GET /api/v1/approvals
@@ -817,6 +822,223 @@ exports.transferHotelRequest = asyncHandler(async (req, res) => {
       200,
       bookingRequest,
       "Hotel booking request transferred successfully"
+    )
+  );
+});
+
+/* ==============================================================
+   VALIDATE FLIGHT APPROVAL (AGENCY BALANCE + WALLET/CREDIT + FARE QUOTE)
+============================================================== */
+exports.validateFlightApproval = asyncHandler(async (req, res) => {
+  const bookingRequest = await BookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: { $in: ["pending_approval", "manager_approved", "pending_second_approval"] },
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Booking request not found or already processed");
+  }
+
+  const isSecondApprover =
+    bookingRequest.requestStatus === "pending_second_approval" &&
+    bookingRequest.secondApprover?.userId?.toString() === req.user._id.toString();
+
+  if (!["travel-admin", "manager"].includes(req.user.role) && !isSecondApprover) {
+    throw new ApiError(403, "You are not authorized to validate this request");
+  }
+
+  const corporate = await Corporate.findById(req.user.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate account not found");
+  }
+
+  const snapshot = bookingRequest.bookingSnapshot;
+  const isRoundTrip = snapshot.sectors && snapshot.sectors.length === 2;
+  const fareResultInit = bookingRequest.flightRequest?.fareQuote?.Results?.[0];
+  const oldPrice = isRoundTrip
+    ? (bookingRequest.pricingSnapshot?.totalAmount || 0)
+    : (fareResultInit?.Fare?.PublishedFare || bookingRequest.pricingSnapshot?.totalAmount || 0);
+
+  let errorMessages = [];
+
+  // 1. Check Agency Balance
+  const env = process.env.TBO_ENV || "live";
+  try {
+    const balance = await getAgencyBalance(env);
+    if (balance.availableBalance < oldPrice) {
+      errorMessages.push(`Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${oldPrice}`);
+    }
+  } catch (err) {
+    errorMessages.push("Failed to fetch agency balance.");
+  }
+
+  // 2. Check Corporate Wallet / Credit Limit
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < oldPrice) {
+      errorMessages.push(`Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${oldPrice}`);
+    }
+  } else if (corporate.classification === "postpaid") {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < oldPrice) {
+      errorMessages.push(`Credit limit exceeded. Available ₹${availableCredit}, Required ₹${oldPrice}`);
+    }
+  }
+
+  // 3. Re-validate Price via FareQuote
+  let newPrice = oldPrice;
+  let priceUpdated = false;
+
+  try {
+    const traceId = bookingRequest.flightRequest.traceId;
+    const resultIndex = bookingRequest.flightRequest.resultIndex;
+    
+    // Call TBO fare quote
+    const fareQuoteResponse = await flightService.getFareQuote(
+      traceId,
+      resultIndex,
+      bookingRequest.corporateId,
+      bookingRequest._id
+    );
+
+    if (fareQuoteResponse?.Response?.Results) {
+      const results = fareQuoteResponse.Response.Results;
+      const fareResult = results.IsLCC ? results : (results.Results ? results.Results[0] : results); 
+      
+      const publishedFare = fareResult?.Fare?.PublishedFare || 0;
+      if (publishedFare > 0) {
+        newPrice = isRoundTrip ? (bookingRequest.pricingSnapshot?.totalAmount || 0) : publishedFare;
+        
+        // Usually fare quote returns published fare
+        newPrice = publishedFare;
+        
+        if (newPrice !== oldPrice && Math.abs(newPrice - oldPrice) > 1) {
+          priceUpdated = true;
+          // Update the DB with new price so that subsequent approval uses the new price
+          if (bookingRequest.flightRequest.fareQuote && bookingRequest.flightRequest.fareQuote.Results) {
+            bookingRequest.flightRequest.fareQuote = fareQuoteResponse;
+          }
+          if (!isRoundTrip) {
+            bookingRequest.pricingSnapshot.totalAmount = newPrice;
+          }
+          await bookingRequest.save();
+        }
+      }
+    }
+  } catch (err) {
+    logger.error("Fare Quote validation failed", { error: err.message });
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        isValid: errorMessages.length === 0,
+        priceUpdated,
+        oldPrice,
+        newPrice,
+        errorMessages
+      },
+      "Validation completed"
+    )
+  );
+});
+
+/* ==============================================================
+   VALIDATE HOTEL APPROVAL
+============================================================== */
+exports.validateHotelApproval = asyncHandler(async (req, res) => {
+  const bookingRequest = await HotelBookingRequest.findOne({
+    _id: req.params.id,
+    corporateId: req.user.corporateId,
+    requestStatus: { $in: ["pending_approval", "manager_approved", "pending_second_approval"] },
+  });
+
+  if (!bookingRequest) {
+    throw new ApiError(404, "Hotel request not found or already processed");
+  }
+
+  const isSecondApprover =
+    bookingRequest.requestStatus === "pending_second_approval" &&
+    bookingRequest.secondApprover?.userId?.toString() === req.user._id.toString();
+
+  if (!["travel-admin", "manager"].includes(req.user.role) && !isSecondApprover) {
+    throw new ApiError(403, "You are not authorized to validate this request");
+  }
+
+  const corporate = await Corporate.findById(req.user.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate account not found");
+  }
+
+  const oldPrice = bookingRequest.pricingSnapshot?.totalAmount || bookingRequest.bookingSnapshot?.amount || 0;
+  let errorMessages = [];
+
+  // 1. Check Agency Balance
+  const env = process.env.TBO_ENV || "live";
+  try {
+    const balance = await getAgencyBalance(env);
+    if (balance.availableBalance < oldPrice) {
+      errorMessages.push(`Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${oldPrice}`);
+    }
+  } catch (err) {
+    errorMessages.push("Failed to fetch agency balance.");
+  }
+
+  // 2. Check Corporate Wallet / Credit Limit
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < oldPrice) {
+      errorMessages.push(`Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${oldPrice}`);
+    }
+  } else if (corporate.classification === "postpaid") {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < oldPrice) {
+      errorMessages.push(`Credit limit exceeded. Available ₹${availableCredit}, Required ₹${oldPrice}`);
+    }
+  }
+
+  // 3. Re-validate Price via PreBook
+  let newPrice = oldPrice;
+  let priceUpdated = false;
+
+  try {
+    const selectedRooms = bookingRequest.hotelRequest?.allRooms || [];
+    const bookingCodes = selectedRooms.map((r) => r.bookingCode).filter(Boolean);
+
+    if (bookingCodes.length > 0) {
+      const preBookResp = await hotelService.preBookHotel({
+        BookingCode: bookingCodes.join(","),
+        EndUserIp: process.env.TBO_END_USER_IP,
+      });
+
+      const isPriceChanged = preBookResp?.HotelResult?.[0]?.IsPriceChanged || false;
+      const updatedFare = preBookResp?.HotelResult?.[0]?.Rooms?.[0]?.TotalFare;
+
+      if (isPriceChanged && updatedFare) {
+        priceUpdated = true;
+        newPrice = updatedFare;
+
+        bookingRequest.hotelRequest.preBookResponse = preBookResp;
+        bookingRequest.pricingSnapshot.totalAmount = newPrice;
+        bookingRequest.bookingSnapshot.amount = newPrice;
+        await bookingRequest.save();
+      }
+    }
+  } catch (err) {
+    logger.error("Hotel PreBook validation failed", { error: err.message });
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        isValid: errorMessages.length === 0,
+        priceUpdated,
+        oldPrice,
+        newPrice,
+        errorMessages
+      },
+      "Validation completed"
     )
   );
 });

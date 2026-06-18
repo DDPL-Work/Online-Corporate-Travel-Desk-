@@ -137,8 +137,8 @@ function CancelledFlightSection() {
         const first = segs[0]; 
         const last = segs[segs.length - 1];
         return {
-          fromCode: first?.origin?.airportCode || "N/A",
-          toCode: last?.destination?.airportCode || "N/A",
+          fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+          toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
           fromCity: first?.origin?.city || "Unknown",
           toCity: last?.destination?.city || "Unknown"
         };
@@ -198,23 +198,23 @@ function CancelledFlightSection() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Cancelled Flights" value={filtered.length} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
-        <StatCard label="Refunds Resolved" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length} Icon={FiRefreshCw} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Awaiting Settlement" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Total Capital Recov." value={`₹${totalRefund.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Refunded" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length} Icon={FiRefreshCw} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Refund Pending" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Total Refunded" value={`₹${totalRefund.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-3">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-3">
             <SearchBar value={search} onChange={setSearch} placeholder="Name, PNR or ID..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-2">
+          <LabeledField label="Employee Name" className="lg:col-span-2">
             <CustomDropdown value={empFilter} onChange={setEmp} options={allCorporateEmployees} />
           </LabeledField>
-          <LabeledField label="Settlement Status" className="lg:col-span-2">
+          <LabeledField label="Status" className="lg:col-span-2">
             <CustomDropdown value={cancelStatusFilter} onChange={setCancelStatus} options={["All", "Cancelled", "Refunded", "Refund Pending"]} />
           </LabeledField>
-          <LabeledField label="Date Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -229,7 +229,7 @@ function CancelledFlightSection() {
 
       <ResponsiveDataTable 
         title="Flight Cancellation Ledger" 
-        subtitle={`${filtered.length} terminated assets`} 
+        subtitle={`${filtered.length} cancelled bookings`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
@@ -237,15 +237,15 @@ function CancelledFlightSection() {
           pageHeader: "Flight Cancellation Ledger",
           statCards: [
             { label: "Cancelled Flights", value: filtered.length },
-            { label: "Refunds Resolved", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length },
-            { label: "Awaiting Settlement", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length },
-            { label: "Total Capital Recov.", value: `₹${totalRefund.toLocaleString()}` }
+            { label: "Refunded", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length },
+            { label: "Refund Pending", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length },
+            { label: "Total Refunded", value: `₹${totalRefund.toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Settlement Status", value: cancelStatusFilter },
-            { label: "Date Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Status", value: cancelStatusFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: adminCancelledFlightsExportTemplate,
@@ -257,12 +257,12 @@ function CancelledFlightSection() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Recovery Status</Th>
-              <Th className="!px-6 !py-5">PNR Ref</Th>
+              <Th className="!px-6 !py-5">Email</Th>
+              <Th className="!px-6 !py-5">Status</Th>
+              <Th className="!px-6 !py-5">PNR</Th>
               <Th className="!px-6 !py-5">Booking Amount</Th>
               <Th className="!px-6 !py-5 !text-left">Action</Th>
             </tr>
@@ -300,7 +300,7 @@ function CancelledFlightSection() {
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
                     </div>
-                    <p className="text-sm font-bold text-slate-400">No termination records found for the selected criteria.</p>
+                    <p className="text-sm font-bold text-slate-400">No cancelled bookings found for the selected criteria.</p>
                   </div>
                 </td>
               </tr>
@@ -368,23 +368,23 @@ function CancelledHotelSection() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Cancelled Hotels" value={filtered.length} Icon={FiXCircle} borderCls="border-rose-500" iconBgCls="bg-rose-50" iconColorCls="text-rose-600" />
-        <StatCard label="Refunds Resolved" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length} Icon={FiRefreshCw} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Awaiting Settlement" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Total Capital Recov." value={`₹${totalRefund.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Refunded" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length} Icon={FiRefreshCw} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Refund Pending" value={filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Total Refunded" value={`₹${totalRefund.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-3">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-3">
             <SearchBar value={search} onChange={setSearch} placeholder="Guest Name or Order ID..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-2">
+          <LabeledField label="Employee Name" className="lg:col-span-2">
             <CustomDropdown value={empFilter} onChange={setEmp} options={allCorporateEmployees} />
           </LabeledField>
-          <LabeledField label="Settlement Status" className="lg:col-span-2">
+          <LabeledField label="Status" className="lg:col-span-2">
             <CustomDropdown value={cancelStatusFilter} onChange={setCancelStatus} options={["All", "Cancelled", "Refunded", "Refund Pending"]} />
           </LabeledField>
-          <LabeledField label="Date Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -399,7 +399,7 @@ function CancelledHotelSection() {
 
       <ResponsiveDataTable 
         title="Hotel Cancellation Ledger" 
-        subtitle={`${filtered.length} terminated assets`} 
+        subtitle={`${filtered.length} cancelled bookings`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
@@ -407,15 +407,15 @@ function CancelledHotelSection() {
           pageHeader: "Hotel Cancellation Ledger",
           statCards: [
             { label: "Cancelled Hotels", value: filtered.length },
-            { label: "Refunds Resolved", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length },
-            { label: "Awaiting Settlement", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length },
-            { label: "Total Capital Recov.", value: `₹${totalRefund.toLocaleString()}` }
+            { label: "Refunded", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refunded").length },
+            { label: "Refund Pending", value: filtered.filter(b => mapCancelStatus(b.cancelStatus || b.status) === "Refund Pending").length },
+            { label: "Total Refunded", value: `₹${totalRefund.toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Settlement Status", value: cancelStatusFilter },
-            { label: "Date Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Status", value: cancelStatusFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: adminCancelledHotelsExportTemplate,
@@ -427,11 +427,11 @@ function CancelledHotelSection() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
-              <Th className="!px-6 !py-5">Recovery Status</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
+              <Th className="!px-6 !py-5">Email</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
+              <Th className="!px-6 !py-5">Status</Th>
               <Th className="!px-6 !py-5">Booking Amount</Th>
               <Th className="!px-6 !py-5 !text-left">Action</Th>
             </tr>
@@ -469,7 +469,7 @@ function CancelledHotelSection() {
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
                     </div>
-                    <p className="text-sm font-bold text-slate-400">No termination records found for the selected criteria.</p>
+                    <p className="text-sm font-bold text-slate-400">No cancelled bookings found for the selected criteria.</p>
                   </div>
                 </td>
               </tr>
@@ -530,7 +530,7 @@ export default function CancelledBookings() {
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Cancelled Bookings</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Tracking Cancelled Bookings and Capital Reclamation
+                   View all cancelled bookings
                  </p>
                </div>
              </div>
@@ -541,7 +541,7 @@ export default function CancelledBookings() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Tab Switcher */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Recov.", FaPlane], ["hotel", "Hotel Recov.", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Cancelled Flight", FaPlane], ["hotel", "Cancelled Hotel", FaHotel]].map(([k, lbl, Icon]) => (
              <button 
                 key={k} 
                 onClick={() => setActiveTab(k)} 

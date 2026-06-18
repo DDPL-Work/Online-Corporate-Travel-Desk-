@@ -57,6 +57,36 @@ export const fetchBookingTransactions = createAsyncThunk(
   },
 );
 
+export const fetchServiceChargeTransactions = createAsyncThunk(
+  "wallet/fetchServiceChargeTransactions",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/wallet/transactions/service-charges", { params });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch service charge transactions",
+      );
+    }
+  },
+);
+
+export const fetchServiceChargeDetails = createAsyncThunk(
+  "wallet/fetchServiceChargeDetails",
+  async ({ bookingId, operationType }, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/wallet/transactions/service-charges/${bookingId}/details`, {
+        params: { operationType }
+      });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch service charge details",
+      );
+    }
+  },
+);
+
 export const initiateWalletRecharge = createAsyncThunk(
   "wallet/initiateRecharge",
   async ({ amount, returnUrl }, { rejectWithValue }) => {
@@ -205,6 +235,19 @@ const walletSlice = createSlice({
         state.pagination = action.payload.pagination;
       })
       .addCase(fetchBookingTransactions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(fetchServiceChargeTransactions.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchServiceChargeTransactions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.transactions = action.payload.transactions;
+        state.pagination = action.payload.pagination;
+      })
+      .addCase(fetchServiceChargeTransactions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

@@ -478,7 +478,11 @@ exports.promoteToFinanceTeam = async (req, res) => {
       });
     }
 
-    if (user.role === "super-admin" || user.role === "travel-admin" || user.role === "corporate-admin") {
+    if (
+      user.role === "super-admin" ||
+      user.role === "travel-admin" ||
+      user.role === "corporate-admin"
+    ) {
       return res.status(400).json({
         success: false,
         message: "Cannot modify admin role",
@@ -565,7 +569,15 @@ exports.getAllEmployees = async (req, res, next) => {
 
     // ✅ Base query (role filter)
     let query = {
-      role: { $in: ["manager", "employee", "travel-admin", "corporate-admin", "finance_team"] },
+      role: {
+        $in: [
+          "manager",
+          "employee",
+          "travel-admin",
+          "corporate-admin",
+          "finance_team",
+        ],
+      },
     };
 
     // ✅ Scope filter (corporate OR domain)
@@ -585,7 +597,7 @@ exports.getAllEmployees = async (req, res, next) => {
       { $match: query },
       {
         $lookup: {
-          from: "employees", 
+          from: "employees",
           localField: "_id",
           foreignField: "userId",
           as: "empProfile",
@@ -632,7 +644,7 @@ exports.getAllEmployees = async (req, res, next) => {
 exports.getEmployeeExpenses = async (req, res, next) => {
   try {
     if (!req.user) return next(new ApiError(401, "Unauthorized"));
-    
+
     const corporateId = req.user.corporateId || req.user._id;
     if (!corporateId) return next(new ApiError(400, "CorporateId required"));
 
@@ -648,52 +660,52 @@ exports.getEmployeeExpenses = async (req, res, next) => {
 
     // Flight aggregation
     const flightAgg = await BookingRequest.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           corporateId: new mongoose.Types.ObjectId(corporateId),
           executionStatus: "ticketed",
-          ...dateFilter
-        }
+          ...dateFilter,
+        },
       },
       {
         $group: {
           _id: "$userId",
-          totalSpend: { $sum: "$pricingSnapshot.totalAmount" }
-        }
-      }
+          totalSpend: { $sum: "$pricingSnapshot.totalAmount" },
+        },
+      },
     ]);
 
     // Hotel aggregation
     const hotelAgg = await HotelBooking.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           corporateId: new mongoose.Types.ObjectId(corporateId),
           executionStatus: "voucher_generated",
-          ...dateFilter
-        }
+          ...dateFilter,
+        },
       },
       {
         $group: {
           _id: "$userId",
-          totalSpend: { $sum: "$pricingSnapshot.totalAmount" }
-        }
-      }
+          totalSpend: { $sum: "$pricingSnapshot.totalAmount" },
+        },
+      },
     ]);
 
     // Combine results
     const expensesMap = {};
-    flightAgg.forEach(f => {
+    flightAgg.forEach((f) => {
       const uId = f._id ? f._id.toString() : "unknown";
       expensesMap[uId] = (expensesMap[uId] || 0) + (f.totalSpend || 0);
     });
-    hotelAgg.forEach(h => {
+    hotelAgg.forEach((h) => {
       const uId = h._id ? h._id.toString() : "unknown";
       expensesMap[uId] = (expensesMap[uId] || 0) + (h.totalSpend || 0);
     });
 
     res.status(200).json({
       success: true,
-      data: expensesMap
+      data: expensesMap,
     });
   } catch (err) {
     next(err);
@@ -867,7 +879,7 @@ exports.getManagerRequests = async (req, res) => {
     }
 
     // 🔒 2. FETCH ONLY SAME CORPORATE DATA
-    const requests = await ManagerRequest.find({
+    let requests = await ManagerRequest.find({
       corporateId: req.user.corporateId,
     })
       .populate({
@@ -879,6 +891,22 @@ exports.getManagerRequests = async (req, res) => {
         select: "email name role isTempManager",
       })
       .sort({ createdAt: -1 });
+
+    // 🔥 Expiry check (72 hours)
+    const now = Date.now();
+    const expiryMs = 72 * 60 * 60 * 1000;
+
+    for (let i = 0; i < requests.length; i++) {
+      if (requests[i].status === "pending") {
+        const timeDiff = now - new Date(requests[i].createdAt).getTime();
+        if (timeDiff > expiryMs) {
+          requests[i].status = "expired";
+          await ManagerRequest.findByIdAndUpdate(requests[i]._id, {
+            status: "expired",
+          });
+        }
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -924,11 +952,14 @@ exports.reviewManagerRequest = async (req, res) => {
       });
     }
 
-    // 🔒 3. PREVENT DOUBLE ACTION
+    // 🔒 3. PREVENT DOUBLE ACTION OR EXPIRED ACTION
     if (request.status !== "pending") {
       return res.status(400).json({
         success: false,
-        message: "Request already processed",
+        message:
+          request.status === "expired"
+            ? "Request has expired"
+            : "Request already processed",
       });
     }
 
@@ -998,14 +1029,6 @@ exports.reviewManagerRequest = async (req, res) => {
       relatedId: request._id,
     });
 
-    // ── Notify Travel Admin of the completed review ──────────
-    notify(EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL, {
-      corporateId: request.corporateId,
-      employeeName: request.employeeId?.name || _reviewedUserName,
-      managerName: request.managerName,
-      managerEmail: request.managerEmail,
-    });
-
     return res.json({
       success: true,
       message: `Request ${action}ed successfully`,
@@ -1013,6 +1036,51 @@ exports.reviewManagerRequest = async (req, res) => {
   } catch (err) {
     console.error("Review Manager Error:", err);
     res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * ============================================================
+ * 💼 FETCH ALL FINANCE TEAM MEMBERS (CORPORATE SCOPED)
+ * ============================================================
+ */
+exports.getFinanceTeamMembers = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { corporateId } = req.user;
+
+    if (!corporateId) {
+      return res.status(400).json({
+        success: false,
+        message: "Corporate ID is required to fetch finance team",
+      });
+    }
+
+    const financeMembers = await User.find({
+      corporateId: new mongoose.Types.ObjectId(corporateId),
+      role: "finance_team",
+    })
+      .select("-password -__v")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: financeMembers.length,
+      data: financeMembers,
+    });
+  } catch (error) {
+    console.error("Fetch Finance Team Error:", error);
+    return res.status(500).json({
       success: false,
       message: "Internal server error",
     });

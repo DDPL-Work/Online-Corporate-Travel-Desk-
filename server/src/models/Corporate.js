@@ -151,14 +151,20 @@ const corporateSchema = new mongoose.Schema(
       updatedAt: { type: Date, default: Date.now }
     }],
 
-    // ───── SERVICE CHARGES ─────
-    serviceCharges: {
-      domesticFlight: { type: Number, default: 0 }, // per pax
-      internationalOneWayFlight: { type: Number, default: 0 },
-      internationalReturnFlight: { type: Number, default: 0 },
-      domesticHotel: { type: Number, default: 0 }, // per transaction
-      internationalHotel: { type: Number, default: 0 }, // per transaction
-    },
+    // ───── SERVICE FEE RULES ─────
+    serviceFeeRules: [
+      {
+        productType: { type: String, enum: ["Flight", "Hotel"], required: true },
+        operation: { type: String, enum: ["Book", "Cancel", "Re-Issue"], required: true },
+        tripType: { type: String, enum: ["Domestic", "International"], required: true },
+        cabinClass: { type: Number, enum: [2, 3, 4, 5, 6] },
+        starRating: { type: Number, enum: [1, 2, 3, 4, 5] },
+        roomCount: { type: Number },
+        feeType: { type: String, enum: ["Fixed", "Percentage"], required: true },
+        feeValue: { type: Number, required: true },
+        status: { type: String, enum: ["Active", "Inactive"], default: "Active" }
+      }
+    ],
 
     // ───── SYSTEM FIELDS ─────
     status: {

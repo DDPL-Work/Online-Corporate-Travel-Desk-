@@ -42,80 +42,10 @@ function fmtDate(d, opts = { day: "2-digit", month: "short", year: "numeric" }) 
   return new Date(d).toLocaleDateString("en-GB", opts);
 }
 
-function DetailModal({ request, onClose }) {
-  if (!request) return null;
-  return (
-    <div className="fixed inset-0 bg-[#000D26]/60 backdrop-blur-md flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-300" onClick={onClose}>
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden relative flex flex-col animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-8 py-6 flex items-center justify-between text-white">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
-              {request.type === "Hotel" ? <MdHotel size={24} /> : <MdFlightTakeoff size={24} />}
-            </div>
-            <div>
-              <h2 className="text-xl font-black">{request.destination}</h2>
-              <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">#{request.id?.slice(-12).toUpperCase()}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2.5 rounded-xl hover:bg-white/10 transition-all border border-white/10 text-white"><FiX size={24} /></button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-8 space-y-8">
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-10"><FiXCircle size={64} className="text-[#003399]" /></div>
-             <p className="text-[10px] font-black uppercase tracking-[2px] text-[#003399] mb-2">Rejection Verdict</p>
-             <p className="text-sm font-bold text-[#000D26] leading-relaxed italic">"{request.reason}"</p>
-             <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-[#003399]">{(request.rejectedBy || "A")[0]}</div>
-                <p className="text-xs font-bold text-slate-500">Rejected by {request.rejectedBy} on {fmtDate(request.rejectedDate)}</p>
-             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            {[
-              { label: "Request Type", value: request.type, icon: FiList },
-              { label: "Planned Deployment", value: fmtDate(request.startDate), icon: FiCalendar },
-            ].map((item, i) => (
-              <div key={i} className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400 shadow-sm border border-slate-100"><item.icon size={18} /></div>
-                <div>
-                   <p className="text-[9px] uppercase font-bold tracking-widest text-slate-400">{item.label}</p>
-                   <p className="text-sm font-black text-[#000D26]">{item.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {request.raw?.flightRequest?.segments?.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[2px] text-slate-400">Flight Configuration</h3>
-              <div className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-500 border-b">
-                    <tr>
-                      <th className="px-5 py-4">Sector</th>
-                      <th className="px-5 py-4">Flight</th>
-                      <th className="px-5 py-4">Timing</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 text-xs">
-                    {request.raw.flightRequest.segments.map((seg, i) => (
-                      <tr key={i}>
-                        <td className="px-5 py-4 font-black text-[#003399] uppercase">{seg.origin.city} → {seg.destination.city}</td>
-                        <td className="px-5 py-4 font-bold text-slate-600">{seg.airlineName} <span className="text-[10px] text-slate-400">({seg.airlineCode}-{seg.flightNumber})</span></td>
-                        <td className="px-5 py-4 text-slate-500">{formatDate(seg.departureDateTime)} {formatTime(seg.departureDateTime)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+import {
+  PendingFlightDetailsModal,
+  PendingHotelDetailsModal,
+} from "../CorporateManagerTabs/Modal/PendingHotelDetailsModal";
 
 function FlightSection({ onSelect }) {
   const [search, setSearch] = useState("");
@@ -161,17 +91,17 @@ function FlightSection({ onSelect }) {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Rejected Flights" value={filtered.length} Icon={FiXCircle} borderCls="border-[#003399]" iconBgCls="bg-slate-50" iconColorCls="text-[#003399]" />
-        <StatCard label="Awaiting Revision" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Policy Violations" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
-        <StatCard label="Rejected Assets" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Needs Updates" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Out of Policy" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Total Rejected" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Rejections</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Destination, ID..." />
           </LabeledField>
-          <LabeledField label="Rejection Date" className="lg:col-span-6">
+          <LabeledField label="Date Range" className="lg:col-span-6">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -186,7 +116,7 @@ function FlightSection({ onSelect }) {
 
       <ResponsiveDataTable 
         title="Rejection Ledger" 
-        subtitle={`${filtered.length} denied authorizations`} 
+        subtitle={`${filtered.length} rejected requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
@@ -194,13 +124,13 @@ function FlightSection({ onSelect }) {
           pageHeader: "Flight Rejection Ledger",
           statCards: [
             { label: "Rejected Flights", value: filtered.length },
-            { label: "Awaiting Revision", value: filtered.length },
-            { label: "Policy Violations", value: filtered.length },
-            { label: "Rejected Assets", value: filtered.length }
+            { label: "Needs Updates", value: filtered.length },
+            { label: "Out of Policy", value: filtered.length },
+            { label: "Total Rejected", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Rejection Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: myRejectedFlightsExportTemplate,
@@ -296,18 +226,18 @@ function HotelSection({ onSelect }) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Rejected Stays" value={filtered.length} Icon={FiXCircle} borderCls="border-[#003399]" iconBgCls="bg-slate-50" iconColorCls="text-[#003399]" />
-        <StatCard label="Awaiting Revision" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Policy Violations" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
-        <StatCard label="Rejected Assets" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Rejected Hotels" value={filtered.length} Icon={FiXCircle} borderCls="border-[#003399]" iconBgCls="bg-slate-50" iconColorCls="text-[#003399]" />
+        <StatCard label="Needs Updates" value={filtered.length} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Out of Policy" value={filtered.length} Icon={FiFilter} borderCls="border-slate-500" iconBgCls="bg-slate-50" iconColorCls="text-slate-600" />
+        <StatCard label="Total Rejected" value={filtered.length} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Rejections</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel Name, ID..." />
           </LabeledField>
-          <LabeledField label="Rejection Date" className="lg:col-span-6">
+          <LabeledField label="Date Range" className="lg:col-span-6">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -322,21 +252,21 @@ function HotelSection({ onSelect }) {
 
       <ResponsiveDataTable 
         title="Hotel Rejection Ledger" 
-        subtitle={`${filtered.length} denied authorizations`} 
+        subtitle={`${filtered.length} rejected requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Hotel Rejection Ledger",
           statCards: [
-            { label: "Rejected Stays", value: filtered.length },
-            { label: "Awaiting Revision", value: filtered.length },
-            { label: "Policy Violations", value: filtered.length },
-            { label: "Rejected Assets", value: filtered.length }
+            { label: "Rejected Hotels", value: filtered.length },
+            { label: "Needs Updates", value: filtered.length },
+            { label: "Out of Policy", value: filtered.length },
+            { label: "Total Rejected", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Rejection Date", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: myRejectedHotelsExportTemplate,
@@ -349,7 +279,7 @@ function HotelSection({ onSelect }) {
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="!px-6 !py-5">Request ID</Th>
-              <Th className="!px-6 !py-5">Hotel Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Rejection Date</Th>
               <Th className="!px-6 !py-5">Reason</Th>
               <Th className="!px-6 !py-5">Status</Th>
@@ -395,7 +325,20 @@ export default function MyRejectedRequests() {
 
   return (
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
-      <DetailModal request={activeRequest} onClose={() => setActiveRequest(null)} />
+      {activeRequest?.type === "Flight" && (
+        <PendingFlightDetailsModal
+          booking={activeRequest.raw}
+          onClose={() => setActiveRequest(null)}
+          isVerified={true}
+        />
+      )}
+      {activeRequest?.type === "Hotel" && (
+        <PendingHotelDetailsModal
+          booking={activeRequest.raw}
+          onClose={() => setActiveRequest(null)}
+          isVerified={true}
+        />
+      )}
       
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
@@ -411,7 +354,7 @@ export default function MyRejectedRequests() {
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiXCircle size={28} /></div>
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Rejected Requests</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Archive of Denied Authorizations and Compliance Feedback Ledger</p>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View all your rejected requests (Hotel & Flight)</p>
                </div>
              </div>
           </div>

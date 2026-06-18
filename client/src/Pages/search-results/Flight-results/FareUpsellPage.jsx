@@ -1,7 +1,11 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { selectFareFamily } from "../../../Redux/Slice/flightSearchSlice";
+import { getFareRule } from "../../../Redux/Actions/flight.thunks";
+import { processFareRulesData } from "../../../utils/fareRulesParser";
+import FareRulesRenderer from "../../../components/flight-details/FareRulesRenderer";
 import {
   MdFlight,
   MdCheck,
@@ -23,6 +27,7 @@ import {
   MdPriorityHigh,
   MdCardMembership,
   MdUpdate,
+  MdClose,
 } from "react-icons/md";
 import { BsStarFill } from "react-icons/bs";
 import LandingHeader from "../../../layout/LandingHeader";
@@ -196,9 +201,12 @@ function categorizeServices(servicesList = []) {
   servicesList.forEach((svc) => {
     if (!svc.UpsellDescription) return;
     const [labelRaw, descRaw] = svc.UpsellDescription.split("|");
-    const label = labelRaw?.trim() || "";
-    const description = descRaw?.trim() || "";
-    const lowerLabel = label.toLowerCase();
+    let description = (descRaw || labelRaw).trim();
+    
+    // Clean up routing prefix like "DEL-AMS: "
+    description = description.replace(/^[A-Z]{3}-[A-Z]{3}:\s*/i, "");
+
+    const lowerDesc = description.toLowerCase();
 
     const status =
       svc.IsIncluded === "Yes"
@@ -209,7 +217,7 @@ function categorizeServices(servicesList = []) {
 
     let matchedGroup = null;
     for (const cat of SERVICE_CATEGORY_RULES) {
-      if (cat.keywords.some((kw) => lowerLabel.includes(kw))) {
+      if (cat.keywords.some((kw) => lowerDesc.includes(kw))) {
         matchedGroup = cat.group;
         break;
       }
@@ -217,10 +225,10 @@ function categorizeServices(servicesList = []) {
     const groupKey = matchedGroup || OTHER_GROUP.group;
     if (!grouped[groupKey]) grouped[groupKey] = [];
 
-    // Deduplicate by label within group
-    const exists = grouped[groupKey].some((s) => s.label === label);
-    if (!exists) {
-      grouped[groupKey].push({ label, description, status });
+    // Deduplicate by description
+    const exists = grouped[groupKey].some((s) => s.description === description);
+    if (!exists && description) {
+      grouped[groupKey].push({ description, status });
     }
   });
 
@@ -409,7 +417,7 @@ function SegmentRow({ segments }) {
   return (
     <div className="flex items-center gap-4 bg-white/5 rounded-2xl border border-white/10 px-5 py-4 mt-4 text-left">
       {/* Origin */}
-      <div className="text-left min-w-[64px]">
+      <div className="text-left min-w-16">
         <p className="text-xl font-bold text-white font-mono tracking-tight">
           {fmtT(dep)}
         </p>
@@ -451,7 +459,7 @@ function SegmentRow({ segments }) {
       </div>
 
       {/* Destination */}
-      <div className="text-right min-w-[64px]">
+      <div className="text-right min-w-16">
         <p className="text-xl font-bold text-white font-mono tracking-tight">
           {fmtT(arr)}
         </p>
@@ -511,8 +519,9 @@ function MiniRulesBadges({ rules }) {
   );
 }
 
-function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab, bookingPath, bookingPayload }) {
+function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules, journeyTab, bookingPath, bookingPayload }) {
   const [expanded, setExpanded] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const servicesToUse =
     journeyTab === "onward" ? fare.onwardServices : fare.returnServices;
@@ -543,7 +552,7 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab, book
       {/* Popular banner */}
       {isPopular && (
         <div
-          className="bg-gradient-to-r from-[#0A203E] via-[#C9A84C] to-[#0A203E] text-white text-center text-[9.5px] font-black tracking-[0.18em] py-2 uppercase shadow-inner"
+          className="bg-linear-to-r from-[#0A203E] via-[#C9A84C] to-[#0A203E] text-white text-center text-[9.5px] font-black tracking-[0.18em] py-2 uppercase shadow-inner"
         >
           ★ MOST POPULAR ★
         </div>
@@ -562,7 +571,7 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab, book
         {/* Fare family + badges */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="text-left">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-400">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
               {fare.cabin}
             </p>
             <p
@@ -642,77 +651,134 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, journeyTab, book
         <MiniRulesBadges rules={fare.miniRules} />
       </div>
 
-      {/* Services — fully dynamic, grouped by category */}
-      <div className="flex-1 px-4 py-3 space-y-3">
-        {groupedServices.map((group) => {
-          const GroupIcon = ICON_MAP[group.icon] || MdUpdate;
-          const displayed = expanded
-            ? group.services
-            : group.services.filter((s) => s.status !== "unavailable");
-          if (!displayed.length) return null;
-
-          return (
-            <div key={group.group}>
-              {/* Group label */}
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <div
-                  className="size-5 rounded-md flex items-center justify-center shrink-0"
-                  style={{ background: group.bgColor }}
-                >
-                  <GroupIcon size={11} style={{ color: group.color }} />
-                </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">
-                  {group.group}
-                </span>
-              </div>
-
-              {/* Services */}
-              <div className="space-y-1.5 pl-1">
-                {displayed.map((svc, idx) => (
-                  <div key={idx} className="flex items-start gap-2">
-                    <StatusIcon status={svc.status} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] text-slate-700 font-medium leading-snug">
-                        {svc.label}
-                      </p>
-                      {svc.description && (
-                        <p className="text-[10px] text-slate-400 leading-snug">
-                          {svc.description}
-                        </p>
-                      )}
-                    </div>
-                    <span
-                      className={`text-[10px] font-semibold shrink-0 ${
-                        svc.status === "included"
-                          ? "text-emerald-600"
-                          : svc.status === "chargeable"
-                            ? "text-amber-600"
-                            : "text-slate-300"
-                      }`}
-                    >
-                      {svc.status === "included"
-                        ? "Free"
-                        : svc.status === "chargeable"
-                          ? "Paid"
-                          : "N/A"}
-                    </span>
-                  </div>
-                ))}
-              </div>
+      {/* Services — Important Info only (max 3 items) */}
+      <div className="flex-1 px-4 py-3 space-y-2">
+        {groupedServices
+          .flatMap((g) => g.services)
+          .filter((s) => s.status === "included")
+          .slice(0, 3)
+          .map((svc, idx) => (
+            <div key={idx} className="flex items-start gap-2">
+              <StatusIcon status={svc.status} />
+              <p className="text-[12px] text-slate-700 font-medium leading-snug flex-1">
+                {svc.description}
+              </p>
             </div>
-          );
-        })}
+          ))}
 
-        {/* Toggle hidden items */}
-        {hasHiddenItems && (
-          <button
-            onClick={() => setExpanded((p) => !p)}
-            className="text-[10px] font-semibold text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors mt-1"
-          >
-            {expanded ? "▲ Show less" : "▼ Show unavailable services"}
-          </button>
-        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowModal(true);
+          }}
+          className="text-[12px] font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2 mt-2 inline-block transition-colors"
+        >
+          View full details
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onViewFareRules) onViewFareRules(fare);
+          }}
+          className="text-[12px] font-bold text-slate-600 hover:text-slate-900 underline underline-offset-2 mt-2 ml-4 inline-block transition-colors"
+        >
+          View Fare Rules
+        </button>
       </div>
+
+      {/* Full Details Modal */}
+      {showModal && createPortal(
+        <div 
+          className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowModal(false);
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-[20px] font-black text-[#0A203E]">{fare.fareFamilyName} Benefits</h3>
+                <p className="text-[13px] text-slate-500 font-medium mt-0.5">{fare.cabin}</p>
+              </div>
+              <button 
+                onClick={() => setShowModal(false)} 
+                className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <MdClose size={20} />
+              </button>
+            </div>
+            
+            <div className="p-5 overflow-y-auto space-y-5">
+              {groupedServices.map((group) => {
+                const GroupIcon = ICON_MAP[group.icon] || MdUpdate;
+                // Only show unavailable items if requested
+                const displayed = expanded
+                  ? group.services
+                  : group.services.filter((s) => s.status !== "unavailable");
+                if (!displayed.length) return null;
+
+                return (
+                  <div key={group.group} className="bg-slate-50/50 rounded-xl p-3.5 border border-slate-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                        style={{ background: group.bgColor }}
+                      >
+                        <GroupIcon size={16} style={{ color: group.color }} />
+                      </div>
+                      <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
+                        {group.group}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5 pl-1">
+                      {displayed.map((svc, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <StatusIcon status={svc.status} />
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                              {svc.description}
+                            </p>
+                          </div>
+                          <span
+                            className={`text-[11px] font-bold shrink-0 uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                              svc.status === "included"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : svc.status === "chargeable"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            {svc.status === "included"
+                              ? "Free"
+                              : svc.status === "chargeable"
+                                ? "Paid"
+                                : "N/A"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {hasHiddenItems && (
+                <button
+                  onClick={() => setExpanded((p) => !p)}
+                  className="text-[13px] font-bold text-[#C9A84C] hover:text-[#b5953e] flex items-center justify-center gap-1.5 w-full py-2 bg-[#C9A84C]/5 hover:bg-[#C9A84C]/10 rounded-xl transition-colors"
+                >
+                  {expanded ? "▲ Hide unavailable services" : "▼ Show unavailable services"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Select button */}
       <div className="px-4 pb-4 pt-2 mt-auto">
@@ -802,6 +868,11 @@ export default function FareUpsellPage() {
   const [activeJourneyTab, setActiveJourneyTab] = useState("onward");
   const [currentIndex, setCurrentIndex] = useState(0);
   const CARDS_PER_VIEW = 4;
+
+  const [showFareRulesModal, setShowFareRulesModal] = useState(false);
+  const [fareRulesData, setFareRulesData] = useState(null);
+  const [isFetchingRules, setIsFetchingRules] = useState(false);
+  const [selectedFareForRules, setSelectedFareForRules] = useState(null);
 
   const responseData = useMemo(
     () => extractUpsellResponse(fareUpsellData),
@@ -985,6 +1056,26 @@ export default function FareUpsellPage() {
       setSelectedReturnFare(fare);
     }
   }
+
+  const handleViewFareRules = async (fare) => {
+    setSelectedFareForRules(fare);
+    setShowFareRulesModal(true);
+    setIsFetchingRules(true);
+    try {
+      const response = await dispatch(getFareRule({ traceId, resultIndex: fare.rawResult.ResultIndex })).unwrap();
+      const rawRules = response?.Response?.FareRules;
+      if (rawRules) {
+        setFareRulesData(processFareRulesData(rawRules));
+      } else {
+        setFareRulesData([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setFareRulesData([]);
+    } finally {
+      setIsFetchingRules(false);
+    }
+  };
 
   const tabIcons = {
     Economy: <MdFlight size={13} />,
@@ -1197,6 +1288,7 @@ export default function FareUpsellPage() {
                         isSelected={isSelected}
                         isPopular={globalIdx === popularIdx}
                         onSelect={handleSelect}
+                        onViewFareRules={handleViewFareRules}
                         journeyTab={activeJourneyTab}
                         bookingPath={!isDomesticRT ? (activeJourneyType === 2 ? "/round-trip-flight/booking" : "/one-way-flight/booking") : null}
                         bookingPayload={!isDomesticRT ? {
@@ -1327,6 +1419,69 @@ export default function FareUpsellPage() {
           </div>
         </div>
       </div>
+      
+      {/* Fare Rules Modal */}
+      {showFareRulesModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          onClick={() => setShowFareRulesModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-[20px] font-black text-[#0A203E]">Fare Rules</h3>
+                <p className="text-[13px] text-slate-500 font-medium mt-0.5">{selectedFareForRules?.fareFamilyName} · {selectedFareForRules?.cabin}</p>
+              </div>
+              <button 
+                onClick={() => setShowFareRulesModal(false)} 
+                className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                <MdClose size={20} />
+              </button>
+            </div>
+            
+            <div className="p-5 overflow-y-auto bg-slate-50">
+              {isFetchingRules ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <MdLoop className="animate-spin text-[#C9A84C] text-4xl mb-4" />
+                  <p className="text-slate-600 font-medium">Fetching fare rules...</p>
+                </div>
+              ) : fareRulesData && fareRulesData.length > 0 ? (
+                <div className="space-y-8">
+                  {fareRulesData.map((rule, idx) => (
+                    <div key={idx}>
+                      {fareRulesData.length > 1 && (
+                        <div className="flex items-center gap-3 mb-6 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                          <div className="w-8 h-8 rounded-lg bg-[#0A203E] flex items-center justify-center shrink-0">
+                            <MdFlight size={16} className="text-white transform rotate-90" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-[#0A203E] uppercase tracking-wider">
+                              {rule.origin} to {rule.destination}
+                            </h4>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                              {rule.airline} • {rule.fareType || "Standard Fare"}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <FareRulesRenderer rule={rule} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 text-slate-500">
+                  <p className="font-bold">No fare rules available</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

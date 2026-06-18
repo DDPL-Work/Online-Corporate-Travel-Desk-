@@ -29,7 +29,7 @@ router.post(
 router.get(
   "/my",
   verifyToken,
-  authorizeRoles("travel-admin", "employee", "manager"),
+  authorizeRoles("travel-admin", "employee", "manager", "finance_team"),
   getProjectsByCorporate
 );
 

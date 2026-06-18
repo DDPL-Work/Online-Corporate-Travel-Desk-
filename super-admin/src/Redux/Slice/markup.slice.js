@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports } from "../Actions/markup.thunks";
+import { fetchAirlines, fetchCountries, fetchCities, fetchHotels, fetchAirports, saveCorporateMarkup, getAllCorporateMarkups, deleteCorporateMarkup, fetchMarkupRevenue, fetchBookingMarkupAudit } from "../Actions/markup.thunks";
 
 const initialState = {
   airlines: [],
@@ -21,6 +21,23 @@ const initialState = {
   airports: [],
   airportsLoading: false,
   airportsError: null,
+
+  saveMarkupLoading: false,
+  saveMarkupError: null,
+
+  configuredMarkups: [],
+  fetchMarkupsLoading: false,
+  fetchMarkupsError: null,
+
+  deleteMarkupLoading: false,
+
+  revenue: [],
+  revenueLoading: false,
+  revenueError: null,
+
+  audit: [],
+  auditLoading: false,
+  auditError: null,
 };
 
 const markupSlice = createSlice({
@@ -41,6 +58,12 @@ const markupSlice = createSlice({
     },
     clearAirports: (state) => {
       state.airports = [];
+    },
+    clearRevenue: (state) => {
+      state.revenue = [];
+    },
+    clearAudit: (state) => {
+      state.audit = [];
     },
   },
   extraReducers: (builder) => {
@@ -113,10 +136,77 @@ const markupSlice = createSlice({
       .addCase(fetchAirports.rejected, (state, action) => {
         state.airportsLoading = false;
         state.airportsError = action.payload;
+      })
+      
+      // Save Corporate Markup
+      .addCase(saveCorporateMarkup.pending, (state) => {
+        state.saveMarkupLoading = true;
+        state.saveMarkupError = null;
+      })
+      .addCase(saveCorporateMarkup.fulfilled, (state) => {
+        state.saveMarkupLoading = false;
+      })
+      .addCase(saveCorporateMarkup.rejected, (state, action) => {
+        state.saveMarkupLoading = false;
+        state.saveMarkupError = action.payload;
+      })
+      
+      // Fetch Corporate Markups
+      .addCase(getAllCorporateMarkups.pending, (state) => {
+        state.fetchMarkupsLoading = true;
+        state.fetchMarkupsError = null;
+      })
+      .addCase(getAllCorporateMarkups.fulfilled, (state, action) => {
+        state.fetchMarkupsLoading = false;
+        state.configuredMarkups = action.payload?.data || [];
+      })
+      .addCase(getAllCorporateMarkups.rejected, (state, action) => {
+        state.fetchMarkupsLoading = false;
+        state.fetchMarkupsError = action.payload;
+      })
+
+      // Delete Corporate Markup
+      .addCase(deleteCorporateMarkup.pending, (state) => {
+        state.deleteMarkupLoading = true;
+      })
+      .addCase(deleteCorporateMarkup.fulfilled, (state, action) => {
+        state.deleteMarkupLoading = false;
+        // The thunk payload might not have the ID, so we re-fetch in the component
+      })
+      .addCase(deleteCorporateMarkup.rejected, (state) => {
+        state.deleteMarkupLoading = false;
+      })
+
+      // Fetch Markup Revenue
+      .addCase(fetchMarkupRevenue.pending, (state) => {
+        state.revenueLoading = true;
+        state.revenueError = null;
+      })
+      .addCase(fetchMarkupRevenue.fulfilled, (state, action) => {
+        state.revenueLoading = false;
+        state.revenue = action.payload?.data || [];
+      })
+      .addCase(fetchMarkupRevenue.rejected, (state, action) => {
+        state.revenueLoading = false;
+        state.revenueError = action.payload || "Failed to fetch markup revenue";
+      })
+
+      // Fetch Booking Markup Audit
+      .addCase(fetchBookingMarkupAudit.pending, (state) => {
+        state.auditLoading = true;
+        state.auditError = null;
+      })
+      .addCase(fetchBookingMarkupAudit.fulfilled, (state, action) => {
+        state.auditLoading = false;
+        state.audit = action.payload?.data || [];
+      })
+      .addCase(fetchBookingMarkupAudit.rejected, (state, action) => {
+        state.auditLoading = false;
+        state.auditError = action.payload || "Failed to fetch booking markup audit";
       });
   },
 });
 
-export const { clearAirlines, clearCountries, clearCities, clearHotels, clearAirports } = markupSlice.actions;
+export const { clearAirlines, clearCountries, clearCities, clearHotels, clearAirports, clearRevenue, clearAudit } = markupSlice.actions;
 
 export default markupSlice.reducer;

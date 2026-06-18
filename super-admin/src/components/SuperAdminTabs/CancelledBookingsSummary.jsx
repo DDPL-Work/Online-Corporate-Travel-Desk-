@@ -199,10 +199,10 @@ const normalizeFlight = (booking = {}) => {
     corporate: corporateName(booking.corporateName || booking.corporate || booking.corporateId),
     corporateId: corporateKey(booking.corporateId || booking.corporate),
     people: travellers.length
-      ? travellers.map((t) => ({ name: joinName(t) || t.email || "Traveller", email: t.email || EMPTY_VALUE }))
+      ? travellers.map((t) => ({ name: joinName(t) || t.email || "Traveler", email: t.email || EMPTY_VALUE }))
       : Array.isArray(booking.travellerDetails) && booking.travellerDetails.length
-        ? booking.travellerDetails.map((t) => ({ name: t.name || t.email || "Traveller", email: t.email || EMPTY_VALUE }))
-        : [{ name: booking.employeeName || booking.travellerName || "Traveller", email: booking.employeeEmail || EMPTY_VALUE }],
+        ? booking.travellerDetails.map((t) => ({ name: t.name || t.email || "Traveler", email: t.email || EMPTY_VALUE }))
+        : [{ name: booking.employeeName || booking.travellerName || "Traveler", email: booking.employeeEmail || EMPTY_VALUE }],
     route: flightRoute(booking),
     airlineName,
     airlineCode,
@@ -367,9 +367,37 @@ function IdCell({ value, muted = false }) {
 }
 
 function DateCell({ value }) {
+  if (!value || value === EMPTY_VALUE) {
+    return (
+      <td className="px-4 xl:px-5 py-4 align-middle text-[12px] text-slate-500 font-medium whitespace-nowrap">
+        {EMPTY_VALUE}
+      </td>
+    );
+  }
+
+  if (value.includes(", ")) {
+    const [datePart, timePart] = value.split(", ");
+    return (
+      <td className="px-4 xl:px-5 py-4 align-middle whitespace-nowrap">
+        <p className="font-bold text-slate-700 text-[12px]">{datePart}</p>
+        <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-bold">{timePart}</p>
+      </td>
+    );
+  }
+
+  if (value.includes(" → ")) {
+    const [start, end] = value.split(" → ");
+    return (
+      <td className="px-4 xl:px-5 py-4 align-middle whitespace-nowrap">
+        <p className="font-bold text-slate-700 text-[12px]">{start}</p>
+        <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-bold">→ {end}</p>
+      </td>
+    );
+  }
+
   return (
-    <td className="px-4 xl:px-5 py-4 align-middle text-[12px] text-slate-500 font-medium whitespace-nowrap">
-      {value || EMPTY_VALUE}
+    <td className="px-4 xl:px-5 py-4 align-middle whitespace-nowrap text-[12px] text-slate-700 font-bold">
+      {value}
     </td>
   );
 }
@@ -394,15 +422,20 @@ function PeopleCell({ people }) {
 
 function ActionCell({ onClick }) {
   return (
-    <td className="px-3 py-4 align-middle text-center">
-      <button
-        type="button"
-        onClick={onClick}
-        className="w-9 h-9 rounded-xl bg-linea-to-br from-[#003399] to-[#000d26] text-white hover:shadow-lg hover:scale-105 transition-all inline-flex items-center justify-center"
-        title="View details"
-      >
-        <span className="text-sm font-black">→</span>
-      </button>
+    <td className="pl-3 pr-6 xl:pl-4 xl:pr-8 py-4 align-middle text-center">
+      <div className="flex min-h-[52px] items-center justify-center">
+        <button
+          type="button"
+          onClick={onClick}
+          className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:from-white hover:to-white group"
+          title="View details"
+        >
+          <FiArrowRight
+            size={16}
+            className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
+          />
+        </button>
+      </div>
     </td>
   );
 }
@@ -412,22 +445,22 @@ function FlightCancellationTable({ rows, sort, onSort, onView }) {
   return (
     <table className="min-w-300 w-full table-fixed text-left border-collapse">
       <colgroup>
-        <col style={{ width: "9%" }} />
-        <col style={{ width: "9%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "12%" }} />
         <col style={{ width: "13%" }} />
         <col style={{ width: "15%" }} />
-        <col style={{ width: "15%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "7%" }} />
-        <col style={{ width: "4%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "10%" }} />
+        <col style={{ width: "6%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-linea-to-r from-[#001a66] to-[#000d26]">
+        <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
           <TableHead>Order ID</TableHead>
-          <TableHead>Cancel Req. ID</TableHead>
-          <TableHead>Corporate</TableHead>
-          <TableHead>Traveller</TableHead>
+          <TableHead>Request ID</TableHead>
+          <TableHead>Company</TableHead>
+          <TableHead>Traveler</TableHead>
           <TableHead>Route / Airline</TableHead>
           <TableHead>
             <SortHeader label="Cancelled Date" sortKey="cancelledDate" sort={sort} onSort={onSort} />
@@ -445,7 +478,8 @@ function FlightCancellationTable({ rows, sort, onSort, onView }) {
         {rows.map((row, idx) => (
           <tr
             key={row.id}
-            className={`transition-colors hover:bg-blue-50/30 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
+            className="h-[92px] hover:bg-slate-50 transition-colors"
+            style={{ background: idx % 2 === 0 ? "#ffffff" : "#f8fafc" }}
           >
             <IdCell value={row.orderId} />
             <IdCell value={row.cancellationRequestId} muted />
@@ -489,21 +523,21 @@ function HotelCancellationTable({ rows, sort, onSort, onView }) {
   return (
     <table className="min-w-300 w-full table-fixed text-left border-collapse">
       <colgroup>
-        <col style={{ width: "9%" }} />
-        <col style={{ width: "9%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "12%" }} />
         <col style={{ width: "13%" }} />
         <col style={{ width: "15%" }} />
-        <col style={{ width: "15%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "7%" }} />
-        <col style={{ width: "4%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "11%" }} />
+        <col style={{ width: "10%" }} />
+        <col style={{ width: "6%" }} />
       </colgroup>
       <thead>
-        <tr className="bg-linea-to-r from-[#001a66] to-[#000d26]">
+        <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
           <TableHead>Order ID</TableHead>
-          <TableHead>Cancel Req. ID</TableHead>
-          <TableHead>Corporate</TableHead>
+          <TableHead>Request ID</TableHead>
+          <TableHead>Company</TableHead>
           <TableHead>Guest</TableHead>
           <TableHead>Hotel / City</TableHead>
           <TableHead>
@@ -522,7 +556,8 @@ function HotelCancellationTable({ rows, sort, onSort, onView }) {
         {rows.map((row, idx) => (
           <tr
             key={row.id}
-            className={`transition-colors hover:bg-blue-50/30 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}
+            className="h-[92px] hover:bg-slate-50 transition-colors"
+            style={{ background: idx % 2 === 0 ? "#ffffff" : "#f8fafc" }}
           >
             <IdCell value={row.orderId} />
             <IdCell value={row.cancellationRequestId} muted />
@@ -724,7 +759,7 @@ export default function CancellationDashboard() {
     const appliedFilters = [
       { label: "Search", value: search || "None" },
       { label: "Status", value: status },
-      { label: "Corporate", value: corporate },
+      { label: "Company", value: corporate },
       { label: "From Date", value: fromDate || "Any" },
       { label: "To Date", value: toDate || "Any" },
       { label: "Active Tab", value: activeTab },
@@ -760,7 +795,7 @@ export default function CancellationDashboard() {
       style={{ background: "#f8fafc" }}
     >
       {/* ── Navy Gradient Header ── */}
-      <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           {/* Left: nav + title */}
           <div className="flex items-center gap-6">
@@ -792,10 +827,10 @@ export default function CancellationDashboard() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Cancellation Summary
+                  Cancellations
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Flight &amp; Hotel Cancellation Management
+                  Manage flight and hotel cancellations
                 </p>
               </div>
             </div>
@@ -896,7 +931,7 @@ export default function CancellationDashboard() {
             {/* Corporate */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Corporate Account
+                Company
               </label>
               <select
                 value={corporate}
@@ -946,7 +981,7 @@ export default function CancellationDashboard() {
             {/* Left: title + count */}
             <div>
               <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-                {activeTab} Cancellation Report
+                {activeTab} Report
               </h2>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                 {sorted.length} records found

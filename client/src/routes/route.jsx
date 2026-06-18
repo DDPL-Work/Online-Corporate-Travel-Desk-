@@ -16,8 +16,7 @@ import ApprovedTravelRequests from "../components/TravelAdminTabs/ApprovedTravel
 import RejectedTravelRequests from "../components/TravelAdminTabs/RejectedTravelRequests";
 import UpcomingTrips from "../components/TravelAdminTabs/UpcomingTrips";
 import PastTrips from "../components/TravelAdminTabs/PastTrips";
-import UserManagement from "../components/TravelAdminTabs/UserManagement";
-import TravelAdminProfile from "../components/TravelAdminTabs/TravelAdminProfile";
+import CorporateProfile from "../components/TravelAdminTabs/CorporateProfile";
 import CreditUtilizationPostpaid from "../components/TravelAdminTabs/CreditUtilizationPostpaid";
 import CorporateWallet from "../components/TravelAdminTabs/CorporateWalletStatusPrepaid";
 import BrandingSettings from "../components/TravelAdminTabs/BrandingSettings";
@@ -169,8 +168,8 @@ export const appRouter = createBrowserRouter([
               { path: "/project-management", element: <ProjectManagement /> },
               { path: "/projects-table", element: <ProjectsTable /> },
               {
-                path: "/travel-profile-settings",
-                element: <TravelAdminProfile />,
+                path: "/corporate-profile",
+                element: <CorporateProfile />,
               },
               { path: "/corporate-wallet", element: <CorporateWallet /> },
               {

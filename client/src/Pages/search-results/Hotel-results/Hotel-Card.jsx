@@ -223,7 +223,8 @@ const HotelCard = ({ hotel }) => {
                 hotelCode: hotel.id, 
                 traceId: hotel.traceId,
                 searchPayload,
-                hotelFromSearch: rawHotel
+                hotelFromSearch: rawHotel,
+                snapshotId: hotel.snapshotId || rawHotel?.SnapshotId
               };
               localStorage.setItem("hotelDetailsState", JSON.stringify(stateObj));
               

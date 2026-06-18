@@ -260,10 +260,10 @@ export default function AllReissueRequests() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Offline Reissue Management
+                  Flight Change Requests
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Operations workspace for assignment & SLA tracking
+                  Manage and assign flight change requests
                 </p>
               </div>
             </div>
@@ -275,25 +275,25 @@ export default function AllReissueRequests() {
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard
-            label="Open Requests"
+            label="Total Requests"
             value={stats.total}
             icon={FiBarChart2}
             borderColor="border-b-[#003399]"
           />
           <StatCard
-            label="Processing"
+            label="In Progress"
             value={stats.processing}
             icon={FiSend}
             borderColor="border-b-amber-500"
           />
           <StatCard
-            label="Ticket Ready"
+            label="Ready"
             value={stats.completed}
             icon={FiDownload}
             borderColor="border-b-emerald-500"
           />
           <StatCard
-            label="Overdue"
+            label="Late"
             value={stats.overdue}
             icon={FiAlertCircle}
             borderColor="border-b-rose-500"
@@ -343,7 +343,7 @@ export default function AllReissueRequests() {
             {/* Agent */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Assigned Agent
+                Assigned To
               </label>
               <select
                 value={assignedTo}
@@ -410,7 +410,7 @@ export default function AllReissueRequests() {
                   : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
               }`}
             >
-              SLA Breach
+              Missed Deadline
             </button>
             
             {/* Airline (inline) */}
@@ -431,7 +431,7 @@ export default function AllReissueRequests() {
           <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50">
             <div>
               <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-                Reissue Queue
+                Flight Changes
               </h2>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                 {stats.total} records found
@@ -478,15 +478,15 @@ export default function AllReissueRequests() {
                 <col style={{ width: "14%" }} /> {/* Passenger */}
                 <col style={{ width: "14%" }} /> {/* Preferred Flight */}
                 <col style={{ width: "10%" }} /> {/* Status */}
-                <col style={{ width: "13%" }} /> {/* Assigned Agent */}
-                <col style={{ width: "11%" }} /> {/* SLA */}
-                <col style={{ width: "13%" }} /> {/* Reissued Ticket */}
+                <col style={{ width: "13%" }} /> {/* Assigned To */}
+                <col style={{ width: "11%" }} /> {/* Deadline */}
+                <col style={{ width: "13%" }} /> {/* New Ticket */}
                 <col style={{ width: "11%" }} /> {/* Updated */}
                 <col style={{ width: "4%" }} />  {/* Action */}
               </colgroup>
               <thead>
                 <tr className="bg-gradient-to-r from-[#001a66] to-[#000d26]">
-                  {["Request", "Passenger", "Preferred Flight", "Status", "Assigned Agent", "SLA", "Reissued Ticket", "Updated", ""].map((heading, i) => (
+                  {["Request", "Traveler", "New Flight", "Status", "Assigned To", "Deadline", "New Ticket", "Updated", ""].map((heading, i) => (
                     <th
                       key={i}
                       className="px-4 xl:px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-300 whitespace-nowrap"
@@ -502,7 +502,7 @@ export default function AllReissueRequests() {
                     <td colSpan="9" className="px-4 py-20 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <FiRefreshCw size={28} className="animate-spin text-[#003399]" />
-                        <p className="text-sm font-bold uppercase tracking-widest">Loading offline reissue queue...</p>
+                        <p className="text-sm font-bold uppercase tracking-widest">Loading flight changes...</p>
                       </div>
                     </td>
                   </tr>
@@ -514,7 +514,7 @@ export default function AllReissueRequests() {
                           <FiRepeat size={28} />
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-700">No offline reissue requests found</p>
+                          <p className="text-sm font-black text-slate-700">No flight change requests found</p>
                           <p className="text-xs text-slate-400 mt-1">Try changing the filters.</p>
                         </div>
                       </div>
@@ -545,7 +545,7 @@ export default function AllReissueRequests() {
                           {getJourneyLabel(request.selectedFlight || request.preferredJourney)}
                         </p>
                         <p className="mt-1 text-[10px] font-bold uppercase text-slate-400 truncate">
-                          {request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || request.airline || "Airline pending"}
+                          {request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || (typeof request.airline === 'object' ? request.airline?.code || request.airline?.name : request.airline) || "Airline pending"}
                           {request.selectedFlight?.flightNumber ? ` • ${request.selectedFlight.flightNumber}` : ""}
                         </p>
                       </td>
@@ -588,7 +588,7 @@ export default function AllReissueRequests() {
                         >
                           {request.generatedTicketUrl || request.revisedTicketUrl
                             ? "Ready to download"
-                            : "Awaiting generation"}
+                            : "Waiting for new ticket"}
                         </p>
                       </td>
                       <td className="px-4 xl:px-5 py-4 align-middle">

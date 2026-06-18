@@ -196,9 +196,9 @@ export default function OpsTeamManagement() {
                 <FiShield size={28} />
               </div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight leading-none">OPS Team</h1>
+                <h1 className="text-3xl font-black tracking-tight leading-none">Team Members</h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Access control, servicing roles, and member management
+                  Manage team members and their roles
                 </p>
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function OpsTeamManagement() {
         <div className="rounded-2xl border bg-white p-6 shadow-sm" style={{ borderColor: colors.border }}>
           <div className="mb-4 flex items-center gap-2">
             <FiFilter size={14} className="text-slate-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Directory Filters</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filters</span>
           </div>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-12">
           <FilterItem label="Search" className="lg:col-span-5">
@@ -313,7 +313,7 @@ export default function OpsTeamManagement() {
           <div className="px-6 py-4 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4 bg-white">
             <div>
               <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">
-                OPS Member Records
+                Team Records
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
                 {members.length} member{members.length === 1 ? "" : "s"} in current view
@@ -616,9 +616,9 @@ const StatusToggleModal = ({ member, loading, onCancel, onConfirm }) => {
               {isActivating ? <FiCheckCircle size={24} /> : <FiXCircle size={24} />}
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase tracking-tight">Change Member Status</h3>
+              <h3 className="text-lg font-black uppercase tracking-tight">Update Status</h3>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
-                Confirm access status update
+                Confirm status change
               </p>
             </div>
           </div>
@@ -681,9 +681,9 @@ const DeleteMemberModal = ({ member, loading, onCancel, onConfirm }) => (
             <FiTrash2 size={24} />
           </div>
           <div>
-            <h3 className="text-lg font-black uppercase tracking-tight">Delete OPS Member</h3>
+            <h3 className="text-lg font-black uppercase tracking-tight">Delete Member</h3>
             <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/60">
-              Confirm permanent member removal
+              Confirm permanent removal
             </p>
           </div>
         </div>
@@ -704,7 +704,7 @@ const DeleteMemberModal = ({ member, loading, onCancel, onConfirm }) => (
         </div>
 
         <p className="text-sm font-medium leading-6 text-slate-600">
-          This will delete the OPS member from the team. This action cannot be undone.
+          This will permanently remove the member from the team. This cannot be undone.
         </p>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

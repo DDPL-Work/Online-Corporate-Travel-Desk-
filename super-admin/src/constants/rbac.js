@@ -42,6 +42,10 @@ const MENU_RULES = Object.freeze([
     requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
   },
   {
+    to: "/markup-revenue",
+    requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
+  },
+  {
     to: "/wallet-recharge-logs",
     requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
   },
@@ -72,7 +76,7 @@ const ROUTE_RULES = Object.freeze([
     requiredPermissions: [OPS_PERMISSIONS.MANAGE_CANCELLATIONS],
   },
   {
-    paths: ["/corporate-revenue", "/wallet-recharge-logs", "/financial-approvals"],
+    paths: ["/corporate-revenue", "/wallet-recharge-logs", "/financial-approvals", "/markup-revenue"],
     requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
   },
   {
@@ -87,7 +91,6 @@ const ROUTE_RULES = Object.freeze([
       "/credit-status",
       "/commission-settings",
       "/api-configurations",
-      "/system-logs",
       "/ops-management",
     ],
     superAdminOnly: true,

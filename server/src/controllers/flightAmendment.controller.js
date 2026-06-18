@@ -317,6 +317,36 @@ else {
       },
     });
 
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Cancel",
+          tripType: (() => {
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
+          })(),
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for cancellation:", err.message);
+    }
+
     return res.json({
       success: true,
       isRoundTrip: bookingIds.length > 1,
@@ -391,6 +421,10 @@ exports.partialCancellation = async (req, res) => {
     const returnPassengers =
       booking?.bookingResult?.returnResponse?.raw?.Response?.Response
         ?.FlightItinerary?.Passenger || [];
+    const providerPassengers =
+      booking?.bookingResult?.providerResponse?.Response?.Response
+        ?.FlightItinerary?.Passenger || 
+      booking?.bookingResult?.providerResponse?.FlightItinerary?.Passenger || [];
 
     const selectPassengersByBookingId = (id) => {
       if (
@@ -403,10 +437,24 @@ exports.partialCancellation = async (req, res) => {
           ?.FlightItinerary?.BookingId === id
       )
         return returnPassengers;
+      if (
+        booking?.bookingResult?.providerResponse?.Response?.Response
+          ?.FlightItinerary?.BookingId === id ||
+        booking?.bookingResult?.providerResponse?.FlightItinerary?.BookingId === id ||
+        booking?.bookingResult?.bookingId === id
+      )
+        return providerPassengers;
+        
       return [];
     };
 
-    const chosenPassengers = selectPassengersByBookingId(tboBookingId);
+    let chosenPassengers = selectPassengersByBookingId(tboBookingId);
+    
+    // Fallback if empty and we only have one set of passengers anyway
+    if (!chosenPassengers.length) {
+       if (providerPassengers.length) chosenPassengers = providerPassengers;
+       else if (onwardPassengers.length && !returnPassengers.length) chosenPassengers = onwardPassengers;
+    }
 
     const ticketIdsFromBooking =
       chosenPassengers
@@ -494,16 +542,48 @@ exports.partialCancellation = async (req, res) => {
         type: "PARTIAL_CANCEL",
         changeRequestIds,
         status: "requested",
+        sectors,
         response: result,
       },
       amendmentHistory: {
         type: "PARTIAL_CANCEL",
-        changeRequestId,
+        changeRequestIds,
         status: "requested",
+        sectors,
         response: result,
         createdAt: new Date(),
       },
     });
+
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Cancel",
+          tripType: (() => {
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
+          })(),
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for partial cancellation:", err.message);
+    }
 
     return res.json(result);
   } catch (error) {
@@ -573,6 +653,36 @@ exports.amendBooking = async (req, res) => {
         createdAt: new Date(),
       },
     });
+
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Re-Issue",
+          tripType: (() => {
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
+          })(),
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for Re-Issue:", err.message);
+    }
 
     return res.json(result);
   } catch (error) {

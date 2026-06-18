@@ -997,8 +997,6 @@ const HotelReviewBooking = () => {
 
   const { myPolicy } = useSelector((state) => state.ssrPolicy);
   const isTravelAdmin = user?.role === "travel-admin";
-  const approvalRequired =
-    !isTravelAdmin && myPolicy?.approvalRequired !== false;
 
   const { hotel, rooms, searchParams } = location.state || {};
 
@@ -1101,20 +1099,23 @@ const HotelReviewBooking = () => {
           let age = "";
 
           if (isLead) {
-            const sourceProfile = myProfile || user;
-            if (sourceProfile) {
-              if (typeof sourceProfile.name === "object") {
-                fName = sourceProfile.name.firstName || "";
-                lName = sourceProfile.name.lastName || "";
+            if (myProfile) {
+              if (typeof myProfile.name === "object") {
+                fName = myProfile.name.firstName || "";
+                lName = myProfile.name.lastName || "";
               } else {
                 const rawName =
-                  sourceProfile.name || sourceProfile.displayName || "";
+                  myProfile.name || myProfile.displayName || "";
                 const names = (typeof rawName === "string" ? rawName : "")
                   .trim()
                   .split(/\s+/);
                 fName = names[0] || "";
                 lName = names.slice(1).join(" ") || "";
               }
+            }
+
+            const sourceProfile = myProfile || user;
+            if (sourceProfile) {
               email = sourceProfile.email || "";
               phone =
                 sourceProfile.phone ||
@@ -1186,20 +1187,23 @@ const HotelReviewBooking = () => {
         let dob = "";
         let age = "";
 
-        const sourceProfile = myProfile || user;
-        if (sourceProfile) {
-          if (typeof sourceProfile.name === "object") {
-            fName = sourceProfile.name.firstName || "";
-            lName = sourceProfile.name.lastName || "";
+        if (myProfile) {
+          if (typeof myProfile.name === "object") {
+            fName = myProfile.name.firstName || "";
+            lName = myProfile.name.lastName || "";
           } else {
             const rawName =
-              sourceProfile.name || sourceProfile.displayName || "";
+              myProfile.name || myProfile.displayName || "";
             const names = (typeof rawName === "string" ? rawName : "")
               .trim()
               .split(/\s+/);
             fName = names[0] || "";
             lName = names.slice(1).join(" ") || "";
           }
+        }
+
+        const sourceProfile = myProfile || user;
+        if (sourceProfile) {
           email = sourceProfile.email || "";
           phone =
             sourceProfile.phone ||
@@ -1259,6 +1263,29 @@ const HotelReviewBooking = () => {
         if (leadIndex !== -1) {
           let updated = false;
           const lead = { ...newTravelers[leadIndex] };
+
+          if (myProfile) {
+            let pFName = "";
+            let pLName = "";
+            if (typeof myProfile.name === "object") {
+              pFName = myProfile.name.firstName || "";
+              pLName = myProfile.name.lastName || "";
+            } else {
+              const rawName = myProfile.name || myProfile.displayName || "";
+              const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
+              pFName = names[0] || "";
+              pLName = names.slice(1).join(" ") || "";
+            }
+
+            if (pFName || pLName) {
+              if (!lead.firstName || lead.firstName !== pFName || !lead.lastName || lead.lastName !== pLName) {
+                lead.firstName = pFName;
+                lead.lastName = pLName;
+                updated = true;
+              }
+            }
+          }
+
           if (!lead.phoneWithCode) {
             lead.phoneWithCode =
               myProfile.phone || myProfile.mobile || myProfile.phoneWithCode || "";
@@ -1384,7 +1411,6 @@ const HotelReviewBooking = () => {
   const selectedRoom = rooms || [];
 
   const hotelCountry =
-    searchParams?.guestNationality ||
     displayHotel?.country ||
     displayHotel?.CountryName ||
     displayHotel?.address?.split(",")?.slice(-1)[0]?.trim() ||
@@ -1412,7 +1438,11 @@ const HotelReviewBooking = () => {
     return found?.isoCode || "";
   };
 
-  const hotelCountryCode = getCountryCode(hotelCountry);
+  const hotelCountryCode = 
+    preBookData?.HotelResult?.[0]?.CountryCode ||
+    displayHotel?.CountryCode || 
+    displayHotel?.countryCode ||
+    getCountryCode(hotelCountry);
 
   const isInternationalBooking = travelers.some((t) => {
     const travelerCountryCode = getCountryCode(t.nationality || t.countryCode);
@@ -1497,8 +1527,25 @@ const HotelReviewBooking = () => {
       : selectedRooms.reduce(
           (sum, r) =>
             sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
-          0,
+          0
         );
+
+  const isAutoApprove = myPolicy?.approvalRequired === false;
+  
+  let applicableLimit = 0;
+  let isUnlimitedLimit = true;
+  if (myPolicy?.hotelLimits?.length) {
+    const loc = hotelCountryCode?.toUpperCase() === "IN" ? "Domestic" : "International";
+    const starNum = Number(displayHotel?.rating) || 3; 
+    const limitObj = myPolicy.hotelLimits.find(l => l.location === loc && l.starRating === starNum);
+    if (limitObj) {
+      applicableLimit = limitObj.limit;
+      isUnlimitedLimit = limitObj.isUnlimited !== false;
+    }
+  }
+
+  const isOverLimit = isAutoApprove && !isUnlimitedLimit && applicableLimit > 0 && totalFare > applicableLimit;
+  const approvalRequired = !isTravelAdmin && (!isAutoApprove || isOverLimit);
 
   let tax =
     preBookBaseFare > 0
@@ -1880,7 +1927,8 @@ const HotelReviewBooking = () => {
     };
 
     try {
-      if (approvalRequired && !isTravelAdmin) {
+      const isApproverTravelAdmin = projectApproverData.approver?.role === "travel-admin";
+      if (approvalRequired && !isTravelAdmin && !isApproverTravelAdmin) {
         if (projectApproverData.approver && projectApproverData.project) {
           await dispatch(
             selectManager({
@@ -2776,6 +2824,7 @@ const HotelReviewBooking = () => {
               <ProjectApproverBlock
                 onChange={setProjectApproverData}
                 errors={formErrors}
+                approvalRequired={approvalRequired}
               />
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">

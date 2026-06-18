@@ -29,15 +29,15 @@ const CABIN_TBO = {
   2: "economy",
   3: "premium_economy",
   4: "business",
+  5: "premium_business",
   6: "first_class",
-  7: "premium_business",
 };
 const TBO_CABIN = {
   economy: 2,
   premium_economy: 3,
   business: 4,
+  premium_business: 5,
   first_class: 6,
-  premium_business: 7,
 };
 const cabinLabel = (v) =>
   CABIN_OPTIONS.find((o) => o.value === v)?.label || "Economy";

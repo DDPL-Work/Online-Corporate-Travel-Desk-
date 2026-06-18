@@ -23,7 +23,7 @@ export const fetchCorporateAdmin = createAsyncThunk(
   "corporateAdmin/fetchCorporateAdmin",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get("/corporate-admin/me");
+      const res = await api.get("/corporate-admin/corporate-profile");
       console.log("API RESPONSE:", res.data); // 👈 ADD THIS
       return res.data.data;
     } catch (err) {
@@ -42,7 +42,7 @@ export const updateCorporateAdmin = createAsyncThunk(
   "corporateAdmin/updateCorporateAdmin",
   async (payload, { rejectWithValue }) => {
     try {
-      const res = await api.patch("/corporate-admin/me", payload);
+      const res = await api.patch("/corporate-admin/corporate-profile", payload);
 
       // backend returns:
       // { success, data, message }

@@ -800,32 +800,7 @@ export const PendingHotelDetailsModal = ({
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                              Per Room / Night
-                            </p>
-                            <p className="text-2xl font-black text-indigo-700 tracking-tighter">
-                              ₹{r.DayRates?.[0]?.[0]?.BasePrice ||
-                                r.DayRates?.[0]?.[0]?.RoomRate ||
-                                (
-                                  (r.TotalFare ||
-                                    r.Price?.totalFare ||
-                                    r.NetAmount ||
-                                    0) /
-                                  ((Array.isArray(r.Name) ? r.Name.length : 1) *
-                                    (bookSnap.nights || 1))
-                                ).toLocaleString()}
-                            </p>
-                            {r.count > 1 && (
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                                Total: ₹
-                                {(
-                                  r.TotalFare ||
-                                  r.Price?.totalFare ||
-                                  r.NetAmount ||
-                                  0
-                                ).toLocaleString()}
-                              </p>
-                            )}
+                            {/* Per Night charge hidden as per request */}
                           </div>
                         </div>
 
@@ -921,29 +896,11 @@ export const PendingHotelDetailsModal = ({
                     <SectionLabel icon={<FiDollarSign />} title="Fare Summary" />
                     <div className="mt-6">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                        Total Amount (Inc. Tax)
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter">
                         ₹ {totalAmount.toLocaleString()}
                       </h4>
-                      <div className="mt-8 space-y-3 pt-6 border-t border-slate-800">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Base Price
-                          </span>
-                          <span className="text-slate-200 font-black">
-                            ₹{baseFare.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Taxes & Fees
-                          </span>
-                          <span className="text-slate-200 font-black">
-                            ₹{tax.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
                     </div>
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
                   </div>
@@ -1044,18 +1001,15 @@ export const PendingHotelDetailsModal = ({
                     <div className="mt-8 flex items-center gap-6">
                       <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
                         {
-                          (booking.requesterDetails?.name ||
-                            booking.userId?.name?.firstName ||
-                            "?")[0]
+                          (booking.requesterDetails?.name || booking.userId?.name?.firstName || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || "?")[0]
                         }
                       </div>
                       <div>
                         <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
-                          {booking.requesterDetails?.name ||
-                            `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim()}
+                          {booking.requesterDetails?.name || `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim() || `${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || ""} ${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.lastName || ""}`.trim() || "Unknown"}
                         </p>
                         <p className="text-xs font-bold text-slate-400 mt-1">
-                          {booking.requesterDetails?.email || booking.userId?.email}
+                          {booking.requesterDetails?.email || booking.userId?.email || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.email || "No email"}
                         </p>
                         <div className="mt-2 flex gap-2">
                           <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
@@ -1074,6 +1028,27 @@ export const PendingHotelDetailsModal = ({
                         "
                       </div>
                     </div>
+                    {(booking.requestStatus === "rejected" || booking.status === "rejected" || booking.bookingStatus === "rejected") && (
+                      <div className="mt-8 pt-8 border-t border-slate-50">
+                        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 shadow-sm">
+                          <SectionLabel icon={<FiXCircle className="text-red-500" />} title="Rejection Details" />
+                          <div className="mt-8">
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {typeof booking.rejectedBy === 'string' ? booking.rejectedBy : (booking.rejectedBy?.name?.firstName ? `${booking.rejectedBy.name.firstName} ${booking.rejectedBy.name.lastName || ""}` : "System")}
+                            </p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                              {booking.rejectedDate ? formatDateTime(booking.rejectedDate) : (booking.rejectedAt ? formatDateTime(booking.rejectedAt) : "Unknown date")}
+                            </p>
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mt-6 mb-4">
+                              Reason for Rejection
+                            </p>
+                            <div className="bg-white p-6 rounded-[2rem] border border-red-100 italic text-sm font-black text-red-700 leading-relaxed shadow-inner">
+                              "{booking.approverComments || booking.reason || "No reason provided"}"
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1940,7 +1915,7 @@ export const PendingFlightDetailsModal = ({
                     />
                     <div className="mt-8 relative">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">
-                        Total Payable Amount
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-slate-500 italic">
@@ -1951,14 +1926,6 @@ export const PendingFlightDetailsModal = ({
                         </h4>
                       </div>
                       <div className="mt-8 space-y-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6">
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
-                          <span className="text-slate-400">Base Fare</span>
-                          <span className="text-slate-100">₹{Math.ceil(baseFare).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
-                          <span className="text-slate-400">Taxes & Fees</span>
-                          <span className="text-slate-100">₹{Math.ceil(totalTax).toLocaleString()}</span>
-                        </div>
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
                           <span className="text-slate-400">SSR Add-ons</span>
                           <span className="text-[#C9A84C]">
@@ -1981,24 +1948,6 @@ export const PendingFlightDetailsModal = ({
                       </div>
                     </div>
                     <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
-                  </div>
-
-                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-3 font-mono">
-                      Flight Reference
-                    </p>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">PNR / Booking Ref</p>
-                        <p className="text-xs font-black text-slate-900">{booking.bookingReference || "Pending"}</p>
-                      </div>
-                      <div className="pt-3 border-t border-slate-50">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cabin Class</p>
-                        <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
-                          {cabinDisplay}
-                        </span>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2088,18 +2037,15 @@ export const PendingFlightDetailsModal = ({
                     <div className="mt-8 flex items-center gap-6">
                       <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
                         {
-                          (booking.requesterDetails?.name ||
-                            booking.userId?.name?.firstName ||
-                            "?")[0]
+                          (booking.requesterDetails?.name || booking.userId?.name?.firstName || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || "?")[0]
                         }
                       </div>
                       <div>
                         <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
-                          {booking.requesterDetails?.name ||
-                            `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim()}
+                          {booking.requesterDetails?.name || `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim() || `${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || ""} ${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.lastName || ""}`.trim() || "Unknown"}
                         </p>
                         <p className="text-xs font-bold text-slate-400 mt-1">
-                          {booking.requesterDetails?.email || booking.userId?.email}
+                          {booking.requesterDetails?.email || booking.userId?.email || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.email || "No email"}
                         </p>
                         <div className="mt-2 flex gap-2">
                           <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
@@ -2118,6 +2064,27 @@ export const PendingFlightDetailsModal = ({
                         "
                       </div>
                     </div>
+                    {(booking.requestStatus === "rejected" || booking.status === "rejected" || booking.bookingStatus === "rejected") && (
+                      <div className="mt-8 pt-8 border-t border-slate-50">
+                        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 shadow-sm">
+                          <SectionLabel icon={<FiXCircle className="text-red-500" />} title="Rejection Details" />
+                          <div className="mt-8">
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {typeof booking.rejectedBy === 'string' ? booking.rejectedBy : (booking.rejectedBy?.name?.firstName ? `${booking.rejectedBy.name.firstName} ${booking.rejectedBy.name.lastName || ""}` : "System")}
+                            </p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                              {booking.rejectedDate ? formatDateTime(booking.rejectedDate) : (booking.rejectedAt ? formatDateTime(booking.rejectedAt) : "Unknown date")}
+                            </p>
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mt-6 mb-4">
+                              Reason for Rejection
+                            </p>
+                            <div className="bg-white p-6 rounded-[2rem] border border-red-100 italic text-sm font-black text-red-700 leading-relaxed shadow-inner">
+                              "{booking.approverComments || booking.reason || "No reason provided"}"
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

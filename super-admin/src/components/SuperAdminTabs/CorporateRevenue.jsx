@@ -119,7 +119,7 @@ export default function CorporateRevenue() {
   const { exportExcel, exportingKey } = useExcelExporter();
 
   // 🟢 1. STATE HOOKS
-  const [dateRange, setDateRange] = useState("thisMonth");
+  const [dateRange, setDateRange] = useState("monthly");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedCorporate, setSelectedCorporate] = useState("All");
@@ -147,8 +147,9 @@ export default function CorporateRevenue() {
   const [ddStatus, setDdStatus] = useState("All");
   const [ddStartDate, setDdStartDate] = useState("");
   const [ddEndDate, setDdEndDate] = useState("");
-
-  const [viewMode, setViewMode] = useState("monthly");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
+  const [selectedQuarter, setSelectedQuarter] = useState(`Q${Math.floor(new Date().getMonth() / 3) + 1}`);
 
   const tableScrollRef = useRef(null);
   const handleScroll = (direction) => {
@@ -164,25 +165,51 @@ export default function CorporateRevenue() {
   // 🟢 2. MEMO HOOKS
   const computedDates = useMemo(() => {
     const today = new Date();
+    
+    const formatLocal = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     let from = "";
-    let to = today.toISOString().split("T")[0];
+    let to = formatLocal(today);
+    let graphTo = to;
 
     if (dateRange === "today") {
       from = to;
     } else if (dateRange === "last7Days") {
       const d = new Date();
       d.setDate(d.getDate() - 7);
-      from = d.toISOString().split("T")[0];
-    } else if (dateRange === "thisMonth") {
-      from = new Date(today.getFullYear(), today.getMonth(), 1)
-        .toISOString()
-        .split("T")[0];
+      from = formatLocal(d);
+    } else if (dateRange === "monthly") {
+      const year = parseInt(selectedYear);
+      const month = parseInt(selectedMonth);
+      from = formatLocal(new Date(year, month, 1));
+      const monthEnd = new Date(year, month + 1, 0);
+      graphTo = formatLocal(monthEnd);
+      to = monthEnd > today ? formatLocal(today) : graphTo;
+    } else if (dateRange === "quarterly") {
+      const year = parseInt(selectedYear);
+      const qIndex = parseInt(selectedQuarter.replace("Q", "")) - 1;
+      from = formatLocal(new Date(year, qIndex * 3, 1));
+      const quarterEnd = new Date(year, qIndex * 3 + 3, 0);
+      graphTo = formatLocal(quarterEnd);
+      to = quarterEnd > today ? formatLocal(today) : graphTo;
+    } else if (dateRange === "yearly") {
+      const year = parseInt(selectedYear);
+      from = formatLocal(new Date(year, 0, 1));
+      const yearEnd = new Date(year, 11, 31);
+      graphTo = formatLocal(yearEnd);
+      to = yearEnd > today ? formatLocal(today) : graphTo;
     } else {
       from = startDate;
       to = endDate;
+      graphTo = to;
     }
-    return { from, to };
-  }, [dateRange, startDate, endDate]);
+    return { from, to, graphTo };
+  }, [dateRange, startDate, endDate, selectedYear, selectedMonth, selectedQuarter]);
 
   const filteredDrillDownData = useMemo(() => {
     return drillDownData.filter((b) => {
@@ -226,7 +253,7 @@ export default function CorporateRevenue() {
       key: "corporate_revenue_transactions",
       pageHeader: corpName,
       statCards: [
-        { label: "Corporate Spent", value: inr(totalSelectedRev) },
+        { label: "Company Spent", value: inr(totalSelectedRev) },
         { label: "Detailed Bookings", value: filteredDrillDownData.length },
         { label: "Date Range", value: formattedDateRange }
       ],
@@ -270,7 +297,7 @@ export default function CorporateRevenue() {
         { label: "Start Date", value: startDate || "Any" },
         { label: "End Date", value: endDate || "Any" },
         { label: "Booking Type", value: bookingType },
-        { label: "Corporate", value: selectedCorporate }
+        { label: "Company", value: selectedCorporate }
       ],
       data: exportData,
       columns: corporateRevenueLeaderboardExportTemplate,
@@ -286,26 +313,97 @@ export default function CorporateRevenue() {
   }, [filteredDrillDownData, drillDownPage]);
 
   const activeTrendData = useMemo(() => {
-    switch (viewMode) {
-      case "yearly":
-        return yearly;
-      case "half-yearly":
-        return halfYearly;
-      case "quarterly":
-        return quarterly;
-      case "custom":
-        return daily;
-      default:
-        return monthly;
+    const sDate = new Date(computedDates.from);
+    let eDate = new Date(computedDates.graphTo || computedDates.to);
+    const today = new Date();
+    
+    // Prevent grouping past today if not custom future
+    if (dateRange !== "custom" && eDate > today) {
+      eDate = today;
     }
-  }, [viewMode, monthly, quarterly, halfYearly, yearly, daily]);
 
-  const xDataKey =
-    viewMode === "monthly"
-      ? "month"
-      : viewMode === "quarterly"
-        ? "quarter"
-        : "label";
+    const diffDays = (eDate - sDate) / (1000 * 3600 * 24);
+    const groupStrategy = diffDays > 31 ? "month" : "day";
+    
+    const timeMap = {};
+
+    if (groupStrategy === "day") {
+      let current = new Date(sDate);
+      current.setHours(0,0,0,0);
+      const end = new Date(eDate);
+      end.setHours(23,59,59,999);
+      
+      while (current <= end) {
+        // Create key like "15 Jun" 
+        const key = `${current.getDate()} ${current.toLocaleString('en-US', {month:'short'})}`;
+        timeMap[key] = { label: key, flightRev: 0, hotelRev: 0, sortVal: current.getTime() };
+        current.setDate(current.getDate() + 1);
+      }
+      
+      (daily || []).forEach(d => {
+        // Try parsing the date from the label or date field
+        let dObj = new Date(d.date || d._id || d.label);
+        
+        // If the label is just "15 Jun", JS might parse it as year 2001. Let's append current year if needed.
+        if (isNaN(dObj) && typeof d.label === "string") {
+          dObj = new Date(`${d.label} ${sDate.getFullYear()}`);
+        }
+        
+        if (!isNaN(dObj)) {
+          const matchedKey = `${dObj.getDate()} ${dObj.toLocaleString('en-US', {month:'short'})}`;
+          if (timeMap[matchedKey]) {
+            timeMap[matchedKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
+            timeMap[matchedKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
+          } else if (timeMap[d.label]) {
+            // fallback if label directly matches
+            timeMap[d.label].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
+            timeMap[d.label].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
+          }
+        } else if (timeMap[d.label]) {
+          timeMap[d.label].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
+          timeMap[d.label].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
+        }
+      });
+    } else {
+      let current = new Date(sDate.getFullYear(), sDate.getMonth(), 1);
+      const end = new Date(eDate.getFullYear(), eDate.getMonth(), 1);
+      
+      while (current <= end) {
+        // Create key like "Jun 2026"
+        const key = `${current.toLocaleString('en-US', {month:'short'})} ${current.getFullYear()}`;
+        timeMap[key] = { label: key, flightRev: 0, hotelRev: 0, sortVal: current.getTime() };
+        current.setMonth(current.getMonth() + 1);
+      }
+      
+      (monthly || []).forEach(d => {
+        const tKey = d.month || d.label || d._id;
+        let dObj = new Date(d.date || d._id || tKey);
+        
+        // If the label is just "Jun", JS might parse it incorrectly or to the wrong year.
+        if ((isNaN(dObj) || dObj.getFullYear() < 2010) && typeof tKey === "string") {
+          dObj = new Date(`1 ${tKey} ${sDate.getFullYear()}`);
+        }
+        
+        if (!isNaN(dObj)) {
+          const matchedKey = `${dObj.toLocaleString('en-US', {month:'short'})} ${dObj.getFullYear()}`;
+          if (timeMap[matchedKey]) {
+            timeMap[matchedKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
+            timeMap[matchedKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
+          } else if (timeMap[tKey]) {
+            timeMap[tKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
+            timeMap[tKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
+          }
+        } else if (timeMap[tKey]) {
+          timeMap[tKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
+          timeMap[tKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
+        }
+      });
+    }
+
+    return Object.values(timeMap).sort((a, b) => a.sortVal - b.sortVal);
+  }, [computedDates, dateRange, daily, monthly]);
+
+  const xDataKey = "label";
 
   // 🟢 3. EFFECT HOOKS
   useEffect(() => {
@@ -403,7 +501,7 @@ export default function CorporateRevenue() {
       companyWise.find((c) => c.corporateId === drillDownId) ||
       {};
     const corpName =
-      corp.corporateName || corp.companyName || "Corporate Details";
+      corp.corporateName || corp.companyName || "Company Details";
     const totalSelectedRev = filteredDrillDownData.reduce(
       (sum, b) => sum + b.amount,
       0,
@@ -516,7 +614,7 @@ export default function CorporateRevenue() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <KPICard
-            label="Corporate Spent"
+            label="Company Spent"
             value={inr(totalSelectedRev)}
             icon={<FaRupeeSign />}
             borderCls="border-[#000D26]"
@@ -551,7 +649,7 @@ export default function CorporateRevenue() {
                 Transaction History
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1.5">
-                Granular view of corporate activity
+                Granular view of company activity
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -802,7 +900,7 @@ export default function CorporateRevenue() {
                 <FaChartLine size={28} />
               </div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight leading-none">Corporate Revenue</h1>
+                <h1 className="text-3xl font-black tracking-tight leading-none">Company Revenue</h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
                   Financial analytics & reporting
                 </p>
@@ -865,7 +963,9 @@ export default function CorporateRevenue() {
                 options={[
                   { label: "Today", value: "today" },
                   { label: "Last 7 Days", value: "last7Days" },
-                  { label: "This Month", value: "thisMonth" },
+                  { label: "Monthly", value: "monthly" },
+                  { label: "Quarterly", value: "quarterly" },
+                  { label: "Yearly", value: "yearly" },
                   { label: "Custom Range", value: "custom" }
                 ]}
               />
@@ -906,7 +1006,7 @@ export default function CorporateRevenue() {
             </div>
 
             <div className={`flex flex-col gap-1.5 ${dateRange === "custom" ? "lg:col-span-3" : "lg:col-span-5"}`}>
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Corporate</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Company</label>
               <CustomSelect
                 value={selectedCorporate}
                 onChange={setSelectedCorporate}
@@ -934,28 +1034,55 @@ export default function CorporateRevenue() {
                 Historical Performance Analysis
               </p>
             </div>
-            <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-              {["monthly", "quarterly", "half-yearly", "yearly", "custom"].map(
-                (mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                      viewMode === mode
-                        ? "bg-white text-[#003399] shadow-md scale-105 border border-slate-100"
-                        : "text-slate-400 hover:text-slate-600"
-                    }`}
-                  >
-                    {mode.replace("-", " ")}
-                  </button>
-                ),
-              )}
-            </div>
+            
+            {(dateRange === "monthly" || dateRange === "quarterly" || dateRange === "yearly") && (
+              <div className="flex items-center gap-2">
+                <CustomSelect
+                  value={selectedYear}
+                  onChange={setSelectedYear}
+                  className="w-32"
+                  options={(() => {
+                    const currentYear = new Date().getFullYear();
+                    const startYear = 2025;
+                    const years = [];
+                    for (let y = currentYear; y >= startYear; y--) {
+                      years.push({ value: y.toString(), label: y.toString() });
+                    }
+                    return years;
+                  })()}
+                />
+                
+                {dateRange === "monthly" && (
+                  <CustomSelect
+                    value={selectedMonth}
+                    onChange={setSelectedMonth}
+                    className="w-32"
+                    options={Array.from({length: 12}).map((_, i) => ({
+                      value: i.toString(),
+                      label: new Date(0, i).toLocaleString('default', { month: 'short' })
+                    }))}
+                  />
+                )}
+                
+                {dateRange === "quarterly" && (
+                  <CustomSelect
+                    value={selectedQuarter}
+                    onChange={setSelectedQuarter}
+                    className="w-40"
+                    options={[
+                      { value: "Q1", label: "Q1 (Jan-Mar)" },
+                      { value: "Q2", label: "Q2 (Apr-Jun)" },
+                      { value: "Q3", label: "Q3 (Jul-Sep)" },
+                      { value: "Q4", label: "Q4 (Oct-Dec)" }
+                    ]}
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           <div className="h-87.5 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              {viewMode !== "quarterly" ? (
                 <AreaChart
                   data={activeTrendData}
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
@@ -1032,66 +1159,6 @@ export default function CorporateRevenue() {
                     animationDuration={1500}
                   />
                 </AreaChart>
-              ) : (
-                <BarChart
-                  data={activeTrendData}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  barGap={8}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#f1f5f9"
-                  />
-                  <XAxis
-                    dataKey={xDataKey}
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#64748b", fontSize: 10, fontWeight: 800 }}
-                    dy={8}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#64748b", fontSize: 9, fontWeight: 800 }}
-                    tickFormatter={(v) =>
-                      `₹${
-                        v >= 1000000
-                          ? (v / 1000000).toFixed(1) + "M"
-                          : v >= 1000
-                            ? (v / 1000).toFixed(0) + "k"
-                            : v
-                      }`
-                    }
-                  />
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{ fill: "#f8fafc" }}
-                  />
-                  <Legend
-                    verticalAlign="top"
-                    align="right"
-                    height={30}
-                    iconType="circle"
-                  />
-                  <Bar
-                    dataKey="flightRev"
-                    name="Flight Revenue"
-                    fill="#003399"
-                    radius={[6, 6, 0, 0]}
-                    barSize={24}
-                    animationDuration={1500}
-                  />
-                  <Bar
-                    dataKey="hotelRev"
-                    name="Hotel Revenue"
-                    fill="#d97706"
-                    radius={[6, 6, 0, 0]}
-                    barSize={24}
-                    animationDuration={1500}
-                  />
-                </BarChart>
-              )}
             </ResponsiveContainer>
           </div>
         </div>
@@ -1102,7 +1169,7 @@ export default function CorporateRevenue() {
               Market Share
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2 leading-none">
-              Leading Corporates by Volume
+              Leading Companies by Volume
             </p>
           </div>
           <div className="flex-1 w-full min-h-70 relative">
@@ -1174,7 +1241,7 @@ export default function CorporateRevenue() {
         <div className="px-6 py-4 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">
-              Corporate Leaderboard
+              Company Leaderboard
             </h3>
             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
               Ranking based on transaction volume
@@ -1220,7 +1287,7 @@ export default function CorporateRevenue() {
                     <div className="flex flex-col items-center">
                       <FiActivity size={40} className="text-slate-200 mb-3" />
                       <p className="text-slate-400 font-bold uppercase text-xs">
-                        No corporate data available
+                        No company data available
                       </p>
                     </div>
                   </td>

@@ -260,6 +260,18 @@ exports.approveCorporate = asyncHandler(async (req, res) => {
     internationalHotel: Number(serviceCharges?.internationalHotel || 0),
   };
 
+  if (req.body.serviceFeeRules) {
+    corporate.serviceFeeRules = req.body.serviceFeeRules.map(rule => ({
+      ...rule,
+      cabinClass: rule.productType === "Flight" && typeof rule.cabinClass === "string"
+        ? ({"economy":2,"premium economy":3,"business":4,"premium business":5,"first class":6}[rule.cabinClass.toLowerCase()] || 2)
+        : rule.cabinClass,
+      starRating: rule.productType === "Hotel" && typeof rule.starRating === "string"
+        ? (parseInt(rule.starRating.match(/\d+/)?.[0] || 3, 10))
+        : rule.starRating
+    }));
+  }
+
   // ----------------------------
   // 🔹 Activate Corporate
   // ----------------------------
@@ -457,11 +469,69 @@ exports.getCorporate = asyncHandler(async (req, res) => {
 // UPDATE CORPORATE
 // -----------------------------------------------------
 exports.updateCorporate = asyncHandler(async (req, res) => {
-  const updated = await Corporate.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
+  if (req.body.serviceFeeRules) {
+    req.body.serviceFeeRules = req.body.serviceFeeRules.map(rule => ({
+      ...rule,
+      cabinClass: rule.productType === "Flight" && typeof rule.cabinClass === "string"
+        ? ({"economy":2,"premium economy":3,"business":4,"premium business":5,"first class":6}[rule.cabinClass.toLowerCase()] || 2)
+        : rule.cabinClass,
+      starRating: rule.productType === "Hotel" && typeof rule.starRating === "string"
+        ? (parseInt(rule.starRating.match(/\d+/)?.[0] || 3, 10))
+        : rule.starRating
+    }));
+  }
+
+  // Handle Base64 file uploads for documents
+  if (req.body.gstFileBase64) {
+    const result = await cloudinary.uploader.upload(req.body.gstFileBase64, {
+      folder: "corporates/gst",
+      resource_type: "auto",
+    });
+    req.body.gstCertificate = {
+      publicId: result.public_id,
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+    delete req.body.gstFileBase64;
+  }
+
+  if (req.body.panFileBase64) {
+    const result = await cloudinary.uploader.upload(req.body.panFileBase64, {
+      folder: "corporates/pan",
+      resource_type: "auto",
+    });
+    req.body.panCard = {
+      ...req.body.panCard,
+      publicId: result.public_id,
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+    delete req.body.panFileBase64;
+  }
+
+  const corporate = await Corporate.findById(req.params.id);
+  if (!corporate) throw new ApiError(404, "Corporate not found");
+
+  const updatableFields = [
+    "corporateName", "corporateType", "classification", "billingCycle", "customBillingDays", 
+    "dueDays", "creditLimit", "walletBalance", "serviceFeeRules"
+  ];
+  
+  updatableFields.forEach(field => {
+    if (req.body[field] !== undefined) corporate[field] = req.body[field];
   });
 
-  if (!updated) throw new ApiError(404, "Corporate not found");
+  const nestedFields = ["primaryContact", "registeredAddress", "billingDepartment", "gstDetails", "gstCertificate", "panCard"];
+  nestedFields.forEach(field => {
+    if (req.body[field]) {
+      const existing = typeof corporate[field]?.toObject === "function" ? corporate[field].toObject() : (corporate[field] || {});
+      corporate[field] = { ...existing, ...req.body[field] };
+    }
+  });
+
+  const updated = await corporate.save();
 
   // ── Notify Super Admin if updated by OPS member ──────────────────
   if (req.user.role === 'ops-member') {
@@ -1072,10 +1142,16 @@ exports.getFlightBookingById = async (req, res) => {
       });
     }
 
+    const BookingMarkupAudit = require("../modules/markup/schemas/BookingMarkupAudit.model");
+    const markupAudit = await BookingMarkupAudit.findOne({ bookingId: req.params.id }).lean();
+
     return res.status(200).json({
       success: true,
       message: "Flight booking fetched successfully",
-      data: mapFlightBookingDto(booking),
+      data: {
+        ...mapFlightBookingDto(booking),
+        markupAudit
+      },
     });
   } catch (error) {
     console.error("SuperAdmin Flight Detail Error:", error);
@@ -1238,6 +1314,9 @@ exports.getHotelBookingById = async (req, res) => {
       });
     }
 
+    const BookingMarkupAudit = require("../modules/markup/schemas/BookingMarkupAudit.model");
+    const markupAudit = await BookingMarkupAudit.findOne({ bookingId: req.params.id }).lean();
+
     let liveBookingData = null;
     try {
       const bookResult = booking.bookingResult?.providerResponse?.BookResult;
@@ -1261,7 +1340,8 @@ exports.getHotelBookingById = async (req, res) => {
       message: "Hotel booking fetched successfully",
       data: {
         ...mapHotelBookingDto(booking),
-        liveBookingData
+        liveBookingData,
+        markupAudit
       },
     });
   } catch (error) {
@@ -1757,3 +1837,92 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     });
   }
 };
+
+// -----------------------------------------------------
+// TBO COMMISSIONS AND TAXES 
+// -----------------------------------------------------
+exports.getTboCommissionsAndTaxes = asyncHandler(async (req, res) => {
+  try {
+    const flightBookings = await BookingRequest.find({
+      bookingType: "flight",
+      executionStatus: { $in: ["ticketed", "cancelled_requested", "cancel_requested", "cancelled", "Ticketed", "Cancelled"] }
+    })
+      .populate("corporateId", "corporateName")
+      .lean();
+
+    const hotelBookings = await HotelBookingRequest.find({
+      bookingType: "hotel",
+      $or: [
+        { executionStatus: { $in: ["voucher_generated", "vouchered", "cancelled_requested", "cancel_requested", "cancelled", "Vouchered", "Cancelled"] } },
+        { "amendment.status": { $in: ["cancelled", "cancelled_requested", "cancel_requested", "Cancelled"] } },
+        { "cancellation.status": { $in: ["cancelled", "cancelled_requested", "cancel_requested", "Cancelled"] } }
+      ]
+    })
+      .populate("corporateId", "corporateName")
+      .lean();
+
+    const results = [];
+
+    const getBookingStatus = (booking) => {
+      const amnd = booking.cancellation?.status || booking.amendment?.status;
+      if (amnd && amnd.toLowerCase().includes("cancel")) return "Cancelled";
+      if (booking.executionStatus && booking.executionStatus.toLowerCase().includes("cancel")) return "Cancelled";
+      return "Confirmed";
+    };
+
+    flightBookings.forEach((booking) => {
+      const fare = booking?.bookingResult?.providerResponse?.Response?.FlightItinerary?.Fare || booking?.flightRequest?.fareQuote?.Results?.[0]?.Fare;
+
+      if (fare) {
+        results.push({
+          bookingId: booking._id,
+          orderId: booking.orderId,
+          bookingReference: booking.bookingReference,
+          bookingType: booking.bookingType,
+          corporateName: booking.corporateId?.corporateName || "Unknown",
+          createdAt: booking.createdAt,
+          status: getBookingStatus(booking),
+          fareDetails: fare
+        });
+      }
+    });
+
+    hotelBookings.forEach((booking) => {
+      const rooms = booking?.hotelRequest?.preBookResponse?.HotelResult?.[0]?.Rooms || [];
+      const allPriceBreakdowns = [];
+      rooms.forEach(room => {
+        if (room.PriceBreakUp) {
+          allPriceBreakdowns.push(...room.PriceBreakUp);
+        }
+      });
+
+      if (allPriceBreakdowns.length > 0) {
+        results.push({
+          bookingId: booking._id,
+          orderId: booking.orderId,
+          bookingReference: booking.bookingReference,
+          bookingType: booking.bookingType,
+          corporateName: booking.corporateId?.corporateName || "Unknown",
+          createdAt: booking.createdAt,
+          status: getBookingStatus(booking),
+          priceBreakdown: allPriceBreakdowns
+        });
+      }
+    });
+
+    results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return res.status(200).json({
+      success: true,
+      data: results
+    });
+
+  } catch (error) {
+    console.error("❌ getTboCommissionsAndTaxes:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch commissions and taxes",
+      error: error.message,
+    });
+  }
+});

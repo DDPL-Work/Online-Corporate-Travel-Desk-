@@ -110,20 +110,20 @@ export default function ApiConfigurations() {
     
     const appliedFilters = [
       { label: "Search", value: searchTerm || "None" },
-      { label: "API Type", value: type },
+      { label: "Connection Type", value: type },
       { label: "Status", value: status },
     ];
 
     exportExcel({
       key: "api_configurations",
-      pageHeader: "API Configurations",
+      pageHeader: "System Connections",
       statCards,
       appliedFilters,
       data: filtered,
       columns: apiConfigurationsExportTemplate,
-      filenamePrefix: "api_configurations_export",
-      emptyMessage: "No API configurations available to export",
-      successMessage: "API configurations exported",
+      filenamePrefix: "system_connections_export",
+      emptyMessage: "No connections available to export",
+      successMessage: "Connections exported",
     });
   };
 
@@ -173,9 +173,9 @@ export default function ApiConfigurations() {
                  <FiKey size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">API Configurations</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">System Connections</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Manage third-party API integrations
+                   Manage connections to other systems
                  </p>
                </div>
              </div>
@@ -187,7 +187,7 @@ export default function ApiConfigurations() {
             className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
           >
             <FiPlusCircle size={16} />
-            Add API Configuration
+            Add Connection
           </button>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function ApiConfigurations() {
         {/* ── API Count Stat Cards ── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <StatCard
-            label="Total APIs"
+            label="Total Connections"
             value={total}
             Icon={FiKey}
             borderCls="border-[#003399]"
@@ -241,7 +241,7 @@ export default function ApiConfigurations() {
             iconColorCls="text-[#003399]"
           />
           <StatCard
-            label="Active APIs"
+            label="Active Connections"
             value={active}
             Icon={FiToggleRight}
             borderCls="border-emerald-500"
@@ -249,7 +249,7 @@ export default function ApiConfigurations() {
             iconColorCls="text-emerald-600"
           />
           <StatCard
-            label="Inactive APIs"
+            label="Inactive Connections"
             value={inactive}
             Icon={FiToggleLeft}
             borderCls="border-rose-500"
@@ -267,7 +267,7 @@ export default function ApiConfigurations() {
                   <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="API Name / Type / Key..."
+                    placeholder="Connection Name / Type / Key..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none bg-slate-50 focus:border-[#003399]"
@@ -277,7 +277,7 @@ export default function ApiConfigurations() {
             </div>
 
             <div className="lg:col-span-2">
-              <LabeledInput label={<span className="flex items-center gap-1"><FiKey size={12}/> API Type</span>}>
+              <LabeledInput label={<span className="flex items-center gap-1"><FiKey size={12}/> Connection Type</span>}>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
@@ -324,9 +324,9 @@ export default function ApiConfigurations() {
         <div className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: C.border }}>
           <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: C.border, background: C.white }}>
             <div>
-              <h2 className="font-black text-slate-800 tracking-tight text-lg">API Configuration List</h2>
+              <h2 className="font-black text-slate-800 tracking-tight text-lg">List of Connections</h2>
               <p className="text-[11px] font-bold uppercase tracking-widest mt-1" style={{ color: C.muted }}>
-                {filtered.length} configuration{filtered.length !== 1 ? "s" : ""} found
+                {filtered.length} connection{filtered.length !== 1 ? "s" : ""} found
               </p>
             </div>
             <TableActionBar
@@ -344,9 +344,9 @@ export default function ApiConfigurations() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">API Name</th>
+                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Connection Name</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Type</th>
-                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">API Key</th>
+                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Access Key</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Status</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest text-center">Actions</th>
                 </tr>
@@ -359,7 +359,7 @@ export default function ApiConfigurations() {
                         <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                           <FiInbox size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">No API configurations found matching the criteria.</p>
+                        <p className="text-sm font-bold text-slate-400">No connections found matching the criteria.</p>
                       </div>
                     </td>
                   </tr>
@@ -417,7 +417,7 @@ export default function ApiConfigurations() {
 
           {/* Table Footer */}
           <div className="bg-slate-50 px-6 py-3 border-t flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest" style={{ borderColor: C.border }}>
-            <span>Showing {filtered.length} API(s)</span>
+            <span>Showing {filtered.length} connection(s)</span>
             <span>Active: {active} | Inactive: {inactive}</span>
           </div>
         </div>

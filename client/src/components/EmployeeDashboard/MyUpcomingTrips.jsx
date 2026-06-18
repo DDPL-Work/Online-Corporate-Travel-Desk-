@@ -380,8 +380,8 @@ export default function MyUpcomingTrips() {
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiCalendar size={28} /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Upcoming Adventures</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Personal Portfolio of Scheduled Travel Deployments and Confirmed Itineraries</p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">My Upcoming Trips</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View all your upcoming confirmed trips (Hotel & Flight)</p>
                </div>
              </div>
           </div>

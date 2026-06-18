@@ -386,11 +386,10 @@ const MyReissueRequests = () => {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Amendment Ledger
+                  Reissued Requests
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Management of Flight Reissue Requests and Travel Document
-                  Modifications
+                  Track all your reissued flight requests
                 </p>
               </div>
             </div>
@@ -489,7 +488,7 @@ const MyReissueRequests = () => {
                 ]}
               />
             </LabeledField>
-            <LabeledField label="Request Window" className="lg:col-span-3">
+            <LabeledField label="Date Range" className="lg:col-span-3">
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -527,15 +526,15 @@ const MyReissueRequests = () => {
         {/* Table Ledger */}
         <ResponsiveDataTable
           title={
-            activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments"
+            activeTab === "my" ? "Reissued Requests" : "Corporate Reissued Requests"
           }
-          subtitle={`${currentRequests.length} active records`}
+          subtitle={`${currentRequests.length} requests`}
           wrapperClass="!border-none !shadow-none"
           exportLabel="Export Excel"
           exportLoading={isExporting}
           exportDisabled={isExporting}
           onExport={() => exportExcel({
-            pageHeader: activeTab === "my" ? "Amendment Ledger" : "Corporate Amendments",
+            pageHeader: activeTab === "my" ? "Reissued Requests" : "Corporate Reissued Requests",
             statCards: [
               { label: "Total Requests", value: stats.total },
               { label: "Pending Review", value: stats.pending },
@@ -545,7 +544,7 @@ const MyReissueRequests = () => {
             appliedFilters: [
               { label: "Search", value: searchQuery || "None" },
               { label: "Status", value: filter },
-              { label: "Request Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+              { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
             ],
             data: currentRequests,
             columns: [
@@ -575,7 +574,7 @@ const MyReissueRequests = () => {
               <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                 <Th className="px-6! py-5!">Request ID</Th>
                 {activeTab === "company" && (
-                  <Th className="px-6! py-5!">Employee / Context</Th>
+                  <Th className="px-6! py-5!">Employee Name</Th>
                 )}
                 <Th className="px-6! py-5!">PNR / Ref</Th>
                 <Th className="px-6! py-5!">Airline & Route</Th>

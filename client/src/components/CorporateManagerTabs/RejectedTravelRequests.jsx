@@ -19,9 +19,9 @@ import {
   getRejectedFlightRequests,
 } from "../../Redux/Actions/manager.thunk";
 import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "./Modal/BookingRequestDetailsModal";
+  PendingFlightDetailsModal,
+  PendingHotelDetailsModal,
+} from "./Modal/PendingHotelDetailsModal";
 import { Pagination } from "../TravelAdminTabs/Shared/Pagination";
 import {
   dateCls,
@@ -107,8 +107,8 @@ function FlightSection({ data, loading }) {
       const first = segs[0]; 
       const last = segs[segs.length - 1];
       return {
-        fromCode: first?.origin?.airportCode || "N/A",
-        toCode: last?.destination?.airportCode || "N/A",
+        fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+        toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
         fromCity: first?.origin?.city || "Unknown",
         toCity: last?.destination?.city || "Unknown"
       };
@@ -158,9 +158,9 @@ function FlightSection({ data, loading }) {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Rejected Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Value Impact" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+        <StatCard label="Total Amount" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
         <StatCard label="Avg. Response" value="2.4h" Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Critical Rejections" value={filtered.length} Icon={FiXCircle} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Rejections" value={filtered.length} Icon={FiXCircle} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
@@ -191,9 +191,9 @@ function FlightSection({ data, loading }) {
           pageHeader: "Flight Rejection Ledger",
           statCards: [
             { label: "Rejected Flights", value: filtered.length },
-            { label: "Value Impact", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` },
+            { label: "Total Estimated Amount", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` },
             { label: "Avg. Response", value: "2.4h" },
-            { label: "Critical Rejections", value: filtered.length }
+            { label: "Total Rejections", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
@@ -258,7 +258,7 @@ function FlightSection({ data, loading }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selectedRequest && <FlightBookingModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
+      {selectedRequest && <PendingFlightDetailsModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
     </div>
   );
 }
@@ -309,8 +309,8 @@ function HotelSection({ data, loading }) {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Rejected Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Value Impact" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
-        <StatCard label="Critical Rejections" value={filtered.length} Icon={FiXCircle} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Amount" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+        <StatCard label="Total Rejections" value={filtered.length} Icon={FiXCircle} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
         <StatCard label="Total Loss" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FiMessageCircle} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
       </div>
 
@@ -342,8 +342,8 @@ function HotelSection({ data, loading }) {
           pageHeader: "Hotel Rejection Ledger",
           statCards: [
             { label: "Rejected Hotels", value: filtered.length },
-            { label: "Value Impact", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` },
-            { label: "Critical Rejections", value: filtered.length },
+            { label: "Total Estimated Amount", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` },
+            { label: "Total Rejections", value: filtered.length },
             { label: "Total Loss", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
           ],
           appliedFilters: [
@@ -363,7 +363,7 @@ function HotelSection({ data, loading }) {
               <Th className="!px-6 !py-5">Order Reference</Th>
               <Th className="!px-6 !py-5">Personnel</Th>
               <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Rejected On</Th>
               <Th className="!px-6 !py-5">Amount</Th>
               <Th className="!px-6 !py-5 !text-center">Action</Th>
@@ -410,7 +410,7 @@ function HotelSection({ data, loading }) {
           </tbody>
         </table>
       </ResponsiveDataTable>
-      {selectedRequest && <HotelBookingModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
+      {selectedRequest && <PendingHotelDetailsModal booking={selectedRequest} onClose={() => setSelectedRequest(null)} />}
     </div>
   );
 }
@@ -455,12 +455,12 @@ export default function RejectedTravelRequestsForManager() {
              </div>
              <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
                  <FiXCircle size={32} />
                </div>
                <div>
-                 <h1 className="text-4xl font-black tracking-tight leading-none">Rejection Registry</h1>
-                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">Analysis of Declined Travel Requirements</p>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Team Rejected Requests</h1>
+                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">View all the rejected requests (Hotel & Flight) which were done by your team</p>
                </div>
              </div>
           </div>

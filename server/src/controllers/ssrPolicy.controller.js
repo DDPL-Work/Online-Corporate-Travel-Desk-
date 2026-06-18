@@ -21,6 +21,8 @@ const DEFAULT_POLICY = {
   mealPriceRange: { min: 0, max: 99999 },
   baggagePriceRange: { min: 0, max: 99999 },
   approvalRequired: true,
+  flightLimits: [],
+  hotelLimits: [],
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -45,6 +47,8 @@ exports.upsertPolicy = asyncHandler(async (req, res) => {
     mealPriceRange,
     baggagePriceRange,
     approvalRequired,
+    flightLimits,
+    hotelLimits,
   } = req.body;
 
   if (!employeeEmail) {
@@ -86,6 +90,21 @@ exports.upsertPolicy = asyncHandler(async (req, res) => {
         mealPriceRange: mealPriceRange ?? { min: 0, max: 99999 },
         baggagePriceRange: baggagePriceRange ?? { min: 0, max: 99999 },
         approvalRequired: approvalRequired ?? true,
+        flightLimits: Array.isArray(flightLimits) ? flightLimits.map(l => {
+          if (typeof l.cabinClass === 'string') {
+            const map = {
+              "all": 1,
+              "economy": 2,
+              "premium economy": 3,
+              "business": 4,
+              "premium business": 5,
+              "first class": 6,
+            };
+            l.cabinClass = map[l.cabinClass.toLowerCase()] || 2;
+          }
+          return l;
+        }) : [],
+        hotelLimits: Array.isArray(hotelLimits) ? hotelLimits : [],
         updatedBy: req.user._id,
         createdBy: req.user._id,
       },
@@ -135,10 +154,37 @@ exports.getPolicyByEmail = asyncHandler(async (req, res) => {
     .select("name email role")
     .lean();
 
-  const policy = await EmployeeSsrPolicy.findOne({
+  let policy = await EmployeeSsrPolicy.findOne({
     corporateId: req.user.corporateId,
     employeeEmail: email.toLowerCase().trim(),
   }).lean();
+
+  if (policy && policy.flightLimits) {
+    policy.flightLimits = policy.flightLimits.map(l => {
+      if (typeof l.cabinClass === 'string') {
+        const map = {
+          "all": 1,
+          "economy": 2,
+          "premium economy": 3,
+          "business": 4,
+          "premium business": 5,
+          "first class": 6,
+        };
+        l.cabinClass = map[l.cabinClass.toLowerCase()] || 2;
+      }
+      return l;
+    });
+  }
+
+  if (policy && policy.hotelLimits) {
+    policy.hotelLimits = policy.hotelLimits.map(l => {
+      if (typeof l.starRating === 'string') {
+        const match = l.starRating.match(/\d+/);
+        l.starRating = match ? parseInt(match[0], 10) : 1;
+      }
+      return l;
+    });
+  }
 
   res.status(200).json(
     new ApiResponse(
@@ -213,6 +259,8 @@ exports.getMyPolicy = asyncHandler(async (req, res) => {
           mealPriceRange: { min: 0, max: 999999 },
           baggagePriceRange: { min: 0, max: 999999 },
           approvalRequired: false,
+          flightLimits: [],
+          hotelLimits: [],
           isTravelAdmin: true,
         },
         "SSR policy fetched (travel-admin — no restrictions)"
@@ -232,6 +280,33 @@ exports.getMyPolicy = asyncHandler(async (req, res) => {
       employeeEmail: req.user.email.toLowerCase().trim(),
       employeeId: req.user.id,
       ...DEFAULT_POLICY,
+    });
+  }
+
+  if (policy && policy.flightLimits) {
+    policy.flightLimits = policy.flightLimits.map(l => {
+      if (typeof l.cabinClass === 'string') {
+        const map = {
+          "all": 1,
+          "economy": 2,
+          "premium economy": 3,
+          "business": 4,
+          "premium business": 5,
+          "first class": 6,
+        };
+        l.cabinClass = map[l.cabinClass.toLowerCase()] || 2;
+      }
+      return l;
+    });
+  }
+
+  if (policy && policy.hotelLimits) {
+    policy.hotelLimits = policy.hotelLimits.map(l => {
+      if (typeof l.starRating === 'string') {
+        const match = l.starRating.match(/\d+/);
+        l.starRating = match ? parseInt(match[0], 10) : 1;
+      }
+      return l;
     });
   }
 

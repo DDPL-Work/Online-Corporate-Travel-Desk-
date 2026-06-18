@@ -15,4 +15,5 @@ export const C = {
   white:     "#FFFFFF",
   black:     "#000000",
   nearBlack: "#1A1714", // High-contrast text
+  red:       "#C10000"
 };

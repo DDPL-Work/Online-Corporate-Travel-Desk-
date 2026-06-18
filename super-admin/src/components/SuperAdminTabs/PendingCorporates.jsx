@@ -4,7 +4,6 @@ import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiCl
 import { MdVerifiedUser, MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
-import FinancialApprovalModal from "../../Modal/FinancialApprovalModal";
 import { fetchCorporates, fetchCorporateById } from "../../Redux/Slice/corporateListSlice";
 import TableActionBar from "../Shared/TableActionBar";
 import useExcelExporter from "../../services/export/useExcelExporter";
@@ -96,7 +95,6 @@ export default function PendingCorporates() {
 
   const [openViewModal, setOpenViewModal] = useState(false);
   const [selectedCorporate, setSelectedCorporate] = useState(null);
-  const [openFinancialApprove, setOpenFinancialApprove] = useState(false);
   
   const [search, setSearch] = useState("");
   const [selectedCorporateId, setSelectedCorporateId] = useState("all");
@@ -111,7 +109,16 @@ export default function PendingCorporates() {
   }, [dispatch]);
 
   const baseCorporates = useMemo(
-    () => corporates.filter((c) => c.status === "pending"),
+    () => corporates.map((c) => {
+      if (c.status === "pending") {
+        const createdAt = new Date(c.createdAt || Date.now());
+        const diffInDays = (Date.now() - createdAt.getTime()) / (1000 * 3600 * 24);
+        if (diffInDays > 7) {
+          return { ...c, status: "expired" };
+        }
+      }
+      return c;
+    }).filter((c) => c.status === "pending" || c.status === "expired"),
     [corporates]
   );
 
@@ -127,21 +134,21 @@ export default function PendingCorporates() {
 
     const appliedFilters = [
       { label: "Search Pending", value: search || "None" },
-      { label: "Corporate", value: selectedCorporateId !== "all" ? selectedCorporateId : "All Corporates" },
+      { label: "Company", value: selectedCorporateId !== "all" ? selectedCorporateId : "All Companies" },
       { label: "Start Date", value: startDate || "Any" },
       { label: "End Date", value: endDate || "Any" },
     ];
 
     exportExcel({
       key: "pending_corporates",
-      pageHeader: "Pending Corporates",
+      pageHeader: "Pending Companies",
       statCards,
       appliedFilters,
       data: filtered,
       columns: pendingCorporatesExportTemplate,
       filenamePrefix: "pending_corporates_export",
-      emptyMessage: "No pending corporates available to export",
-      successMessage: "Pending corporates exported",
+      emptyMessage: "No pending companies available to export",
+      successMessage: "Pending companies exported",
     });
   };
 
@@ -199,8 +206,9 @@ export default function PendingCorporates() {
   };
 
   const handleApprove = (corporate) => {
-    setSelectedCorporate(corporate);
-    setOpenFinancialApprove(true);
+    navigate(`/financial-approval/${corporate._id}`, {
+      state: { corporate, from: "/pending-corporates" },
+    });
   };
 
   return (
@@ -234,9 +242,9 @@ export default function PendingCorporates() {
                  <FiUsers size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Pending Corporates</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Pending Companies</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Manage pending corporate profiles for approval
+                   Manage pending company profiles for approval
                  </p>
                </div>
              </div>
@@ -271,13 +279,13 @@ export default function PendingCorporates() {
             </div>
 
             <div className="flex flex-col gap-1.5 lg:col-span-2">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Corporate</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MdBusiness size={12}/> Company</label>
               <select
                 className="w-full px-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white cursor-pointer"
                 value={selectedCorporateId}
                 onChange={(e) => setSelectedCorporateId(e.target.value)}
               >
-                <option value="all">All Corporates</option>
+                <option value="all">All Companies</option>
                 {baseCorporates.map(c => (
                   <option key={c._id} value={c._id}>{c.corporateName}</option>
                 ))}
@@ -333,7 +341,7 @@ export default function PendingCorporates() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Corporate Entity</th>
+                  <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Company Entity</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Primary Contact</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Classification</th>
                   <th className="px-6 py-5 text-[10px] uppercase font-black tracking-widest">Company Link</th>
@@ -349,7 +357,7 @@ export default function PendingCorporates() {
                         <div className="animate-spin text-[#003399]">
                           <FiRefreshCw size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">Loading corporates...</p>
+                        <p className="text-sm font-bold text-slate-400">Loading companies...</p>
                       </div>
                     </td>
                   </tr>
@@ -420,18 +428,20 @@ export default function PendingCorporates() {
                         <div className="flex gap-2 items-center justify-center">
                           <button
                             onClick={() => handleView(c._id)}
-                            title="View Corporate"
+                            title="View Company"
                             className="p-2 rounded hover:bg-white/60 text-[#003399] transition-colors cursor-pointer"
                           >
                             <FiEye size={16} />
                           </button>
-                          <button
-                            onClick={() => handleApprove(c)}
-                            title="Approve Corporate"
-                            className="p-2 rounded hover:bg-emerald-100 text-emerald-600 transition-colors cursor-pointer"
-                          >
-                            <FiCheckCircle size={16} />
-                          </button>
+                          {c.status === "pending" && (
+                            <button
+                              onClick={() => handleApprove(c)}
+                              title="Approve Company"
+                              className="p-2 rounded hover:bg-emerald-100 text-emerald-600 transition-colors cursor-pointer"
+                            >
+                              <FiCheckCircle size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -444,7 +454,7 @@ export default function PendingCorporates() {
                         <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                           <FiInbox size={32} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400">No pending corporates found.</p>
+                        <p className="text-sm font-bold text-slate-400">No pending companies found.</p>
                       </div>
                     </td>
                   </tr>
@@ -459,15 +469,6 @@ export default function PendingCorporates() {
           <ViewCorporateModal corporate={selectedCorporate} onClose={() => setOpenViewModal(false)} />
         )}
 
-        {openFinancialApprove && selectedCorporate && (
-          <FinancialApprovalModal
-            corporate={selectedCorporate}
-            onClose={() => {
-              setOpenFinancialApprove(false);
-              setSelectedCorporate(null);
-            }}
-          />
-        )}
       </div>
     </div>
   );

@@ -63,7 +63,7 @@ const CHANNEL_MAP = {
   [EVENTS.CREDIT_CYCLE_START]:              { email: true,  inapp: true  },
   [EVENTS.TEAM_BOOKING_ACTIVITY]:           { email: false, inapp: true  },
   [EVENTS.MANAGER_BOOKING_ACTION]:          { email: false, inapp: true  },
-  [EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL]: { email: false, inapp: true  },
+  [EVENTS.EMPLOYEE_MANAGER_FIRST_APPROVAL]: { email: true,  inapp: true  },
   [EVENTS.SSR_POLICY_UPDATED]:              { email: true,  inapp: true  },
   [EVENTS.BOOKING_OFFLINE_CANCELLED]:       { email: false, inapp: true  },
   [EVENTS.OPS_LOGIN_ALERT]:                 { email: true,  inapp: true  },

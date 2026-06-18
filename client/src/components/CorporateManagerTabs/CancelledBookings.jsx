@@ -133,8 +133,8 @@ function CancelledFlightSection() {
         const first = segs[0]; 
         const last = segs[segs.length - 1];
         return {
-          fromCode: first?.origin?.airportCode || "N/A",
-          toCode: last?.destination?.airportCode || "N/A",
+          fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+          toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
           fromCity: first?.origin?.city || "Unknown",
           toCity: last?.destination?.city || "Unknown",
           departureDate: first?.departureDateTime
@@ -420,10 +420,10 @@ function CancelledHotelSection() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
+              <Th className="!px-6 !py-5">Order ID</Th>
               <Th className="!px-6 !py-5">Personnel</Th>
               <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Status</Th>
               <Th className="!px-6 !py-5">Cancelled On</Th>
               <Th className="!px-6 !py-5">Refund Est.</Th>
@@ -510,12 +510,12 @@ export default function CancelledBookingsForManager() {
              </div>
              <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
                  <FiXCircle size={32} />
                </div>
                <div>
-                 <h1 className="text-4xl font-black tracking-tight leading-none">Cancellations</h1>
-                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">Inventory of Rescinded Travel Deployments</p>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Team Cancelled Bookings</h1>
+                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">View all cancelled bookings (Hotels & FLights) which were done by your team</p>
                </div>
              </div>
           </div>

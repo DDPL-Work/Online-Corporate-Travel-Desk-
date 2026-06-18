@@ -103,6 +103,10 @@ const fetchFullHotelSearchDataset = async ({
   CheckIn,
   CheckOut,
   CityCode,
+  CityName,
+  CountryCode,
+  CountryName,
+  corporateId,
   GuestNationality,
   NoOfRooms,
   PaxRooms,
@@ -138,6 +142,11 @@ const fetchFullHotelSearchDataset = async ({
     searchPayload: {
       CheckIn,
       CheckOut,
+      CityCode,
+      CityName,
+      CountryCode,
+      CountryName,
+      corporateId,
       GuestNationality,
       NoOfRooms,
       PaxRooms,
@@ -288,7 +297,10 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     ResponseTime,
     SearchFilters,
     forceRefresh,
+    corporateId: bodyCorporateId,
   } = req.body;
+
+  const corporateId = req.user?.corporateId || bodyCorporateId;
 
   if (!CheckIn || !CheckOut) {
     throw new ApiError(400, "CheckIn and CheckOut are required");
@@ -306,16 +318,22 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     throw new ApiError(400, "NoOfRooms must match PaxRooms length");
   }
 
+  const cityRecord = await TBOCity.findOne({ cityCode: CityCode }).lean();
+
   const baseSearchPayload = {
     CheckIn,
     CheckOut,
     CityCode,
+    CityName: cityRecord?.cityName || "",
+    CountryCode: cityRecord?.countryCode || "",
+    CountryName: cityRecord?.countryName || "",
     GuestNationality: GuestNationality || "IN",
     NoOfRooms: Number(NoOfRooms),
     PaxRooms,
     IsDetailedResponse:
       IsDetailedResponse === undefined ? true : Boolean(IsDetailedResponse),
     ResponseTime: ResponseTime === undefined ? undefined : Number(ResponseTime),
+    corporateId,
   };
   const searchFilters = normalizeSearchFilters(SearchFilters, Filters);
   const cacheKey = cacheService.buildSearchCacheKey(baseSearchPayload);
@@ -355,6 +373,10 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
+        CityCode,
+        CityName: cityRecord?.cityName || "",
+        CountryCode: cityRecord?.countryCode || "",
+        CountryName: cityRecord?.countryName || "",
         hotels: allHotels,
         HotelResult: allHotels,
         pagination: {

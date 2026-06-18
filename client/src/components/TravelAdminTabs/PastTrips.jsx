@@ -105,20 +105,20 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Archived Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
-        <StatCard label="Completed Journeys" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+        <StatCard label="Past Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
+        <StatCard label="Completed Flights" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Archive Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Name, Reference or Destination..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-3">
+          <LabeledField label="Employee Name" className="lg:col-span-3">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField label="Travel Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -133,20 +133,20 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
 
       <ResponsiveDataTable 
         title="Flight History Ledger" 
-        subtitle={`${filtered.length} archived deployments`} 
+        subtitle={`${filtered.length} past flights`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Flight History Ledger",
           statCards: [
-            { label: "Archived Flights", value: filtered.length },
-            { label: "Completed Journeys", value: filtered.length }
+            { label: "Past Flights", value: filtered.length },
+            { label: "Completed Flights", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Travel Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
           ],
           data: filtered,
           columns: adminPastFlightTripsExportTemplate,
@@ -158,11 +158,11 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Route</Th>
               <Th className="!px-6 !py-5">Travel Date</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Email</Th>
               <Th className="!px-6 !py-5 text-center">Status</Th>
               <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
@@ -198,7 +198,7 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
                     <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                       <FiSearch size={32} />
                     </div>
-                    <p className="text-sm font-bold text-slate-400">No historical flights found in the archive.</p>
+                    <p className="text-sm font-bold text-slate-400">No past flights found.</p>
                   </div>
                 </td>
               </tr>
@@ -247,20 +247,20 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Archived Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
-        <StatCard label="Completed Stays" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+        <StatCard label="Past Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
+        <StatCard label="Completed Hotels" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Archive Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel, Guest or Order ID..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-3">
+          <LabeledField label="Employee Name" className="lg:col-span-3">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField label="Stay Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -275,20 +275,20 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
 
       <ResponsiveDataTable 
         title="Hotel History Ledger" 
-        subtitle={`${filtered.length} archived stays`} 
+        subtitle={`${filtered.length} past hotels`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Hotel History Ledger",
           statCards: [
-            { label: "Archived Hotels", value: filtered.length },
-            { label: "Completed Stays", value: filtered.length }
+            { label: "Past Hotels", value: filtered.length },
+            { label: "Completed Hotels", value: filtered.length }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Stay Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
           ],
           data: filtered,
           columns: adminPastHotelStaysExportTemplate,
@@ -300,11 +300,11 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Duration</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Email</Th>
               <Th className="!px-6 !py-5 text-center">Status</Th>
               <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
@@ -458,9 +458,9 @@ export default function PastTrips() {
                  <FiList size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Historical Archives</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Past Trips</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Validated Registry of Completed Corporate Travel Missions
+                   View all past corporate travel
                  </p>
                </div>
              </div>
@@ -470,7 +470,7 @@ export default function PastTrips() {
 
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Archive", FaPlane], ["hotel", "Hotel Archive", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Past Flights", FaPlane], ["hotel", "Past Stays", FaHotel]].map(([k, lbl, Icon]) => (
              <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                 <Icon size={14} /> {lbl}
              </button>

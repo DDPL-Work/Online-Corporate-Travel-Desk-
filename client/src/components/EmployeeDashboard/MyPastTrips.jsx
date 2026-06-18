@@ -125,7 +125,7 @@ function FlightSection() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Archived Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Past Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
         <StatCard label="Completed" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
         <StatCard label="Travel History" value={filtered.length} Icon={FiArchive} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
         <StatCard label="Total Spent" value={`₹${totalValue.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
@@ -133,7 +133,7 @@ function FlightSection() {
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Records</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search Flights</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="PNR, Order ID..." />
           </LabeledField>
           <LabeledField label="Booking Window" className="lg:col-span-6">
@@ -151,14 +151,14 @@ function FlightSection() {
 
       <ResponsiveDataTable 
         title="Flight History Ledger" 
-        subtitle={`${filtered.length} completed journeys`} 
+        subtitle={`${filtered.length} past flights`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Flight History Ledger",
           statCards: [
-            { label: "Archived Flights", value: filtered.length },
+            { label: "Past Flights", value: filtered.length },
             { label: "Completed", value: filtered.length },
             { label: "Travel History", value: filtered.length },
             { label: "Total Spent", value: `₹${totalValue.toLocaleString()}` }
@@ -262,7 +262,7 @@ function HotelSection() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Archived Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+        <StatCard label="Past Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
         <StatCard label="Completed" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
         <StatCard label="Past Stays" value={filtered.length} Icon={FiArchive} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
         <StatCard label="Total Spent" value={`₹${totalValue.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
@@ -270,7 +270,7 @@ function HotelSection() {
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Property</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search Hotels</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel Name or Order ID..." />
           </LabeledField>
           <LabeledField label="Booking Window" className="lg:col-span-6">
@@ -288,14 +288,14 @@ function HotelSection() {
 
       <ResponsiveDataTable 
         title="Hotel History Ledger" 
-        subtitle={`${filtered.length} completed stays`} 
+        subtitle={`${filtered.length} past hotels`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Hotel History Ledger",
           statCards: [
-            { label: "Archived Hotels", value: filtered.length },
+            { label: "Past Hotels", value: filtered.length },
             { label: "Completed", value: filtered.length },
             { label: "Past Stays", value: filtered.length },
             { label: "Total Spent", value: `₹${totalValue.toLocaleString()}` }
@@ -315,7 +315,7 @@ function HotelSection() {
           <thead>
             <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="px-6! py-5!">Order ID</Th>
-              <Th className="px-6! py-5!">Hotel Detail</Th>
+              <Th className="px-6! py-5!">Hotel Name</Th>
               <Th className="px-6! py-5!">Stay Period</Th>
               <Th className="px-6! py-5!">Status</Th>
               <Th className="px-6! py-5!">Amount</Th>
@@ -385,8 +385,8 @@ export default function MyPastTrips() {
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiArchive size={28} /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Travel History</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Complete Archive of your Professional Travel Deployments and Asset Utilization</p>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">My Past Trips</h1>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View all your past trips (Hotel & Flight)</p>
                </div>
              </div>
           </div>

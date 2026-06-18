@@ -1527,6 +1527,7 @@ class PaymentService {
         balanceBefore,
         balanceAfter: corporate.walletBalance,
         description: booking.bookingType === 'flight' ? "Wallet debited for flight booking" : "Wallet debited for booking",
+        operationType: booking.bookingType === 'flight' ? "Flight-Booking" : "Hotel-Booking",
         status: "completed",
       });
 
@@ -1622,6 +1623,7 @@ class PaymentService {
         description: `${
           booking.bookingType === "hotel" ? "Hotel" : "Flight"
         } booking on credit (postpaid)`,
+        operationType: booking.bookingType === 'flight' ? "Flight-Booking" : "Hotel-Booking",
         metadata: {
           bookingType: booking.bookingType,
           flightNumber: booking.flightNumber,

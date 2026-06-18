@@ -76,7 +76,7 @@ export default function CommissionSettings() {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold" style={{ color: colors.dark }}>
-            Commission Settings
+            Commissions
           </h1>
 
           <button
@@ -90,7 +90,7 @@ export default function CommissionSettings() {
 
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <SummaryCard title="Total Commission Rules" value={total} color={colors.primary} />
+          <SummaryCard title="Total Rules" value={total} color={colors.primary} />
           <SummaryCard title="Active Rules" value={active} color={colors.success} />
           <SummaryCard title="Inactive Rules" value={inactive} color={colors.danger} />
         </div>
@@ -106,7 +106,7 @@ export default function CommissionSettings() {
 
             {/* Corporate */}
             <div>
-              <label className="text-sm font-medium">Corporate</label>
+              <label className="text-sm font-medium">Company</label>
               <select
                 className="border p-2 rounded w-full mt-1"
                 value={corporate}
@@ -138,14 +138,14 @@ export default function CommissionSettings() {
         {/* TABLE */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold">Commission Rules</h2>
+            <h2 className="text-xl font-semibold">Rules</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead style={{ backgroundColor: colors.primary }}>
                 <tr>
-                  {["Corporate", "Type", "Commission", "Status", "Actions"].map((h) => (
+                  {["Company", "Type", "Commission", "Status", "Actions"].map((h) => (
                     <th key={h} className="px-6 py-3 text-sm text-white font-medium">
                       {h}
                     </th>

@@ -113,8 +113,8 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
       const first = segs[0]; 
       const last = segs[segs.length - 1];
       return {
-        fromCode: first?.origin?.airportCode || "N/A",
-        toCode: last?.destination?.airportCode || "N/A",
+        fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+        toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
         fromCity: first?.origin?.city || "Unknown",
         toCity: last?.destination?.city || "Unknown"
       };
@@ -170,7 +170,7 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
         <StatCard label="Pending Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
         <StatCard label="Urgent Review" value={filtered.filter(r => !r.isTravelPassed).length} Icon={FiClock} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
         <StatCard label="Expired/Discarded" value={filtered.filter(r => r.isTravelPassed).length} Icon={FiXCircle} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
-        <StatCard label="Potential Outlay" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Estimated Amount" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
@@ -203,7 +203,7 @@ function FlightSection({ data, loading, onRefresh, handleAction, isVerified, onS
             { label: "Pending Flights", value: filtered.length },
             { label: "Urgent Review", value: filtered.filter(r => !r.isTravelPassed).length },
             { label: "Expired/Discarded", value: filtered.filter(r => r.isTravelPassed).length },
-            { label: "Potential Outlay", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+            { label: "Total Estimated Amount", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
@@ -347,7 +347,7 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
         <StatCard label="Pending Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
         <StatCard label="Urgent Review" value={filtered.filter(r => !r.isTravelPassed).length} Icon={FiClock} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
         <StatCard label="Expired/Discarded" value={filtered.filter(r => r.isTravelPassed).length} Icon={FiXCircle} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
-        <StatCard label="Potential Outlay" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Total Estimated Amount" value={`₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
@@ -380,7 +380,7 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
             { label: "Pending Hotels", value: filtered.length },
             { label: "Urgent Review", value: filtered.filter(r => !r.isTravelPassed).length },
             { label: "Expired/Discarded", value: filtered.filter(r => r.isTravelPassed).length },
-            { label: "Potential Outlay", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
+            { label: "Total Estimated Amount", value: `₹${filtered.reduce((s, r) => s + (r.amount || 0), 0).toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
@@ -401,7 +401,7 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
               <Th className="!px-6 !py-5">Requested On</Th>
               <Th className="!px-6 !py-5">Check-in</Th>
               <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Status</Th>
               <Th className="!px-6 !py-5">Estimate</Th>
               <Th className="!px-6 !py-5 !text-center">Action</Th>
@@ -577,12 +577,12 @@ export default function PendingTravelRequestsForManager() {
              </div>
              <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
                  <FiClock size={32} />
                </div>
                <div>
-                 <h1 className="text-4xl font-black tracking-tight leading-none">Approval Queue</h1>
-                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">Team Travel Requirement Oversight</p>
+                 <h1 className="text-4xl font-black tracking-tight leading-none">Team Pending Requests</h1>
+                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">View all the pending requests (Hotel & Flight) which were done by your team</p>
                </div>
              </div>
           </div>

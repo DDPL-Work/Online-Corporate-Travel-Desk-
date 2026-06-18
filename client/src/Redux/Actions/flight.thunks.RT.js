@@ -32,6 +32,23 @@ export const searchFlightsRT = createAsyncThunk(
   }
 );
 
+/* ---------------- FARE QUOTE ---------------- */
+export const getFareQuote = createAsyncThunk(
+  "flightRT/fareQuote",
+  async ({ traceId, resultIndex, snapshotId }, { rejectWithValue }) => {
+    try {
+      const { data } = await flightApi.post("/fare-quote", {
+        traceId,
+        resultIndex,
+        snapshotId,
+      });
+      return data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
+  }
+);
+
 /* ---------------- FARE QUOTE (ROUND-TRIP) ---------------- */
 export const getRTFareQuote = createAsyncThunk(
   "flightsRT/fareQuoteRT",

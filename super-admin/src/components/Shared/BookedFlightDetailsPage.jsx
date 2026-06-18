@@ -1400,12 +1400,6 @@ function FareRulesSection({ bookingResult }) {
 
   if (!rules.length) return null;
 
-  const staticNotes = [
-    "GST, RAF and any other applicable charges are extra.",
-    "Fees are indicative per pax and per sector.",
-    "Domestic: submit cancellation/reissue request at least 2 hours before the airline policy time limit.",
-    "International: submit cancellation/reissue request at least 4 hours before the airline policy time limit.",
-  ];
 
   return (
     <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
@@ -1576,20 +1570,6 @@ function FareRulesSection({ bookingResult }) {
             );
           })}
 
-          {/* Static policy notes */}
-          {/* <ul className="space-y-2 border-t border-[#E0D8C8] pt-4">
-            {staticNotes.map((note, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2.5 text-[13px] text-gray-600"
-              >
-                <span className="text-[#A07840] mt-0.5 shrink-0 text-xs">
-                  ●
-                </span>
-                {note}
-              </li>
-            ))}
-          </ul> */}
         </>
     </div>
   );
@@ -3260,6 +3240,7 @@ export default function BookedFlightDetails() {
         <div className="max-w-[1440px] mx-auto px-5 h-14 flex items-center gap-6 border-t border-[#EAE4D9]">
           {[
             { id: "flight_details", label: "Flight Details" },
+            ...(booking?.markupAudit ? [{ id: "markup", label: "Markup Details" }] : []),
             { id: "passengers", label: "Passengers" },
             { id: "cancellation", label: "Fare Rules & Policies" },
             { id: "amendment", label: "Cancellations & Amendments" },
@@ -3909,6 +3890,65 @@ export default function BookedFlightDetails() {
         <BookingHistory booking={booking} />
           </div>
         )}
+
+        {activeTab === "markup" && booking?.markupAudit && (() => {
+          const audit = booking.markupAudit;
+          const supplierFare = audit.fareBeforeMarkup?.supplierFare || audit.markupSnapshot?.supplierFare || 0;
+          const totalMarkup = audit.fareAfterMarkup?.markupAmount || audit.markupSnapshot?.markupAmount || 0;
+          const finalFare = audit.fareAfterMarkup?.finalFare || audit.markupSnapshot?.finalFare || 0;
+          const netRevenue = audit.earnings?.totalMarkupEarned || audit.earnings?.profitGenerated || totalMarkup;
+          const rules = audit.appliedMarkupRules || audit.markupSnapshot?.markupBreakdown || [];
+
+          return (
+            <div className="space-y-6">
+              <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6">
+                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                   <FiTag size={16} className="text-[#A07840]" />
+                   Markup Overview
+                 </h3>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                   <div className="bg-white p-4 rounded-xl border border-[#E8E0D0] shadow-sm">
+                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Supplier Fare</p>
+                     <p className="text-lg font-black text-gray-900">₹{supplierFare}</p>
+                   </div>
+                   <div className="bg-white p-4 rounded-xl border border-[#E8E0D0] shadow-sm">
+                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Total Markup</p>
+                     <p className="text-lg font-black text-emerald-600">+ ₹{totalMarkup}</p>
+                   </div>
+                   <div className="bg-white p-4 rounded-xl border border-[#E8E0D0] shadow-sm">
+                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Final Fare</p>
+                     <p className="text-lg font-black text-gray-900">₹{finalFare}</p>
+                   </div>
+                   <div className="bg-white p-4 rounded-xl border border-[#E8E0D0] shadow-sm">
+                     <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Net Revenue</p>
+                     <p className="text-lg font-black text-indigo-600">₹{netRevenue}</p>
+                   </div>
+                 </div>
+                 
+                 {rules.length > 0 && (
+                   <>
+                     <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3 border-t border-[#E8E0D0] pt-5 mt-2">Applied Rules</h3>
+                     <div className="grid gap-3 sm:grid-cols-2">
+                       {rules.map((rule, idx) => (
+                         <div key={idx} className="bg-white p-4 rounded-xl border border-[#E8E0D0] flex justify-between items-center shadow-sm hover:border-[#A07840]/30 transition">
+                           <div>
+                             <p className="text-sm font-bold text-gray-800">{rule.category}</p>
+                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-1">
+                               {rule.markupMethod} • {rule.refundPolicy}
+                             </p>
+                           </div>
+                           <div className="text-right">
+                             <p className="text-sm font-black text-gray-900">₹{rule.calculatedAmount || rule.markupAmount}</p>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </>
+                 )}
+              </div>
+            </div>
+          );
+        })()}
       </main>
 
       {/* Modals – keep your existing modal components */}

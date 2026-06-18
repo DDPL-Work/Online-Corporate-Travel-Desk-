@@ -398,7 +398,7 @@ function CancellationQueryTab() {
 
     exportExcel({
       key: "flight_cancellation_queries",
-      pageHeader: "Cancellation Archive",
+      pageHeader: "Cancellations",
       statCards,
       appliedFilters,
       data: filtered,
@@ -531,11 +531,11 @@ function CancellationQueryTab() {
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg flex items-center gap-2">
             <FiMessageSquare size={18} className="text-[#003399]" />
-            Query List
+            Queries
           </h2>
           <TableActionBar
             scrollRef={tableScrollRef}
-            exportLabel="Export Queries"
+            exportLabel="Export"
             onExport={handleExport}
             exportDisabled={loadingCancellationQueries || isExporting}
             exportLoading={isExporting}
@@ -560,8 +560,8 @@ function CancellationQueryTab() {
                   {[
                     "Query ID",
                     "Type",
-                    "Corporate / Employee",
-                    "Booking Details",
+                    "Company / Employee",
+                    "Details",
                     "Travel Date",
                     "Total Fare",
                     "Priority",
@@ -756,10 +756,10 @@ export default function CancellationQueries() {
               </div>
               <div>
                 <h1 className="text-3xl font-black text-white tracking-tight leading-none">
-                  Cancellation Archive
+                  Cancellations
                 </h1>
                 <p className="text-[10px] text-white/60 mt-2 font-bold uppercase tracking-[2px]">
-                  Super Admin Monitor
+                  Manage cancellation queries
                 </p>
               </div>
             </div>
