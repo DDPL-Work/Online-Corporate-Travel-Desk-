@@ -1479,7 +1479,7 @@ export const TravelerForm = ({
               {/* DOB */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Date of Birth
+                  Date of Birth {isInternational && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="date"
@@ -1496,7 +1496,7 @@ export const TravelerForm = ({
                   }`}
                 />
                 {errors?.[index]?.dob && (
-                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                  <p className="text-[10px] text-red-500 mt-1 font-bold  tracking-tight">
                     {errors[index].dob}
                   </p>
                 )}

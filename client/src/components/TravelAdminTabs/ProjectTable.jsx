@@ -1,13 +1,14 @@
 import { useEffect, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Swal from "sweetalert2";
 import { ToastWithTimer } from "../../utils/ToastConfirm";
-import { 
-  fetchProjects, 
-  deleteProject as deleteProjectAction, 
-  getProjectFlightExpenses, 
-  getProjectHotelExpenses 
+import {
+  fetchProjects,
+  deleteProject as deleteProjectAction,
+  getProjectFlightExpenses,
+  getProjectHotelExpenses,
 } from "../../Redux/Actions/project.thunk";
 import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
 
@@ -25,9 +26,18 @@ import {
   HiDocumentText,
   HiXMark,
   HiChevronLeft,
-  HiChevronRight
+  HiChevronRight,
 } from "react-icons/hi2";
-import { FiRefreshCw, FiX, FiSearch, FiCalendar, FiArrowRight, FiClock, FiList } from "react-icons/fi";
+import {
+  FiRefreshCw,
+  FiX,
+  FiSearch,
+  FiCalendar,
+  FiArrowRight,
+  FiClock,
+  FiList,
+  FiDownload,
+} from "react-icons/fi";
 import { FaPlane, FaHotel, FaClipboardList, FaRupeeSign } from "react-icons/fa";
 import {
   LabeledField,
@@ -37,14 +47,17 @@ import {
   Th,
   StatusBadge,
   SearchBar,
-  dateCls
+  dateCls,
 } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import { Pagination } from "./Shared/Pagination";
 import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
-import { adminProjectRegistryExportTemplate, adminProjectBookingsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
+import {
+  adminProjectRegistryExportTemplate,
+  adminProjectBookingsExportTemplate,
+} from "../../templates/exportTemplates/clientExportTemplates";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -81,7 +94,11 @@ function initials(str) {
 function fmtDate(d) {
   const date = d ? new Date(d) : null;
   if (!date || Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 const RouteCell = ({ routes, airline }) => {
@@ -95,10 +112,12 @@ const RouteCell = ({ routes, airline }) => {
   return (
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-        <img src={logoUrl}
+        <img
+          src={logoUrl}
           alt={airlineName}
           className="w-full h-full object-contain"
-          loading="eager" onError={(e) => {
+          loading="eager"
+          onError={(e) => {
             e.target.onerror = null;
             e.target.src =
               "https://cdn-icons-png.flaticon.com/512/3114/3114883.png";
@@ -136,285 +155,15 @@ const RouteCell = ({ routes, airline }) => {
   );
 };
 
-/* ───────────────────────────────────────────────────────────────────────────── */
-/*  💰 PROJECT EXPENSE MODAL                                                    */
-/* ───────────────────────────────────────────────────────────────────────────── */
-function ProjectExpenseModal({ project, onClose }) {
-  const dispatch = useDispatch();
-  const scrollRef = useRef(null);
-  const { expenses } = useSelector((state) => state.corporateProject);
-  const [activeTab, setActiveTab] = useState("flight");
-  const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [modalPage, setModalPage] = useState(1);
-  const itemsPerPage = 6;
 
-  useEffect(() => {
-    const projectId = project.projectCodeId || project.code || project.projectId || project._id;
-    dispatch(getProjectFlightExpenses(projectId));
-    dispatch(getProjectHotelExpenses(projectId));
-  }, [dispatch, project]);
-
-  const data = activeTab === "flight" ? expenses.flight : expenses.hotel;
-
-  const filtered = useMemo(() => {
-    return data.filter((item) => {
-      const q = search.toLowerCase();
-      const empName = item.userId?.name 
-        ? `${item.userId.name.firstName || ""} ${item.userId.name.lastName || ""}` 
-        : `${item.travellers?.[0]?.firstName || "Unknown"} ${item.travellers?.[0]?.lastName || ""}`;
-      
-      const empEmail = item.userId?.email || item.travellers?.[0]?.email || "";
-      const orderId = (item.orderId || "").toLowerCase();
-
-      const travelDate = new Date(item.bookingSnapshot?.travelDate || item.bookingSnapshot?.checkInDate || item.createdAt);
-      const dateOk = (!startDate || travelDate >= new Date(startDate)) && (!endDate || travelDate <= new Date(endDate));
-      const searchOk = !q || empName.toLowerCase().includes(q) || empEmail.toLowerCase().includes(q) || orderId.includes(q);
-
-      return dateOk && searchOk;
-    });
-  }, [data, search, startDate, endDate]);
-
-  const totalSpend = useMemo(() => filtered.reduce((sum, it) => sum + (it.pricingSnapshot?.totalAmount || 0), 0), [filtered]);
-  const totalBookings = filtered.length;
-  const totalPages = Math.ceil(totalBookings / itemsPerPage);
-  const paginatedData = filtered.slice((modalPage - 1) * itemsPerPage, modalPage * itemsPerPage);
-
-  return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-10 bg-[#000D26]70 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-7xl h-full max-h-[850px] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/20">
-        
-        {/* Header */}
-        <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#003399] to-[#000d26] flex items-center justify-center shadow-xl shadow-blue-900/10">
-              <HiTableCells className="w-8 h-8 text-[#E7C695]" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-                Project Expenses
-              </h2>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">
-                {project.projectName || project.name} <span className="mx-2 opacity-30">/</span> <span className="text-[#003399] font-mono">{project.projectCodeId || project.code}</span>
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-12 h-12 rounded-2xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-500 flex items-center justify-center transition-all active:scale-95 shadow-sm">
-            <HiXMark size={28} />
-          </button>
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto bg-slate-50/30 p-10 custom-scrollbar">
-          
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-            <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center gap-6 group hover:shadow-xl hover:-translate-y-1 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-[#003399]10 flex items-center justify-center">
-                <HiCurrencyRupee className="w-8 h-8 text-[#003399]" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Spend</p>
-                <p className="text-3xl font-black text-slate-800 tabular-nums">₹{totalSpend.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center gap-6 group hover:shadow-xl hover:-translate-y-1 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                <HiCalendarDays className="w-8 h-8 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Bookings</p>
-                <p className="text-3xl font-black text-slate-800 tabular-nums">{totalBookings}</p>
-              </div>
-            </div>
-            <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-slate-100 flex items-center gap-6 group hover:shadow-xl hover:-translate-y-1 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center">
-                <HiCalculator className="w-8 h-8 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Average Cost</p>
-                <p className="text-3xl font-black text-slate-800 tabular-nums">₹{(totalBookings > 0 ? totalSpend / totalBookings : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters & Tabs */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 mb-8">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-              
-              <div className="flex bg-slate-50 p-1.5 rounded-2xl w-fit border border-slate-100 shadow-inner">
-                <button
-                  onClick={() => setActiveTab("flight")}
-                  className={`flex items-center gap-3 px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
-                    activeTab === "flight" 
-                    ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" 
-                    : "text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  <FaPlane size={14} /> Flight Logs
-                </button>
-                <button
-                  onClick={() => setActiveTab("hotel")}
-                  className={`flex items-center gap-3 px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
-                    activeTab === "hotel" 
-                    ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" 
-                    : "text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  <FaHotel size={14} /> Hotel Logs
-                </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative group flex-1 min-w-[300px]">
-                  <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#003399] transition-colors" />
-                  <input
-                    type="text"
-                    placeholder="Search Reference or Personnel..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold focus:outline-none focus:ring-4 focus:ring-blue-900/5 focus:border-[#003399] transition-all placeholder:text-slate-300"
-                  />
-                </div>
-                <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3">
-                  <FiCalendar className="text-slate-300 w-4 h-4" />
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent border-none outline-none text-[11px] font-black text-slate-600 cursor-pointer uppercase" />
-                  <span className="text-slate-200">/</span>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent border-none outline-none text-[11px] font-black text-slate-600 cursor-pointer uppercase" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden relative">
-            <div className="px-10 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Transactions</h3>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => { if(scrollRef.current) scrollRef.current.scrollBy({ left: -300, behavior: 'smooth' }); }}
-                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#003399] hover:border-[#003399] transition-all shadow-sm active:scale-90"
-                >
-                  <HiChevronLeft size={16} />
-                </button>
-                <button 
-                  onClick={() => { if(scrollRef.current) scrollRef.current.scrollBy({ left: 300, behavior: 'smooth' }); }}
-                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#003399] hover:border-[#003399] transition-all shadow-sm active:scale-90"
-                >
-                  <HiChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-            {expenses.loading ? (
-               <div className="py-24 flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Transactions...</p>
-               </div>
-            ) : filtered.length === 0 ? (
-               <div className="py-24 flex flex-col items-center justify-center text-center">
-                  <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner text-slate-200">
-                    <HiDocumentText size={48} />
-                  </div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">No Transactions Found</h3>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Adjust filters to search again</p>
-               </div>
-            ) : (
-              <div ref={scrollRef} className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left min-w-[900px] border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100">
-                      <Th className="!px-10 !py-6">Request ID</Th>
-                      <Th className="!px-10 !py-6">Employee</Th>
-                      <Th className="!px-10 !py-6">{activeTab === "flight" ? "Travel Date" : "Dates"}</Th>
-                      <Th className="!px-10 !py-6">Approved By</Th>
-                      <Th className="!px-10 !py-6 text-right">Amount</Th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {paginatedData.map((item, i) => {
-                      const empName = item.userId?.name 
-                        ? `${item.userId.name.firstName || ""} ${item.userId.name.lastName || ""}` 
-                        : `${item.travellers?.[0]?.firstName || "Unknown"} ${item.travellers?.[0]?.lastName || ""}`;
-                      const empEmail = item.userId?.email || item.travellers?.[0]?.email || "—";
-                      const approverName = item.approvedBy?.name ? `${item.approvedBy.name.firstName || ""} ${item.approvedBy.name.lastName || ""}` : item.approverName || "Auto Processed";
-                      const isAuto = !item.approvedBy && (item.approverName === "Auto Approver" || item.requestStatus === "approved");
-
-                      return (
-                        <tr key={item._id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="!px-10 !py-6"><IdCell id={item.orderId} /></td>
-                          <td className="!px-10 !py-6">
-                            <div>
-                              <p className="text-sm font-black text-slate-800 tracking-tight">{empName}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{empEmail}</p>
-                            </div>
-                          </td>
-                          <td className="!px-10 !py-6">
-                            {activeTab === "flight" ? (
-                              <p className="text-[11px] font-black text-slate-600 uppercase">
-                                {new Date(item.bookingSnapshot?.travelDate || item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </p>
-                            ) : (
-                              <div>
-                                <p className="text-[11px] font-black text-slate-800">
-                                  {new Date(item.bookingSnapshot?.checkInDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} → {new Date(item.bookingSnapshot?.checkOutDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                </p>
-                              </div>
-                            )}
-                          </td>
-                          <td className="!px-10 !py-6">
-                             {isAuto ? (
-                               <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-100">Auto Approved</span>
-                             ) : (
-                               <div>
-                                 <p className="text-[11px] font-black text-slate-800">{approverName}</p>
-                                 <p className="text-[9px] text-slate-400 uppercase font-black tracking-tighter">{item.approvedBy?.role || "Admin"}</p>
-                               </div>
-                             )}
-                          </td>
-                          <td className="!px-10 !py-6 text-right">
-                            <span className="text-sm font-black text-[#003399] tabular-nums">₹{(item.pricingSnapshot?.totalAmount || 0).toLocaleString()}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-10 py-6 border-t border-slate-100 bg-white flex flex-col md:flex-row justify-between items-center gap-6">
-           <div className="flex items-center gap-8">
-             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
-               Page {modalPage} of {totalPages || 1} <span className="mx-2">/</span> {totalBookings} Items
-             </p>
-             
-             {totalPages > 1 && (
-               <div className="flex items-center gap-2">
-                 <button disabled={modalPage === 1} onClick={() => setModalPage(p => p - 1)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-30 transition-all shadow-sm"><HiArrowLeft size={16} /></button>
-                 <button disabled={modalPage === totalPages} onClick={() => setModalPage(p => p + 1)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-30 transition-all shadow-sm"><HiArrowRight size={16} /></button>
-               </div>
-             )}
-           </div>
-
-           <button onClick={onClose} className="group bg-[#000D26] text-white px-10 py-4 rounded-[1.2rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center gap-3">
-             Close <FiX size={16} className="group-hover:rotate-90 transition-transform" />
-           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ───────────────────────────────────────────────────────────────────────────── */
-/*  MAIN COMPONENT                                                              */
-/* ───────────────────────────────────────────────────────────────────────────── */
 export default function ProjectsTable({ projects, setProjects }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { projects: storedProjects, deleteLoading, expenses } = useSelector((state) => state.corporateProject);
+  const {
+    projects: storedProjects,
+    deleteLoading,
+    expenses,
+  } = useSelector((state) => state.corporateProject);
   const { user } = useSelector((state) => state.auth);
   const { employees } = useSelector((state) => state.employeeAction);
 
@@ -439,7 +188,8 @@ export default function ProjectsTable({ projects, setProjects }) {
   const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("All Clients");
   const [localProjects, setLocalProjects] = useState([]);
-  const [selectedProjectForExpenses, setSelectedProjectForExpenses] = useState(null);
+  const [selectedProjectForExpenses, setSelectedProjectForExpenses] =
+    useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
@@ -459,7 +209,8 @@ export default function ProjectsTable({ projects, setProjects }) {
   }, [storedProjects]);
 
   const authUser = user || JSON.parse(sessionStorage.getItem("user") || "null");
-  const corporateId = authUser?.corporateId || authUser?.corporate?._id || authUser?._id;
+  const corporateId =
+    authUser?.corporateId || authUser?.corporate?._id || authUser?._id;
 
   const handleRefresh = async () => {
     if (activeMainTab === "directory") {
@@ -473,7 +224,7 @@ export default function ProjectsTable({ projects, setProjects }) {
         setIsSyncing(true);
         await Promise.all([
           dispatch(getProjectFlightExpenses(selectedProjectId)),
-          dispatch(getProjectHotelExpenses(selectedProjectId))
+          dispatch(getProjectHotelExpenses(selectedProjectId)),
         ]);
         setTimeout(() => setIsSyncing(false), 500);
       }
@@ -510,22 +261,33 @@ export default function ProjectsTable({ projects, setProjects }) {
       confirmButtonColor: "#E11D48",
       cancelButtonText: "Keep Active",
       reverseButtons: true,
-      customClass: { popup: 'rounded-[2rem] p-8' }
+      customClass: { popup: "rounded-[2rem] p-8" },
     });
 
     if (result.isConfirmed) {
       try {
-        await dispatch(deleteProjectAction({ id: projectId, corporateId })).unwrap();
+        await dispatch(
+          deleteProjectAction({ id: projectId, corporateId }),
+        ).unwrap();
         ToastWithTimer({ type: "success", message: "Record Purged" });
-        setLocalProjects(prev => prev.filter(p => (p._id || p.id) !== projectId));
+        setLocalProjects((prev) =>
+          prev.filter((p) => (p._id || p.id) !== projectId),
+        );
       } catch (err) {
-        ToastWithTimer({ type: "error", message: err.message || "Operation Failed" });
+        ToastWithTimer({
+          type: "error",
+          message: err.message || "Operation Failed",
+        });
       }
     }
   };
 
   const clients = useMemo(() => {
-    const c = [...new Set(effectiveProjects.map((p) => p.clientName || p.client || ""))].filter(Boolean).sort();
+    const c = [
+      ...new Set(effectiveProjects.map((p) => p.clientName || p.client || "")),
+    ]
+      .filter(Boolean)
+      .sort();
     return ["All Clients", ...c];
   }, [effectiveProjects]);
 
@@ -535,14 +297,19 @@ export default function ProjectsTable({ projects, setProjects }) {
       const name = (p.projectName || p.name || "").toLowerCase();
       const code = (p.projectCodeId || p.code || "").toLowerCase();
       const client = (p.clientName || p.client || "").toLowerCase();
-      const matchQ = !q || name.includes(q) || code.includes(q) || client.includes(q);
-      const matchC = clientFilter === "All Clients" || client === clientFilter.toLowerCase();
+      const matchQ =
+        !q || name.includes(q) || code.includes(q) || client.includes(q);
+      const matchC =
+        clientFilter === "All Clients" || client === clientFilter.toLowerCase();
       return matchQ && matchC;
     });
   }, [effectiveProjects, search, clientFilter]);
 
   const paginated = useMemo(() => {
-    return filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    return filtered.slice(
+      (currentPage - 1) * PAGE_SIZE,
+      currentPage * PAGE_SIZE,
+    );
   }, [filtered, currentPage]);
 
   useEffect(() => {
@@ -568,9 +335,10 @@ export default function ProjectsTable({ projects, setProjects }) {
   const employeeOptions = useMemo(() => {
     const opts = [{ value: "all", label: "All Personnel" }];
     (employees || []).forEach((e) => {
-      const name = typeof e.name === "string" 
-        ? e.name 
-        : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.trim();
+      const name =
+        typeof e.name === "string"
+          ? e.name
+          : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.trim();
       const email = e.email || "";
       opts.push({
         value: email.toLowerCase(),
@@ -587,22 +355,32 @@ export default function ProjectsTable({ projects, setProjects }) {
       const traveller = b.userId?.name
         ? `${b.userId.name.firstName || ""} ${b.userId.name.lastName || ""}`.trim()
         : `${b.travellers?.[0]?.firstName || "Staff"} ${b.travellers?.[0]?.lastName || "Member"}`.trim();
-      
-      const status = b.executionStatus === "ticketed" ? "Confirmed" : "Pending";
+
+      let status = b.executionStatus === "ticketed" ? "Confirmed" : "Pending";
+      if (b.executionStatus === "cancelled" || b.status === "cancelled" || b.cancelStatus === "cancelled") {
+        status = "Cancelled";
+      } else if (b.amendment) {
+        if (b.amendment.status === "requested" || b.amendment.status === "processed" || b.amendment.status === "completed") status = "Cancelled";
+      } else if (b.cancelStatus === "requested") {
+        status = "Cancelled";
+      }
+
       const pnr = b.bookingResult?.pnr || "—";
-      const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
+      const amount =
+        b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
       const segments = b.flightRequest?.segments || [];
-      const onwardSegments = segments.filter(s => s.journeyType === "onward");
-      const returnSegments = segments.filter(s => s.journeyType === "return");
+      const onwardSegments = segments.filter((s) => s.journeyType === "onward");
+      const returnSegments = segments.filter((s) => s.journeyType === "return");
 
       const buildLeg = (segs) => {
         if (!segs.length) return null;
         const first = segs[0];
         const last = segs[segs.length - 1];
         return {
-          fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
-          toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
+          fromCode: first?.origin?.code || first?.origin?.airportCode || "N/A",
+          toCode:
+            last?.destination?.code || last?.destination?.airportCode || "N/A",
           fromCity: first?.origin?.city || "Unknown",
           toCity: last?.destination?.city || "Unknown",
         };
@@ -621,8 +399,10 @@ export default function ProjectsTable({ projects, setProjects }) {
 
       const airline = segments[0]
         ? {
-            airlineCode: segments[0].airlineCode || segments[0].airline?.airlineCode,
-            airlineName: segments[0].airlineName || segments[0].airline?.airlineName,
+            airlineCode:
+              segments[0].airlineCode || segments[0].airline?.airlineCode,
+            airlineName:
+              segments[0].airlineName || segments[0].airline?.airlineName,
           }
         : null;
 
@@ -646,11 +426,27 @@ export default function ProjectsTable({ projects, setProjects }) {
       const guest = b.userId?.name
         ? `${b.userId.name.firstName || ""} ${b.userId.name.lastName || ""}`.trim()
         : "Staff Member";
-      const status = b.executionStatus === "voucher_generated" ? "Confirmed" : "Pending";
-      const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
+      let status = b.executionStatus === "voucher_generated" ? "Confirmed" : "Pending";
+      if (b.executionStatus === "cancelled" || b.status === "cancelled" || b.cancelStatus === "cancelled") {
+        status = "Cancelled";
+      } else if (b.amendment) {
+        if (b.amendment.status === "requested" || b.amendment.status === "processed" || b.amendment.status === "completed") status = "Cancelled";
+      } else if (b.cancelStatus === "requested") {
+        status = "Cancelled";
+      }
+      const amount =
+        b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 
-      const hotelName = b.bookingSnapshot?.hotelName || b.hotelRequest?.selectedHotel?.hotelName || "Unknown Hotel";
-      const city = b.hotelRequest?.selectedHotel?.city || b.hotelRequest?.city || b.hotelRequest?.cityName || b.bookingSnapshot?.city || "—";
+      const hotelName =
+        b.bookingSnapshot?.hotelName ||
+        b.hotelRequest?.selectedHotel?.hotelName ||
+        "Unknown Hotel";
+      const city =
+        b.hotelRequest?.selectedHotel?.city ||
+        b.hotelRequest?.city ||
+        b.hotelRequest?.cityName ||
+        b.bookingSnapshot?.city ||
+        "—";
 
       return {
         ...b,
@@ -668,7 +464,7 @@ export default function ProjectsTable({ projects, setProjects }) {
   // Merge Flight Bookings and Hotel Bookings into a Single Unified Table
   const combinedBookings = useMemo(() => {
     const list = [];
-    
+
     // Add flight bookings
     (formattedFlightBookings || []).forEach((b) => {
       list.push({
@@ -698,34 +494,63 @@ export default function ProjectsTable({ projects, setProjects }) {
   // Filter Combined Bookings by Search, Type, Employee & Date Window
   const filteredBookings = useMemo(() => {
     const q = bookingSearch.toLowerCase();
-    
-    return combinedBookings.filter((b) => {
-      const booked = b.bookedDate ? new Date(b.bookedDate).toISOString().slice(0, 10) : "";
-      
-      const typeMatch = bookingTypeFilter === "all" || b.bookingType === bookingTypeFilter;
 
-      const employeeMatch = selectedEmployeeEmail === "all" || 
+    return combinedBookings.filter((b) => {
+      const booked = b.bookedDate
+        ? new Date(b.bookedDate).toISOString().slice(0, 10)
+        : "";
+
+      const typeMatch =
+        bookingTypeFilter === "all" || b.bookingType === bookingTypeFilter;
+
+      const employeeMatch =
+        selectedEmployeeEmail === "all" ||
         (b.employeeId && b.employeeId.toLowerCase() === selectedEmployeeEmail);
 
-      const searchMatch = !q ||
-        (b.bookingType === "flight" 
-          ? (b.travellerName?.toLowerCase().includes(q) || b.employeeId?.toLowerCase().includes(q) || b.pnr?.toLowerCase().includes(q) || b.orderId?.toLowerCase().includes(q))
-          : (b.guestName?.toLowerCase().includes(q) || b.employeeId?.toLowerCase().includes(q) || b.hotelName?.toLowerCase().includes(q) || b.orderId?.toLowerCase().includes(q))
-        );
+      const searchMatch =
+        !q ||
+        (b.bookingType === "flight"
+          ? b.travellerName?.toLowerCase().includes(q) ||
+            b.employeeId?.toLowerCase().includes(q) ||
+            b.pnr?.toLowerCase().includes(q) ||
+            b.orderId?.toLowerCase().includes(q)
+          : b.guestName?.toLowerCase().includes(q) ||
+            b.employeeId?.toLowerCase().includes(q) ||
+            b.hotelName?.toLowerCase().includes(q) ||
+            b.orderId?.toLowerCase().includes(q));
 
-      const dateMatch = (!bookingStartDate || booked >= bookingStartDate) && (!bookingEndDate || booked <= bookingEndDate);
+      const dateMatch =
+        (!bookingStartDate || booked >= bookingStartDate) &&
+        (!bookingEndDate || booked <= bookingEndDate);
 
       return typeMatch && employeeMatch && searchMatch && dateMatch;
     });
-  }, [combinedBookings, bookingSearch, bookingStartDate, bookingEndDate, bookingTypeFilter, selectedEmployeeEmail]);
+  }, [
+    combinedBookings,
+    bookingSearch,
+    bookingStartDate,
+    bookingEndDate,
+    bookingTypeFilter,
+    selectedEmployeeEmail,
+  ]);
 
   const paginatedBookings = useMemo(() => {
-    return filteredBookings.slice((bookingPage - 1) * PAGE_SIZE, bookingPage * PAGE_SIZE);
+    return filteredBookings.slice(
+      (bookingPage - 1) * PAGE_SIZE,
+      bookingPage * PAGE_SIZE,
+    );
   }, [filteredBookings, bookingPage]);
 
   useEffect(() => {
     setBookingPage(1);
-  }, [bookingSearch, bookingStartDate, bookingEndDate, bookingTypeFilter, selectedProjectId, selectedEmployeeEmail]);
+  }, [
+    bookingSearch,
+    bookingStartDate,
+    bookingEndDate,
+    bookingTypeFilter,
+    selectedProjectId,
+    selectedEmployeeEmail,
+  ]);
 
   const bookingTotalSpend = useMemo(() => {
     return filteredBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
@@ -738,19 +563,27 @@ export default function ProjectsTable({ projects, setProjects }) {
   const ledgerDateRange = useMemo(() => {
     const fmt = (d) => {
       if (!d || Number.isNaN(d.getTime())) return "—";
-      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
     };
 
     if (bookingStartDate || bookingEndDate) {
-      const start = bookingStartDate ? fmt(new Date(bookingStartDate)) : "Beginning";
+      const start = bookingStartDate
+        ? fmt(new Date(bookingStartDate))
+        : "Beginning";
       const end = bookingEndDate ? fmt(new Date(bookingEndDate)) : "Present";
       return `${start} to ${end}`;
     }
 
     if (filteredBookings.length === 0) return "—";
     const newest = new Date(filteredBookings[0].bookedDate);
-    const oldest = new Date(filteredBookings[filteredBookings.length - 1].bookedDate);
-    
+    const oldest = new Date(
+      filteredBookings[filteredBookings.length - 1].bookedDate,
+    );
+
     const newStr = fmt(newest);
     const oldStr = fmt(oldest);
     if (newStr === "—" || oldStr === "—") return "—";
@@ -758,43 +591,60 @@ export default function ProjectsTable({ projects, setProjects }) {
   }, [filteredBookings, bookingStartDate, bookingEndDate]);
 
   return (
-    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
-      
-      {selectedProjectForExpenses && <ProjectExpenseModal project={selectedProjectForExpenses} onClose={() => setSelectedProjectForExpenses(null)} />}
-
+    <div
+      className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6"
+      style={{ background: C.offWhite }}
+    >
       {/* Header Section */}
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center gap-6">
-             <div className="flex items-center gap-3">
-               <button onClick={() => navigate(-1)} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10">
-                 <HiArrowLeft size={20} />
-               </button>
-               <button onClick={handleRefresh} className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${(isSyncing || expenses?.loading) ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`} disabled={isSyncing || expenses?.loading}>
-                 <div className={(isSyncing || expenses?.loading) ? "animate-spin" : ""}>
-                   <FiRefreshCw size={20} />
-                 </div>
-               </button>
-             </div>
-             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
-             <div className="flex items-center gap-5">
-               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
-                 <HiTableCells size={28} />
-               </div>
-               <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none uppercase">Projects</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Manage and track project expenses</p>
-               </div>
-             </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+              >
+                <HiArrowLeft size={20} />
+              </button>
+              <button
+                onClick={handleRefresh}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${isSyncing || expenses?.loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={isSyncing || expenses?.loading}
+              >
+                <div
+                  className={
+                    isSyncing || expenses?.loading ? "animate-spin" : ""
+                  }
+                >
+                  <FiRefreshCw size={20} />
+                </div>
+              </button>
+            </div>
+            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <HiTableCells size={28} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight leading-none uppercase">
+                  Projects
+                </h1>
+                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                  Manage and track project expenses
+                </p>
+              </div>
+            </div>
           </div>
-          <button onClick={() => navigate("/project-management")} className="group bg-[#E7C695] hover:bg-white text-[#000D26] px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3">
-             Add Projects <HiTableCells size={16} />
+          <button
+            onClick={() => navigate("/project-management")}
+            className="group bg-[#C9A240] hover:bg-white text-[#000D26] px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3"
+          >
+            Add Projects <HiTableCells size={16} />
           </button>
         </div>
       </div>
 
       <div className="w-full px-4 md:px-10 -mt-10 space-y-8">
-        
         {/* Top-Level Tab Switcher */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           <button
@@ -814,17 +664,44 @@ export default function ProjectsTable({ projects, setProjects }) {
         {activeMainTab === "directory" ? (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard label="Total Projects" value={effectiveProjects.length} Icon={HiTableCells} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
-              <StatCard label="Active Clients" value={clients.length - 1} Icon={HiUsers} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
-              <StatCard label="Last Updated" value="Today" Icon={FiCalendar} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <StatCard
+                label="Total Projects"
+                value={effectiveProjects.length}
+                Icon={HiTableCells}
+                borderCls="border-[#003399]"
+                iconBgCls="bg-[#003399]10"
+                iconColorCls="text-[#003399]"
+              />
+              <StatCard
+                label="Active Clients"
+                value={clients.length - 1}
+                Icon={HiUsers}
+                borderCls="border-violet-500"
+                iconBgCls="bg-violet-50"
+                iconColorCls="text-violet-600"
+              />
+              <StatCard
+                label="Last Updated"
+                value="Today"
+                Icon={FiCalendar}
+                borderCls="border-emerald-500"
+                iconBgCls="bg-emerald-50"
+                iconColorCls="text-emerald-600"
+              />
             </div>
 
             {/* Filters */}
             <div className="bg-white rounded-[2.5rem] border border-slate-200/60 p-8 shadow-2xl">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-end">
                 <div className="md:col-span-5">
-                  <LabeledField label={<><HiMagnifyingGlass size={12} /> Search Directory</>}>
+                  <LabeledField
+                    label={
+                      <>
+                        <HiMagnifyingGlass size={12} /> Search Directory
+                      </>
+                    }
+                  >
                     <div className="relative group">
                       <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#003399] transition-colors" />
                       <input
@@ -838,12 +715,28 @@ export default function ProjectsTable({ projects, setProjects }) {
                   </LabeledField>
                 </div>
                 <div className="md:col-span-4">
-                  <LabeledField label={<><HiUsers size={12} /> Filter by Client</>}>
-                    <CustomDropdown value={clientFilter} onChange={setClientFilter} options={clients} />
+                  <LabeledField
+                    label={
+                      <>
+                        <HiUsers size={12} /> Filter by Client
+                      </>
+                    }
+                  >
+                    <CustomDropdown
+                      value={clientFilter}
+                      onChange={setClientFilter}
+                      options={clients}
+                    />
                   </LabeledField>
                 </div>
                 <div className="md:col-span-3">
-                  <button onClick={() => { setSearch(""); setClientFilter("All Clients"); }} className="w-full py-4 rounded-2xl font-black text-[11px] text-slate-400 border-2 border-slate-50 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest">
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setClientFilter("All Clients");
+                    }}
+                    className="w-full py-4 rounded-2xl font-black text-[11px] text-slate-400 border-2 border-slate-50 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest"
+                  >
                     <FiX size={16} /> Reset Filters
                   </button>
                 </div>
@@ -851,29 +744,41 @@ export default function ProjectsTable({ projects, setProjects }) {
             </div>
 
             {/* Table */}
-              <ResponsiveDataTable 
-                title="Projects" 
-                subtitle={`${filtered.length} found`} 
-                exportLabel="Export Excel"
-                exportLoading={isExporting}
-                exportDisabled={isExporting}
-                onExport={() => exportExcel({
+            <ResponsiveDataTable
+              title="Projects"
+              subtitle={`${filtered.length} found`}
+              exportLabel="Export Excel"
+              exportLoading={isExporting}
+              exportDisabled={isExporting}
+              onExport={() =>
+                exportExcel({
                   pageHeader: "Project Registry",
                   statCards: [
-                    { label: "Total Projects", value: effectiveProjects.length },
+                    {
+                      label: "Total Projects",
+                      value: effectiveProjects.length,
+                    },
                     { label: "Active Clients", value: clients.length - 1 },
-                    { label: "Last Updated", value: "Today" }
+                    { label: "Last Updated", value: "Today" },
                   ],
                   appliedFilters: [
                     { label: "Search", value: search || "None" },
-                    { label: "Client Entity", value: clientFilter }
+                    { label: "Client Entity", value: clientFilter },
                   ],
                   data: filtered,
                   columns: adminProjectRegistryExportTemplate,
-                  filenamePrefix: "project_registry"
-                })}
-                wrapperClass="!border-none !shadow-none"
-              pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
+                  filenamePrefix: "project_registry",
+                })
+              }
+              wrapperClass="!border-none !shadow-none"
+              pagination={
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filtered.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setCurrentPage}
+                />
+              }
             >
               <table className="w-full border-collapse">
                 <thead>
@@ -894,28 +799,70 @@ export default function ProjectsTable({ projects, setProjects }) {
                     const createdAt = p.createdAt || p.addedOn;
                     const av = getAvatar(projectName);
                     return (
-                      <tr key={p._id || i} className="hover:bg-slate-100/50 transition-colors group">
-                        <td className="!px-8 !py-6"><IdCell id={projectCode} /></td>
+                      <tr
+                        key={p._id || i}
+                        className="hover:bg-slate-100/50 transition-colors group"
+                      >
+                        <td className="!px-8 !py-6">
+                          <IdCell id={projectCode} />
+                        </td>
                         <td className="!px-8 !py-6">
                           <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 shadow-sm transition-transform group-hover:scale-110" style={{ backgroundColor: av.bg, color: av.text }}>{initials(projectName)}</div>
-                            <span className="text-sm font-black text-slate-800 tracking-tight">{projectName}</span>
+                            <div
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 shadow-sm transition-transform group-hover:scale-110"
+                              style={{ backgroundColor: av.bg, color: av.text }}
+                            >
+                              {initials(projectName)}
+                            </div>
+                            <span className="text-sm font-black text-slate-800 tracking-tight">
+                              {projectName}
+                            </span>
                           </div>
                         </td>
                         <td className="!px-8 !py-6">
-                          <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-[#003399] text-[10px] font-black uppercase tracking-widest rounded-lg border border-blue-100">{clientName}</span>
+                          <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-[#003399] text-[10px] font-black uppercase tracking-widest rounded-lg border border-blue-100">
+                            {clientName}
+                          </span>
                         </td>
                         <td className="!px-8 !py-6">
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100">{p.bookingCount || 0}</div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active</span>
+                            <div className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100">
+                              {p.bookingCount || 0}
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              Active
+                            </span>
                           </div>
                         </td>
-                        <td className="!px-8 !py-6 text-[11px] font-bold text-slate-400 uppercase">{fmtDate(createdAt)}</td>
+                        <td className="!px-8 !py-6 text-[11px] font-bold text-slate-400 uppercase">
+                          {fmtDate(createdAt)}
+                        </td>
                         <td className="!px-8 !py-6">
                           <div className="flex items-center justify-center gap-3">
-                            <button title="View Expenses" onClick={() => setSelectedProjectForExpenses(p)} className="w-10 h-10 rounded-xl bg-[#003399]10 text-[#003399] flex items-center justify-center hover:bg-[#003399] hover:text-white transition-all shadow-sm"><HiEye size={18} /></button>
-                            <button title="Delete Project" onClick={() => handleDeleteProject(p)} disabled={deleteLoading} className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-30"><HiTrash size={18} /></button>
+                            <button
+                              title="View Expenses"
+                              onClick={() => {
+                                const pId =
+                                  p.projectCodeId ||
+                                  p.code ||
+                                  p.projectId ||
+                                  p.id ||
+                                  p._id;
+                                setSelectedProjectId(pId);
+                                setActiveMainTab("bookings");
+                              }}
+                              className="w-10 h-10 rounded-xl bg-[#003399]10 text-[#003399] flex items-center justify-center hover:bg-[#003399] hover:text-white transition-all shadow-sm"
+                            >
+                              <HiEye size={18} />
+                            </button>
+                            <button
+                              title="Delete Project"
+                              onClick={() => handleDeleteProject(p)}
+                              disabled={deleteLoading}
+                              className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-30"
+                            >
+                              <HiTrash size={18} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -931,7 +878,11 @@ export default function ProjectsTable({ projects, setProjects }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <StatCard
                 label="Selected Project Code"
-                value={selectedProjectId === "all" ? "All Projects" : selectedProjectId || "None"}
+                value={
+                  selectedProjectId === "all"
+                    ? "All Projects"
+                    : selectedProjectId || "None"
+                }
                 Icon={FaClipboardList}
                 borderCls="border-[#000D26]"
                 iconBgCls="bg-slate-100"
@@ -955,74 +906,98 @@ export default function ProjectsTable({ projects, setProjects }) {
               />
             </div>
 
-             <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
-                 <LabeledField label={<><HiTableCells size={10} /> Select Project</>} className="lg:col-span-2">
-                   <CustomDropdown
-                     value={selectedProjectId}
-                     onChange={setSelectedProjectId}
-                     options={projectOptions}
-                     placeholder="Choose Project..."
-                   />
-                 </LabeledField>
+            <div
+              className="bg-white rounded-2xl p-6 border shadow-sm"
+              style={{ borderColor: C.border }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+                <LabeledField
+                  label={
+                    <>
+                      <HiTableCells size={10} /> Select Project
+                    </>
+                  }
+                  className="lg:col-span-2"
+                >
+                  <CustomDropdown
+                    value={selectedProjectId}
+                    onChange={setSelectedProjectId}
+                    options={projectOptions}
+                    placeholder="Choose Project..."
+                  />
+                </LabeledField>
 
-                 <LabeledField label={<><HiUsers size={10} /> Filter by Employee</>} className="lg:col-span-3">
-                   <CustomDropdown
-                     value={selectedEmployeeEmail}
-                     onChange={setSelectedEmployeeEmail}
-                     options={employeeOptions}
-                     placeholder="Select employee..."
-                   />
-                 </LabeledField>
- 
-                 <LabeledField label={<><HiMagnifyingGlass size={10} /> Search Bookings</>} className="lg:col-span-2">
-                   <SearchBar
-                     value={bookingSearch}
-                     onChange={setBookingSearch}
-                     placeholder="Search PNR, hotel, ID..."
-                   />
-                 </LabeledField>
- 
-                 <LabeledField label="Date Range" className="lg:col-span-3">
-                   <div className="flex items-center gap-2">
-                     <input
-                       type="date"
-                       value={bookingStartDate}
-                       onChange={(e) => setBookingStartDate(e.target.value)}
-                       className={dateCls}
-                       style={{ borderColor: C.border }}
-                     />
-                     <span className="text-slate-300">to</span>
-                     <input
-                       type="date"
-                       value={bookingEndDate}
-                       onChange={(e) => setBookingEndDate(e.target.value)}
-                       className={dateCls}
-                       style={{ borderColor: C.border }}
-                     />
-                   </div>
-                 </LabeledField>
- 
-                 <div className="flex items-end lg:col-span-2">
-                   <button
-                     onClick={() => {
-                       setBookingSearch("");
-                       setBookingStartDate("");
-                       setBookingEndDate("");
-                       setSelectedEmployeeEmail("all");
-                     }}
-                     className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest"
-                     style={{
-                       background: C.white,
-                       borderColor: C.border,
-                       color: C.muted,
-                     }}
-                   >
-                     <FiX /> Reset Filters
-                   </button>
-                 </div>
-               </div>
-             </div>
+                <LabeledField
+                  label={
+                    <>
+                      <HiUsers size={10} /> Filter by Employee
+                    </>
+                  }
+                  className="lg:col-span-3"
+                >
+                  <CustomDropdown
+                    value={selectedEmployeeEmail}
+                    onChange={setSelectedEmployeeEmail}
+                    options={employeeOptions}
+                    placeholder="Select employee..."
+                  />
+                </LabeledField>
+
+                <LabeledField
+                  label={
+                    <>
+                      <HiMagnifyingGlass size={10} /> Search Bookings
+                    </>
+                  }
+                  className="lg:col-span-2"
+                >
+                  <SearchBar
+                    value={bookingSearch}
+                    onChange={setBookingSearch}
+                    placeholder="Search PNR, hotel, ID..."
+                  />
+                </LabeledField>
+
+                <LabeledField label="Date Range" className="lg:col-span-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={bookingStartDate}
+                      onChange={(e) => setBookingStartDate(e.target.value)}
+                      className={dateCls}
+                      style={{ borderColor: C.border }}
+                    />
+                    <span className="text-slate-300">to</span>
+                    <input
+                      type="date"
+                      value={bookingEndDate}
+                      onChange={(e) => setBookingEndDate(e.target.value)}
+                      className={dateCls}
+                      style={{ borderColor: C.border }}
+                    />
+                  </div>
+                </LabeledField>
+
+                <div className="flex items-end lg:col-span-2">
+                  <button
+                    onClick={() => {
+                      setBookingSearch("");
+                      setBookingStartDate("");
+                      setBookingEndDate("");
+                      setSelectedEmployeeEmail("all");
+                    }}
+                    className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest"
+                    style={{
+                      background: C.white,
+                      borderColor: C.border,
+                      color: C.muted,
+                    }}
+                  >
+                    <FiX /> Reset Filters
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Booking Type Filter Tabs (All, Flight, Hotel) */}
             <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
@@ -1047,8 +1022,10 @@ export default function ProjectsTable({ projects, setProjects }) {
             {/* Responsive DataTable */}
             {expenses?.loading ? (
               <div className="py-24 flex flex-col items-center justify-center bg-white rounded-[2.5rem] border border-slate-200/60 shadow-2xl">
-                 <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
-                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading Bookings...</p>
+                <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  Loading Bookings...
+                </p>
               </div>
             ) : (
               <ResponsiveDataTable
@@ -1056,30 +1033,55 @@ export default function ProjectsTable({ projects, setProjects }) {
                   bookingTypeFilter === "all"
                     ? "All Bookings"
                     : bookingTypeFilter === "flight"
-                    ? "Flight Bookings"
-                    : "Hotel Bookings"
+                      ? "Flight Bookings"
+                      : "Hotel Bookings"
                 }
                 subtitle={`${filteredBookings.length} bookings found`}
                 exportLabel="Export Excel"
                 exportLoading={isExporting}
                 exportDisabled={isExporting}
-                onExport={() => exportExcel({
-                  pageHeader: bookingTypeFilter === "all" ? "Combined Project Ledger" : bookingTypeFilter === "flight" ? "Project Flight Manifests" : "Project Hotel Manifests",
-                  statCards: [
-                    { label: "Selected Project", value: selectedProjectId === "all" ? "All Projects" : selectedProjectId || "None" },
-                    { label: "Total Amount", value: `₹${bookingTotalSpend.toLocaleString()}` },
-                    { label: "Ledger Timeline", value: ledgerDateRange }
-                  ],
-                  appliedFilters: [
-                    { label: "Personnel Filter", value: selectedEmployeeEmail },
-                    { label: "Search Manifest", value: bookingSearch || "None" },
-                    { label: "Booking Window", value: `${bookingStartDate || "Any"} to ${bookingEndDate || "Any"}` },
-                    { label: "Type", value: bookingTypeFilter }
-                  ],
-                  data: filteredBookings,
-                  columns: adminProjectBookingsExportTemplate,
-                  filenamePrefix: "project_bookings"
-                })}
+                onExport={() =>
+                  exportExcel({
+                    pageHeader:
+                      bookingTypeFilter === "all"
+                        ? "Combined Project Ledger"
+                        : bookingTypeFilter === "flight"
+                          ? "Project Flight Manifests"
+                          : "Project Hotel Manifests",
+                    statCards: [
+                      {
+                        label: "Selected Project",
+                        value:
+                          selectedProjectId === "all"
+                            ? "All Projects"
+                            : selectedProjectId || "None",
+                      },
+                      {
+                        label: "Total Amount",
+                        value: `₹${bookingTotalSpend.toLocaleString()}`,
+                      },
+                      { label: "Ledger Timeline", value: ledgerDateRange },
+                    ],
+                    appliedFilters: [
+                      {
+                        label: "Personnel Filter",
+                        value: selectedEmployeeEmail,
+                      },
+                      {
+                        label: "Search Manifest",
+                        value: bookingSearch || "None",
+                      },
+                      {
+                        label: "Booking Window",
+                        value: `${bookingStartDate || "Any"} to ${bookingEndDate || "Any"}`,
+                      },
+                      { label: "Type", value: bookingTypeFilter },
+                    ],
+                    data: filteredBookings,
+                    columns: adminProjectBookingsExportTemplate,
+                    filenamePrefix: "project_bookings",
+                  })
+                }
                 wrapperClass="!border-none !shadow-none"
                 pagination={
                   <Pagination
@@ -1110,8 +1112,9 @@ export default function ProjectsTable({ projects, setProjects }) {
                         const isFlight = b.bookingType === "flight";
                         const name = isFlight ? b.travellerName : b.guestName;
                         const purpose = isFlight
-                          ? (b.flightRequest?.purposeOfTravel || "Business Flight")
-                          : (b.hotelRequest?.purposeOfTravel || "Business Stay");
+                          ? b.flightRequest?.purposeOfTravel ||
+                            "Business Flight"
+                          : b.hotelRequest?.purposeOfTravel || "Business Stay";
                         const path = isFlight
                           ? `/employee-flight-booking/${b._id}`
                           : `/employee-hotel-booking/${b._id}`;
@@ -1120,7 +1123,9 @@ export default function ProjectsTable({ projects, setProjects }) {
                           <tr
                             key={b.key}
                             className="hover:bg-slate-100 transition-colors"
-                            style={{ background: i % 2 === 0 ? C.white : C.lightGray }}
+                            style={{
+                              background: i % 2 === 0 ? C.white : C.lightGray,
+                            }}
                           >
                             <td className="!px-6 !py-5">
                               <span
@@ -1130,7 +1135,11 @@ export default function ProjectsTable({ projects, setProjects }) {
                                     : "bg-amber-50 text-[#D97706] border border-amber-100"
                                 }`}
                               >
-                                {isFlight ? <FaPlane size={10} /> : <FaHotel size={10} />}
+                                {isFlight ? (
+                                  <FaPlane size={10} />
+                                ) : (
+                                  <FaHotel size={10} />
+                                )}
                                 {b.bookingType}
                               </span>
                             </td>
@@ -1138,7 +1147,10 @@ export default function ProjectsTable({ projects, setProjects }) {
                               <IdCell id={b.orderId} />
                             </td>
                             <td className="!px-6 !py-5">
-                              <p className="text-xs font-black" style={{ color: C.navy }}>
+                              <p
+                                className="text-xs font-black"
+                                style={{ color: C.navy }}
+                              >
                                 {name}
                               </p>
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate max-w-[120px]">
@@ -1147,7 +1159,10 @@ export default function ProjectsTable({ projects, setProjects }) {
                             </td>
                             <td className="!px-6 !py-5">
                               {isFlight ? (
-                                <RouteCell routes={b.routes} airline={b.airline} />
+                                <RouteCell
+                                  routes={b.routes}
+                                  airline={b.airline}
+                                />
                               ) : (
                                 <div className="flex items-center gap-3">
                                   <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden text-[#D97706]">
@@ -1167,17 +1182,23 @@ export default function ProjectsTable({ projects, setProjects }) {
                             <td className="!px-6 !py-5">
                               <span
                                 className="text-[11px] font-bold font-mono px-2 py-1 rounded"
-                                style={{ background: C.offWhite, color: C.navy }}
+                                style={{
+                                  background: C.offWhite,
+                                  color: C.navy,
+                                }}
                               >
                                 {b.employeeId}
                               </span>
                             </td>
                             <td className="!px-6 !py-5 text-[11px] font-bold text-slate-500 uppercase">
-                              {new Date(b.bookedDate).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })}
+                              {new Date(b.bookedDate).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
                             </td>
                             <td className="!px-6 !py-5">
                               <StatusBadge status={b.status} />
@@ -1190,7 +1211,7 @@ export default function ProjectsTable({ projects, setProjects }) {
                             </td>
                             <td className="!px-6 !py-5 !text-center">
                               <button
-                                onClick={() => navigate(path)}
+                                onClick={() => navigate(path, { state: { isCancelled: b.status === "Cancelled", fromProjectExpenditure: true } })}
                                 className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
                               >
                                 <FiArrowRight

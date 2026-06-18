@@ -56,7 +56,19 @@ export default function EditCorporatePage() {
   const location = useLocation();
   const dispatch = useDispatch();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("tab") || "overview";
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
   const [corporate, setCorporate] = useState(location.state?.corporate || null);
   const [loading, setLoading] = useState(!corporate);
   const [saving, setSaving] = useState(false);

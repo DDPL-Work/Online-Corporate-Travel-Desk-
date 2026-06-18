@@ -918,6 +918,10 @@ export default function OneFlightBooking() {
           "Passport number is required for international flights";
       }
 
+      if (isInternational && !t.dob) {
+        e.dob = "Date of Birth is required for international flights";
+      }
+
       if (Object.keys(e).length > 0) {
         errors[idx] = e;
         isValid = false;
@@ -1083,6 +1087,7 @@ export default function OneFlightBooking() {
       }
 
       if (isIntl && !t.passportNumber?.trim()) return false;
+      if (isIntl && !t.dob) return false;
     }
 
     if (

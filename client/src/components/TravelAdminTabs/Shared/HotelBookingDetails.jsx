@@ -2274,7 +2274,9 @@ export default function HotelBookingDetails() {
             ? "/corporate-wallet"
             : source === "postpaid"
               ? "/credit-utilization"
-              : "/total-bookings";
+              : location.state?.fromProjectExpenditure
+                ? -1
+                : "/total-bookings";
 
   const backLabel =
     source === "cancelled"
@@ -2422,7 +2424,10 @@ export default function HotelBookingDetails() {
         {/* Top Row */}
         <div className="flex items-center gap-4 w-full">
           <button
-            onClick={() => navigate(backPath, { state: location.state })}
+            onClick={() => {
+              if (backPath === -1) navigate(-1);
+              else navigate(backPath, { state: location.state });
+            }}
             className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
           >
             <FiArrowLeft size={14} />

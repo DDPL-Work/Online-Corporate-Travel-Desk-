@@ -526,7 +526,12 @@ function HotelSection() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return formattedBookings.filter((b) => {
-      if (b.executionStatus !== "voucher_generated") return false;
+      if (
+        b.executionStatus !== "voucher_generated" ||
+        (b.amendment && b.amendment.status !== "not_requested")
+      ) {
+        return false;
+      }
       const booked = b.bookedDate
         ? new Date(b.bookedDate).toISOString().slice(0, 10)
         : "";

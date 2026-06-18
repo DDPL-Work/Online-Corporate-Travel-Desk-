@@ -16,6 +16,7 @@ import CorporateMarkupConfiguration from "../components/SuperAdminTabs/Corporate
 import CorporateMarkupList from "../components/SuperAdminTabs/CorporateMarkupList";
 import BookingsSummary from "../components/SuperAdminTabs/BookingsSummary";
 import CorporateRevenue from "../components/SuperAdminTabs/CorporateRevenue";
+import TotalRevenueBreakdown from "../components/SuperAdminTabs/TotalRevenueBreakdown";
 import MarkupRevenueAndAudit from "../components/SuperAdminTabs/MarkupRevenueAndAudit";
 import CreditStatusAlerts from "../components/SuperAdminTabs/CreditStatusAlerts";
 import WalletRechargeLogs from "../components/SuperAdminTabs/WalletRechargeLogs";
@@ -33,6 +34,7 @@ import ProfileSettings from "../Pages/Auth/ProfileSettings";
 import BookedFlightDetailsPage from "../components/Shared/BookedFlightDetailsPage";
 import BookedHotelDetailsPage from "../components/Shared/BookedHotelDetailsPage";
 import TboCommissionsTaxes from "../components/SuperAdminTabs/TboCommissionsTaxes";
+import CorporateServiceCollection from "../components/SuperAdminTabs/CorporateServiceCollection";
 
 import BlogListPage from '../components/Blog/AllBlogs'
 import BlogEditPage from '../components/Blog/BlogEditPage'
@@ -86,6 +88,8 @@ export const appRouter = createBrowserRouter([
           { path: "/cancellation-query", element: <Navigate to="/cancellation-queries" replace /> },
           { path: "/all-reissue-requests", element: <AllReissueRequests /> },
           { path: "/corporate-revenue", element: <CorporateRevenue /> },
+          { path: "/total-revenue-breakdown", element: <TotalRevenueBreakdown /> },
+          { path: "/corporate-service-collections", element: <CorporateServiceCollection /> },
           { path: "/markup-revenue", element: <MarkupRevenueAndAudit /> },
           { path: "/credit-status", element: <Navigate to="/credit-status-alerts" replace /> },
           { path: "/wallet-recharge-logs", element: <WalletRechargeLogs /> },

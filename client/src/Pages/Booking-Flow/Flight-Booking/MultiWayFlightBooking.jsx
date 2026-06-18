@@ -839,6 +839,10 @@ export default function MultiCityFlightBooking() {
           "Passport number is required for international flights";
       }
 
+      if (isInternational && !t.dob) {
+        e.dob = "Date of Birth is required for international flights";
+      }
+
       if (Object.keys(e).length > 0) {
         errors[idx] = e;
         isValid = false;

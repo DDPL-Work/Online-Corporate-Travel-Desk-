@@ -5,14 +5,14 @@ const auth = require("../middleware/auth.middleware");
 
 
 router.get(
-  "/me",
+  "/corporate-profile",
   auth.verifyToken,
   auth.authorizeRoles("travel-admin", "finance_team", "manager", "employee"),
   corpAdminCtrl.getMyCorporateProfile
 );
 
 router.patch(
-  "/me",
+  "/corporate-profile",
   auth.verifyToken,
   auth.authorizeRoles("travel-admin"),
   corpAdminCtrl.updateMyCorporateProfile

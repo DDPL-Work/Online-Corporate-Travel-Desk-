@@ -131,6 +131,11 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           icon: <FaFileInvoiceDollar />,
         },
         {
+          to: "/total-revenue-breakdown",
+          label: "Total Revenue Breakdown",
+          icon: <FaFileInvoiceDollar />,
+        },
+        {
           to: "/markup-revenue",
           label: "Markup Revenue & Audit",
           icon: <FaFileInvoiceDollar />,

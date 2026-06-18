@@ -115,6 +115,13 @@ router.get(
 // --------------------------------------------------
 
 router.get(
+  "/revenue/total-breakdown",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("View Finance"),
+  revenueController.getTotalRevenueBreakdown
+);
+
+router.get(
   "/revenue/summary",
   authorizeRoles("super-admin", "ops-member"),
   requireOpsPermission("View Finance"),

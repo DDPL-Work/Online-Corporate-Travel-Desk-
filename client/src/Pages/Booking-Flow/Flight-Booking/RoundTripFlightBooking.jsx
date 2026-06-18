@@ -1061,6 +1061,7 @@ export default function RoundTripFlightBooking() {
             airlineCode: seg.Airline?.AirlineCode || null,
             flightNumber: seg.Airline?.FlightNumber || null,
             aircraft: seg.Craft || null,
+            cabinClass: seg.CabinClass || null,
 
             origin: {
               airportCode: seg.Origin?.Airport?.AirportCode,
@@ -1474,6 +1475,10 @@ export default function RoundTripFlightBooking() {
           "Passport number is required for international flights";
       }
 
+      if (isInternational && !t.dob) {
+        e.dob = "Date of Birth is required for international flights";
+      }
+
       if (Object.keys(e).length > 0) {
         errors[idx] = e;
         isValid = false;
@@ -1674,6 +1679,7 @@ export default function RoundTripFlightBooking() {
       }
 
       if (isIntl && !t.passportNumber?.trim()) return false;
+      if (isIntl && !t.dob) return false;
     }
 
     if (

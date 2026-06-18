@@ -134,7 +134,7 @@ export default function Sidebar({ isOpen, onClose }) {
     }
     menu.push(
       {
-        to: "/travel-profile-settings",
+        to: "/corporate-profile",
         label: "Corporate Profile",
         icon: <FaBuilding />,
       },

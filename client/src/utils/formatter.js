@@ -68,8 +68,11 @@ export const formatStops = (stops) => {
 export const getStopsLabel = (segments = []) => {
   const stops = segments.length - 1;
   if (stops <= 0) return "Non-stop";
-  const stopCities = segments.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean);
-  return `${stops} Stop${stops > 1 ? "s" : ""}${stopCities.length ? ` via ${stopCities.join(', ')}` : ''}`;
+  const stopCities = segments
+    .slice(0, -1)
+    .map((s) => s.Destination?.Airport?.AirportCode)
+    .filter(Boolean);
+  return `${stops} Stop${stops > 1 ? "s" : ""}${stopCities.length ? ` via ${stopCities.join(", ")}` : ""}`;
 };
 
 export const formatDuration = (mins = 0) =>

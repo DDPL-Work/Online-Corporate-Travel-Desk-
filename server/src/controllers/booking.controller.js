@@ -2899,7 +2899,7 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
 
   const query = {
     corporateId: req.user.corporateId,
-    executionStatus: "ticketed",
+    executionStatus: { $in: ["ticketed", "cancelled", "cancel_requested", "reissued"] },
   };
 
   if (projectId !== "all") {
@@ -2907,8 +2907,10 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
   }
 
   const expenses = await BookingRequest.find(query)
+    .select(
+      "_id userId executionStatus status cancelStatus amendment.status bookingResult.pnr pricingSnapshot.totalAmount bookingSnapshot.amount flightRequest.segments flightRequest.purposeOfTravel createdAt orderId travellers bookingType"
+    )
     .populate("userId", "name email")
-    .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });
 
   res

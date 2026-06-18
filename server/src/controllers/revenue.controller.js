@@ -10,7 +10,7 @@ const getFilterQuery = (query) => {
   const { fromDate, toDate, corporateId, bookingType } = query;
   const filter = {
     requestStatus: "approved",
-    executionStatus: { $nin: ["failed", "not_started"] },
+    executionStatus: { $in: ["ticketed", "confirmed", "completed", "booked", "voucher_generated"] },
   };
 
   if (fromDate || toDate) {
@@ -414,7 +414,7 @@ exports.getCorporateDetailedBookings = asyncHandler(async (req, res) => {
   const filter = {
     corporateId: new mongoose.Types.ObjectId(id),
     requestStatus: "approved",
-    executionStatus: { $nin: ["failed", "not_started"] }
+    executionStatus: { $in: ["ticketed", "confirmed", "completed", "booked", "voucher_generated"] }
   };
 
   const [flights, hotels] = await Promise.all([
@@ -459,4 +459,200 @@ exports.getCorporateDetailedBookings = asyncHandler(async (req, res) => {
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   res.status(200).json(new ApiResponse(200, combined, "Detailed bookings fetched"));
+});
+
+/**
+ * 🟢 TOTAL REVENUE BREAKDOWN
+ */
+exports.getTotalRevenueBreakdown = asyncHandler(async (req, res) => {
+  const { fromDate, toDate, corporateId, bookingType } = req.query;
+
+  // We strictly exclude cancelled, failed, expired, abandoned, etc.
+  const filter = {
+    requestStatus: "approved",
+    executionStatus: { $in: ["ticketed", "confirmed", "completed", "booked", "voucher_generated"] }
+  };
+
+  if (fromDate || toDate) {
+    filter.createdAt = {};
+    if (fromDate) filter.createdAt.$gte = new Date(fromDate);
+    if (toDate) filter.createdAt.$lte = new Date(toDate);
+  }
+
+  if (corporateId && corporateId !== "All") {
+    filter.corporateId = new mongoose.Types.ObjectId(corporateId);
+  }
+
+  // Common pipeline for both Flight and Hotel
+  const buildPipeline = (bType) => {
+    const pipeline = [
+      { $match: { ...filter, bookingType: bType } },
+      
+      // Lookup Service Fee Ledger
+      {
+        $lookup: {
+          from: "servicefeeledgers",
+          localField: "_id",
+          foreignField: "bookingId",
+          as: "serviceFees"
+        }
+      },
+      // Lookup BookingMarkupAudit
+      {
+        $lookup: {
+          from: "bookingmarkupaudits",
+          localField: "_id",
+          foreignField: "bookingId",
+          as: "markupAudits"
+        }
+      },
+      
+      // Project calculations
+      {
+        $project: {
+          _id: 1,
+          corporateId: 1,
+          createdAt: 1,
+          bookingType: 1,
+          bookingReference: 1,
+          orderId: 1,
+          travellers: 1,
+          executionStatus: 1,
+          payment: 1,
+          pricingSnapshot: 1,
+          markupSnapshot: 1,
+          
+          supplierFare: {
+            $cond: {
+              if: { $gt: [{ $size: "$markupAudits" }, 0] },
+              then: { $arrayElemAt: ["$markupAudits.fareBeforeMarkup.supplierFare", 0] },
+              else: { $ifNull: ["$markupSnapshot.supplierFare", 0] }
+            }
+          },
+          
+          markupAmount: {
+            $cond: {
+              if: { $gt: [{ $size: "$markupAudits" }, 0] },
+              then: { $arrayElemAt: ["$markupAudits.fareAfterMarkup.markupAmount", 0] },
+              else: { $ifNull: ["$markupSnapshot.markupAmount", 0] }
+            }
+          },
+          
+          serviceCharge: {
+            $reduce: {
+              input: {
+                $filter: {
+                  input: "$serviceFees",
+                  as: "sf",
+                  cond: { $in: ["$$sf.action", ["book", "re-issued"]] }
+                }
+              },
+              initialValue: 0,
+              in: { $add: ["$$value", { $ifNull: ["$$this.amountDeducted", 0] }] }
+            }
+          }
+        }
+      },
+      // Ensure numeric and fallback to pricingSnapshot for older bookings
+      {
+        $addFields: {
+          rawSupplierFare: { $ifNull: ["$supplierFare", 0] },
+          rawMarkup: { $ifNull: ["$markupAmount", 0] },
+          serviceCharge: { $ifNull: ["$serviceCharge", 0] }
+        }
+      },
+      {
+        $addFields: {
+          supplierFare: {
+            $cond: {
+              if: { $and: [{ $eq: ["$rawSupplierFare", 0] }, { $eq: ["$rawMarkup", 0] }] },
+              then: { $ifNull: ["$pricingSnapshot.totalAmount", 0] },
+              else: "$rawSupplierFare"
+            }
+          },
+          markupAmount: "$rawMarkup"
+        }
+      },
+      // Total Revenue
+      {
+        $addFields: {
+          totalRevenue: { $add: ["$supplierFare", "$markupAmount", "$serviceCharge"] }
+        }
+      }
+    ];
+    return pipeline;
+  };
+
+  const [flightData, hotelData] = await Promise.all([
+    BookingRequest.aggregate(buildPipeline("flight")),
+    HotelBookingRequest.aggregate(buildPipeline("hotel"))
+  ]);
+
+  const allBookings = [...flightData, ...hotelData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const summary = {
+    grandTotal: 0,
+    totalSupplierFare: 0,
+    totalMarkup: 0,
+    totalServiceCharge: 0,
+    totalBookings: allBookings.length
+  };
+
+  const companyMap = {};
+  const dailyMap = {};
+
+  allBookings.forEach(b => {
+    summary.grandTotal += b.totalRevenue;
+    summary.totalSupplierFare += b.supplierFare;
+    summary.totalMarkup += b.markupAmount;
+    summary.totalServiceCharge += b.serviceCharge;
+
+    // Company grouping
+    const cId = b.corporateId.toString();
+    if (!companyMap[cId]) {
+      companyMap[cId] = {
+        corporateId: cId,
+        revenue: 0,
+        bookings: 0
+      };
+    }
+    companyMap[cId].revenue += b.totalRevenue;
+    companyMap[cId].bookings += 1;
+
+    // Daily grouping
+    const dateStr = new Date(b.createdAt).toISOString().split('T')[0];
+    if (!dailyMap[dateStr]) {
+      dailyMap[dateStr] = {
+        date: dateStr,
+        totalRevenue: 0,
+        flightRev: 0,
+        hotelRev: 0
+      };
+    }
+    dailyMap[dateStr].totalRevenue += b.totalRevenue;
+    if (b.bookingType === "flight") dailyMap[dateStr].flightRev += b.totalRevenue;
+    else dailyMap[dateStr].hotelRev += b.totalRevenue;
+  });
+
+  res.status(200).json(new ApiResponse(200, {
+    summary,
+    daily: Object.values(dailyMap).sort((a,b) => new Date(a.date) - new Date(b.date)),
+    companyWise: Object.values(companyMap).sort((a,b) => b.revenue - a.revenue),
+    drillDownData: allBookings.map(b => ({
+      id: b._id,
+      date: b.createdAt,
+      reference: b.bookingReference,
+      orderId: b.orderId || b.bookingReference,
+      type: b.bookingType === "flight" ? "Flight" : "Hotel",
+      employee: `${b.travellers?.[0]?.firstName || "—"} ${b.travellers?.[0]?.lastName || ""}`,
+      email: b.travellers?.[0]?.email || "—",
+      status: b.executionStatus,
+      paymentId: b.payment?.paymentId || null,
+      paymentMethod: b.payment?.method || null,
+      supplierFare: b.supplierFare,
+      markupAmount: b.markupAmount,
+      serviceCharge: b.serviceCharge,
+      amount: b.totalRevenue
+    }))
+  }, "Total revenue breakdown fetched"));
 });

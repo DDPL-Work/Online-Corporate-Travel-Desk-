@@ -212,7 +212,7 @@ export default function ProjectManagement() {
              </div>
           </div>
 
-          <button onClick={() => navigate("/projects-table")} className="group bg-[#E7C695] hover:bg-white text-[#000D26] px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3 active:scale-[0.98]">
+          <button onClick={() => navigate("/projects-table")} className="group bg-[#C9A240] hover:bg-white text-[#000D26] px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3 active:scale-[0.98]">
              View Projects <HiArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
@@ -287,7 +287,7 @@ export default function ProjectManagement() {
                       </span>
                     ) : "Upload"}
                   </button>
-                  <button onClick={removeFile} className="flex-1 py-5 rounded-[1.2rem] border-2 border-slate-100 font-black text-xs uppercase tracking-[0.2em] transition-all hover:bg-slate-50 text-slate-400">
+                  <button onClick={removeFile} className="flex-1 py-5 rounded-[1.2rem] border-2 border-slate-100 font-black text-xs uppercase tracking-[0.2em] transition-all hover:bg-slate-50 text-white cursor-pointer" style={{background: C.red}}>
                     Cancel
                   </button>
                 </div>

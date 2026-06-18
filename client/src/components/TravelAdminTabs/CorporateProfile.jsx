@@ -19,9 +19,10 @@ import {
   FiDollarSign,
   FiInfo,
 } from "react-icons/fi";
-import { FaBuilding, FaRupeeSign } from "react-icons/fa";
+import { FaBuilding, FaRupeeSign, FaPlane, FaHotel } from "react-icons/fa";
 import { fetchCorporateAdmin, updateCorporateAdmin } from "../../Redux/Slice/corporateAdminSlice";
 import { C } from "../Shared/color";
+import ServiceFeesModal from "./Modal/ServiceFeesModal";
 
 const CORPORATE_FIELDS = [
   { key: "corporateName", label: "Company Name", icon: FiUser, type: "text" },
@@ -74,10 +75,12 @@ const getNestedValue = (obj, path) => {
   return path.split('.').reduce((acc, part) => acc && acc[part], obj) || "";
 };
 
-export default function TravelAdminProfile() {
+export default function CorporateProfile() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { corporate, loading } = useSelector((state) => state.corporateAdmin);
+
+  const [showFeesModal, setShowFeesModal] = useState(false);
 
   useEffect(() => { dispatch(fetchCorporateAdmin()); }, [dispatch]);
 
@@ -171,6 +174,14 @@ export default function TravelAdminProfile() {
                   <InfoRow icon={FiMail} value={corporate.primaryContact?.email || "—"} label="Contact Email" />
                   <InfoRow icon={FiPhone} value={corporate.primaryContact?.mobile || "—"} label="Contact Mobile" />
                 </div>
+
+                <button 
+                  onClick={() => setShowFeesModal(true)}
+                  className="mt-6 w-full py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl flex items-center justify-center gap-2 text-[11px] font-black text-slate-600 hover:text-[#003399] hover:border-[#003399]/30 hover:bg-blue-50 transition-all uppercase tracking-widest"
+                >
+                  <FiDollarSign size={14} />
+                  View All Service Fees
+                </button>
               </div>
             </div>
           </div>
@@ -341,7 +352,7 @@ export default function TravelAdminProfile() {
               </div>
             </div>
 
-            {/* Platform Engagement Fees */}
+            {/* Service Fees */}
             <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
               <div className="p-8 border-b border-slate-50 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-sm">
@@ -354,26 +365,23 @@ export default function TravelAdminProfile() {
               </div>
 
               <div className="p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                  <div className="space-y-6">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Flight Fees (Per Passenger)</p>
-                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <InfoRow label="Domestic" value={`₹${corporate.serviceCharges?.domesticFlight?.toLocaleString() || "0"}`} />
-                        <InfoRow label="Intl One-Way" value={`₹${corporate.serviceCharges?.internationalOneWayFlight?.toLocaleString() || "0"}`} />
-                        <InfoRow label="Intl Return" value={`₹${corporate.serviceCharges?.internationalReturnFlight?.toLocaleString() || "0"}`} />
-                     </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-[#F8FAFC] border border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                      <FiInfo size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Complete Fee Schedule</h4>
+                      <p className="text-[10px] text-slate-500 font-bold mt-0.5">View all defined company rules, including inactive ones and other categories.</p>
+                    </div>
                   </div>
-                  <div className="space-y-6">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Hotel Fees (Per Booking)</p>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <InfoRow label="Domestic" value={`₹${corporate.serviceCharges?.domesticHotel?.toLocaleString() || "0"}`} />
-                        <InfoRow label="International" value={`₹${corporate.serviceCharges?.internationalHotel?.toLocaleString() || "0"}`} />
-                     </div>
-                  </div>
-                </div>
-                <div className="mt-8 p-4 rounded-2xl bg-slate-50 border flex items-center gap-3" style={{ borderColor: C.border }}>
-                  <FiInfo className="text-gold shrink-0" />
-                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest italic">Fees are set by the platform admin. Please contact support if you have any questions.</p>
+                  <button 
+                    onClick={() => setShowFeesModal(true)}
+                    className="px-6 py-2.5 bg-[#003399] text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-800 transition-colors shadow-md shadow-[#003399]/20 whitespace-nowrap"
+                  >
+                    View All Fees
+                  </button>
                 </div>
               </div>
             </div>
@@ -381,6 +389,12 @@ export default function TravelAdminProfile() {
           </div>
         </div>
       </div>
+      
+      <ServiceFeesModal 
+        isOpen={showFeesModal} 
+        onClose={() => setShowFeesModal(false)} 
+        rules={corporate.serviceFeeRules} 
+      />
     </div>
   );
 }

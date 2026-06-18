@@ -1357,7 +1357,9 @@ export default function FlightBookingDetails() {
             ? "/corporate-wallet"
             : source === "postpaid"
               ? "/credit-utilization"
-              : "/total-bookings";
+              : location.state?.fromProjectExpenditure
+                ? -1
+                : "/total-bookings";
 
   const backLabel =
     source === "cancelled"
@@ -1497,7 +1499,10 @@ export default function FlightBookingDetails() {
         {/* Top bar: back + order ID + status */}
         <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
           <button
-            onClick={() => navigate(backPath, { state: location.state })}
+            onClick={() => {
+              if (backPath === -1) navigate(-1);
+              else navigate(backPath, { state: location.state });
+            }}
             className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-[0.12em] uppercase text-[#7A7068] hover:text-[#1A1714] transition-colors"
           >
             <FiArrowLeft size={14} /> {backLabel}

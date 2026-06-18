@@ -328,14 +328,18 @@ else {
           productType: "Flight",
           operation: "Cancel",
           tripType: (() => {
-            const f = booking.flightRequest;
-            if (!f) return "Domestic";
-            const firstSeg = f.segments?.[0];
-            const lastSeg = f.segments?.[f.segments.length - 1];
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
             const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
-            return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
           })(),
-          cabinClass: booking.flightRequest?.segments?.[0]?.cabinClass,
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
           baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
         }
       );
@@ -417,6 +421,10 @@ exports.partialCancellation = async (req, res) => {
     const returnPassengers =
       booking?.bookingResult?.returnResponse?.raw?.Response?.Response
         ?.FlightItinerary?.Passenger || [];
+    const providerPassengers =
+      booking?.bookingResult?.providerResponse?.Response?.Response
+        ?.FlightItinerary?.Passenger || 
+      booking?.bookingResult?.providerResponse?.FlightItinerary?.Passenger || [];
 
     const selectPassengersByBookingId = (id) => {
       if (
@@ -429,10 +437,24 @@ exports.partialCancellation = async (req, res) => {
           ?.FlightItinerary?.BookingId === id
       )
         return returnPassengers;
+      if (
+        booking?.bookingResult?.providerResponse?.Response?.Response
+          ?.FlightItinerary?.BookingId === id ||
+        booking?.bookingResult?.providerResponse?.FlightItinerary?.BookingId === id ||
+        booking?.bookingResult?.bookingId === id
+      )
+        return providerPassengers;
+        
       return [];
     };
 
-    const chosenPassengers = selectPassengersByBookingId(tboBookingId);
+    let chosenPassengers = selectPassengersByBookingId(tboBookingId);
+    
+    // Fallback if empty and we only have one set of passengers anyway
+    if (!chosenPassengers.length) {
+       if (providerPassengers.length) chosenPassengers = providerPassengers;
+       else if (onwardPassengers.length && !returnPassengers.length) chosenPassengers = onwardPassengers;
+    }
 
     const ticketIdsFromBooking =
       chosenPassengers
@@ -520,12 +542,14 @@ exports.partialCancellation = async (req, res) => {
         type: "PARTIAL_CANCEL",
         changeRequestIds,
         status: "requested",
+        sectors,
         response: result,
       },
       amendmentHistory: {
         type: "PARTIAL_CANCEL",
-        changeRequestId,
+        changeRequestIds,
         status: "requested",
+        sectors,
         response: result,
         createdAt: new Date(),
       },
@@ -542,14 +566,18 @@ exports.partialCancellation = async (req, res) => {
           productType: "Flight",
           operation: "Cancel",
           tripType: (() => {
-            const f = booking.flightRequest;
-            if (!f) return "Domestic";
-            const firstSeg = f.segments?.[0];
-            const lastSeg = f.segments?.[f.segments.length - 1];
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
             const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
-            return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
           })(),
-          cabinClass: booking.flightRequest?.segments?.[0]?.cabinClass,
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
           baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
         }
       );
@@ -637,14 +665,18 @@ exports.amendBooking = async (req, res) => {
           productType: "Flight",
           operation: "Re-Issue",
           tripType: (() => {
-            const f = booking.flightRequest;
-            if (!f) return "Domestic";
-            const firstSeg = f.segments?.[0];
-            const lastSeg = f.segments?.[f.segments.length - 1];
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
             const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
-            return isIndia(firstSeg?.origin?.countryCode || firstSeg?.origin?.country) && isIndia(lastSeg?.destination?.countryCode || lastSeg?.destination?.country) ? "Domestic" : "International";
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
           })(),
-          cabinClass: booking.flightRequest?.segments?.[0]?.cabinClass,
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
           baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
         }
       );

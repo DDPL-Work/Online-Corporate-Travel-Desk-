@@ -2160,8 +2160,10 @@ exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
   }
 
   const expenses = await HotelBookingRequest.find(query)
+    .select(
+      "_id userId executionStatus status cancelStatus amendment.status hotelRequest.purposeOfTravel pricingSnapshot.totalAmount bookingSnapshot.amount bookingSnapshot.hotelName hotelRequest.selectedHotel.hotelName hotelRequest.city hotelRequest.cityName hotelRequest.selectedHotel.city hotelRequest.selectedHotel.cityName bookingSnapshot.city createdAt orderId travellers bookingType"
+    )
     .populate("userId", "name email")
-    .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });
 
   res

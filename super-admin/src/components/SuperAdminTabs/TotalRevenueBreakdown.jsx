@@ -48,10 +48,6 @@ import {
 import {
   fetchRevenueSummary,
   fetchCompanyWiseRevenue,
-  fetchMonthlyRevenue,
-  fetchQuarterlyRevenue,
-  fetchHalfYearlyRevenue,
-  fetchYearlyRevenue,
   fetchDailyRevenue,
   fetchCorporateDetailedBookings,
 } from "../../Redux/Actions/corporate.related.thunks";
@@ -112,7 +108,7 @@ const Avatar = ({ name = "", classification = "postpaid" }) => {
 };
 const ITEMS_PER_PAGE = 10;
 
-export default function CorporateRevenue() {
+export default function TotalRevenueBreakdown() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const leaderboardScrollRef = useRef(null);
@@ -127,10 +123,6 @@ export default function CorporateRevenue() {
 
   const [summary, setSummary] = useState(null);
   const [companyWise, setCompanyWise] = useState([]);
-  const [monthly, setMonthly] = useState([]);
-  const [quarterly, setQuarterly] = useState([]);
-  const [halfYearly, setHalfYearly] = useState([]);
-  const [yearly, setYearly] = useState([]);
   const [daily, setDaily] = useState([]);
   const [corporates, setCorporates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -287,10 +279,10 @@ export default function CorporateRevenue() {
       key: "corporate_revenue_leaderboard",
       pageHeader: "Corporate Revenue Leaderboard",
       statCards: [
-        { label: "Total Revenue", value: inr(summary?.totalRevenue) },
-        { label: "Flight Revenue", value: inr(summary?.flights?.totalRevenue) },
-        { label: "Hotel Revenue", value: inr(summary?.hotels?.totalRevenue) },
-        { label: "Avg Booking Value", value: inr(summary?.avgBookingValue) }
+        { label: "Grand Total Revenue", value: inr(summary?.grandTotal) },
+        { label: "Supplier Fares", value: inr(summary?.totalSupplierFare) },
+        { label: "Total Markup", value: inr(summary?.totalMarkup) },
+        { label: "Service Charges", value: inr(summary?.totalServiceCharge) }
       ],
       appliedFilters: [
         { label: "Date Range", value: dateRange },
@@ -375,33 +367,21 @@ export default function CorporateRevenue() {
         current.setMonth(current.getMonth() + 1);
       }
       
-      (monthly || []).forEach(d => {
-        const tKey = d.month || d.label || d._id;
-        let dObj = new Date(d.date || d._id || tKey);
-        
-        // If the label is just "Jun", JS might parse it incorrectly or to the wrong year.
-        if ((isNaN(dObj) || dObj.getFullYear() < 2010) && typeof tKey === "string") {
-          dObj = new Date(`1 ${tKey} ${sDate.getFullYear()}`);
-        }
+      (daily || []).forEach(d => {
+        const dObj = new Date(d.date || d._id || d.label);
         
         if (!isNaN(dObj)) {
           const matchedKey = `${dObj.toLocaleString('en-US', {month:'short'})} ${dObj.getFullYear()}`;
           if (timeMap[matchedKey]) {
             timeMap[matchedKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
             timeMap[matchedKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
-          } else if (timeMap[tKey]) {
-            timeMap[tKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
-            timeMap[tKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
           }
-        } else if (timeMap[tKey]) {
-          timeMap[tKey].flightRev += (d.flightRev || d.flights?.totalRevenue || 0);
-          timeMap[tKey].hotelRev += (d.hotelRev || d.hotels?.totalRevenue || 0);
         }
       });
     }
 
     return Object.values(timeMap).sort((a, b) => a.sortVal - b.sortVal);
-  }, [computedDates, dateRange, daily, monthly]);
+  }, [computedDates, dateRange, daily]);
 
   const xDataKey = "label";
 
@@ -431,24 +411,11 @@ export default function CorporateRevenue() {
     };
 
     try {
-      const [sumRes, compRes, monRes, quartRes, halfRes, yearRes, dailyRes] =
-        await Promise.all([
-          dispatch(fetchRevenueSummary(params)).unwrap(),
-          dispatch(fetchCompanyWiseRevenue(params)).unwrap(),
-          dispatch(fetchMonthlyRevenue(params)).unwrap(),
-          dispatch(fetchQuarterlyRevenue(params)).unwrap(),
-          dispatch(fetchHalfYearlyRevenue(params)).unwrap(),
-          dispatch(fetchYearlyRevenue(params)).unwrap(),
-          dispatch(fetchDailyRevenue(params)).unwrap(),
-        ]);
-
-      setSummary(sumRes.data);
-      setCompanyWise(compRes.data);
-      setMonthly(monRes.data);
-      setQuarterly(quartRes.data);
-      setHalfYearly(halfRes.data);
-      setYearly(yearRes.data);
-      setDaily(dailyRes.data);
+      const res = await api.get("/corporate-related/revenue/total-breakdown", { params });
+      const data = res.data.data;
+      setSummary(data.summary);
+      setCompanyWise(data.companyWise);
+      setDaily(data.daily);
       setLeaderboardPage(1);
     } catch (err) {
       toast.error(err.message || "Failed to fetch revenue data");
@@ -914,41 +881,36 @@ export default function CorporateRevenue() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
-          label="Total Revenue"
-          value={inr(summary?.totalRevenue)}
+          label="Grand Total Revenue"
+          value={inr(summary?.grandTotal)}
           icon={<FaRupeeSign />}
           borderCls="border-[#000D26]"
           iconBgCls="bg-slate-100"
           iconColorCls="text-[#000D26]"
-          trend="+12.5%"
-          isGood={true}
         />
         <KPICard
-          label="Flight Revenue"
-          value={inr(summary?.flights?.totalRevenue)}
+          label="Supplier Fares"
+          value={inr(summary?.totalSupplierFare)}
           icon={<FaPlane />}
-          borderCls="border-[#003399]"
-          iconBgCls="bg-[#003399]/10"
-          iconColorCls="text-[#003399]"
-          subLabel={`${summary?.flights?.totalBookings} Bookings`}
+          borderCls="border-sky-500"
+          iconBgCls="bg-sky-50"
+          iconColorCls="text-sky-600"
         />
         <KPICard
-          label="Hotel Revenue"
-          value={inr(summary?.hotels?.totalRevenue)}
-          icon={<FaBuilding />}
-          borderCls="border-[#d97706]"
-          iconBgCls="bg-[#d97706]/10"
-          iconColorCls="text-[#d97706]"
-          subLabel={`${summary?.hotels?.totalBookings} Bookings`}
-        />
-        <KPICard
-          label="Avg Booking Value"
-          value={inr(summary?.avgBookingValue)}
+          label="Total Markup"
+          value={inr(summary?.totalMarkup)}
           icon={<FiTrendingUp />}
           borderCls="border-emerald-500"
           iconBgCls="bg-emerald-50"
           iconColorCls="text-emerald-600"
-          subLabel="Per successful booking"
+        />
+        <KPICard
+          label="Service Charges"
+          value={inr(summary?.totalServiceCharge)}
+          icon={<FaChartLine />}
+          borderCls="border-amber-500"
+          iconBgCls="bg-amber-50"
+          iconColorCls="text-amber-600"
         />
       </div>
 
@@ -1234,163 +1196,6 @@ export default function CorporateRevenue() {
               </p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter leading-none">
-              Company Leaderboard
-            </h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-none mt-2">
-              Ranking based on transaction volume
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Pagination
-              currentPage={leaderboardPage}
-              totalPages={Math.ceil(companyWise.length / ITEMS_PER_PAGE)}
-              onPageChange={setLeaderboardPage}
-              showFirstLast={false}
-            />
-            <TableActionBar
-              scrollRef={leaderboardScrollRef}
-              exportLabel="Export"
-              onExport={handleLeaderboardExport}
-              exportDisabled={exportingKey === "corporate_revenue_leaderboard"}
-              exportLoading={exportingKey === "corporate_revenue_leaderboard"}
-              exportClassName="bg-slate-900 hover:bg-black shadow-black/10"
-              arrowClassName="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 disabled:hover:bg-slate-50"
-            />
-          </div>
-        </div>
-
-        <div ref={leaderboardScrollRef} className="overflow-x-auto">
-          <table className="min-w-305 w-full table-fixed text-left border-collapse">
-            <thead>
-              <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Rank</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Company</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Account Type</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Total Bookings</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90">Revenue Spread</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 text-right">Revenue</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 text-right">Contribution</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest opacity-90 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {paginatedLeaderboard.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="py-20 text-center">
-                    <div className="flex flex-col items-center">
-                      <FiActivity size={40} className="text-slate-200 mb-3" />
-                      <p className="text-slate-400 font-bold uppercase text-xs">
-                        No company data available
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedLeaderboard.map((c, i) => {
-                  const rank = (leaderboardPage - 1) * ITEMS_PER_PAGE + i + 1;
-                  return (
-                    <tr
-                      key={c.corporateId}
-                      className="h-21 hover:bg-slate-50/50 transition-all group"
-                    >
-                      <td className="px-6 py-4 align-middle font-black text-slate-300 group-hover:text-[#003399] whitespace-nowrap">
-                        #{String(rank).padStart(2, "0")}
-                      </td>
-                      <td className="px-6 py-4 align-middle">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 font-black text-[15px] capitalize group-hover:bg-[#003399]/10 group-hover:text-[#003399] transition-colors">
-                            {c.companyName[0]}
-                          </div>
-                          <span className="block max-w-60 font-black text-[13px] leading-snug text-slate-800 tracking-tight">
-                            {c.companyName}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 align-middle">
-                        <span
-                          className={`inline-flex min-w-29 items-center justify-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                            c.accountType === "postpaid"
-                              ? "bg-purple-50 text-purple-700 border-purple-100"
-                              : "bg-emerald-50 text-emerald-700 border-emerald-100"
-                          }`}
-                        >
-                          {c.accountType}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 align-middle">
-                        <div className="flex items-center">
-                          <span className="inline-flex min-w-27.5 items-center justify-center px-3 py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-600 tracking-tighter uppercase leading-none">
-                            {c.bookings} Bookings
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 align-middle">
-                        <div className="w-42.5 space-y-2 leading-none">
-                          <div className="flex justify-between text-[9px] font-black uppercase text-slate-400 tracking-widest">
-                            <span>
-                              F:{" "}
-                              {Math.round(
-                                (c.flightRev / (c.revenue || 1)) * 100,
-                              )}
-                              %
-                            </span>
-                            <span>
-                              H:{" "}
-                              {Math.round(
-                                (c.hotelRev / (c.revenue || 1)) * 100,
-                              )}
-                              %
-                            </span>
-                          </div>
-                          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
-                            <div
-                              className="h-full bg-[#003399]"
-                              style={{
-                                width: `${(c.flightRev / (c.revenue || 1)) * 100}%`,
-                              }}
-                            />
-                            <div
-                              className="h-full bg-[#d97706]"
-                              style={{
-                                width: `${(c.hotelRev / (c.revenue || 1)) * 100}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 align-middle text-right">
-                        <span className="text-[13px] font-black text-slate-900 tracking-tight whitespace-nowrap">
-                          {inr(c.revenue)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 align-middle text-right">
-                        <div className="flex items-center justify-end gap-1.5 text-emerald-600 font-black text-[10px] tracking-tighter whitespace-nowrap">
-                          <FiArrowUpRight size={10} />{" "}
-                          {c.contribution.toFixed(1)}%
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 align-middle text-center">
-                        <button
-                          onClick={() => setDrillDownId(c.corporateId)}
-                          className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-[#003399] hover:bg-[#003399]/10 hover:border-[#003399]/20 transition-all hover:scale-110 active:scale-95 mx-auto"
-                          title="View Detailed Revenue"
-                        >
-                          <FiEye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
       </div>

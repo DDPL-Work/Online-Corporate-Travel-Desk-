@@ -336,8 +336,9 @@ function FlightCard({
     // 1. Check if already in segment (unlikely but safe)
     const segMatch = segments.find(
       (s) =>
-        (isOrigin ? s.origin?.airportCode || s.origin?.code : s.destination?.airportCode || s.destination?.code) ===
-        code,
+        (isOrigin
+          ? s.origin?.airportCode || s.origin?.code
+          : s.destination?.airportCode || s.destination?.code) === code,
     );
     const existing = isOrigin
       ? segMatch?.origin?.airportName || segMatch?.origin?.AirportName
@@ -458,8 +459,10 @@ function FlightCard({
                 {formatDate(firstSeg?.departureDateTime)}
               </div>
               <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
-                {originAirportName || journeyOrigin?.airportCode || journeyOrigin?.code} <br />{" "}
-                Terminal: {journeyOrigin?.terminal || "Not Available"}
+                {originAirportName ||
+                  journeyOrigin?.airportCode ||
+                  journeyOrigin?.code}{" "}
+                <br /> Terminal: {journeyOrigin?.terminal || "Not Available"}
               </div>
             </div>
 
@@ -490,8 +493,11 @@ function FlightCard({
                 {formatDate(lastSeg?.arrivalDateTime)}
               </div>
               <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
-                {destAirportName || journeyDestination?.airportCode || journeyDestination?.code} <br />{" "}
-                Terminal: {journeyDestination?.terminal || "Not Available"}
+                {destAirportName ||
+                  journeyDestination?.airportCode ||
+                  journeyDestination?.code}{" "}
+                <br /> Terminal:{" "}
+                {journeyDestination?.terminal || "Not Available"}
               </div>
             </div>
           </div>
@@ -599,7 +605,9 @@ function PaymentStatusCard({
   ].filter((item) => !item.hidden);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9] mb-8">
+    <div
+      className={`grid ${!isTravelAdmin ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-3"} gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9] mb-8`}
+    >
       {items.map((item, i) => (
         <div key={i} className="bg-white p-5">
           <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
@@ -705,8 +713,21 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   if (!activeTravelers.length) return null;
 
   const renderPrice = (price) => {
-    if (price > 0) return !isEmployee ? <span className="text-[11px] text-[#B5862A] ml-1 whitespace-nowrap">(₹{price})</span> : <span className="text-[11px] text-[#B5862A] ml-1 whitespace-nowrap">(Selected)</span>;
-    return <span className="text-[11px] text-[#A89F94] italic ml-1 whitespace-nowrap">(Free)</span>;
+    if (price > 0)
+      return !isEmployee ? (
+        <span className="text-[11px] text-[#B5862A] ml-1 whitespace-nowrap">
+          (₹{price})
+        </span>
+      ) : (
+        <span className="text-[11px] text-[#B5862A] ml-1 whitespace-nowrap">
+          (Selected)
+        </span>
+      );
+    return (
+      <span className="text-[11px] text-[#A89F94] italic ml-1 whitespace-nowrap">
+        (Free)
+      </span>
+    );
   };
 
   return (
@@ -736,20 +757,29 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
           // Group by segment for this traveler
           const bySegment = {};
           const addBySeg = (item, type) => {
-            const sIdx = item.segmentIndex !== undefined ? item.segmentIndex : "unknown";
+            const sIdx =
+              item.segmentIndex !== undefined ? item.segmentIndex : "unknown";
             if (!bySegment[sIdx]) {
-              bySegment[sIdx] = { seats: [], meals: [], baggage: [], specialServices: [] };
+              bySegment[sIdx] = {
+                seats: [],
+                meals: [],
+                baggage: [],
+                specialServices: [],
+              };
             }
             bySegment[sIdx][type].push(item);
           };
 
-          data.seats.forEach(i => addBySeg(i, 'seats'));
-          data.meals.forEach(i => addBySeg(i, 'meals'));
-          data.baggage.forEach(i => addBySeg(i, 'baggage'));
-          data.specialServices.forEach(i => addBySeg(i, 'specialServices'));
+          data.seats.forEach((i) => addBySeg(i, "seats"));
+          data.meals.forEach((i) => addBySeg(i, "meals"));
+          data.baggage.forEach((i) => addBySeg(i, "baggage"));
+          data.specialServices.forEach((i) => addBySeg(i, "specialServices"));
 
           return (
-            <div key={travelerIdx} className="overflow-hidden border border-[#EAE4D9] shadow-sm">
+            <div
+              key={travelerIdx}
+              className="overflow-hidden border border-[#EAE4D9] shadow-sm"
+            >
               <div className="bg-[#FAF8F4] px-5 py-4 border-b border-[#EAE4D9] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white border border-[#F0E0A8] flex items-center justify-center shrink-0">
@@ -759,7 +789,9 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                     <h4 className="text-[14px] font-semibold text-[#1A1714]">
                       {travelerName(idx)}
                     </h4>
-                    <span className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-widest">{paxTypeLabel}</span>
+                    <span className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-widest">
+                      {paxTypeLabel}
+                    </span>
                   </div>
                 </div>
                 {passengerTotal > 0 && !isEmployee && (
@@ -772,49 +804,100 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#FAF8F4] border-b border-[#EAE4D9]">
-                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#B5862A] border-r border-[#EAE4D9] min-w-[120px]">Route</th>
-                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[120px]">Seat</th>
-                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[150px]">Meal</th>
-                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[150px]">Baggage</th>
-                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] min-w-[150px]">Special Service</th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#B5862A] border-r border-[#EAE4D9] min-w-[120px]">
+                        Route
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[120px]">
+                        Seat
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[150px]">
+                        Meal
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[150px]">
+                        Baggage
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] min-w-[150px]">
+                        Special Service
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(bySegment).map(([sIdx, items], rowIdx, arr) => (
-                      <tr key={sIdx} className={rowIdx < arr.length - 1 ? "border-b border-[#EAE4D9]" : ""}>
-                        <td className="px-5 py-4 text-[12px] font-semibold text-[#1A1714] border-r border-[#EAE4D9] whitespace-nowrap">
-                          {sIdx === "unknown" ? "Any Route" : segRoute(sIdx) || "Unknown Route"}
-                        </td>
-                        <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
-                          {items.seats.length > 0 ? items.seats.map((s, i) => (
-                            <div key={i} className="mb-1 last:mb-0">
-                              {s.seatNo} {renderPrice(s.price)}
-                            </div>
-                          )) : <span className="text-[#A89F94]">-</span>}
-                        </td>
-                        <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
-                          {items.meals.length > 0 ? items.meals.map((m, i) => (
-                            <div key={i} className="mb-1 last:mb-0">
-                              {m.airlineDescription || m.AirlineDescription || m.code} {m.description && typeof m.description === "string" && isNaN(Number(m.description)) ? `· ${m.description}` : ""} {renderPrice(m.price)}
-                            </div>
-                          )) : <span className="text-[#A89F94]">-</span>}
-                        </td>
-                        <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
-                          {items.baggage.length > 0 ? items.baggage.map((b, i) => (
-                            <div key={i} className="mb-1 last:mb-0">
-                              {b.weight || b.description || "Extra"} {renderPrice(b.price)}
-                            </div>
-                          )) : <span className="text-[#A89F94]">-</span>}
-                        </td>
-                        <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714]">
-                          {items.specialServices.length > 0 ? items.specialServices.map((ss, i) => (
-                            <div key={i} className="mb-1 last:mb-0">
-                              {ss.text || ss.Text || ss.code || ss.Code || "Special Service"} {renderPrice(ss.price || ss.Price)}
-                            </div>
-                          )) : <span className="text-[#A89F94]">-</span>}
-                        </td>
-                      </tr>
-                    ))}
+                    {Object.entries(bySegment).map(
+                      ([sIdx, items], rowIdx, arr) => (
+                        <tr
+                          key={sIdx}
+                          className={
+                            rowIdx < arr.length - 1
+                              ? "border-b border-[#EAE4D9]"
+                              : ""
+                          }
+                        >
+                          <td className="px-5 py-4 text-[12px] font-semibold text-[#1A1714] border-r border-[#EAE4D9] whitespace-nowrap">
+                            {sIdx === "unknown"
+                              ? "Any Route"
+                              : segRoute(sIdx) || "Unknown Route"}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
+                            {items.seats.length > 0 ? (
+                              items.seats.map((s, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {s.seatNo} {renderPrice(s.price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
+                            {items.meals.length > 0 ? (
+                              items.meals.map((m, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {m.airlineDescription ||
+                                    m.AirlineDescription ||
+                                    m.code}{" "}
+                                  {m.description &&
+                                  typeof m.description === "string" &&
+                                  isNaN(Number(m.description))
+                                    ? `· ${m.description}`
+                                    : ""}{" "}
+                                  {renderPrice(m.price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
+                            {items.baggage.length > 0 ? (
+                              items.baggage.map((b, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {b.weight || b.description || "Extra"}{" "}
+                                  {renderPrice(b.price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714]">
+                            {items.specialServices.length > 0 ? (
+                              items.specialServices.map((ss, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {ss.text ||
+                                    ss.Text ||
+                                    ss.code ||
+                                    ss.Code ||
+                                    "Special Service"}{" "}
+                                  {renderPrice(ss.price || ss.Price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ),
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -932,16 +1015,25 @@ function BookingHistory({ booking, reissueRequest }) {
     });
   }
 
-  const hasOnlineReissue = 
-    (booking.amendment && booking.amendment.status === "completed" && !isCancelled);
+  const hasOnlineReissue =
+    booking.amendment &&
+    booking.amendment.status === "completed" &&
+    !isCancelled;
 
   if (reissueRequest || hasOnlineReissue) {
-    const isCompleted = reissueRequest 
+    const isCompleted = reissueRequest
       ? ["COMPLETED", "TICKET_GENERATED"].includes(reissueRequest.status)
       : booking.amendment?.status === "completed";
-      
-    const reqDate = reissueRequest?.createdAt || booking.amendment?.requestedAt || booking.updatedAt;
-    const updDate = reissueRequest?.updatedAt || reissueRequest?.createdAt || booking.amendment?.updatedAt || booking.updatedAt;
+
+    const reqDate =
+      reissueRequest?.createdAt ||
+      booking.amendment?.requestedAt ||
+      booking.updatedAt;
+    const updDate =
+      reissueRequest?.updatedAt ||
+      reissueRequest?.createdAt ||
+      booking.amendment?.updatedAt ||
+      booking.updatedAt;
 
     steps.push({
       label: "Reissue Requested",
@@ -1406,8 +1498,6 @@ function FareRulesSection({ bookingResult, fareSnapshot, booking }) {
             </div>
           </div>
         )}
-
-
       </div>
     </div>
   );
@@ -1566,13 +1656,19 @@ export default function BookingDetails() {
   const isAmendmentPending =
     bookingAmendmentStatus === "requested" ||
     bookingAmendmentStatus === "in_progress";
-    
-  const isReissued = 
-    booking?.executionStatus?.toLowerCase() === "reissued" || 
-    (bookingOfflineRequest && ["COMPLETED", "TICKET_GENERATED"].includes(bookingOfflineRequest.status)) ||
+
+  const isReissued =
+    booking?.executionStatus?.toLowerCase() === "reissued" ||
+    (bookingOfflineRequest &&
+      ["COMPLETED", "TICKET_GENERATED"].includes(
+        bookingOfflineRequest.status,
+      )) ||
     (bookingAmendmentStatus === "completed" && !isCancelled);
-  const isReissuePending = 
-    (bookingOfflineRequest && ["RAISED", "ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(bookingOfflineRequest.status)) ||
+  const isReissuePending =
+    (bookingOfflineRequest &&
+      ["RAISED", "ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(
+        bookingOfflineRequest.status,
+      )) ||
     (isAmendmentPending && !isCancelled);
   const hasReissue = isReissued || isReissuePending;
 
@@ -1892,7 +1988,6 @@ export default function BookingDetails() {
                 )}
               </div>
               <div className="space-y-5">
-
                 {/* SSR Section */}
                 <SSRSection
                   ssrSnapshot={ssrSnapshot}
@@ -2598,7 +2693,10 @@ export default function BookingDetails() {
                       <div className="px-6 py-4 border-b border-[#EAE4D9] flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-3">
                           <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#A89F94]">
-                            {booking.amendment?.type === "AMENDMENT" || hasReissue ? "Reissue Status" : "Cancellation Status"}
+                            {booking.amendment?.type === "AMENDMENT" ||
+                            hasReissue
+                              ? "Reissue Status"
+                              : "Cancellation Status"}
                           </div>
                           {statusLabel && (
                             <span
@@ -2637,7 +2735,10 @@ export default function BookingDetails() {
                         </div>
                         <div className="px-6 py-5">
                           <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                            {booking.amendment?.type === "AMENDMENT" || hasReissue ? "Reissue Charges" : "Cancellation Charges"}
+                            {booking.amendment?.type === "AMENDMENT" ||
+                            hasReissue
+                              ? "Reissue Charges"
+                              : "Cancellation Charges"}
                           </div>
                           <div className="text-[18px] font-bold text-[#B5341A]">
                             {displayCharge !== "_"
@@ -2655,7 +2756,10 @@ export default function BookingDetails() {
                         </div>
                         <div className="px-6 py-5">
                           <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                            {booking.amendment?.type === "AMENDMENT" || hasReissue ? "Reissue Reason" : "Cancellation Reason"}
+                            {booking.amendment?.type === "AMENDMENT" ||
+                            hasReissue
+                              ? "Reissue Reason"
+                              : "Cancellation Reason"}
                           </div>
                           <div className="text-[13px] font-medium text-[#1A1714] italic">
                             "
@@ -2766,142 +2870,153 @@ export default function BookingDetails() {
               {/* Active booking — show amendment action buttons */}
               {!isCancelled &&
                 (() => {
-                   if (hasReissue) {
-                     return (
-                       <div className="bg-white border border-[#EAE4D9] p-8 text-center">
-                         <FiAlertCircle size={24} className="text-[#1A4A7A] mx-auto mb-3" />
-                         <p className="text-[13px] font-semibold text-[#1A1714]">
-                           {isReissued ? "Booking Reissued" : "Re-issue in Progress"}
-                         </p>
-                         <p className="text-[12px] text-[#7A7068] mt-1">
-                           {isReissued
-                             ? "This booking is re-issued no action can be perform now."
-                             : "A re-issue request is currently being processed. You cannot cancel or re-issue this booking again."}
-                         </p>
-                         <button
-                           onClick={() => navigate(`/my-reissued?bookingId=${booking._id}`)}
-                           className="mt-4 inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
-                         >
-                           <FiEye size={12} /> View Reissue Status
-                         </button>
-                       </div>
-                     );
-                   }
-
-                   return showCancellationChargesBtn ? (
-                  <div className="bg-white border border-[#EAE4D9] p-6">
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                      <div>
+                  if (hasReissue) {
+                    return (
+                      <div className="bg-white border border-[#EAE4D9] p-8 text-center">
+                        <FiAlertCircle
+                          size={24}
+                          className="text-[#1A4A7A] mx-auto mb-3"
+                        />
                         <p className="text-[13px] font-semibold text-[#1A1714]">
-                          Amendment Actions
+                          {isReissued
+                            ? "Booking Reissued"
+                            : "Re-issue in Progress"}
                         </p>
-                        <p className="text-[11px] text-[#A89F94] mt-0.5">
-                          Ticket is live — changes apply immediately
+                        <p className="text-[12px] text-[#7A7068] mt-1">
+                          {isReissued
+                            ? "This booking is re-issued no action can be perform now."
+                            : "A re-issue request is currently being processed. You cannot cancel or re-issue this booking again."}
                         </p>
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {eligibilityLoading ? (
-                          <span className="flex items-center gap-1.5 px-4 py-[10px] bg-[#FAF8F4] text-[#A89F94] text-[11px] font-semibold tracking-[0.12em] uppercase">
-                            <FiLoader size={12} className="animate-spin" />{" "}
-                            Checking...
-                          </span>
-                        ) : bookingOfflineRequest ? (
-                          <button
-                            onClick={() =>
-                              navigate(`/my-reissued?bookingId=${booking._id}`)
-                            }
-                            className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
-                          >
-                            <FiEye size={12} /> View Reissue Status
-                          </button>
-                        ) : isOnlineEligible ? (
-                          <button
-                            onClick={() => setShowReissueModal(true)}
-                            className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
-                          >
-                            <FiRefreshCw size={12} /> Reissue Online
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setShowReissueModal(true)}
-                            className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
-                          >
-                            <FiFileText size={12} /> Raise Reissue Request
-                          </button>
-                        )}
                         <button
-                          onClick={() => setShowCancellationModal(true)}
-                          className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#B5341A] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] transition"
+                          onClick={() =>
+                            navigate(`/my-reissued?bookingId=${booking._id}`)
+                          }
+                          className="mt-4 inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
                         >
-                          <FiXCircle size={12} /> Cancellation Charges
+                          <FiEye size={12} /> View Reissue Status
                         </button>
                       </div>
-                    </div>
-                    {eligibility && !eligibilityLoading && (
-                      <div
-                        className={`flex items-center gap-2 px-4 py-2 text-[11px] font-semibold border ${
-                          bookingOfflineRequest
-                            ? offlineReissueBadge?.className ||
-                              "bg-[#FAF8F4] text-[#7A7068] border-[#EAE4D9]"
-                            : isOnlineEligible
-                              ? "bg-[#EDF7F2] text-[#2C7A4B] border-[#C3E4D2]"
-                              : "bg-[#FDF8EE] text-[#8A6200] border-[#F0E0A8]"
-                        }`}
-                      >
-                        {bookingOfflineRequest ? (
-                          <>
-                            <FiCheckCircle size={12} />{" "}
-                            {offlineReissueBadge?.label}
-                            {bookingOfflineRequest.requestId
-                              ? ` · ${bookingOfflineRequest.requestId}`
-                              : ""}
-                          </>
-                        ) : isOnlineEligible ? (
-                          <>
-                            <FiCheckCircle size={12} /> Online Reissue Available
-                          </>
-                        ) : (
-                          <>
-                            <FiAlertCircle size={12} /> Offline Reissue Required
-                            — This booking/fare does not support online reissue
-                          </>
-                        )}
+                    );
+                  }
+
+                  return showCancellationChargesBtn ? (
+                    <div className="bg-white border border-[#EAE4D9] p-6">
+                      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div>
+                          <p className="text-[13px] font-semibold text-[#1A1714]">
+                            Amendment Actions
+                          </p>
+                          <p className="text-[11px] text-[#A89F94] mt-0.5">
+                            Ticket is live — changes apply immediately
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {eligibilityLoading ? (
+                            <span className="flex items-center gap-1.5 px-4 py-[10px] bg-[#FAF8F4] text-[#A89F94] text-[11px] font-semibold tracking-[0.12em] uppercase">
+                              <FiLoader size={12} className="animate-spin" />{" "}
+                              Checking...
+                            </span>
+                          ) : bookingOfflineRequest ? (
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/my-reissued?bookingId=${booking._id}`,
+                                )
+                              }
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
+                            >
+                              <FiEye size={12} /> View Reissue Status
+                            </button>
+                          ) : isOnlineEligible ? (
+                            <button
+                              onClick={() => setShowReissueModal(true)}
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
+                            >
+                              <FiRefreshCw size={12} /> Reissue Online
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setShowReissueModal(true)}
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
+                            >
+                              <FiFileText size={12} /> Raise Reissue Request
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowCancellationModal(true)}
+                            className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#B5341A] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] transition"
+                          >
+                            <FiXCircle size={12} /> Cancellation Charges
+                          </button>
+                        </div>
                       </div>
-                    )}
-                    <p className="text-[11px] text-[#A89F94] mt-4">
-                      Charges may apply as per fare rules. Cancellation cannot
-                      be undone.
-                    </p>
-                  </div>
-                ) : isTravelPassed ? (
-                  <div className="bg-white border border-[#EAE4D9] p-8 text-center">
-                    <FiAlertCircle
-                      size={24}
-                      className="text-[#A89F94] mx-auto mb-3"
-                    />
-                    <p className="text-[13px] font-semibold text-[#1A1714]">
-                      No Amendments Available
-                    </p>
-                    <p className="text-[12px] text-[#7A7068] mt-1">
-                      Amendments cannot be made because the travel date has
-                      already passed.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-white border border-[#EAE4D9] p-8 text-center">
-                    <FiAlertCircle
-                      size={24}
-                      className="text-[#A89F94] mx-auto mb-3"
-                    />
-                    <p className="text-[13px] font-semibold text-[#1A1714]">
-                      No Amendments Available
-                    </p>
-                    <p className="text-[12px] text-[#7A7068] mt-1">
-                      Amendments are only available for confirmed and ticketed
-                      bookings.
-                    </p>
-                  </div>
-                );
+                      {eligibility && !eligibilityLoading && (
+                        <div
+                          className={`flex items-center gap-2 px-4 py-2 text-[11px] font-semibold border ${
+                            bookingOfflineRequest
+                              ? offlineReissueBadge?.className ||
+                                "bg-[#FAF8F4] text-[#7A7068] border-[#EAE4D9]"
+                              : isOnlineEligible
+                                ? "bg-[#EDF7F2] text-[#2C7A4B] border-[#C3E4D2]"
+                                : "bg-[#FDF8EE] text-[#8A6200] border-[#F0E0A8]"
+                          }`}
+                        >
+                          {bookingOfflineRequest ? (
+                            <>
+                              <FiCheckCircle size={12} />{" "}
+                              {offlineReissueBadge?.label}
+                              {bookingOfflineRequest.requestId
+                                ? ` · ${bookingOfflineRequest.requestId}`
+                                : ""}
+                            </>
+                          ) : isOnlineEligible ? (
+                            <>
+                              <FiCheckCircle size={12} /> Online Reissue
+                              Available
+                            </>
+                          ) : (
+                            <>
+                              <FiAlertCircle size={12} /> Offline Reissue
+                              Required — This booking/fare does not support
+                              online reissue
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-[#A89F94] mt-4">
+                        Charges may apply as per fare rules. Cancellation cannot
+                        be undone.
+                      </p>
+                    </div>
+                  ) : isTravelPassed ? (
+                    <div className="bg-white border border-[#EAE4D9] p-8 text-center">
+                      <FiAlertCircle
+                        size={24}
+                        className="text-[#A89F94] mx-auto mb-3"
+                      />
+                      <p className="text-[13px] font-semibold text-[#1A1714]">
+                        No Amendments Available
+                      </p>
+                      <p className="text-[12px] text-[#7A7068] mt-1">
+                        Amendments cannot be made because the travel date has
+                        already passed.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[#EAE4D9] p-8 text-center">
+                      <FiAlertCircle
+                        size={24}
+                        className="text-[#A89F94] mx-auto mb-3"
+                      />
+                      <p className="text-[13px] font-semibold text-[#1A1714]">
+                        No Amendments Available
+                      </p>
+                      <p className="text-[12px] text-[#7A7068] mt-1">
+                        Amendments are only available for confirmed and ticketed
+                        bookings.
+                      </p>
+                    </div>
+                  );
                 })()}
             </div>
           )}
@@ -2984,7 +3099,10 @@ export default function BookingDetails() {
 
           {activeTab === "history" && (
             <div className="space-y-6">
-              <BookingHistory booking={booking} reissueRequest={bookingOfflineRequest} />
+              <BookingHistory
+                booking={booking}
+                reissueRequest={bookingOfflineRequest}
+              />
             </div>
           )}
         </div>
