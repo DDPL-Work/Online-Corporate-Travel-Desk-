@@ -16,6 +16,7 @@ import {
   sendHotelAmendment,
   fetchCancellationQueries,
   updateCancellationQueryStatus,
+  fetchTboCommissions,
 } from "../Actions/corporate.related.thunks";
 
 const initialState = {
@@ -81,6 +82,11 @@ const initialState = {
 
   updatingCancellationQuery: false,
   updateCancellationQueryError: null,
+
+  // 💰 TBO Commissions
+  tboCommissions: [],
+  loadingTboCommissions: false,
+  tboCommissionsError: null,
 
   error: null,
 };
@@ -393,6 +399,22 @@ const corporateRelatedSlice = createSlice({
       .addCase(updateCancellationQueryStatus.rejected, (state, action) => {
         state.updatingCancellationQuery = false;
         state.updateCancellationQueryError = action.payload;
+      })
+
+      /**
+       * 💰 TBO COMMISSIONS & TAXES
+       */
+      .addCase(fetchTboCommissions.pending, (state) => {
+        state.loadingTboCommissions = true;
+        state.tboCommissionsError = null;
+      })
+      .addCase(fetchTboCommissions.fulfilled, (state, action) => {
+        state.loadingTboCommissions = false;
+        state.tboCommissions = action.payload.data || [];
+      })
+      .addCase(fetchTboCommissions.rejected, (state, action) => {
+        state.loadingTboCommissions = false;
+        state.tboCommissionsError = action.payload;
       });
   },
 });

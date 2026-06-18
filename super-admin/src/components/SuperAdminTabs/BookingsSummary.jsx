@@ -370,7 +370,10 @@ export default function GlobalBookingsDashboard() {
         b.paymentId?.toLowerCase().includes(searchText) ||
         b.empId?.toLowerCase().includes(searchText) ||
         b.bookingRef?.toLowerCase?.().includes(searchText) ||
-        formatDisplayDateTime(b.bookedDate).toLowerCase().includes(searchText);
+        b.corporate?.toLowerCase().includes(searchText) ||
+        b.pnr?.toLowerCase().includes(searchText) ||
+        formatDisplayDateTime(b.bookedDate).toLowerCase().includes(searchText) ||
+        formatDisplayDate(b.bookedDate).toLowerCase().includes(searchText);
 
       let dateMatch = true;
       if (activeTab === "Flight" && travelDate) {
@@ -471,7 +474,7 @@ export default function GlobalBookingsDashboard() {
     // Build applied filters for export
     const appliedFilters = [
       { label: "Search", value: search || "None" },
-      { label: "Corporate Account", value: corporate },
+      { label: "Company", value: corporate },
     ];
     if (activeTab === "Flight") {
       appliedFilters.push({ label: "Travel Date", value: travelDate || "Any" });
@@ -484,7 +487,7 @@ export default function GlobalBookingsDashboard() {
 
     exportExcel({
       key: exportKey,
-      pageHeader: `Global Bookings Summary - ${activeTab} Detailed Report`,
+      pageHeader: `All Bookings Summary - ${activeTab} Report`,
       statCards,
       appliedFilters,
       data: filtered,
@@ -530,10 +533,10 @@ export default function GlobalBookingsDashboard() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Global Bookings Summary
+                  All Bookings Summary
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Multi-Corporate Administration
+                  Manage company bookings
                 </p>
               </div>
             </div>
@@ -545,8 +548,8 @@ export default function GlobalBookingsDashboard() {
         {/* ── Tab Switcher ── */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           {[
-            ["Flight", "Flight Manifest", FaPlane],
-            ["Hotel", "Hotel Manifest", FaHotel],
+            ["Flight", "Flight Bookings", FaPlane],
+            ["Hotel", "Hotel Bookings", FaHotel],
           ].map(([k, lbl, Icon]) => (
             <button
               key={k}
@@ -611,7 +614,7 @@ export default function GlobalBookingsDashboard() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Traveller or booking..."
+                  placeholder="Traveler or booking..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-[13px] font-medium outline-none transition-all focus:border-[#003399] focus:ring-2 focus:ring-[#003399]/10 bg-slate-50 hover:bg-white"
@@ -623,7 +626,7 @@ export default function GlobalBookingsDashboard() {
             {/* Corporate */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Corporate Account
+                Company
               </label>
               <select
                 value={corporate}
@@ -706,7 +709,7 @@ export default function GlobalBookingsDashboard() {
             {/* Left: title + count */}
             <div>
               <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-                {activeTab} Detailed Report
+                {activeTab} Report
               </h2>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                 {sortedFiltered.length} records found
@@ -799,7 +802,7 @@ export default function GlobalBookingsDashboard() {
           <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex flex-wrap gap-2 justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
             <span>Showing {sortedFiltered.length} {activeTab} Records</span>
             <span>
-              Est. Market Value:{" "}
+              Total Value:{" "}
               <span className="text-[#003399]">₹{totalSpend.toLocaleString()}</span>
             </span>
           </div>
@@ -832,7 +835,7 @@ const FlightTable = ({ data, onView, sort, onSort }) => (
           <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold">
             <SortHeader label="Booked Date" sortKey="bookedDate" sort={sort} onSort={onSort} />
           </th>
-          {["Corporate Account", "Traveller / ID"].map((h) => (
+          {["Company", "Traveler"].map((h) => (
             <th key={h} className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">
               {h}
             </th>
@@ -980,7 +983,7 @@ const HotelTable = ({ data, onView, sort, onSort }) => (
           <th className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold">
             <SortHeader label="Booked Date" sortKey="bookedDate" sort={sort} onSort={onSort} />
           </th>
-          {["Corporate Account", "Guest / ID"].map((h) => (
+          {["Company", "Guest"].map((h) => (
             <th key={h} className="px-4 xl:px-5 py-5 align-middle text-[10px] font-bold uppercase tracking-wider">
               {h}
             </th>

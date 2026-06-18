@@ -94,6 +94,26 @@ exports.amendHotelBooking = async (req, res) => {
 
     await booking.save();
 
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        booking.corporateId,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Hotel",
+          operation: "Cancel",
+          tripType: ["in", "ind", "india"].includes((booking.hotelRequest?.countryCode || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryName || "").toLowerCase()) ? "Domestic" : "International",
+          starRating: booking.hotelRequest?.selectedHotel?.starRating || booking.hotelRequest?.selectedHotel?.StarRating || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || booking.hotelRequest?.hotelDetails?.StarRating || booking.hotelRequest?.starRating || 1,
+          roomCount: booking.hotelRequest?.noOfRooms || booking.hotelRequest?.roomGuests?.length || booking.hotelRequest?.roomDetails?.length || 1,
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        }
+      );
+    } catch(err) {
+      console.error("Failed to deduct service fee for Hotel Cancellation:", err.message);
+    }
+
     res.json({
       success: true,
       message: "Amendment request sent successfully",

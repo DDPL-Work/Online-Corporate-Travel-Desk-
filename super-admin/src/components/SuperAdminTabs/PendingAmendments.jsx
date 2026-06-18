@@ -123,7 +123,7 @@ export default function PendingAmendments() {
       { label: "Search", value: searchTerm || "None" },
       { label: "From Date", value: dateFrom || "Any" },
       { label: "To Date", value: dateTo || "Any" },
-      { label: "Corporate", value: corporate },
+      { label: "Company", value: corporate },
       { label: "Type", value: type },
       { label: "Status", value: status },
       { label: "Active Tab", value: activeTab },
@@ -263,7 +263,7 @@ export default function PendingAmendments() {
               </div>
             </LabeledInput>
 
-            <LabeledInput label="Corporate">
+            <LabeledInput label="Company">
               <select
                 value={corporate}
                 onChange={(e) => setCorporate(e.target.value)}
@@ -341,7 +341,7 @@ export default function PendingAmendments() {
                     Request Date
                   </th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
-                    Corporate
+                    Company
                   </th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest">
                     Traveller / Guest

@@ -178,7 +178,8 @@ exports.getProjectsByCorporate = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ["$projectId", "$$pCode"] },
-                    { $eq: ["$corporateId", "$$cId"] }
+                    { $eq: ["$corporateId", "$$cId"] },
+                    { $in: ["$executionStatus", ["ticketed", "cancelled", "cancel_requested", "reissued"]] }
                   ]
                 }
               }
@@ -197,7 +198,8 @@ exports.getProjectsByCorporate = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ["$projectId", "$$pCode"] },
-                    { $eq: ["$corporateId", "$$cId"] }
+                    { $eq: ["$corporateId", "$$cId"] },
+                    { $in: ["$executionStatus", ["voucher_generated"]] }
                   ]
                 }
               }

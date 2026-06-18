@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { fetchManagerRequests } from "../../../Redux/Actions/travelAdmin.thunks";
+import { validateApproval } from "../../../Redux/Actions/approval.thunks";
 import { FaHotel, FaPlane } from "react-icons/fa";
 import {
   FiX,
@@ -263,6 +264,7 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
   const [searchTerm, setSearchTerm] = useState("");
   const [remark, setRemark] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [financeTeamUsers, setFinanceTeamUsers] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedApprover, setSelectedApprover] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -279,32 +281,42 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
   }, []);
 
   useEffect(() => {
-    if (!searchTerm) {
+    if (isOpen) {
+      const fetchUsers = async () => {
+        setIsSearching(true);
+        try {
+          const { data } = await api.get("/travel-admin/finance-team");
+          setFinanceTeamUsers(data.data || []);
+        } catch (err) {
+          console.error("Failed to fetch finance team", err);
+        } finally {
+          setIsSearching(false);
+        }
+      };
+      fetchUsers();
+    } else {
+      setSearchTerm("");
+      setFinanceTeamUsers([]);
       setSearchResults([]);
+      setDropdownOpen(false);
+      setRemark("");
+      setSelectedApprover(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setSearchResults(financeTeamUsers);
       return;
     }
-    const delayDebounceFn = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const { data } = await api.get("/travel-admin/all-employees");
-        const users = data.employees || [];
-        const filtered = users.filter(
-          (u) =>
-            u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setSearchResults(filtered);
-        setDropdownOpen(true);
-      } catch (err) {
-        console.error("Failed to fetch employees", err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+    const filtered = financeTeamUsers.filter(
+      (u) =>
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setSearchResults(filtered);
+  }, [searchTerm, financeTeamUsers]);
 
   if (!isOpen) return null;
 
@@ -317,6 +329,7 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setSelectedApprover(null);
+    setDropdownOpen(true);
   };
 
   const handleSubmit = () => {
@@ -353,6 +366,7 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
                 type="text"
                 value={searchTerm}
                 onChange={handleSearchChange}
+                onFocus={() => setDropdownOpen(true)}
                 placeholder="Search by name or email..."
                 className="w-full pl-10 pr-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700"
               />
@@ -373,9 +387,14 @@ export const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType
                 ))}
               </div>
             )}
-            {dropdownOpen && searchTerm && searchResults.length === 0 && !isSearching && (
+            {dropdownOpen && searchResults.length === 0 && !isSearching && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
                 <p className="text-sm font-medium text-slate-500">No users found.</p>
+              </div>
+            )}
+            {dropdownOpen && isSearching && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
+                <p className="text-sm font-medium text-slate-500 animate-pulse">Loading finance team...</p>
               </div>
             )}
           </div>
@@ -431,6 +450,30 @@ export const PendingHotelDetailsModal = ({
   const [isMounted, setIsMounted] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const [validationState, setValidationState] = useState("idle");
+  const [validationError, setValidationError] = useState(null);
+  const [updatedPrice, setUpdatedPrice] = useState(null);
+
+  const handleValidate = async () => {
+    setValidationState("loading");
+    setValidationError(null);
+    try {
+      const res = await dispatch(validateApproval({ id: booking._id, type: "hotel" })).unwrap();
+      if (!res.isValid) {
+        setValidationState("error");
+        setValidationError(res.errorMessages?.join(", ") || "Validation failed");
+      } else if (res.priceUpdated) {
+        setValidationState("validated_price_changed");
+        setUpdatedPrice(res.newPrice);
+      } else {
+        setValidationState("validated_ok");
+      }
+    } catch (err) {
+      setValidationState("error");
+      setValidationError(err?.message || err || "Failed to validate approval");
+    }
+  };
 
   const handleConfirmAction = (comments) => {
     if (actionModal.action === "approve") {
@@ -639,6 +682,19 @@ export const PendingHotelDetailsModal = ({
               </div>
             ) : (
               <>
+                {validationError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 w-full">
+                    <FiAlertCircle size={16} className="shrink-0" />
+                    {validationError}
+                  </div>
+                )}
+                {validationState === "validated_price_changed" && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs flex flex-col gap-1 w-full">
+                    <div className="flex items-center gap-2 font-bold"><FiAlertCircle size={16} /> Price Updated!</div>
+                    <p>The price has changed to ₹{updatedPrice}. Do you still want to approve?</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-3 ml-auto shrink-0 w-full justify-end">
                 {onTransfer && (
                   <button
                     onClick={() => setIsTransferModalOpen(true)}
@@ -657,15 +713,26 @@ export const PendingHotelDetailsModal = ({
                 >
                   Reject Request
                 </button>
-                <button
-                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
-                  disabled={!isVerified}
-                  className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
-                  title={!isVerified ? "Account pending verification" : ""}
-                >
-                  <FiCheckCircle size={14} />
-                  Approve & Proceed
-                </button>
+
+                {validationState === "idle" || validationState === "error" || validationState === "loading" ? (
+                  <button
+                    onClick={handleValidate}
+                    disabled={!isVerified || validationState === "loading"}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified || validationState === "loading" ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    {validationState === "loading" ? "Validating..." : "Validate Price"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActionModal({ isOpen: true, action: "approve" })}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    <FiCheckCircle size={14} />
+                    {validationState === "validated_price_changed" ? "Approve Updated Price" : "Approve & Proceed"}
+                  </button>
+                )}
+                </div>
               </>
             )}
           </div>
@@ -855,33 +922,7 @@ export const PendingHotelDetailsModal = ({
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                              Per Room / Night
-                            </p>
-                            <p className="text-2xl font-black text-[#B5862A] tracking-tighter">
-                              ₹
-                              {r.DayRates?.[0]?.[0]?.BasePrice ||
-                                r.DayRates?.[0]?.[0]?.RoomRate ||
-                                (
-                                  (r.TotalFare ||
-                                    r.Price?.totalFare ||
-                                    r.NetAmount ||
-                                    0) /
-                                  ((Array.isArray(r.Name) ? r.Name.length : 1) *
-                                    (bookSnap.nights || 1))
-                                ).toLocaleString()}
-                            </p>
-                            {r.count > 1 && (
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                                Total: ₹
-                                {(
-                                  r.TotalFare ||
-                                  r.Price?.totalFare ||
-                                  r.NetAmount ||
-                                  0
-                                ).toLocaleString()}
-                              </p>
-                            )}
+                            {/* Per Night charge hidden as per request */}
                           </div>
                         </div>
 
@@ -1011,29 +1052,11 @@ export const PendingHotelDetailsModal = ({
                     />
                     <div className="mt-6">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                        Total Amount (Inc. Tax)
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter">
                         ₹ {totalAmount.toLocaleString()}
                       </h4>
-                      <div className="mt-8 space-y-3 pt-6 border-t border-slate-800">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Base Price
-                          </span>
-                          <span className="text-slate-200 font-black">
-                            ₹{baseFare.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Taxes & Fees
-                          </span>
-                          <span className="text-slate-200 font-black">
-                            ₹{tax.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
                     </div>
                     <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
                   </div>
@@ -1370,6 +1393,30 @@ export const PendingFlightDetailsModal = ({
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
 
+  const [validationState, setValidationState] = useState("idle");
+  const [validationError, setValidationError] = useState(null);
+  const [updatedPrice, setUpdatedPrice] = useState(null);
+
+  const handleValidate = async () => {
+    setValidationState("loading");
+    setValidationError(null);
+    try {
+      const res = await dispatch(validateApproval({ id: booking._id, type: "flight" })).unwrap();
+      if (!res.isValid) {
+        setValidationState("error");
+        setValidationError(res.errorMessages?.join(", ") || "Validation failed");
+      } else if (res.priceUpdated) {
+        setValidationState("validated_price_changed");
+        setUpdatedPrice(res.newPrice);
+      } else {
+        setValidationState("validated_ok");
+      }
+    } catch (err) {
+      setValidationState("error");
+      setValidationError(err?.message || err || "Failed to validate approval");
+    }
+  };
+
   const handleConfirmAction = (comments) => {
     if (actionModal.action === "approve") {
       onApprove(booking._id, "flight", "approve", comments);
@@ -1584,6 +1631,19 @@ export const PendingFlightDetailsModal = ({
               </div>
             ) : (
               <>
+                {validationError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 w-full">
+                    <FiAlertCircle size={16} className="shrink-0" />
+                    {validationError}
+                  </div>
+                )}
+                {validationState === "validated_price_changed" && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs flex flex-col gap-1 w-full">
+                    <div className="flex items-center gap-2 font-bold"><FiAlertCircle size={16} /> Price Updated!</div>
+                    <p>The price has changed to ₹{updatedPrice}. Do you still want to approve?</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-3 ml-auto shrink-0 w-full justify-end">
                 {onTransfer && (
                   <button
                     onClick={() => setIsTransferModalOpen(true)}
@@ -1602,15 +1662,26 @@ export const PendingFlightDetailsModal = ({
                 >
                   Reject Request
                 </button>
-                <button
-                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
-                  disabled={!isVerified}
-                  className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
-                  title={!isVerified ? "Account pending verification" : ""}
-                >
-                  <FiCheckCircle size={14} />
-                  Approve & Proceed
-                </button>
+
+                {validationState === "idle" || validationState === "error" || validationState === "loading" ? (
+                  <button
+                    onClick={handleValidate}
+                    disabled={!isVerified || validationState === "loading"}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified || validationState === "loading" ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    {validationState === "loading" ? "Validating..." : "Validate Price"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setActionModal({ isOpen: true, action: "approve" })}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  >
+                    <FiCheckCircle size={14} />
+                    {validationState === "validated_price_changed" ? "Approve Updated Price" : "Approve & Proceed"}
+                  </button>
+                )}
+                </div>
               </>
             )}
           </div>
@@ -2072,7 +2143,7 @@ export const PendingFlightDetailsModal = ({
                     />
                     <div className="mt-8 relative">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">
-                        Total Payable Amount
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-slate-500 italic">
@@ -2083,18 +2154,6 @@ export const PendingFlightDetailsModal = ({
                         </h4>
                       </div>
                       <div className="mt-8 space-y-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6">
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
-                          <span className="text-slate-400">Base Fare</span>
-                          <span className="text-slate-100">
-                            ₹{Math.ceil(baseFare).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
-                          <span className="text-slate-400">Taxes & Fees</span>
-                          <span className="text-slate-100">
-                            ₹{Math.ceil(totalTax).toLocaleString()}
-                          </span>
-                        </div>
                         <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
                           <span className="text-slate-400">SSR Add-ons</span>
                           <span className="text-[#C9A84C]">

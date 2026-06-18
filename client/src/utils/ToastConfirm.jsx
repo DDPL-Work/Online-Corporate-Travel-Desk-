@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-export const ToastWithTimer = ({ message, type, duration = 4000 }) => {
+export const ToastWithTimer = ({ message, type, duration = 5000 }) => {
   toast(message, {
     duration,
     className: `sonner-toast ${type}`,

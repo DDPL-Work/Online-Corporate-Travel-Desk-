@@ -145,6 +145,17 @@ const bookingRequestSchema = new mongoose.Schema(
       totalAmount: Number,
       currency: { type: String, default: "INR" },
       capturedAt: Date,
+      serviceFeeDetails: mongoose.Schema.Types.Mixed,
+    },
+
+    markupSnapshot: {
+      supplierFare: Number,
+      markupAmount: Number,
+      finalFare: Number,
+      appliedRuleId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporateMarkup' },
+      markupVersion: String,
+      markupRefundable: { type: Boolean, default: false },
+      markupRefundPolicy: { type: String, enum: ["NONE", "FULL", "PROPORTIONAL"], default: "NONE" },
     },
 
     priceAudit: {

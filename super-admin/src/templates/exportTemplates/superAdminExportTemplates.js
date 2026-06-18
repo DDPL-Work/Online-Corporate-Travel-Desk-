@@ -310,3 +310,13 @@ export const blogArticlesExportTemplate = [
   { header: "Slug", value: (row) => valueOrNA(row.slug) },
   { header: "Summary", value: (row) => valueOrNA(row.meta_description || row.excerpt || row.summary) },
 ];
+
+export const serviceChargeCollectionsExportTemplate = [
+  { header: "Date", value: (row) => formatExportDateTime(row.createdAt) },
+  { header: "Corporate", value: (row) => valueOrNA(row.corporateId?.corporateName) },
+  { header: "Booking Info", value: (row) => valueOrNA(row.reference || row.bookingId) },
+  { header: "Description", value: (row) => valueOrNA(row.description) },
+  { header: "Action", value: (row) => valueOrNA(row.operationType || "Book") },
+  { header: "Amount", value: (row) => formatExportCurrency(row.amount) },
+  { header: "Status", value: (row) => normalizeStatus(row.status) },
+];

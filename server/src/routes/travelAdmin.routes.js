@@ -20,7 +20,7 @@ router.use(verifyToken);
  * 🧑‍💼 ADMIN ACCESS ONLY (TRAVEL ADMIN / CORPORATE ADMIN)
  * ============================================================
  */
-router.use(authorizeRoles("travel-admin", "corporate-admin", "employee", "manager"));
+router.use(authorizeRoles("travel-admin", "finance_team", "employee", "manager"));
 
 /**
  * ============================================================
@@ -47,6 +47,7 @@ router.post('/all/managers', adminBookingCtrl.getManagerRequests);
 
 router.get("/expenses/employees", adminBookingCtrl.getEmployeeExpenses); // get aggregated expenses per employee
 router.get("/all-employees",  adminBookingCtrl.getAllEmployees); // list all employees
+router.get("/finance-team", adminBookingCtrl.getFinanceTeamMembers); // list finance team members
 router.get("/:id", adminBookingCtrl.getEmployee); // single employee
 router.put("/:id", adminBookingCtrl.updateEmployee); // update employee
 router.put("/promote/:userId", adminBookingCtrl.promoteToManager); // promote employee to manager

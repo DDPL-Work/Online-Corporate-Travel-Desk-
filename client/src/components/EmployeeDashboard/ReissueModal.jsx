@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   FiAlertCircle,
@@ -1096,8 +1097,8 @@ export default function ReissueModal({ booking, onClose }) {
     !showOfflineFlow &&
     [STEP.SEARCH_RESULTS, STEP.FARE_QUOTE, STEP.CONFIRMATION].includes(currentStep);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/55 p-4 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
       <div className="mx-auto flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
           <div>
@@ -1458,6 +1459,7 @@ export default function ReissueModal({ booking, onClose }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

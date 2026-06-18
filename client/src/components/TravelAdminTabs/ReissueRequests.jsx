@@ -35,6 +35,7 @@ import {
   extractRequestArray,
 } from "../../utils/reissueResolvers";
 import { IdCell, Th } from "./Shared/CommonComponents";
+import { Pagination } from "./Shared/Pagination";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
 import { adminReissueRequestsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
@@ -258,6 +259,9 @@ export default function ReissueRequests() {
     });
   }, [requests, search, statusFilter]);
 
+  const PAGE_SIZE = 10;
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
   const { exportExcel, isExporting } = useExcelExporter();
 
   return (
@@ -396,6 +400,7 @@ export default function ReissueRequests() {
               filenamePrefix: "reissue_requests"
             })}
             wrapperClass="!border-none !shadow-none"
+            pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
           >
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -429,7 +434,7 @@ export default function ReissueRequests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map((r, i) => {
+                  {paginated.map((r, i) => {
                     const requestId = getRequestId(r);
                     const userName = getUserName(r);
                     const userEmail = getUserEmail(r);

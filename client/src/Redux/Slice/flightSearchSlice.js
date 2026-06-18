@@ -58,6 +58,8 @@ const flightSlice = createSlice({
       .addCase(searchFlights.pending, (state) => {
         state.loading = true;
         state.isUpsellLoading = false;
+        state.error = null;
+        state.searchResults = [];
       })
       .addCase(searchFlights.fulfilled, (state, action) => {
         state.loading = false;

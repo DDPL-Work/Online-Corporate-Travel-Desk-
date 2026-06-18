@@ -1,104 +1,164 @@
-// HotelBookNow.jsx
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { createPortal } from "react-dom";
 import {
   MdArrowBack,
   MdHotel,
-  MdCheckCircle,
-  MdInfo,
-  MdVerifiedUser,
   MdLocationOn,
-  MdCalendarToday,
+  MdVerifiedUser,
+  MdKingBed,
 } from "react-icons/md";
 import {
-  FiUser,
-  FiMail,
-  FiPhone,
-  FiCalendar,
-  FiMapPin,
-  FiGlobe,
-  FiShield,
   FiCheckCircle,
-  FiAlertCircle,
+  FiAlertTriangle,
+  FiInfo,
+  FiUser,
+  FiPhone,
+  FiMail,
+  FiStar,
+  FiWifi,
+  FiBriefcase,
+  FiUsers,
+  FiTag,
+  FiShield,
+  FiFileText,
+  FiChevronLeft,
+  FiClock,
 } from "react-icons/fi";
+import { Country } from "country-state-city";
 import {
   fetchHotelRequestById,
   executeHotelBooking,
 } from "../../../Redux/Actions/hotelBooking.thunks";
-import { ToastWithTimer } from "../../../utils/ToastConfirm";
-import Swal from "sweetalert2";
-import { Country } from "country-state-city";
 import LandingHeader from "../../../layout/LandingHeader";
 
-/* ─── Helpers ─── */
+// Helpers
 const countries = Country.getAllCountries();
-
 function countryName(isoCode) {
   return countries.find((c) => c.isoCode === isoCode)?.name || isoCode || "—";
 }
-
-function fmt(dateStr, opts) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-GB", opts);
+function fmtDate(
+  d,
+  opts = { day: "2-digit", month: "short", year: "numeric" },
+) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", opts);
+}
+function fmtDay(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-GB", { weekday: "long" });
+}
+function nightsCount(ci, co) {
+  if (!ci || !co) return 1;
+  return Math.ceil((new Date(co) - new Date(ci)) / (1000 * 60 * 60 * 24));
 }
 
-/* ─── Sub-components ─── */
-function Skeleton({ className = "" }) {
+// Components
+function StatusPill({ status }) {
+  const s = (status || "").toLowerCase();
+  const labelMap = {
+    pending_approval: "Pending",
+    pending_second_approval: "Pending",
+    manager_approved: "Pending",
+    approved: "Ready to Book",
+    rejected: "Rejected",
+    draft: "Draft",
+  };
+  const label = labelMap[s] || status;
+
+  const isApproved = s === "approved";
+  const isRejected = s === "rejected";
+
+  const colors = isRejected
+    ? "bg-[#FDF1EE] text-[#B5341A] border-[#F0C4BA]"
+    : isApproved
+      ? "bg-[#EDF7F2] text-[#2C7A4B] border-[#C3E4D2]"
+      : "bg-[#FDF8EE] text-[#8A6200] border-[#F0E0A8]";
+
+  const dotColor = isRejected
+    ? "bg-[#B5341A]"
+    : isApproved
+      ? "bg-[#2C7A4B]"
+      : "bg-[#8A6200]";
+
   return (
-    <div className={`animate-pulse bg-[#04112F]/10 rounded-xl ${className}`} />
+    <span
+      className={`inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-[2px] border text-[10px] font-semibold tracking-[0.12em] uppercase ${colors}`}
+    >
+      <span className={`w-[6px] h-[6px] rounded-full ${dotColor}`} />
+      {label}
+    </span>
   );
 }
 
 function Stars({ count = 0 }) {
+  const rating = count || 0;
   return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
+    <span className="inline-flex gap-[2px] items-center">
+      {[...Array(5)].map((_, i) => (
         <svg
           key={i}
-          className="w-3.5 h-3.5 text-[#C9A84C]"
-          fill="currentColor"
+          width="16"
+          height="16"
+          className={i < rating ? "fill-[#B5862A]" : "fill-[#EAE4D9]"}
           viewBox="0 0 20 20"
         >
           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
         </svg>
       ))}
-    </div>
+    </span>
   );
 }
 
-function GuestField({ icon: Icon, label, value }) {
+function GridSummary({ items = [] }) {
   return (
-    <div className="flex items-start gap-3 py-3 px-4 border-b border-slate-100 last:border-0">
-      <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={13} className="text-[#0A203E]" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
-          {label}
-        </p>
-        <p className="text-sm font-semibold text-slate-700 truncate">
-          {value || "—"}
-        </p>
-      </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9] mb-6">
+      {items.map((item, i) => (
+        <div key={i} className="bg-white p-5">
+          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+            {item.label}
+          </div>
+          <div
+            className={`flex items-center gap-[6px] text-[15px] font-semibold ${
+              item.ok === true
+                ? "text-[#2C7A4B]"
+                : item.ok === false
+                  ? "text-[#8A6200]"
+                  : "text-[#1A1714]"
+            }`}
+          >
+            {item.icon && (
+              <span
+                className={
+                  item.ok === true
+                    ? "text-[#2C7A4B]"
+                    : item.ok === false
+                      ? "text-[#8A6200]"
+                      : "text-[#A89F94]"
+                }
+              >
+                {item.icon}
+              </span>
+            )}
+            {item.value}
+          </div>
+          {item.sub && (
+            <div className="text-[11px] text-[#A89F94] mt-1">{item.sub}</div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
-function calculateNights(checkIn, checkOut) {
-  if (!checkIn || !checkOut) return 1;
+const decodeHtml = (html) => {
+  if (!html) return "";
+  const txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
+};
 
-  const inDate = new Date(checkIn);
-  const outDate = new Date(checkOut);
-
-  const diffTime = outDate - inDate;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  return diffDays > 0 ? diffDays : 1;
-}
-
-/* ─── Main ─── */
 const HotelBookNow = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -110,6 +170,9 @@ const HotelBookNow = () => {
   const [bookingRequest, setBookingRequest] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [fetching, setFetching] = useState(true);
+  const [activeTab, setActiveTab] = useState("hotel");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [alertModal, setAlertModal] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
 
   useEffect(() => {
@@ -133,23 +196,27 @@ const HotelBookNow = () => {
   /* Derived */
   const travelers = bookingRequest?.travellers || [];
   const purposeOfTravel = bookingRequest?.purposeOfTravel || "";
-  const approvedBy = bookingRequest?.approvedBy || null;
   const hotelReq = bookingRequest?.hotelRequest || {};
   const snapshot = bookingRequest?.bookingSnapshot || {};
-  const pricing = bookingRequest?.pricingSnapshot || {};
+
+  const projectName = bookingRequest?.projectName;
+  const projectId = bookingRequest?.projectId;
+  const projectClient = bookingRequest?.projectClient;
+
+  const requester = bookingRequest?.requesterDetails || {};
+  const gst = bookingRequest?.gstDetails || {};
 
   const selectedHotel = hotelReq.selectedHotel || {};
   const selectedRooms = Array.isArray(hotelReq.allRooms)
     ? hotelReq.allRooms
     : [];
-  // const rawRoom = selectedRooms.rawRoomData || {};
 
   const hotelImages =
     (hotelReq?.selectedHotel?.images?.length > 0
       ? hotelReq.selectedHotel.images
       : null) ||
     (snapshot?.hotelImage ? [snapshot.hotelImage] : null) ||
-    hotelReq?.selectedRoom?.rawRoomData?.[0]?.images ||
+    hotelReq?.selectedRoom?.rawRoomData?.images ||
     [];
 
   useEffect(() => {
@@ -167,36 +234,20 @@ const HotelBookNow = () => {
     address: selectedHotel.address || "",
     city: selectedHotel.city || "",
     image: hotelImages[imgIdx] || "/placeholder-hotel.jpg",
-    bgImage:
-      hotelImages[(imgIdx + 1) % hotelImages.length] ||
-      hotelImages[imgIdx] ||
-      "/placeholder-hotel.jpg",
   };
 
   const checkIn = hotelReq.checkInDate || snapshot.checkInDate;
   const checkOut = hotelReq.checkOutDate || snapshot.checkOutDate;
-  const roomNames = selectedRooms.map((r) => r.name || "Room");
-  const nights = calculateNights(checkIn, checkOut);
-
-  const room = {
-    typeName: roomNames.join(", "),
-    nights: nights,
-    currency: selectedRooms[0]?.price?.currency || "INR",
-    cancellationPolicies: selectedRooms[0]?.cancelPolicies || [],
-    inclusions: [],
-    mealType: selectedRooms.map((r) => r.mealType).join(", "),
-    refundable: selectedRooms[0]?.isRefundable,
-  };
-
+  const nights = nightsCount(checkIn, checkOut);
   const roomCount = selectedRooms.length;
   const totalAdults =
     hotelReq.roomGuests?.reduce((sum, r) => sum + (r.noOfAdults || 0), 0) ||
     travelers.length;
+
   const totalFare = selectedRooms.reduce(
     (sum, r) => sum + (r.totalFare || r.price?.totalFare || 0),
     0,
   );
-
   const tax = selectedRooms.reduce(
     (sum, r) => sum + (r.totalTax || r.price?.tax || 0),
     0,
@@ -204,638 +255,1043 @@ const HotelBookNow = () => {
   const baseFare = totalFare - tax;
 
   const isApproved = bookingRequest?.requestStatus === "approved";
-
-  const handleBookNow = async () => {
-    const result = await Swal.fire({
-      title: "Confirm Booking",
-      html: `<p style="color:#475569;font-size:14px">Confirm reservation at <strong>${hotel.name}</strong>?<br/>This cannot be undone.</p>`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonColor: "#059669",
-      cancelButtonColor: "#94a3b8",
-      confirmButtonText: "Yes, Book Now",
-      cancelButtonText: "Go Back",
-      showLoaderOnConfirm: true,
-      preConfirm: async () => {
-        try {
-          return await dispatch(executeHotelBooking(id)).unwrap();
-        } catch (e) {
-          Swal.showValidationMessage(e);
-        }
-      },
-      allowOutsideClick: () => !Swal.isLoading(),
-    });
-    if (result.isConfirmed) {
-      ToastWithTimer({
-        type: "success",
-        message: "Hotel booked successfully!",
-      });
-      navigate("/my-bookings");
-    }
-  };
-
   const status = bookingRequest?.requestStatus;
 
-  const getCompletedStep = () => {
-    switch (status) {
-      case "pending_approval":
-        return 2;
-      case "approved":
-        return 3;
-      case "completed":
-        return 4;
-      default:
-        return 1;
+  const labelMap = {
+    pending_approval: "Pending",
+    pending_second_approval: "Pending",
+    manager_approved: "Pending",
+    approved: "Ready to Book",
+    rejected: "Rejected",
+    draft: "Draft",
+  };
+  const label = labelMap[status?.toLowerCase()] || status || "Pending";
+
+  // Policies extraction
+  const cancellationPolicies =
+    hotelReq.selectedRoom?.cancelPolicies ||
+    hotelReq.selectedRoom?.rawRoomData?.CancelPolicies ||
+    [];
+  const rateConditions =
+    hotelReq.preBookResponse?.HotelResult?.[0]?.RateConditions ||
+    hotelReq.selectedRoom?.rawRoomData?.RateConditions ||
+    [];
+
+  // Detail Rooms
+  const detailRooms =
+    hotelReq.preBookResponse?.HotelResult?.[0]?.Rooms ||
+    (hotelReq.selectedRoom?.rawRoomData
+      ? [hotelReq.selectedRoom.rawRoomData]
+      : selectedRooms);
+
+  const handleBookHotel = async () => {
+    setShowConfirmModal(false);
+    try {
+      await dispatch(executeHotelBooking(id)).unwrap();
+      setAlertModal({
+        type: "success",
+        title: "Booking Successful",
+        text: "Hotel booked successfully!",
+        confirmText: "View Bookings",
+        onConfirm: () => navigate("/my-bookings", { replace: true }),
+      });
+    } catch (err) {
+      const errorMessage = err?.message?.toLowerCase() || "";
+      if (errorMessage.includes("insufficient balance")) {
+        setAlertModal({
+          type: "error",
+          title: "Insufficient Balance",
+          text: "Insufficient wallet balance. Please recharge your account.",
+          confirmText: "OK",
+        });
+        return;
+      }
+      setAlertModal({
+        type: "error",
+        title: "Booking Failed",
+        text: err?.message || "Something went wrong while booking.",
+        confirmText: "OK",
+      });
     }
   };
 
-  const completedStep = getCompletedStep();
+  if (fetching) {
+    return (
+      <div className="bg-[#FAF8F4] min-h-screen">
+        <LandingHeader />
+        <div className="p-8 flex justify-center">
+          <div className="w-8 h-8 border-4 border-[#C9A240] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
-  const steps = [
-    { num: 1, label: "Search & Select" },
-    { num: 2, label: "Review & Request" },
-    { num: 3, label: "Approval" },
-    { num: 4, label: "Confirm Booking" },
+  if (loadError || !bookingRequest) {
+    return (
+      <div className="bg-[#FAF8F4] min-h-screen">
+        <LandingHeader />
+        <div className="p-8 flex justify-center">
+          <div className="bg-white p-8 max-w-md w-full border border-[#E1E7EF] text-center">
+            <FiAlertTriangle
+              size={32}
+              className="mx-auto text-[#DC2626] mb-4"
+            />
+            <p className="text-[14px] text-[#1A1714] font-bold mb-4">
+              {loadError || "Booking not found."}
+            </p>
+            <button
+              onClick={() => navigate(-1)}
+              className="px-6 py-[10px] bg-[#000D26] text-white text-[11px] font-semibold uppercase tracking-[0.1em] hover:bg-[#04112F]"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: "hotel", label: "Hotel Details" },
+    { id: "room", label: "Room Details" },
+    { id: "project", label: "Project & Approver Details" },
+    { id: "guests", label: "Passengers Details" },
+    { id: "policy", label: "Policy & Rules" },
   ];
 
-  const statusConfig = {
-    draft: {
-      label: "Draft",
-      sub: "Not Submitted",
-      className: "text-white/40 bg-slate-400/10 border-slate-400/20",
-    },
-    pending_approval: {
-      label: "Pending",
-      sub: "Waiting for Approval",
-      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
-    },
-    pending_second_approval: {
-      label: "Pending",
-      sub: "Waiting for Travel Admin Approval",
-      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
-    },
-    manager_approved: {
-      label: "Pending",
-      sub: "Waiting for Travel Admin Approval",
-      className: "text-[#C9A84C] bg-amber-400/10 border-amber-400/20",
-    },
-    approved: {
-      label: "Approved",
-      sub: "Ready to Book",
-      className: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-    },
-    rejected: {
-      label: "Rejected",
-      sub: "Request Denied",
-      className: "text-red-400 bg-red-400/10 border-red-400/20",
-    },
-  };
-
-  const currentStatus = statusConfig[status] || statusConfig.draft;
-
-  const getStatusStyles = (status) => {
-    switch (status) {
-      case "approved":
-        return {
-          icon: <MdVerifiedUser size={18} />,
-          color: "emerald",
-        };
-      case "pending_approval":
-      case "pending_second_approval":
-      case "manager_approved":
-        return {
-          icon: <FiAlertCircle size={18} />,
-          color: "amber",
-        };
-      case "rejected":
-        return {
-          icon: <FiAlertCircle size={18} />,
-          color: "red",
-        };
-      default:
-        return {
-          icon: <FiAlertCircle size={18} />,
-          color: "slate",
-        };
-    }
-  };
-
-  const stylesMap = {
-    emerald: {
-      bg: "bg-emerald-500/15",
-      border: "border-emerald-400/30",
-      text: "text-emerald-400",
-    },
-    amber: {
-      bg: "bg-amber-500/15",
-      border: "border-amber-400/30",
-      text: "text-[#C9A84C]",
-    },
-    red: {
-      bg: "bg-red-500/15",
-      border: "border-red-400/30",
-      text: "text-red-400",
-    },
-    slate: {
-      bg: "bg-slate-500/15",
-      border: "border-slate-400/30",
-      text: "text-white/40",
-    },
-  };
-
-  const statusUI = getStatusStyles(status);
-  const s = stylesMap[statusUI.color];
-
-  /* ── Loading ── */
-  if (fetching)
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <LandingHeader />
-        <div className="h-64 bg-slate-200 animate-pulse" />
-        <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3 space-y-4">
-            <Skeleton className="h-40" />
-            <Skeleton className="h-56" />
-          </div>
-          <div className="lg:col-span-2">
-            <Skeleton className="h-80" />
-          </div>
-        </div>
-      </div>
-    );
-
-  /* ── Error ── */
-  if (loadError || !bookingRequest)
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <LandingHeader />
-        <div className="max-w-6xl mx-auto px-4 py-24 flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-100 flex items-center justify-center">
-            <FiAlertCircle size={26} className="text-red-400" />
-          </div>
-          <p className="text-slate-600 font-semibold">
-            {loadError || "Booking not found."}
-          </p>
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-600 border border-slate-200 px-5 py-2.5 rounded-xl hover:bg-white transition"
-          >
-            <MdArrowBack size={16} /> Go Back
-          </button>
-        </div>
-      </div>
-    );
-
-  /* ── Main ── */
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <>
       <LandingHeader />
+      <div className=" min-h-screen font-['DM_Sans'] selection:bg-[#C9A24020] selection:text-[#C9A240]">
+        {/* ── Sticky header ── */}
+        <header className="sticky top-[104px] z-40 bg-white flex flex-col pt-4 px-6 md:px-8 gap-4 mx-4 md:mx-10 mt-6">
+          {/* Top Row */}
+          <div className="flex items-center gap-4 w-full">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-[6px] bg-transparent border-none cursor-pointer text-[12px] font-semibold text-[#C9A240] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
+            >
+              <FiChevronLeft size={14} />
+              Back
+            </button>
+            <span className="w-[1px] h-4 bg-[#E1E7EF]" />
+            <h1 className="text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em]">
+              Hotel Booking — Approval Review
+            </h1>
 
-      {/* ══════════════════════════════════
-          HERO BAND
-      ══════════════════════════════════ */}
-      <div className="relative bg-[#0A203E] overflow-hidden">
-        {/* Blurred bg image */}
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-30 transition-all duration-1000 ease-in-out"
-          style={{ backgroundImage: `url(${hotel.bgImage})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A203E] via-[#0A203E]/80 to-transparent" />
-
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-0">
-          {/* Back */}
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-white/60 hover:text-white transition mb-6"
-          >
-            <MdArrowBack size={14} /> Back to Approvals
-          </button>
-
-          <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end pb-8">
-            {/* Hotel image */}
-            <div className="relative shrink-0">
-              <img src={hotel.image}
-                alt={hotel.name}
-                className="w-28 h-28 sm:w-32 sm:h-32 object-cover rounded-2xl border-2 border-white/20 shadow-2xl transition-all duration-700 ease-in-out" loading="lazy" decoding="async" />
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-2 border-[#0A203E] flex items-center justify-center shadow-lg">
-                <MdVerifiedUser size={14} className="text-white" />
-              </div>
-            </div>
-
-            {/* Hotel name + meta */}
-            <div className="flex-1 min-w-0">
-              <div
-                className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-3 border ${currentStatus.className}`}
-              >
-                <MdCheckCircle size={11} />
-                {currentStatus.label} & {currentStatus.sub}
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight mb-2">
-                {hotel.name}
-              </h1>
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-                <Stars count={hotel.rating} />
-                <span className="text-white/30 text-xs">·</span>
-                <span className="flex items-center gap-1 text-xs text-white/80">
-                  <MdLocationOn size={12} className="text-emerald-400" />
-                  {hotel.address}
+            <div className="ml-auto flex items-center gap-4">
+              {bookingRequest.orderId && (
+                <span className="text-[11px] text-[#65758B]">
+                  Order ID:{" "}
+                  <strong className="text-[#1A1714] font-['DM_Sans'] font-mono">
+                    {bookingRequest.orderId}
+                  </strong>
                 </span>
-              </div>
-            </div>
-
-            {/* Date band — right side */}
-            <div className="flex gap-2 shrink-0">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-3 text-center min-w-[90px]">
-                <p className="text-white/60 text-[10px] font-semibold uppercase mb-1">
-                  Check-in
-                </p>
-                <p className="text-white font-black text-sm">
-                  {fmt(checkIn, { day: "2-digit", month: "short" })}
-                </p>
-                <p className="text-white/50 text-[10px]">
-                  {fmt(checkIn, { weekday: "short", year: "numeric" })}
-                </p>
-              </div>
-              <div className="flex flex-col items-center justify-center px-1 gap-1">
-                <div className="w-px h-4 bg-white/20" />
-                <span className="text-white font-black text-lg leading-none">
-                  {room.nights}
-                </span>
-                <span className="text-white/40 text-[9px] uppercase tracking-widest">
-                  Nts
-                </span>
-                <div className="w-px h-4 bg-white/20" />
-              </div>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-3 text-center min-w-[90px]">
-                <p className="text-white/60 text-[10px] font-semibold uppercase mb-1">
-                  Check-out
-                </p>
-                <p className="text-white font-black text-sm">
-                  {fmt(checkOut, { day: "2-digit", month: "short" })}
-                </p>
-                <p className="text-white/50 text-[10px]">
-                  {fmt(checkOut, { weekday: "short", year: "numeric" })}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Wave bottom */}
-        <div
-          className="h-6 bg-slate-50"
-          style={{ clipPath: "ellipse(60% 100% at 50% 100%)" }}
-        />
-      </div>
-
-      {/* ══════════════════════════════════
-          PROGRESS STEPPER
-      ══════════════════════════════════ */}
-      <div className="bg-white border-b border-slate-200 -mt-1">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-center gap-0">
-            {steps.map((step, idx) => {
-              const isDone = step.num <= completedStep;
-
-              return (
-                <React.Fragment key={step.num}>
-                  <div className="flex flex-col items-center gap-1">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
-          ${
-            isDone
-              ? "bg-emerald-500 border-emerald-500 text-white"
-              : "bg-white border-slate-200 text-slate-400"
-          }`}
-                    >
-                      {isDone ? <MdCheckCircle size={14} /> : step.num}
-                    </div>
-
-                    <span
-                      className={`text-[10px] font-semibold whitespace-nowrap hidden sm:block
-          ${isDone ? "text-emerald-600" : "text-slate-400"}`}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-
-                  {idx < steps.length - 1 && (
-                    <div
-                      className={`h-0.5 flex-1 mx-1 rounded-full max-w-20
-          ${step.num < completedStep ? "bg-emerald-400" : "bg-slate-100"}`}
-                    />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ══════════════════════════════════
-          BODY
-      ══════════════════════════════════ */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* ─── LEFT (3/5) ─── */}
-          <div className="lg:col-span-3 space-y-5">
-            {/* Room strip */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <MdHotel size={14} className="text-[#0A203E]" />
-                  </div>
-                  <div className="flex flex-col">
-                    {selectedRooms.map((r, i) => (
-                      <div
-                        key={i}
-                        className="text-sm font-bold text-slate-800 line-clamp-1"
-                      >
-                        {r.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <FiUser size={11} /> {totalAdults} Adult
-                    {totalAdults !== 1 ? "s" : ""}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {roomCount} Room{roomCount !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              </div>
-
-              {room.inclusions.length > 0 && (
-                <div className="px-5 py-3 flex flex-wrap gap-1.5">
-                  {room.inclusions.slice(0, 6).map((item, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
-                    >
-                      <FiCheckCircle size={10} /> {item.trim()}
-                    </span>
-                  ))}
-                </div>
               )}
 
-              {room.cancellationPolicies?.[0] && (
-                <div className="px-5 py-3 border-t border-slate-100 flex items-start gap-2">
-                  <MdInfo
-                    size={14}
-                    className="text-[#C9A84C] shrink-0 mt-0.5"
-                  />
-                  <p className="text-[11px] text-[#C9A84C] leading-relaxed">
-                    {room.cancellationPolicies[0]?.ChargeType
-                      ? `From ${room.cancellationPolicies[0].FromDate} - ${room.cancellationPolicies[0].ChargeType} ${room.cancellationPolicies[0].CancellationCharge}`
-                      : "Cancellation policy applies"}
+              {/* Status badge */}
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-[5px] text-[10px] font-semibold uppercase tracking-[0.1em] border ${
+                  bookingRequest.requestStatus === "approved"
+                    ? "bg-[#EDF7F2] border-[#C3E4D2] text-[#2C7A4B]"
+                    : bookingRequest.requestStatus === "rejected"
+                      ? "bg-[#FDF1EE] border-[#F0C4BA] text-[#B5341A]"
+                      : "bg-[#FFFBEB] border-[#F0E0A8] text-[#8A6200]"
+                }`}
+              >
+                {bookingRequest.requestStatus === "approved" ? (
+                  <FiCheckCircle size={10} />
+                ) : bookingRequest.requestStatus === "rejected" ? (
+                  <FiAlertTriangle size={10} />
+                ) : (
+                  <FiClock size={10} />
+                )}
+                {label}
+              </span>
+
+              {/* Confirm Booking button */}
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                disabled={!isApproved || actionLoading}
+                className="px-6 py-[12px] bg-[#000D26] text-white text-[11px] font-semibold uppercase tracking-[0.1em] hover:bg-[#04112F] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {!isApproved ? (
+                  "Waiting for Approval"
+                ) : actionLoading ? (
+                  <>
+                    <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <FiCheckCircle size={14} />
+                    Confirm &amp; Book
+                  </>
+                )}
+              </button>
+
+            </div>
+          </div>
+
+          {/* Bottom Row - Tabs */}
+          <div className="flex gap-8 relative overflow-x-auto whitespace-nowrap scrollbar-hide">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`pb-3 text-[12px] font-bold uppercase tracking-[0.08em] transition-colors relative flex-shrink-0 ${
+                  activeTab === tab.id
+                    ? "text-[#1A1714]"
+                    : "text-[#94A3B8] hover:text-[#65758B]"
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#C9A240]" />
+                )}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <main className="bg-[#FAF8F4] mx-10 px-8 py-8 flex flex-col gap-8 pb-24">
+          {/* Dynamic Header per tab */}
+          {(() => {
+            const headers = {
+              hotel: {
+                label: "Reservation",
+                title: "Hotel Booking",
+                subtitle:
+                  "A complete record of the approved hotel booking, pricing, and details.",
+              },
+              room: {
+                label: "Room Information",
+                title: "Room Details",
+                subtitle:
+                  "Information about the selected room type, amenities, and inclusions.",
+              },
+              project: {
+                label: "Project Details",
+                title: "Project & Approvals",
+                subtitle:
+                  "Information about the project code and the approval workflow for this trip.",
+              },
+              guests: {
+                label: "Traveller Information",
+                title: "Passengers",
+                subtitle:
+                  "List of all passengers staying on this approved booking.",
+              },
+              policy: {
+                label: "Rules & Policies",
+                title: "Policy & Rules",
+                subtitle: "Cancellation terms and rate conditions.",
+              },
+            };
+            const h = headers[activeTab] || headers.hotel;
+            return (
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+                    {h.label}
+                  </p>
+                  <h1 className="text-[36px] font-black text-[#1A1714] tracking-tight leading-none mb-3 font-['Cormorant_Garamond']">
+                    {h.title}
+                  </h1>
+                  <p className="text-sm text-[#65758B] leading-relaxed">
+                    {h.subtitle}
                   </p>
                 </div>
-              )}
-            </div>
-
-            {/* Guest cards */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <MdVerifiedUser size={13} className="text-emerald-600" />
-                </div>
-                <h2 className="text-sm font-bold text-slate-800">
-                  Verified Guests
-                  <span className="ml-2 text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    {travelers.length}{" "}
-                    {travelers.length === 1 ? "Guest" : "Guests"}
-                  </span>
-                </h2>
+                {bookingRequest?.approvedBy?.approvedAt && (
+                  <div className="flex flex-col items-end gap-1 text-right">
+                    <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#65758B]">
+                      Approved By
+                    </p>
+                    <p className="text-[14px] font-semibold text-[#1A1714]">
+                      {bookingRequest.approverName ||
+                        bookingRequest.approvedBy?.name?.firstName ||
+                        "—"}
+                    </p>
+                    <p className="text-[11px] text-[#65758B]">
+                      {bookingRequest.approverEmail || "—"}
+                    </p>
+                  </div>
+                )}
               </div>
+            );
+          })()}
 
-              {travelers.length === 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">
-                  No guest details available.
-                </div>
-              )}
-
-              {travelers.map((t, index) => (
-                <div
-                  key={t._id || t.id || index}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 overflow-hidden"
-                >
-                  {/* Card header */}
-                  <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0A203E] to-[#1a3a5a] flex items-center justify-center text-sm font-black text-white shadow-md">
-                        {(t.firstName?.[0] || "G").toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">
-                          {t.title} {t.firstName} {t.middleName || ""}{" "}
-                          {t.lastName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-medium">
-                          Guest {index + 1}
-                        </p>
-                      </div>
-                    </div>
-                    {t.isLeadPassenger && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-[#0A203E] bg-[#0A203E]/5 border border-[#0A203E]/10 px-2.5 py-1 rounded-full">
-                        Lead
-                      </span>
-                    )}
+          {/* ----- HOTEL DETAILS TAB ----- */}
+          {activeTab === "hotel" && (
+            <div className="space-y-6">
+              {/* Hotel Hero Card & Price Card Side-by-Side */}
+              <div className="flex flex-col lg:flex-row gap-6 items-start">
+                {/* Hotel Hero Card */}
+                <div className="flex-1 bg-white border border-[#EAE4D9] w-full">
+                  <div className="px-6 py-[10px] border-b border-[#EAE4D9] flex justify-between items-center bg-[#FAF8F4]">
+                    <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-[#A89F94]">
+                      Hotel Request
+                    </span>
                   </div>
-
-                  {/* 2-col info grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                    <div>
-                      <GuestField icon={FiMail} label="Email" value={t.email} />
-                      <GuestField
-                        icon={FiPhone}
-                        label="Phone"
-                        value={t.phoneWithCode ? `+${t.phoneWithCode}` : "—"}
-                      />
-                      <GuestField
-                        icon={FiGlobe}
-                        label="Nationality"
-                        value={countryName(t.nationality)}
+                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,380px)_1fr] gap-0">
+                    <div className="relative min-h-[320px] overflow-hidden bg-[#E8E0D0]">
+                      <img
+                        src={hotel.image}
+                        alt={hotel.name}
+                        className="w-full h-full object-cover block absolute inset-0"
                       />
                     </div>
-                    <div>
-                      <GuestField
-                        icon={FiCalendar}
-                        label="Date of Birth"
-                        value={
-                          t.dob
-                            ? fmt(t.dob, {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "—"
-                        }
-                      />
-                      <GuestField
-                        icon={FiUser}
-                        label="Age"
-                        value={t.age ? `${t.age} yrs` : "—"}
-                      />
-                      {/* <GuestField
-                        icon={FiMapPin}
-                        label="Country"
-                        value={t.countryCode || "—"}
-                      /> */}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ─── RIGHT (2/5) sticky ─── */}
-          <div className="lg:col-span-2">
-            <div className="sticky top-20 space-y-4">
-              {/* Gold price + CTA card */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl relative overflow-hidden">
-                <div className="bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] px-5 py-4">
-                  {/* Approval header */}
-                  <div className="flex items-center gap-3">
-                    {/* Icon */}
-                    <div
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center border bg-white/20 border-white/30 text-[#0A203E]`}
-                    >
-                      {statusUI.icon}
-                    </div>
-
-                    {/* Text */}
-                    <div className="flex flex-col">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-[#0A203E]/70">
-                        {currentStatus.label}
-                      </p>
-                      <p className="text-sm font-extrabold text-[#0A203E] tracking-tight">
-                        {currentStatus.sub}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5">
-                  {/* Approver info */}
-                  {approvedBy && (
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 space-y-1.5 mb-4">
-                      {approvedBy.name && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-500">Approved by</span>
-                          <span className="font-bold text-slate-800">
-                            {`${approvedBy.name?.firstName || ""} ${approvedBy.name?.lastName || ""}`}
-                          </span>
+                    <div className="p-8 md:p-9">
+                      <div className="mb-6">
+                        <div className="flex items-center gap-4 flex-wrap mb-2">
+                          <h1 className="font-['Cormorant_Garamond'] text-[36px] font-bold leading-[1.1] text-[#1A1714]">
+                            {hotel.name}
+                          </h1>
+                          <Stars count={hotel.rating} />
                         </div>
-                      )}
-                      {approvedBy.email && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-500">Mail ID</span>
-                          <span className="font-semibold text-slate-700">
-                            {approvedBy.email}
-                          </span>
+                        <div className="flex items-center gap-3 flex-wrap mb-[6px]">
+                          {hotel.city && (
+                            <span className="flex items-center gap-1 text-[12px] text-[#7A7068]">
+                              <MdLocationOn
+                                size={13}
+                                className="text-[#B5862A]"
+                              />
+                              {hotel.city}
+                            </span>
+                          )}
                         </div>
-                      )}
-                      {approvedBy.approvedAt && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-500">Date</span>
-                          <span className="font-semibold text-slate-700">
-                            {fmt(approvedBy.approvedAt, {
-                              day: "2-digit",
+                        {hotel.address && (
+                          <p className="text-[12px] text-[#A89F94] leading-[1.5] max-w-[400px]">
+                            {hotel.address}
+                          </p>
+                        )}
+                      </div>
+                      <hr className="border-t border-[#EAE4D9] my-5" />
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-6">
+                        <div>
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                            Check-in
+                          </div>
+                          <div className="font-['Cormorant_Garamond'] text-[32px] font-bold leading-none mb-[2px]">
+                            {checkIn
+                              ? new Date(checkIn)
+                                  .getDate()
+                                  .toString()
+                                  .padStart(2, "0")
+                              : "—"}
+                          </div>
+                          <div className="text-[13px] text-[#7A7068] font-medium">
+                            {fmtDate(checkIn, {
                               month: "short",
                               year: "numeric",
                             })}
+                          </div>
+                          <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                            {fmtDay(checkIn)}
+                          </div>
+                        </div>
+                        <div className="text-center px-2">
+                          <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#A89F94] mb-2">
+                            {nights} Night{nights !== 1 ? "s" : ""}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="w-[6px] h-[6px] rounded-full border border-[#EAE4D9] inline-block" />
+                            <div className="flex-1 border-t border-dashed border-[#EAE4D9] w-10" />
+                            <MdKingBed size={14} className="text-[#A89F94]" />
+                            <div className="flex-1 border-t border-dashed border-[#EAE4D9] w-10" />
+                            <span className="w-[6px] h-[6px] rounded-full bg-[#B5862A] inline-block" />
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                            Check-out
+                          </div>
+                          <div className="font-['Cormorant_Garamond'] text-[32px] font-bold leading-none mb-[2px]">
+                            {checkOut
+                              ? new Date(checkOut)
+                                  .getDate()
+                                  .toString()
+                                  .padStart(2, "0")
+                              : "—"}
+                          </div>
+                          <div className="text-[13px] text-[#7A7068] font-medium">
+                            {fmtDate(checkOut, {
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </div>
+                          <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                            {fmtDay(checkOut)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simplified Payment Summary (Right Side) */}
+                <div className="w-full lg:w-[320px] shrink-0 bg-[#FAF8F4] border border-[#EAE4D9] p-8 flex flex-col justify-center items-start h-full min-h-[160px]">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#A89F94] mb-3">
+                    Total Payment
+                  </div>
+                  <div className="text-[36px] font-black text-[#1A1714] font-['Cormorant_Garamond'] leading-none mb-3">
+                    ₹{totalFare.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-[13px] text-[#7A7068] leading-relaxed border-t border-[#EAE4D9] pt-4 mt-auto w-full">
+                    Includes all taxes and service fees.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ----- ROOM DETAILS TAB ----- */}
+          {activeTab === "room" && (
+            <div className="flex flex-col gap-6 w-full">
+              {detailRooms.map((roomData, index) => {
+                const descriptionHtml = roomData.RoomDescription || "";
+
+                // Better extraction of inclusions
+                let inclusions = [];
+                if (roomData.inclusion) {
+                  inclusions = roomData.inclusion.split(",");
+                } else if (roomData.Inclusion) {
+                  inclusions = roomData.Inclusion.split(",");
+                }
+
+                // Amenities directly from roomData
+                const roomAmenities = roomData.Amenities || [];
+
+                return (
+                  <div
+                    key={index}
+                    className="border border-[#EAE4D9] bg-white overflow-hidden"
+                  >
+                    <div className="p-6 border-b border-[#EAE4D9] flex justify-between items-center bg-[#FAF8F4] flex-wrap gap-4">
+                      <h3 className="font-['Cormorant_Garamond'] text-[24px] font-semibold text-[#1A1714]">
+                        {roomData.name ||
+                          roomData.Name?.[0] ||
+                          roomData.RoomTypeName ||
+                          `Room ${index + 1}`}
+                      </h3>
+                      <div className="flex gap-2">
+                        {(roomData.mealType || roomData.MealType) && (
+                          <span className="inline-flex items-center gap-[5px] px-[10px] py-1 border border-[#B5862A] text-[10px] font-bold text-[#B5862A] bg-[#FAF8F4] uppercase tracking-wider">
+                            {(roomData.mealType || roomData.MealType).replace(
+                              /_/g,
+                              " ",
+                            )}
                           </span>
+                        )}
+                        {(roomData.isRefundable !== undefined ||
+                          roomData.IsRefundable !== undefined) && (
+                          <span
+                            className={`inline-flex items-center gap-[5px] px-[10px] py-1 border text-[10px] font-bold uppercase tracking-wider ${
+                              (roomData.isRefundable ?? roomData.IsRefundable)
+                                ? "border-[#2C7A4B] text-[#2C7A4B] bg-[#EDF7F2]"
+                                : "border-[#B5341A] text-[#B5341A] bg-[#FDF1EE]"
+                            }`}
+                          >
+                            {(roomData.isRefundable ?? roomData.IsRefundable)
+                              ? "Refundable"
+                              : "Non-Refundable"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-[1px] bg-[#EAE4D9]">
+                      {descriptionHtml && (
+                        <div className="bg-white p-6">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                            Description
+                          </div>
+                          <div
+                            className="text-[13px] leading-[1.7] text-[#7A7068]"
+                            dangerouslySetInnerHTML={{
+                              __html: descriptionHtml.replace(/<p><\/p>/g, ""),
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {inclusions.length > 0 && (
+                        <div className="bg-white p-6">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+                            Room Inclusions
+                          </div>
+                          <ul className="list-none p-0 m-0 flex flex-col gap-2">
+                            {inclusions.map((inc, i) => (
+                              <li
+                                key={i}
+                                className="flex gap-2 items-center text-[14px] text-[#1A1714]"
+                              >
+                                <FiCheckCircle
+                                  className="text-[#2C7A4B] shrink-0"
+                                  size={14}
+                                />{" "}
+                                {inc.trim()}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {roomAmenities.length > 0 && (
+                        <div className="bg-white p-6">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-4">
+                            All Amenities
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {roomAmenities.map((amenity, i) => (
+                              <div key={i} className="flex items-start gap-3">
+                                <div className="w-2 h-2 mt-1.5 rounded-full bg-[#B5862A] shrink-0" />
+                                <span className="text-[14px] text-[#7A7068] leading-snug">
+                                  {amenity}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-                  {/* Fare */}
-                  <div className="space-y-2 mb-4 pt-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Base Fare</span>
-                      <span className="text-slate-700 font-semibold">
-                        ₹{(baseFare || 0).toLocaleString("en-IN")}
-                      </span>
+          {/* ----- PROJECT & APPROVER DETAILS TAB ----- */}
+          {activeTab === "project" && (
+            <div className="flex flex-col gap-6 w-full">
+              {/* TRIP DETAILS CARD */}
+              <div className="bg-white border border-[#EAE4D9] p-8">
+                <h2 className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#A89F94] mb-8">
+                  Trip Details
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#A89F94] mb-2">
+                      Order ID
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Taxes &amp; Fees</span>
-                      <span className="text-slate-700 font-semibold">
-                        ₹{(tax || 0).toLocaleString("en-IN")}
-                      </span>
+                    <div className="text-[15px] font-semibold text-[#1A1714]">
+                      {bookingRequest?.orderId || "—"}
                     </div>
-                    <div className="h-px bg-slate-100 my-2" />
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Total
-                      </span>
-                      <div className="text-right">
-                        <span className="text-2xl font-black text-[#0A203E]">
-                          ₹{totalFare.toLocaleString("en-IN")}
-                        </span>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {room.currency} · incl. all taxes
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#A89F94] mb-2">
+                      Purpose of Travel
+                    </div>
+                    <div className="text-[15px] font-semibold text-[#1A1714]">
+                      {bookingRequest?.purposeOfTravel || "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#A89F94] mb-2">
+                      Project Code
+                    </div>
+                    <div className="text-[15px] font-semibold text-[#1A1714]">
+                      {bookingRequest?.projectId || "—"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#A89F94] mb-2">
+                      Requested On
+                    </div>
+                    <div className="text-[15px] font-semibold text-[#1A1714]">
+                      {bookingRequest?.createdAt
+                        ? fmtDate(bookingRequest.createdAt, {
+                            day: "2-digit",
+                            month: "long",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#A89F94] mb-3">
+                      Overall Status
+                    </div>
+                    <div className="inline-block px-3 py-1.5 border border-[#EAE4D9] bg-[#FFFDF5] text-[#B5862A] text-[11px] font-bold tracking-widest uppercase">
+                      {bookingRequest?.requestStatus || "PENDING_APPROVAL"}
+                    </div>
+                  </div>
+                  <div></div>
+                </div>
+              </div>
+
+              {/* Approval Chain */}
+              <div className="bg-white border border-[#E1E7EF] p-8">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-6">
+                  Approval Chain
+                </p>
+                <div className="flex flex-col sm:flex-row gap-0">
+                  {/* Step 1: Manager */}
+                  <div className="flex-1 relative">
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                          bookingRequest?.approvedBy?.approvedAt
+                            ? "bg-[#EDF7F2] border-[#2C7A4B]"
+                            : bookingRequest?.requestStatus === "rejected"
+                              ? "bg-[#FDF1EE] border-[#B5341A]"
+                              : "bg-[#FFFBEB] border-[#C9A240]"
+                        }`}
+                      >
+                        <FiUser
+                          size={16}
+                          className={
+                            bookingRequest?.approvedBy?.approvedAt
+                              ? "text-[#2C7A4B]"
+                              : bookingRequest?.requestStatus === "rejected"
+                                ? "text-[#B5341A]"
+                                : "text-[#C9A240]"
+                          }
+                        />
+                      </div>
+                      <div className="flex-1 pb-8 sm:pb-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="text-[12px] font-bold text-[#1A1714]">
+                            Manager Approval
+                          </p>
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 uppercase tracking-widest border ${
+                              bookingRequest?.approvedBy?.approvedAt
+                                ? "bg-[#EDF7F2] border-[#C3E4D2] text-[#2C7A4B]"
+                                : bookingRequest?.requestStatus === "rejected"
+                                  ? "bg-[#FDF1EE] border-[#F0C4BA] text-[#B5341A]"
+                                  : "bg-[#FFFBEB] border-[#F0E0A8] text-[#8A6200]"
+                            }`}
+                          >
+                            {bookingRequest?.approvedBy?.approvedAt
+                              ? "Approved"
+                              : bookingRequest?.requestStatus === "rejected"
+                                ? "Rejected"
+                                : "Pending"}
+                          </span>
+                        </div>
+                        {bookingRequest?.approverName ||
+                        bookingRequest?.approverEmail ||
+                        bookingRequest?.approvedBy?.name?.firstName ? (
+                          <>
+                            <p className="text-[13px] font-semibold text-[#1A1714]">
+                              {bookingRequest.approverName ||
+                                bookingRequest.approvedBy?.name?.firstName ||
+                                "—"}
+                            </p>
+                            {bookingRequest.approverEmail && (
+                              <p className="text-[11px] text-[#65758B] mt-0.5">
+                                {bookingRequest.approverEmail}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-[#8B7355] mt-0.5 uppercase tracking-wider">
+                              {bookingRequest.approverRole || "EMPLOYEE"}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-[12px] text-[#65758B] italic">
+                            No manager selected
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {/* connector line */}
+                    <div className="hidden sm:block absolute top-5 left-[calc(100%-8px)] w-8 border-t-2 border-dashed border-[#E1E7EF]" />
+                  </div>
+
+                  {/* Step 2: Travel Admin */}
+                  <div className="flex-1">
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                          isApproved
+                            ? "bg-[#EDF7F2] border-[#2C7A4B]"
+                            : bookingRequest?.requestStatus === "rejected"
+                              ? "bg-[#FDF1EE] border-[#B5341A]"
+                              : "bg-[#F5F5F5] border-[#E1E7EF]"
+                        }`}
+                      >
+                        <FiCheckCircle
+                          size={16}
+                          className={
+                            isApproved
+                              ? "text-[#2C7A4B]"
+                              : bookingRequest?.requestStatus === "rejected"
+                                ? "text-[#B5341A]"
+                                : "text-[#65758B]"
+                          }
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="text-[12px] font-bold text-[#1A1714]">
+                            Travel Admin Approval
+                          </p>
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 uppercase tracking-widest border ${
+                              isApproved
+                                ? "bg-[#EDF7F2] border-[#C3E4D2] text-[#2C7A4B]"
+                                : bookingRequest?.requestStatus === "rejected"
+                                  ? "bg-[#FDF1EE] border-[#F0C4BA] text-[#B5341A]"
+                                  : "bg-[#F5F5F5] border-[#E1E7EF] text-[#65758B]"
+                            }`}
+                          >
+                            {isApproved
+                              ? "Approved"
+                              : bookingRequest?.requestStatus === "rejected"
+                                ? "Rejected"
+                                : "Awaiting"}
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-[#65758B] italic">
+                          {isApproved ? "Reviewed" : "Not yet reviewed"}
                         </p>
                       </div>
                     </div>
                   </div>
-
-                  {/* CTA */}
-                  <button
-                    onClick={handleBookNow}
-                    disabled={actionLoading || !isApproved}
-                    className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg
-  ${
-    isApproved
-      ? "bg-gradient-to-r from-[#C9A84C] to-[#C9A84C] text-[#0A203E] hover:shadow-[#C9A84C]/20 active:scale-[0.98]"
-      : "bg-slate-100 text-slate-400 cursor-not-allowed"
-  }
-`}
-                  >
-                    {!isApproved ? (
-                      "Waiting for Approval"
-                    ) : actionLoading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-[#0A203E]/30 border-t-[#0A203E] rounded-full animate-spin" />
-                        Processing…
-                      </>
-                    ) : (
-                      <>
-                        <MdCheckCircle size={16} />
-                        Confirm & Book Now
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Purpose of Travel */}
-              {purposeOfTravel && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/5 p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center">
-                      <FiShield size={16} className="text-[#C9A84C]" />
-                    </div>
-                    <h3 className="text-lg font-bold text-[#C9A84C]">
-                      Purpose of Travel
-                    </h3>
+          {/* ----- PASSENGERS DETAILS TAB ----- */}
+          {activeTab === "guests" && (
+            <div className="bg-white border border-[#EAE4D9] w-full">
+              <div className="px-6 py-[10px] border-b border-[#EAE4D9] flex justify-between items-center bg-[#FAF8F4]">
+                <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-[#A89F94]">
+                  Guests · {travelers.length}
+                </span>
+              </div>
+              <div className="overflow-x-auto w-full">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[#EAE4D9]">
+                      <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-[#A89F94] bg-[#FDF8EE]">
+                        Name & Details
+                      </th>
+                      <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-[#A89F94] bg-[#FDF8EE]">
+                        Contact
+                      </th>
+                      <th className="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-[#A89F94] bg-[#FDF8EE]">
+                        Nationality
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EAE4D9]">
+                    {travelers.map((t, idx) => (
+                      <tr
+                        key={idx}
+                        className="hover:bg-[#FAF8F4] transition-colors"
+                      >
+                        <td className="px-4 py-5">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="text-[14px] font-bold text-[#1A1714]">
+                                {t.title} {t.firstName} {t.lastName}
+                              </p>
+                              <p className="text-[12px] text-[#7A7068] mt-1">
+                                {t.type || "Adult"}{" "}
+                                {t.isLeadPassenger && (
+                                  <span className="text-[#C9A240] ml-1 font-bold">
+                                    · Lead
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-5">
+                          <div className="space-y-2">
+                            <p className="text-[13px] text-[#7A7068] flex items-center gap-2">
+                              <FiMail size={13} /> {t.email || "—"}
+                            </p>
+                            <p className="text-[13px] text-[#7A7068] flex items-center gap-2">
+                              <FiPhone size={13} />{" "}
+                              {t.phoneWithCode ? `+${t.phoneWithCode}` : "—"}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-5">
+                          <p className="text-[13px] font-semibold text-[#1A1714]">
+                            {countryName(t.nationality)}
+                          </p>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ----- POLICY & SUPPORT TAB ----- */}
+          {activeTab === "policy" && (
+            <div className="space-y-6 w-full">
+              {/* Cancel Policies */}
+              {cancellationPolicies.length > 0 && (
+                <div className="bg-white border border-[#EAE4D9]">
+                  <div className="px-6 py-[10px] border-b border-[#EAE4D9] flex justify-between items-center bg-[#FAF8F4]">
+                    <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-[#A89F94]">
+                      Cancellation Policy
+                    </span>
                   </div>
-                  <div className="pl-1">
-                    <p className="text-md font-medium text-[#0A203E] leading-relaxed">
-                      {purposeOfTravel}
-                    </p>
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="text-left p-[10px_20px] text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
+                          From Date
+                        </th>
+                        <th className="text-left p-[10px_20px] text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
+                          Charge Type
+                        </th>
+                        <th className="text-right p-[10px_20px] text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] border-b border-[#EAE4D9]">
+                          Charge
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cancellationPolicies.map((p, i) => (
+                        <tr key={i} className="hover:bg-[#FAF8F4]">
+                          <td className="p-[16px_20px] border-b border-[#EAE4D9] text-[14px] text-[#7A7068]">
+                            {p.FromDate || "—"}
+                          </td>
+                          <td className="p-[16px_20px] border-b border-[#EAE4D9]">
+                            <span
+                              className={`text-[11px] font-semibold tracking-[0.1em] uppercase px-2 py-[2px] ${p.CancellationCharge === 0 ? "bg-[#EDF7F2] text-[#2C7A4B]" : "bg-[#FDF1EE] text-[#B5341A]"}`}
+                            >
+                              {p.ChargeType === 1 || p.ChargeType === "Fixed"
+                                ? "Fixed (INR)"
+                                : p.ChargeType === 2 ||
+                                    p.ChargeType === "Percentage"
+                                  ? "Percentage (%)"
+                                  : String(p.ChargeType)}
+                            </span>
+                          </td>
+                          <td className="p-[16px_20px] border-b border-[#EAE4D9] text-right font-semibold text-[15px]">
+                            {p.CancellationCharge === 0 ? (
+                              <span className="text-[#2C7A4B]">Free</span>
+                            ) : (
+                              <span className="text-[#1A1714]">
+                                {p.ChargeType === 2 ||
+                                p.ChargeType === "Percentage"
+                                  ? `${p.CancellationCharge}%`
+                                  : `₹${p.CancellationCharge}`}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Rate Conditions / House Rules */}
+              {rateConditions.length > 0 && (
+                <div className="bg-white border border-[#EAE4D9]">
+                  <div className="px-6 py-[10px] border-b border-[#EAE4D9] flex justify-between items-center bg-[#FAF8F4]">
+                    <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-[#A89F94]">
+                      Rate Conditions & Rules
+                    </span>
+                  </div>
+                  <div className="p-6 md:p-8">
+                    <ul className="list-disc pl-5 space-y-4">
+                      {rateConditions.map((cond, i) => {
+                        const str =
+                          typeof cond === "string"
+                            ? decodeHtml(cond)
+                            : JSON.stringify(cond);
+                        // Clean up basic HTML tags just in case
+                        const cleanStr = str.replace(/<[^>]*>?/gm, " ");
+                        return (
+                          <li
+                            key={i}
+                            className="text-[14px] text-[#7A7068] leading-relaxed"
+                          >
+                            {cleanStr.trim()}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </div>
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          )}
+        </main>
       </div>
-    </div>
+      {/* ===== CONFIRM BOOKING MODAL ===== */}
+      {showConfirmModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}
+          >
+            <div
+              className="absolute inset-0 bg-[#1A1714]/60 backdrop-blur-sm"
+              onClick={() => setShowConfirmModal(false)}
+            />
+            <div
+              className="relative bg-white w-full max-w-lg shadow-2xl overflow-hidden"
+              style={{ animation: "modalIn 0.18s ease" }}
+            >
+              <style>{`@keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}`}</style>
+              <div className="h-[4px] bg-gradient-to-r from-[#C9A240] to-[#8B7355]" />
+              <div className="px-8 pt-7 pb-4 flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#000D26] flex items-center justify-center shrink-0">
+                    <FiCheckCircle size={18} className="text-[#C9A240]" />
+                  </div>
+                  <div>
+                    <h2 className="text-[16px] font-bold text-[#1A1714] font-['DM_Sans'] tracking-tight">
+                      Confirm Hotel Booking
+                    </h2>
+                    <p className="text-[11px] text-[#65758B] mt-0.5">
+                      Please review the details before proceeding
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="text-[#65758B] hover:text-[#1A1714] transition-colors p-1"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M12 4L4 12M4 4l8 8"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div className="mx-8 mb-5 bg-[#FAF8F4] border border-[#E1E7EF] p-5 flex gap-4">
+                <img
+                  src={hotel.image}
+                  className="w-14 h-14 object-cover"
+                  alt="Hotel"
+                />
+                <div>
+                  <p className="text-[13px] font-bold text-[#1A1714]">
+                    {hotel.name}
+                  </p>
+                  <p className="text-[11px] text-[#65758B] mt-1">
+                    {hotel.city}
+                  </p>
+                  <p className="text-[11px] text-[#1A1714] mt-1 font-semibold">
+                    {nights} Night(s) · {roomCount} Room(s)
+                  </p>
+                </div>
+              </div>
+              <div className="mx-8 mb-6 flex gap-2 items-start">
+                <FiInfo size={13} className="text-[#C9A240] mt-0.5 shrink-0" />
+                <p className="text-[11px] text-[#65758B] leading-relaxed">
+                  By confirming, a booking will be created for this hotel. This
+                  action{" "}
+                  <strong className="text-[#1A1714]">cannot be undone</strong>.
+                </p>
+              </div>
+              <div className="px-8 pb-7 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="px-5 py-[10px] text-[11px] font-semibold uppercase tracking-[0.1em] text-[#65758B] bg-white border border-[#E1E7EF] hover:bg-[#F5F5F5] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBookHotel}
+                  disabled={actionLoading}
+                  className="inline-flex items-center gap-2 px-6 py-[10px] bg-[#000D26] text-white text-[11px] font-semibold uppercase tracking-[0.1em] hover:bg-[#04112F] transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <FiCheckCircle size={13} />
+                      Confirm &amp; Book
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+      {/* ===== ALERT MODAL ===== */}
+      {alertModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}
+          >
+            <div
+              className="absolute inset-0 bg-[#1A1714]/60 backdrop-blur-sm"
+              onClick={() => setAlertModal(null)}
+            />
+            <div
+              className="relative bg-white w-full max-w-md shadow-2xl overflow-hidden"
+              style={{ animation: "modalIn 0.18s ease" }}
+            >
+              <div
+                className={`h-[4px] ${alertModal.type === "error" ? "bg-[#DC2626]" : alertModal.type === "warning" ? "bg-[#D97706]" : alertModal.type === "success" ? "bg-[#059669]" : "bg-[#2563EB]"}`}
+              />
+              <div className="p-8">
+                <div className="flex items-start gap-4 mb-5">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${alertModal.type === "error" ? "bg-[#FEF2F2]" : alertModal.type === "warning" ? "bg-[#FFFBEB]" : alertModal.type === "success" ? "bg-[#ECFDF5]" : "bg-[#EFF6FF]"}`}
+                  >
+                    {alertModal.type === "error" && (
+                      <FiAlertTriangle size={18} className="text-[#DC2626]" />
+                    )}
+                    {alertModal.type === "warning" && (
+                      <FiAlertTriangle size={18} className="text-[#D97706]" />
+                    )}
+                    {alertModal.type === "success" && (
+                      <FiCheckCircle size={18} className="text-[#059669]" />
+                    )}
+                    {alertModal.type === "info" && (
+                      <FiInfo size={18} className="text-[#2563EB]" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-bold text-[#1A1714] font-['DM_Sans']">
+                      {alertModal.title}
+                    </h3>
+                    <p className="text-[12px] text-[#65758B] mt-1 leading-relaxed">
+                      {alertModal.text}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  {alertModal.cancelText && (
+                    <button
+                      onClick={() => setAlertModal(null)}
+                      className="px-5 py-[9px] text-[11px] font-semibold uppercase tracking-[0.1em] text-[#65758B] bg-white border border-[#E1E7EF] hover:bg-[#F5F5F5] transition-colors"
+                    >
+                      {alertModal.cancelText}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      const cb = alertModal.onConfirm;
+                      setAlertModal(null);
+                      if (cb) cb();
+                    }}
+                    className={`px-5 py-[9px] text-[11px] font-semibold uppercase tracking-[0.1em] text-white transition-colors ${alertModal.type === "error" ? "bg-[#DC2626] hover:bg-[#B91C1C]" : alertModal.type === "warning" ? "bg-[#D97706] hover:bg-[#B45309]" : alertModal.type === "success" ? "bg-[#059669] hover:bg-[#047857]" : "bg-[#2563EB] hover:bg-[#1D4ED8]"}`}
+                  >
+                    {alertModal.confirmText || "OK"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}{" "}
+    </>
   );
 };
 

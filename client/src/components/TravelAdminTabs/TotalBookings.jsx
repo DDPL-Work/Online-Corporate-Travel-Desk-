@@ -140,8 +140,8 @@ function FlightSection() {
           const first = segs[0];
           const last = segs[segs.length - 1];
           return {
-            fromCode: first?.origin?.airportCode || "N/A",
-            toCode: last?.destination?.airportCode || "N/A",
+            fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+            toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
             fromCity: first?.origin?.city || "Unknown",
             toCity: last?.destination?.city || "Unknown",
           };
@@ -191,7 +191,7 @@ function FlightSection() {
     const q = search.toLowerCase();
     return formattedBookings.filter((b) => {
       if (
-        b.executionStatus !== "ticketed" ||
+        (b.executionStatus !== "ticketed" || b.latestReissueBookingId) ||
         b.amendment?.status === "requested"
       )
         return false;
@@ -202,7 +202,19 @@ function FlightSection() {
         (!q ||
           b.travellerName?.toLowerCase().includes(q) ||
           b.employeeId?.toLowerCase().includes(q) ||
-          b.pnr?.toLowerCase().includes(q)) &&
+          b.pnr?.toLowerCase().includes(q) ||
+          b.orderId?.toLowerCase().includes(q) ||
+          b.status?.toLowerCase().includes(q) ||
+          b.flightRequest?.purposeOfTravel?.toLowerCase().includes(q) ||
+          b.airline?.airlineName?.toLowerCase().includes(q) ||
+          b.airline?.airlineCode?.toLowerCase().includes(q) ||
+          (b.routes && b.routes.some(r => 
+            r.fromCode?.toLowerCase().includes(q) || 
+            r.toCode?.toLowerCase().includes(q) || 
+            r.fromCity?.toLowerCase().includes(q) || 
+            r.toCity?.toLowerCase().includes(q)
+          )) ||
+          b.amount?.toString().includes(q)) &&
         (!startDate || booked >= startDate) &&
         (!endDate || booked <= endDate) &&
         (statusFilter === "All" || b.status === statusFilter) &&
@@ -224,15 +236,15 @@ function FlightSection() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          label="Flight Manifest"
+          label="Total Flights"
           value={filtered.length}
-          Icon={FaPlane}
-          borderCls="border-[#000D26]"
-          iconBgCls="bg-slate-100"
-          iconColorCls="text-[#000D26]"
+          Icon={FiList}
+          borderCls="border-[#003399]"
+          iconBgCls="bg-[#003399]/10"
+          iconColorCls="text-[#003399]"
         />
         <StatCard
-          label="Ticketed Assets"
+          label="Confirmed Flights"
           value={filtered.filter((b) => b.status === "Confirmed").length}
           Icon={FiCheckCircle}
           borderCls="border-emerald-500"
@@ -240,7 +252,7 @@ function FlightSection() {
           iconColorCls="text-emerald-600"
         />
         <StatCard
-          label="Pending Sync"
+          label="Pending Flights"
           value={filtered.filter((b) => b.status === "Pending").length}
           Icon={FiClock}
           borderCls="border-amber-500"
@@ -248,7 +260,7 @@ function FlightSection() {
           iconColorCls="text-amber-600"
         />
         <StatCard
-          label="Capital Outlay"
+          label="Total Spend"
           value={`₹${totalSpend.toLocaleString()}`}
           Icon={FaRupeeSign}
           borderCls="border-violet-500"
@@ -265,7 +277,7 @@ function FlightSection() {
           <LabeledField
             label={
               <>
-                <FiSearch size={10} /> Manifest Search
+                <FiSearch size={10} /> Search
               </>
             }
             className="lg:col-span-3"
@@ -273,10 +285,10 @@ function FlightSection() {
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="PNR, Name or ID..."
+              placeholder="Search Flights..."
             />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-2">
+          <LabeledField label="Employee Name" className="lg:col-span-2">
             <CustomDropdown
               value={empFilter}
               onChange={setEmp}
@@ -290,7 +302,7 @@ function FlightSection() {
               options={["All", "Confirmed", "Pending"]}
             />
           </LabeledField>
-          <LabeledField label="Booking Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
             <div className="flex items-center gap-2">
               <input
                 type="date"
@@ -333,23 +345,23 @@ function FlightSection() {
 
       <ResponsiveDataTable
         title="Flight Ledger"
-        subtitle={`${filtered.length} active deployments`}
+        subtitle={`${filtered.length} flight bookings`}
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Total Flight Bookings",
           statCards: [
-            { label: "Flight Manifest", value: filtered.length },
-            { label: "Ticketed Assets", value: filtered.filter((b) => b.status === "Confirmed").length },
-            { label: "Pending Sync", value: filtered.filter((b) => b.status === "Pending").length },
-            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` }
+            { label: "Total Flights", value: filtered.length },
+            { label: "Confirmed Flights", value: filtered.filter((b) => b.status === "Confirmed").length },
+            { label: "Pending Flights", value: filtered.filter((b) => b.status === "Pending").length },
+            { label: "Total Spend", value: `₹${totalSpend.toLocaleString()}` }
           ],
           appliedFilters: [
-            { label: "Manifest Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
+            { label: "Search", value: search || "None" },
+            { label: "Employee Name", value: empFilter },
             { label: "Status", value: statusFilter },
-            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: totalFlightsExportTemplate,
@@ -368,12 +380,12 @@ function FlightSection() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Route</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Email</Th>
               <Th className="!px-6 !py-5">Status</Th>
-              <Th className="!px-6 !py-5">PNR Ref</Th>
+              <Th className="!px-6 !py-5">PNR</Th>
               <Th className="!px-6 !py-5">Amount</Th>
               <Th className="!px-6 !py-5 !text-left">Action</Th>
             </tr>
@@ -461,6 +473,7 @@ function HotelSection() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [waitingBookingId, setWaitingBookingId] = useState(null);
   const PAGE_SIZE = 10;
 
   const navigate = useNavigate();
@@ -513,7 +526,12 @@ function HotelSection() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return formattedBookings.filter((b) => {
-      if (b.executionStatus !== "voucher_generated") return false;
+      if (
+        b.executionStatus !== "voucher_generated" ||
+        (b.amendment && b.amendment.status !== "not_requested")
+      ) {
+        return false;
+      }
       const booked = b.bookedDate
         ? new Date(b.bookedDate).toISOString().slice(0, 10)
         : "";
@@ -521,7 +539,12 @@ function HotelSection() {
         (!q ||
           b.guestName?.toLowerCase().includes(q) ||
           b.employeeId?.toLowerCase().includes(q) ||
-          b.orderId?.toLowerCase().includes(q)) &&
+          b.orderId?.toLowerCase().includes(q) ||
+          b.hotelName?.toLowerCase().includes(q) ||
+          b.city?.toLowerCase().includes(q) ||
+          b.status?.toLowerCase().includes(q) ||
+          b.hotelRequest?.purposeOfTravel?.toLowerCase().includes(q) ||
+          b.amount?.toString().includes(q)) &&
         (!startDate || booked >= startDate) &&
         (!endDate || booked <= endDate)
       );
@@ -593,7 +616,7 @@ function HotelSection() {
               placeholder="Guest Name or Order ID..."
             />
           </LabeledField>
-          <LabeledField label="Booking Window" className="lg:col-span-4">
+          <LabeledField label="Date Range" className="lg:col-span-4">
             <div className="flex items-center gap-2">
               <input
                 type="date"
@@ -634,21 +657,22 @@ function HotelSection() {
 
       <ResponsiveDataTable
         title="Hotel Ledger"
-        subtitle={`${filtered.length} active stays`}
+        subtitle={`${filtered.length} hotel bookings`}
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Total Hotel Bookings",
           statCards: [
-            { label: "Hotel Manifest", value: filtered.length },
-            { label: "Vouchered Assets", value: filtered.length },
-            { label: "Capital Outlay", value: `₹${totalSpend.toLocaleString()}` },
-            { label: "Unique Properties", value: new Set(filtered.map((b) => b.hotelName)).size }
+            { label: "Total Hotels", value: filtered.length },
+            { label: "Confirmed Hotels", value: filtered.length },
+            { label: "Total Spend", value: `₹${totalSpend.toLocaleString()}` },
+            { label: "Unique Hotels", value: new Set(filtered.map((b) => b.hotelName)).size }
           ],
           appliedFilters: [
-            { label: "Manifest Search", value: search || "None" },
-            { label: "Booking Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Search", value: search || "None" },
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: totalHotelsExportTemplate,
@@ -667,10 +691,10 @@ function HotelSection() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order Reference</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
+              <Th className="!px-6 !py-5">Email</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Booked Date</Th>
               <Th className="!px-6 !py-5">Status</Th>
               <Th className="!px-6 !py-5">Amount</Th>
@@ -724,18 +748,30 @@ function HotelSection() {
                   >
                     ₹{b.amount.toLocaleString()}
                   </td>
-                  <td className="!px-6 !py-5 !text-left">
+                  <td className="!px-6 !py-5 !text-left relative">
                     <button
-                      onClick={() =>
-                        navigate(`/employee-hotel-booking/${b._id}`)
-                      }
-                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                      onClick={() => {
+                        const elapsed = (Date.now() - new Date(b.bookedDate).getTime()) / 1000;
+                        if (elapsed < 120) {
+                          setWaitingBookingId(b._id);
+                          setTimeout(() => setWaitingBookingId(null), 3000);
+                        } else {
+                          navigate(`/employee-hotel-booking/${b._id}`);
+                        }
+                      }}
+                      className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group relative"
                     >
                       <FiArrowRight
                         size={18}
                         className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
                       />
                     </button>
+                    {waitingBookingId === b._id && (
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 mr-16 w-48 bg-white border border-amber-200 shadow-xl rounded-xl p-3 z-[100] animate-in fade-in zoom-in-95 duration-200">
+                        <p className="text-xs text-amber-600 font-black mb-1">Please Wait</p>
+                        <p className="text-[10px] text-slate-500 leading-tight">Your voucher is being generated. Please wait 120 seconds after booking to view details.</p>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -817,11 +853,10 @@ export default function TotalBookings() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Total Booking Registry
+                  Total Bookings
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Comprehensive Oversight of all Corporate Travel Deployments
-                  and Asset Management
+                  View all corporate travel bookings
                 </p>
               </div>
             </div>
@@ -833,8 +868,8 @@ export default function TotalBookings() {
         {/* Tab Switcher - Aligned with CancelledBookings */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           {[
-            ["flight", "Flight Manifest", FaPlane],
-            ["hotel", "Hotel Manifest", FaHotel],
+            ["flight", "Flight Bookings", FaPlane],
+            ["hotel", "Hotel Bookings", FaHotel],
           ].map(([k, lbl, Icon]) => (
             <button
               key={k}

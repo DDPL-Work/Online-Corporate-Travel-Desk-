@@ -22,6 +22,8 @@ import {
   FaServer,
   FaUser,
   FaSignOutAlt,
+  FaPercent,
+  FaChartLine,
 } from "react-icons/fa";
 
 import {
@@ -129,6 +131,16 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           icon: <FaFileInvoiceDollar />,
         },
         {
+          to: "/total-revenue-breakdown",
+          label: "Total Revenue Breakdown",
+          icon: <FaFileInvoiceDollar />,
+        },
+        {
+          to: "/markup-revenue",
+          label: "Markup Revenue & Audit",
+          icon: <FaFileInvoiceDollar />,
+        },
+        {
           to: "/wallet-recharge-logs",
           label: "Wallet Recharge Logs",
           icon: <FaWallet />,
@@ -137,6 +149,28 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/credit-status-alerts",
           label: "Credit Alerts",
           icon: <FaBell />,
+        },
+        {
+          to: "/tbo-commissions-taxes",
+          label: "TBO Commissions",
+          icon: <FaMoneyBillWave />,
+        },
+      ],
+    },
+
+    {
+      label: "Pricing & Markup",
+      icon: <FaChartLine />,
+      subItems: [
+        {
+          to: "/global-markup-engine",
+          label: "Markup Engine",
+          icon: <FaPercent />,
+        },
+        {
+          to: "/service-fee-management",
+          label: "Service Fees",
+          icon: <FaMoneyBillWave />,
         },
       ],
     },

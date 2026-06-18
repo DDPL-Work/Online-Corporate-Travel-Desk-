@@ -28,6 +28,8 @@ const { generateSequentialOrderId } = require("../utils/orderIdGenerator");
 const flightOrchestrationService = require("../services/booking/flightOrchestration.service");
 const { resolvePnr } = require("../utils/bookingResolver.util");
 const { resolveBookingContext } = require("../utils/activeBookingResolver.util");
+const MarkupAccountingService = require("../modules/markup/services/markupAccounting.service");
+const serviceFeeService = require("../services/serviceFee.service");
 
 // @desc    Create booking request (Approval-first)
 // @route   POST /api/v1/bookings
@@ -293,20 +295,48 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Valid FareQuote is required");
   }
 
-  /* ================= BALANCE CHECK ================= */
-  const env = process.env.TBO_ENV || "live";
+  /* ================= SERVICE FEE CALCULATION ================= */
+  let serviceFeeDetails = null;
+  if (bookingType === "flight" && flightRequest) {
+    const isIndia = (code) => {
+      if (!code) return false;
+      const c = code.toLowerCase();
+      return c === "in" || c === "ind" || c === "india";
+    };
 
-  const balance = await getAgencyBalance(env);
-
-  const availableBalance = balance.availableBalance;
-  const requiredAmount = Number(pricingSnapshot.totalAmount);
-
-  if (availableBalance < requiredAmount) {
-    throw new ApiError(
-      400,
-      `Insufficient agency balance. Available ₹${availableBalance}, Required ₹${requiredAmount}`,
+    const segments = flightRequest.segments || [];
+    const isDomesticFlight = segments.length > 0 && segments.every(seg => 
+      isIndia(seg.origin?.countryCode || seg.origin?.country) && 
+      isIndia(seg.destination?.countryCode || seg.destination?.country)
     );
+
+    let cabinClassCode = segments[0]?.cabinClass;
+    if (cabinClassCode == null) {
+      try {
+        cabinClassCode = flightRequest.fareQuote?.Results?.[0]?.Segments?.[0]?.[0]?.CabinClass 
+                         || flightRequest.fareQuote?.onward?.Response?.Results?.Segments?.[0]?.[0]?.CabinClass
+                         || 2;
+      } catch (e) {
+        cabinClassCode = 2; // Default Economy
+      }
+    }
+    
+    const serviceFeePayload = {
+      productType: "Flight",
+      operation: "Book",
+      tripType: isDomesticFlight ? "Domestic" : "International",
+      cabinClass: cabinClassCode,
+      baseFare: Number(pricingSnapshot.totalAmount)
+    };
+
+    serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
+    if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
+      pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + serviceFeeDetails.feeAmount;
+      pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
+    }
   }
+
+  /* ================= BALANCE CHECK REMOVED FOR APPROVAL REQUEST ================= */
 
   let bookingSnapshot;
 
@@ -442,32 +472,40 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
   const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 
   let requestStatus = "pending_approval"; // default
-
-  try {
-        const ssrPolicy = await EmployeeSsrPolicy.findOne({
-          corporateId: corporate._id,
-      employeeEmail: user.email?.toLowerCase().trim(),
-        }).lean();
-
-    // If policy exists and approvalRequired is false → auto-approve
-        if (ssrPolicy && ssrPolicy.approvalRequired === false) {
-          requestStatus = "approved";
-          finalApproverName = "Auto Approve";
-          finalApprovedAt = new Date();
-          logger.info("✅ SSR Policy: Auto-approving booking for employee", {
-        email: user.email,
-            corporateId: corporate._id,
-          });
-        }
-    } catch (policyErr) {
-    // If policy lookup fails, fall back to pending_approval (safe default)
-    logger.warn("⚠️ SSR Policy lookup failed, defaulting to pending_approval", {
-          error: policyErr.message,
-    });
-  }
-
   let finalApproverName = approverName;
   let finalApprovedAt = null;
+
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
+
+  if (isAutoApproveIntent && user.role === "travel-admin") {
+    requestStatus = "approved";
+    finalApproverName = "Auto Approve (Travel Admin)";
+    finalApprovedAt = new Date();
+    logger.info("✅ SSR Policy: Auto-approving for Travel Admin", { email: user.email });
+  } else {
+    try {
+      const ssrPolicy = await EmployeeSsrPolicy.findOne({
+        corporateId: corporate._id,
+        employeeEmail: user.email?.toLowerCase().trim(),
+      }).lean();
+
+      // If policy exists and approvalRequired is false AND intent is auto-approve
+      if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
+        requestStatus = "approved";
+        finalApproverName = "Auto Approve";
+        finalApprovedAt = new Date();
+        logger.info("✅ SSR Policy: Auto-approving booking for employee", {
+          email: user.email,
+          corporateId: corporate._id,
+        });
+      }
+    } catch (policyErr) {
+      // If policy lookup fails, fall back to pending_approval (safe default)
+      logger.warn("⚠️ SSR Policy lookup failed, defaulting to pending_approval", {
+        error: policyErr.message,
+      });
+    }
+  }
 
   const bookingRequest = await BookingRequest.create({
     bookingReference: generateBookingReference(),
@@ -506,13 +544,20 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     hotelRequest: bookingType === "hotel" ? hotelRequest : undefined,
 
     pricingSnapshot: {
-      totalAmount: pricingSnapshot.totalAmount,
-      currency: pricingSnapshot.currency || "INR",
+      ...pricingSnapshot,
       capturedAt: new Date(),
     },
+    markupSnapshot: req.body.markupSnapshot || (bookingType === "flight" && flightRequest?.fareSnapshot?.markupAmount > 0 ? {
+      supplierFare: flightRequest.fareSnapshot.supplierFare || 0,
+      finalFare: flightRequest.fareSnapshot.finalFare || flightRequest.fareSnapshot.TotalFare || flightRequest.fareSnapshot.totalFare || 0,
+      markupAmount: flightRequest.fareSnapshot.markupAmount,
+      markupBreakdown: flightRequest.fareSnapshot.markupBreakdown || []
+    } : null),
     bookingSnapshot,
     // bookingSnapshot: req.body.bookingSnapshot,
   });
+
+
 
   /* ================= NOTIFICATION ================= */
   const _flightRequesterEmail = user.email;
@@ -745,15 +790,68 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   );
   if (!fareResult) throw new ApiError(400, "Valid FareQuote is required");
 
+  /* ================= SERVICE FEE CALCULATION ================= */
+  const isIndia = (code) => {
+    if (!code) return false;
+    const c = code.toLowerCase();
+    return c === "in" || c === "ind" || c === "india";
+  };
+  const segments = flightRequest?.segments || [];
+  const isDomesticFlight = segments.length > 0 && segments.every(seg => 
+    isIndia(seg.origin?.countryCode || seg.origin?.country) && 
+    isIndia(seg.destination?.countryCode || seg.destination?.country)
+  );
+
+  let cabinClassCode = segments[0]?.cabinClass;
+  if (cabinClassCode == null) {
+    try {
+      cabinClassCode = flightRequest?.fareQuote?.Results?.[0]?.Segments?.[0]?.[0]?.CabinClass 
+                       || flightRequest?.fareQuote?.onward?.Response?.Results?.Segments?.[0]?.[0]?.CabinClass
+                       || 2;
+    } catch (e) {
+      cabinClassCode = 2;
+    }
+  }
+
+  const serviceFeePayload = {
+    productType: "Flight",
+    operation: "Book",
+    tripType: isDomesticFlight ? "Domestic" : "International",
+    cabinClass: cabinClassCode,
+    baseFare: Number(pricingSnapshot.totalAmount)
+  };
+
+  const serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
+  let totalServiceFee = 0;
+  if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
+    totalServiceFee = serviceFeeDetails.feeAmount;
+    pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + totalServiceFee;
+    pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
+  }
+
   /* ================= BALANCE CHECK ================= */
   const env = process.env.TBO_ENV || "live";
-  const balance = await getAgencyBalance(env);
   const requiredAmount = Number(pricingSnapshot.totalAmount);
+
+  // 1. Check Agency Balance
+  const balance = await getAgencyBalance(env);
   if (balance.availableBalance < requiredAmount) {
     throw new ApiError(
       400,
       `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`,
     );
+  }
+
+  // 2. Check Corporate Wallet / Credit Balance
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
   }
 
   /* ================= PREPARE SNAPSHOT ================= */
@@ -880,8 +978,10 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   let finalApproverName = approverName;
   let finalApprovedAt = null;
 
-  // 1. Travel Admin Exception
-  if (user.role === "travel-admin") {
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
+
+  // 1. Travel Admin Exception (if intent is auto-approve)
+  if (isAutoApproveIntent && user.role === "travel-admin") {
     requestStatus = "approved";
     finalApproverName = "Auto Approve (Travel Admin)";
     finalApprovedAt = new Date();
@@ -901,7 +1001,7 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
           employeeEmail: lookupEmail,
         }).lean();
 
-        if (ssrPolicy && ssrPolicy.approvalRequired === false) {
+        if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
           requestStatus = "approved";
           finalApproverName = "Auto Approve";
           finalApprovedAt = new Date();
@@ -955,9 +1055,18 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
       totalAmount: pricingSnapshot.totalAmount,
       currency: pricingSnapshot.currency || "INR",
       capturedAt: new Date(),
+      serviceFeeDetails: pricingSnapshot.serviceFeeDetails || null,
     },
+    markupSnapshot: req.body.markupSnapshot || (bookingType === "flight" && flightRequest?.fareSnapshot?.markupAmount > 0 ? {
+      supplierFare: flightRequest.fareSnapshot.supplierFare || 0,
+      finalFare: flightRequest.fareSnapshot.finalFare || flightRequest.fareSnapshot.TotalFare || flightRequest.fareSnapshot.totalFare || 0,
+      markupAmount: flightRequest.fareSnapshot.markupAmount,
+      markupBreakdown: flightRequest.fareSnapshot.markupBreakdown || []
+    } : null),
     bookingSnapshot,
   });
+
+
 
   /* ================= NOTIFICATION ================= */
   const _flightRequesterName = user.name?.firstName
@@ -1107,6 +1216,48 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
           });
         } else {
           throw err;
+        }
+      }
+
+      await MarkupAccountingService.recordBookingRevenue(bookingRequest, corporate).catch((err) => {
+        logger.error("Failed to record markup revenue", {
+          bookingId: bookingRequest._id,
+          error: err.message,
+        });
+      });
+
+      if (bookingRequest.pricingSnapshot?.serviceFeeDetails) {
+        try {
+          await serviceFeeService.applyServiceFee(
+            corporate._id,
+            user._id,
+            bookingRequest._id,
+            bookingRequest.orderId,
+            {
+              productType: "Flight",
+              operation: "Book",
+              cabinClass: (() => {
+                const segCabin = bookingRequest.flightRequest?.segments?.[0]?.cabinClass;
+                if (segCabin != null) return segCabin;
+                const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+                return map[bookingRequest.bookingSnapshot?.cabinClass] || 2;
+              })(),
+              tripType: (() => {
+                const segments = bookingRequest.flightRequest?.segments || [];
+                if (segments.length === 0) return "Domestic";
+                const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+                const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+                return isDom ? "Domestic" : "International";
+              })()
+            },
+            null
+            // true // skipWalletDeduction
+          );
+        } catch (feeErr) {
+          logger.error("Failed to apply service fee ledger record", {
+            bookingId: bookingRequest._id,
+            error: feeErr.message,
+          });
         }
       }
 
@@ -2043,20 +2194,90 @@ const getExecutionMessage = (status) => {
 exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 
-  const bookingOwner = await BookingRequest.findById(bookingId).select("userId");
-  if (!bookingOwner) {
+  const booking = await BookingRequest.findById(bookingId);
+  if (!booking) {
     throw new ApiError(404, "Booking not found");
   }
 
-  if (bookingOwner.userId.toString() !== req.user._id.toString()) {
+  if (booking.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Not authorized to execute this booking");
   }
+
+  // ── BALANCE CHECK START ──
+  const corporate = await Corporate.findById(booking.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
+
+  const env = process.env.TBO_ENV || "live";
+  const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+
+  const balance = await getAgencyBalance(env);
+
+  if (balance.availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`
+    );
+  }
+
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
+  }
+  // ── BALANCE CHECK END ──
 
   const orchestrationResult = await flightOrchestrationService.processBooking({
     bookingId,
     actorId: req.user._id,
     confirmPendingRevalidation: req.body?.confirmPendingRevalidation === true,
   });
+
+  if (
+    orchestrationResult.status === "SUCCESS" &&
+    !orchestrationResult.idempotent &&
+    booking.pricingSnapshot?.serviceFeeDetails
+  ) {
+    try {
+      const serviceFeeService = require("../services/serviceFee.service");
+      await serviceFeeService.applyServiceFee(
+        corporate._id,
+        req.user._id,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Flight",
+          operation: "Book",
+          cabinClass: (() => {
+            const segCabin = booking.flightRequest?.segments?.[0]?.cabinClass;
+            if (segCabin != null) return segCabin;
+            const map = { "Economy": 2, "Premium Economy": 3, "Business": 4, "First Class": 6 };
+            return map[booking.bookingSnapshot?.cabinClass] || 2;
+          })(),
+          tripType: (() => {
+            const segments = booking.flightRequest?.segments || [];
+            if (segments.length === 0) return "Domestic";
+            const isIndia = c => { if(!c) return false; const cl = c.toLowerCase(); return cl==="in" || cl==="ind" || cl==="india"; };
+            const isDom = segments.every(seg => isIndia(seg.origin?.countryCode || seg.origin?.country) && isIndia(seg.destination?.countryCode || seg.destination?.country));
+            return isDom ? "Domestic" : "International";
+          })(),
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        },
+        null,
+      );
+    } catch (feeErr) {
+      logger.error("Failed to apply service fee ledger record for approved flight booking", {
+        bookingId: booking._id,
+        error: feeErr.message,
+      });
+    }
+  }
 
   const orchestrationStatusCode =
     orchestrationResult.status === "PROCESSING" ? 202 : 200;
@@ -2069,20 +2290,20 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
     ),
   );
 
-  const booking = await BookingRequest.findById(bookingId);
-  if (!booking) throw new ApiError(404, "Booking not found");
+  const legacyBooking = await BookingRequest.findById(bookingId);
+  if (!legacyBooking) throw new ApiError(404, "Booking not found");
 
   const intent = await BookingIntent.findOne({
-    bookingRequestId: booking._id,
+    bookingRequestId: legacyBooking._id,
     approvalStatus: "approved",
   });
   if (!intent) throw new ApiError(400, "No approved booking intent found");
 
-  if (booking.requestStatus !== "approved")
+  if (legacyBooking.requestStatus !== "approved")
     throw new ApiError(400, "Booking not approved");
 
-  const corporate = await Corporate.findById(booking.corporateId);
-  if (!corporate) throw new ApiError(404, "Corporate not found");
+  const legacyCorporate = await Corporate.findById(legacyBooking.corporateId);
+  if (!legacyCorporate) throw new ApiError(404, "Corporate not found");
 
   const leadPassenger =
     booking.travellers.find((t) => t.isLeadPassenger) || booking.travellers[0];
@@ -2314,7 +2535,7 @@ exports.downloadTicketPdf = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Booking not found");
   }
 
-  const isAdminOrOps = ["super-admin", "travel-admin", "ops-member"].includes(
+  const isAdminOrOps = ["super-admin", "travel-admin", "ops-member", "manager"].includes(
     req.user.role
   );
 
@@ -2678,7 +2899,7 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
 
   const query = {
     corporateId: req.user.corporateId,
-    executionStatus: "ticketed",
+    executionStatus: { $in: ["ticketed", "cancelled", "cancel_requested", "reissued"] },
   };
 
   if (projectId !== "all") {
@@ -2686,8 +2907,10 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
   }
 
   const expenses = await BookingRequest.find(query)
+    .select(
+      "_id userId executionStatus status cancelStatus amendment.status bookingResult.pnr pricingSnapshot.totalAmount bookingSnapshot.amount flightRequest.segments flightRequest.purposeOfTravel createdAt orderId travellers bookingType"
+    )
     .populate("userId", "name email")
-    .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });
 
   res

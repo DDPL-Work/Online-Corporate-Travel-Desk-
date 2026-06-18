@@ -96,10 +96,10 @@ function FlightSection() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Total Active Requests" value={allActiveFlights.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Total Requests" value={allActiveFlights.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
         <StatCard label="Awaiting Approval" value={totalPending} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Approved (Queued)" value={totalApproved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Pipeline Value" value={`₹${totalPipeline.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Approved" value={totalApproved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Total Amount" value={`₹${totalPipeline.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-sm rounded-2xl w-fit">
@@ -113,10 +113,10 @@ function FlightSection() {
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Requests</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Order ID, Route..." />
           </LabeledField>
-          <LabeledField label="Request Window" className="lg:col-span-6">
+          <LabeledField label="Date Range" className="lg:col-span-6">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -130,22 +130,22 @@ function FlightSection() {
       </div>
 
       <ResponsiveDataTable 
-        title={activeSubTab === "pending_approval" ? "Pending Approval Pipeline" : "Approved Pipeline"} 
-        subtitle={`${filtered.length} active requests`} 
+        title={activeSubTab === "pending_approval" ? "Pending Requests" : "Approved Requests"} 
+        subtitle={`${filtered.length} requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: activeSubTab === "pending_approval" ? "Flight Pending Approval Pipeline" : "Flight Approved Pipeline",
           statCards: [
-            { label: "Total Active Requests", value: allActiveFlights.length },
+            { label: "Total Requests", value: allActiveFlights.length },
             { label: "Awaiting Approval", value: totalPending },
-            { label: "Approved (Queued)", value: totalApproved },
-            { label: "Pipeline Value", value: `₹${totalPipeline.toLocaleString()}` }
+            { label: "Approved", value: totalApproved },
+            { label: "Total Amount", value: `₹${totalPipeline.toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Request Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: myPendingFlightsExportTemplate,
@@ -249,10 +249,10 @@ function HotelSection() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Total Active Requests" value={allActiveHotels.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Total Requests" value={allActiveHotels.length} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
         <StatCard label="Awaiting Approval" value={totalPending} Icon={FiList} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-        <StatCard label="Approved (Queued)" value={totalApproved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Pipeline Value" value={`₹${totalPipeline.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Approved" value={totalApproved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Total Amount" value={`₹${totalPipeline.toLocaleString()}`} Icon={FaRupeeSign} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-sm rounded-2xl w-fit">
@@ -266,10 +266,10 @@ function HotelSection() {
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Search Requests</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel Name or Order ID..." />
           </LabeledField>
-          <LabeledField label="Request Window" className="lg:col-span-6">
+          <LabeledField label="Date Range" className="lg:col-span-6">
              <div className="flex items-center gap-2">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -283,22 +283,22 @@ function HotelSection() {
       </div>
 
       <ResponsiveDataTable 
-        title={activeSubTab === "pending_approval" ? "Hotel Pending Approval Pipeline" : "Hotel Approved Pipeline"} 
-        subtitle={`${filtered.length} active requests`} 
+        title={activeSubTab === "pending_approval" ? "Pending Hotel Requests" : "Approved Hotel Requests"} 
+        subtitle={`${filtered.length} requests`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: activeSubTab === "pending_approval" ? "Hotel Pending Approval Pipeline" : "Hotel Approved Pipeline",
           statCards: [
-            { label: "Total Active Requests", value: allActiveHotels.length },
+            { label: "Total Requests", value: allActiveHotels.length },
             { label: "Awaiting Approval", value: totalPending },
-            { label: "Approved (Queued)", value: totalApproved },
-            { label: "Pipeline Value", value: `₹${totalPipeline.toLocaleString()}` }
+            { label: "Approved", value: totalApproved },
+            { label: "Total Amount", value: `₹${totalPipeline.toLocaleString()}` }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Request Window", value: `${startDate || "Any"} to ${endDate || "Any"}` }
+            { label: "Date Range", value: `${startDate || "Any"} to ${endDate || "Any"}` }
           ],
           data: filtered,
           columns: myPendingHotelsExportTemplate,
@@ -311,7 +311,7 @@ function HotelSection() {
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
               <Th className="!px-6 !py-5">Request ID</Th>
-              <Th className="!px-6 !py-5">Hotel Detail</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Check-In Date</Th>
               <Th className="!px-6 !py-5">Status</Th>
               <Th className="!px-6 !py-5">Est. Amount</Th>
@@ -380,7 +380,7 @@ export default function MyPendingApprovals() {
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiClock size={28} /></div>
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Booking Requests</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Real-time tracking of your travel approval pipeline and resource authorization</p>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Track all your pending travel requests (Hotel & Flight)</p>
                </div>
              </div>
           </div>
@@ -388,7 +388,7 @@ export default function MyPendingApprovals() {
       </div>
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Pipeline", FaPlane], ["hotel", "Hotel Pipeline", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Requested Flights", FaPlane], ["hotel", "Requested Hotels", FaHotel]].map(([k, lbl, Icon]) => (
              <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                 <Icon size={14} /> {lbl}
              </button>

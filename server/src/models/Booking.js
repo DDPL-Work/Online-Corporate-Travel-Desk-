@@ -145,7 +145,16 @@ const bookingSchema = new mongoose.Schema({
     type: { type: String, enum: ['email', 'sms'] },
     sentAt: Date,
     status: String
-  }]
+  }],
+
+  markupSnapshot: {
+    supplierFare: Number,
+    markupAmount: Number,
+    finalFare: Number,
+    appliedRuleId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporateMarkup' },
+    markupVersion: String,
+    markupRefundable: { type: Boolean, default: false }
+  }
 }, { timestamps: true });
 
 // Indexes

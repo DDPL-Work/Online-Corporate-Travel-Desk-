@@ -83,8 +83,8 @@ const ManagerRequestsPage = () => {
 
   const handleApprove = async (requestId) => {
     const result = await Swal.fire({
-      title: "Verify Manager?",
-      text: "This will officially verify this person as a corporate approver, allowing them to approve or reject travel requests.",
+      title: "Approve Manager?",
+      text: "This will allow this person to approve or reject travel requests.",
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: C.navy,
@@ -205,9 +205,9 @@ const ManagerRequestsPage = () => {
                  <MdVerifiedUser size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Approver Verification</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Manager Approvals</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Employee verification for corporate travel approvals and management permissions
+                   Review requests from employees to become managers
                  </p>
                </div>
              </div>
@@ -219,23 +219,24 @@ const ManagerRequestsPage = () => {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard label="Total Requests" value={stats.total} Icon={FiUsers} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-          <StatCard label="Pending Review" value={stats.pending} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-          <StatCard label="Verified Assets" value={stats.approved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-          <StatCard label="Denied Access" value={stats.rejected} Icon={FiXCircle} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
+          <StatCard label="Pending" value={stats.pending} Icon={FiClock} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+          <StatCard label="Approved" value={stats.approved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+          <StatCard label="Rejected" value={stats.rejected} Icon={FiXCircle} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
         </div>
 
         {/* Filter Section */}
         <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-            <LabeledField label={<><FiSearch size={10} /> Search Directory</>} className="lg:col-span-6">
+            <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-6">
               <SearchBar value={search} onChange={(val) => { setSearch(val); setCurrentPage(1); }} placeholder="Employee name, email, or project..." />
             </LabeledField>
-            <LabeledField label="Filter Status" className="lg:col-span-3">
+            <LabeledField label="Filter by Status" className="lg:col-span-3">
               <CustomDropdown value={filter} onChange={(val) => { setFilter(val); setCurrentPage(1); }} options={[
                 { label: "All Requests", value: "all" },
-                { label: "Pending Verification", value: "pending" },
-                { label: "Approved Approvers", value: "approved" },
-                { label: "Rejected Requests", value: "rejected" }
+                { label: "Pending", value: "pending" },
+                { label: "Approved", value: "approved" },
+                { label: "Rejected", value: "rejected" },
+                { label: "Expired", value: "expired" }
               ]} />
             </LabeledField>
             <div className="flex items-end lg:col-span-3">
@@ -246,18 +247,18 @@ const ManagerRequestsPage = () => {
 
         {/* Data Table */}
         <ResponsiveDataTable 
-          title="Verification Ledger" 
-          subtitle={`${filtered.length} authentication entries`} 
+          title="Manager Requests" 
+          subtitle={`${filtered.length} requests`} 
           exportLabel="Export Excel"
           exportLoading={isExporting}
           exportDisabled={isExporting}
           onExport={() => exportExcel({
-            pageHeader: "Verification Ledger",
+            pageHeader: "Manager Requests",
             statCards: [
               { label: "Total Requests", value: stats.total },
-              { label: "Pending Review", value: stats.pending },
-              { label: "Verified Assets", value: stats.approved },
-              { label: "Denied Access", value: stats.rejected }
+              { label: "Pending", value: stats.pending },
+              { label: "Approved", value: stats.approved },
+              { label: "Rejected", value: stats.rejected }
             ],
             appliedFilters: [
               { label: "Search", value: search || "None" },
@@ -273,12 +274,12 @@ const ManagerRequestsPage = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                <Th className="!px-6 !py-5">Personnel</Th>
-                <Th className="!px-6 !py-5">Project Scope</Th>
+                <Th className="!px-6 !py-5">Employee</Th>
+                <Th className="!px-6 !py-5">Project</Th>
                 {/* <Th className="!px-6 !py-5">Booking Context</Th>
                 <Th className="!px-6 !py-5">Order ID</Th> */}
-                <Th className="!px-6 !py-5">Designated Approver</Th>
-                <Th className="!px-6 !py-5">Requested On</Th>
+                <Th className="!px-6 !py-5">Manager</Th>
+                <Th className="!px-6 !py-5">Date</Th>
                 <Th className="!px-6 !py-5">Status</Th>
                 <Th className="!px-6 !py-5 !text-center">Action</Th>
               </tr>
@@ -350,8 +351,8 @@ const ManagerRequestsPage = () => {
                           </div>
                        ) : (
                           <div className="flex justify-center">
-                             <div className={`p-2 rounded-lg border flex items-center justify-center ${req.status === "approved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"}`}>
-                                {req.status === "approved" ? <MdVerifiedUser size={16} /> : <FiXCircle size={16} />}
+                             <div className={`p-2 rounded-lg border flex items-center justify-center ${req.status === "approved" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : req.status === "expired" ? "bg-slate-50 text-slate-500 border-slate-200" : "bg-red-50 text-red-600 border-red-100"}`}>
+                                {req.status === "approved" ? <MdVerifiedUser size={16} /> : req.status === "expired" ? <FiClock size={16} /> : <FiXCircle size={16} />}
                              </div>
                           </div>
                        )}
@@ -365,7 +366,7 @@ const ManagerRequestsPage = () => {
                       <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                         <FiInbox size={32} />
                       </div>
-                      <p className="text-sm font-bold text-slate-400">No verification requests found matching the criteria.</p>
+                      <p className="text-sm font-bold text-slate-400">No requests found matching your search.</p>
                     </div>
                   </td>
                 </tr>

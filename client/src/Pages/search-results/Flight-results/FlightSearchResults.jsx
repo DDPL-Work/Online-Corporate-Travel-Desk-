@@ -1,5 +1,6 @@
 // FlightSearchResults.jsx
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import LandingHeader  from "../../../layout/LandingHeader";
@@ -15,6 +16,7 @@ import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 import ResearchableFlightHeader from "./ResearchableFlightHeader";
 import Swal from "sweetalert2";
+import { FiAlertCircle } from "react-icons/fi";
 
 const extractRoutes = (flights, journeyType) => {
   if (!Array.isArray(flights) || flights.length === 0) return [];
@@ -284,6 +286,31 @@ export default function FlightSearchResults() {
 
   // Live search payload — updated when user re-searches from the header
   const [currentSearchPayload, setCurrentSearchPayload] = useState(searchPayload);
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState("");
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const isExpired = sessionStorage.getItem("traceExpired") === "true";
+      const expiredEvent = localStorage.getItem("sessionExpiredEvent");
+      if (isExpired || expiredEvent) {
+        setShowSessionExpiredModal(true);
+        setSessionExpiredMsg(sessionStorage.getItem("traceExpiredMsg") || "Your search session has expired. Please search again for the same itinerary.");
+        sessionStorage.removeItem("traceExpired");
+        sessionStorage.removeItem("traceExpiredMsg");
+        localStorage.removeItem("sessionExpiredEvent");
+      }
+    };
+
+    handleStorageChange();
+    window.addEventListener("focus", handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("focus", handleStorageChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
 
   const onwardSearchDate = normalizeSearchDate(
     searchPayload?.Segments?.[0]?.PreferredDepartureTime ||
@@ -626,7 +653,7 @@ export default function FlightSearchResults() {
     const adults   = tboStylePayload.AdultCount  ?? tboStylePayload.passengers?.adults   ?? 1;
     const children = tboStylePayload.ChildCount  ?? tboStylePayload.passengers?.children ?? 0;
     const infants  = tboStylePayload.InfantCount ?? tboStylePayload.passengers?.infants  ?? 0;
-    const CABIN_MAP = { 2: "economy", 3: "premium_economy", 4: "business", 6: "first_class" };
+    const CABIN_MAP = { 2: "economy", 3: "premium_economy", 4: "business", 5: "premium_business", 6: "first_class" };
     const cabinClassVal = tboStylePayload.Segments?.[0]?.FlightCabinClass ?? tboStylePayload.cabinClass ?? 2;
     const cabinClassStr = CABIN_MAP[Number(cabinClassVal)] || "economy";
 
@@ -643,7 +670,6 @@ export default function FlightSearchResults() {
           departureDate: (s.PreferredDepartureTime || s.departureDate || "").split("T")[0],
         })),
       };
-      await dispatch(searchFlightsMC(appPayload));
     } else {
       const seg0 = tboStylePayload.Segments?.[0] || {};
       const seg1 = tboStylePayload.Segments?.[1] || {};
@@ -658,7 +684,6 @@ export default function FlightSearchResults() {
           returnDate: (seg1.PreferredDepartureTime || seg1.departureDate || "").split("T")[0],
         } : {}),
       };
-      await dispatch(searchFlights(appPayload));
     }
 
     setCurrentSearchPayload(appPayload);
@@ -668,6 +693,12 @@ export default function FlightSearchResults() {
     setActiveTab("onward");
     setOnwardFilters(initialFilterState);
     setReturnFilters(initialFilterState);
+
+    if (jt === 3) {
+      await dispatch(searchFlightsMC(appPayload));
+    } else {
+      await dispatch(searchFlights(appPayload));
+    }
   };
 
   /* ---------------- FILTER LOGIC ---------------- */
@@ -1165,6 +1196,47 @@ export default function FlightSearchResults() {
             </div>
           </aside>
 
+          {/* Session Expired Modal */}
+          {showSessionExpiredModal && createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-4">
+                    <FiAlertCircle size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Session Expired</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    {sessionExpiredMsg}
+                  </p>
+                  <div className="flex gap-3 w-full">
+                    <button
+                      onClick={() => setShowSessionExpiredModal(false)}
+                      className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSessionExpiredModal(false);
+                        const payload = currentSearchPayload || searchPayload;
+                        navigate("/travel", {
+                          state: {
+                            activeTab: "flight",
+                            prefillFlightSearch: payload,
+                          },
+                        });
+                      }}
+                      className="flex-1 px-4 py-2 bg-[#0A203E] text-white font-semibold rounded-lg hover:bg-[#12325c] transition-colors"
+                    >
+                      Search Again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
           {/* RESULTS */}
           <section className="lg:col-span-9 space-y-4">
             {!loading && noFlightsAfterFilters && (
@@ -1173,9 +1245,11 @@ export default function FlightSearchResults() {
               </div>
             )}
 
-            {/* Return Flight Tabs */}
-            {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
-              <div className="sticky top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
+            {!loading && (
+              <>
+                {/* Return Flight Tabs */}
+                {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
+                  <div className="sticky top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
                   {/* ONWARD ROUTE */}
                   <button
@@ -1370,6 +1444,8 @@ export default function FlightSearchResults() {
                 ? groupedOneWayFlights
                 : filteredFlights
               ).map((flight, idx) => renderFlightCard(flight, idx))
+            )}
+              </>
             )}
 
             {/* Bottom Padding for Sticky Summary */}

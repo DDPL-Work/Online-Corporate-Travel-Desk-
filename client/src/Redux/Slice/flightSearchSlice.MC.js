@@ -34,6 +34,7 @@ const flightSlice = createSlice({
       .addCase(searchFlightsMC.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.results = [];
       })
 
       // ---------------- SEARCH SUCCESS ----------------

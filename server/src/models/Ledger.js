@@ -60,6 +60,11 @@ const ledgerSchema = new mongoose.Schema({
     trim: true
   },
 
+  operationType: {
+    type: String,
+    trim: true
+  },
+
   status: {
     type: String,
     enum: ['pending', 'billed', 'paid', 'cancelled'],

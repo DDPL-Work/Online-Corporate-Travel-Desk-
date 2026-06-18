@@ -262,6 +262,7 @@ export default function TravelersClassModal({
                 icon: MdFlightClass,
               },
               { id: "Business", label: "Business", icon: FaCrown },
+              { id: "Premium Business", label: "Premium Business", icon: FaCrown },
               { id: "First Class", label: "First Class", icon: FaCrown },
             ].map((cls) => (
               <button

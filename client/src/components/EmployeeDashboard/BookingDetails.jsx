@@ -8,7 +8,6 @@ import {
   FiDownload,
   FiUser,
   FiCreditCard,
-  FiEye,
   FiCheckCircle,
   FiAlertCircle,
   FiBriefcase,
@@ -34,13 +33,13 @@ import {
   FiGlobe,
   FiPhone,
   FiInfo,
-  FiSend,
+  FiHash,
+  FiEye,
+  FiUsers,
 } from "react-icons/fi";
-import {
-  downloadTicketPdf,
-  fetchMyBookingById,
-  manualTicketNonLcc,
-} from "../../Redux/Actions/booking.thunks";
+import { fetchMyBookingById } from "../../Redux/Actions/booking.thunks";
+import { downloadTicketPdf } from "../../Redux/Actions/booking.thunks";
+import { MdVerifiedUser } from "react-icons/md";
 import {
   fetchCancellationCharges,
   fullCancellation,
@@ -51,6 +50,7 @@ import {
 import {
   checkReissueEligibility,
   fetchOfflineReissueRequestByBooking,
+  createReissueRequest,
 } from "../../Redux/Actions/reissueThunks";
 import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
 import { clearEligibility } from "../../Redux/Slice/reissueSlice";
@@ -69,6 +69,45 @@ import ReissueModal from "./ReissueModal";
 /* ────────────────────────────────────────────────────────────── */
 /*  Utility helpers (unchanged)                                   */
 /* ────────────────────────────────────────────────────────────── */
+
+function getOfflineReissueBadgeMeta(status) {
+  switch (status) {
+    case "RAISED":
+      return {
+        label: "Offline Reissue Requested",
+        className: "bg-amber-50 text-amber-700 border border-amber-100",
+      };
+    case "ASSIGNED":
+    case "IN_PROGRESS":
+    case "WAITING_AIRLINE":
+      return {
+        label: "Processing Reissue",
+        className: "bg-blue-50 text-blue-700 border border-blue-100",
+      };
+    case "TICKET_GENERATED":
+    case "COMPLETED":
+      return {
+        label: "Reissued Ticket Ready",
+        className: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+      };
+    case "REJECTED":
+      return {
+        label: "Reissue Rejected",
+        className: "bg-rose-50 text-rose-700 border border-rose-100",
+      };
+    case "FAILED":
+      return {
+        label: "Reissue Failed",
+        className: "bg-rose-50 text-rose-700 border border-rose-100",
+      };
+    default:
+      return {
+        label: "Offline Reissue Requested",
+        className: "bg-slate-50 text-slate-700 border border-slate-100",
+      };
+  }
+}
+
 function formatPaxType(paxType) {
   const map = { ADULT: "Adult", CHILD: "Child", INFANT: "Infant" };
   return map[paxType] || paxType || "Unknown";
@@ -120,75 +159,82 @@ function formatLayoverDuration(mins) {
   return h > 0 ? `${h}h ${m}m layover` : `${m}m layover`;
 }
 
-function getOfflineReissueBadgeMeta(status) {
-  switch (status) {
-    case "RAISED":
-      return {
-        label: "Offline Reissue Requested",
-        className: "bg-amber-50 text-amber-700 border border-amber-100",
-      };
-    case "ASSIGNED":
-    case "IN_PROGRESS":
-    case "WAITING_AIRLINE":
-      return {
-        label: "Processing Reissue",
-        className: "bg-blue-50 text-blue-700 border border-blue-100",
-      };
-    case "TICKET_GENERATED":
-    case "COMPLETED":
-      return {
-        label: "Reissued Ticket Ready",
-        className: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-      };
-    case "REJECTED":
-      return {
-        label: "Reissue Rejected",
-        className: "bg-rose-50 text-rose-700 border border-rose-100",
-      };
-    case "FAILED":
-      return {
-        label: "Reissue Failed",
-        className: "bg-rose-50 text-rose-700 border border-rose-100",
-      };
-    default:
-      return {
-        label: "Offline Reissue Requested",
-        className: "bg-slate-50 text-slate-700 border border-slate-100",
-      };
-  }
-}
-
 /* ────────────────────────────────────────────────────────────── */
 /*  Shared primitives (restyled)                                  */
 /* ────────────────────────────────────────────────────────────── */
-function StatusPill({ status, size = "sm" }) {
-  const map = {
-    Confirmed: "bg-green-100 text-green-800",
-    Pending: "bg-amber-100 text-amber-800",
-    Cancelled: "bg-red-100 text-red-800",
-    ticketed: "bg-green-100 text-green-800",
-    approved: "bg-blue-100 text-blue-800",
-    pending: "bg-amber-100 text-amber-800",
-    cancelled: "bg-red-100 text-red-800",
+function StatusPill({ status }) {
+  const s = (status || "").toLowerCase();
+  const labelMap = {
+    voucher_generated: "Confirmed",
+    booked: "Booked",
+    confirmed: "Confirmed",
+    cancelled: "Cancelled",
+    cancel_requested: "Cancel Requested",
+    amendment_requested: "Cancelled",
+    amendment_in_progress: "Cancelled",
+    amendment_completed: "Cancelled",
+    ticketed: "Confirmed",
   };
-  const key = status?.toLowerCase() || "pending";
+  const label = labelMap[s] || status;
+  const isAmendment = s.startsWith("amendment_");
+  const isCancelled =
+    ["cancelled", "cancel_requested"].includes(s) || isAmendment;
+  const isConfirmed = [
+    "confirmed",
+    "voucher_generated",
+    "booked",
+    "ticketed",
+  ].includes(s);
+
+  const colors = isCancelled
+    ? "bg-[#FDF1EE] text-[#B5341A] border-[#F0C4BA]"
+    : isConfirmed
+      ? "bg-[#EDF7F2] text-[#2C7A4B] border-[#C3E4D2]"
+      : "bg-[#FDF8EE] text-[#8A6200] border-[#F0E0A8]";
+
+  const dotColor = isCancelled
+    ? "bg-[#B5341A]"
+    : isConfirmed
+      ? "bg-[#2C7A4B]"
+      : "bg-[#8A6200]";
+
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${map[key] || map.pending}`}
+      className={`inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-[2px] border text-[10px] font-semibold tracking-[0.12em] uppercase ${colors}`}
     >
-      {status}
+      <span className={`w-[6px] h-[6px] rounded-full ${dotColor}`} />
+      {label}
     </span>
+  );
+}
+
+function SectionHeader({ num, title }) {
+  return (
+    <div className="flex items-center pb-3 border-b border-[#EAE4D9] mb-6">
+      {num && (
+        <span className="text-[12px] font-semibold tracking-[0.15em] text-[#B5862A] mr-4 uppercase">
+          0{num}
+        </span>
+      )}
+      <h2 className="font-['Cormorant_Garamond'] text-[22px] font-semibold text-[#1A1714] md:text-[18px]">
+        {title}
+      </h2>
+    </div>
   );
 }
 
 function InfoRow({ label, value, accent, mono }) {
   return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-500 font-medium">{label}</span>
+    <div className="flex flex-col gap-1 py-3 border-b border-[#EAE4D9] last:border-0">
+      <span className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+        {label}
+      </span>
       <span
-        className={`text-[13px] font-semibold ${accent ? "text-teal-600" : "text-gray-800"} ${mono ? "font-mono tracking-wide" : ""}`}
+        className={`text-[13px] font-medium ${
+          accent ? "text-[#B5862A]" : "text-[#1A1714]"
+        } ${mono ? "font-['DM_Mono'] tracking-wide" : ""}`}
       >
-        {value ?? "—"}
+        {value || "—"}
       </span>
     </div>
   );
@@ -202,23 +248,63 @@ function FlightCard({
   segments,
   pnr,
   paymentSuccessful,
-  downloading,
-  onDownload,
-  showDownload,
   fareQuoteResults,
   bookingResult,
 }) {
+  const [expandedLayover, setExpandedLayover] = useState(null);
   const firstSeg = segments[0];
   const lastSeg = segments[segments.length - 1];
-  const isDownloading = downloading === journeyType;
 
-  // Resolve airline info string
+  const resolveCabinClass = () => {
+    if (firstSeg?.cabinClass) return firstSeg.cabinClass;
+    for (const res of fareQuoteResults || []) {
+      for (const segGroup of res.Segments || []) {
+        for (const s of segGroup) {
+          if (
+            s.Airline?.FlightNumber === firstSeg?.flightNumber &&
+            s.Airline?.AirlineCode === firstSeg?.airlineCode
+          ) {
+            return s.CabinClass;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const resolveSupplierFare = () => {
+    for (const res of fareQuoteResults || []) {
+      for (const segGroup of res.Segments || []) {
+        for (const s of segGroup) {
+          if (
+            s.Airline?.FlightNumber === firstSeg?.flightNumber &&
+            s.Airline?.AirlineCode === firstSeg?.airlineCode
+          ) {
+            return s.SupplierFareClass || s.FareClassification?.Type;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const cabinClassCode = resolveCabinClass();
+  const cabinClassLabel =
+    typeof cabinClassCode === "number"
+      ? getCabinClassLabel(cabinClassCode)
+      : "Economy";
+  const supplierFare = resolveSupplierFare() || cabinClassLabel;
+
   const airlineInfo = [
-    firstSeg?.airlineName,
-    segments.map((s) => `${s.airlineCode} ${s.flightNumber}`).join(" · "),
-    getCabinClassLabel?.(firstSeg?.cabinClass) || "Economy",
+    segments
+      .map(
+        (s) =>
+          `${s.origin?.airportCode || s.origin?.code}-${s.destination?.airportCode || s.destination?.code} ${s.airlineCode} ${s.flightNumber}`,
+      )
+      .join(" · "),
+    cabinClassLabel,
   ]
-    .filter(Boolean)
+    .filter((v) => v && v !== "—")
     .join(" · ");
 
   // Total stops across all segments
@@ -228,7 +314,7 @@ function FlightCard({
       ? "Non-stop"
       : `${totalStops} Stop${totalStops > 1 ? "s" : ""} · ${segments
           .slice(0, -1)
-          .map((s) => s.destination?.airportCode)
+          .map((s) => s.destination?.airportCode || s.destination?.code)
           .join(", ")}`;
 
   // Overall journey duration: departure of first seg → arrival of last seg
@@ -248,182 +334,309 @@ function FlightCard({
   // Helper to find airport names from deeper data structures
   const resolveAirportName = (code, isOrigin) => {
     // 1. Check if already in segment (unlikely but safe)
-    const segMatch = segments.find(s => (isOrigin ? s.origin?.airportCode : s.destination?.airportCode) === code);
-    const existing = isOrigin ? (segMatch?.origin?.airportName || segMatch?.origin?.AirportName) : (segMatch?.destination?.airportName || segMatch?.destination?.AirportName);
+    const segMatch = segments.find(
+      (s) =>
+        (isOrigin
+          ? s.origin?.airportCode || s.origin?.code
+          : s.destination?.airportCode || s.destination?.code) === code,
+    );
+    const existing = isOrigin
+      ? segMatch?.origin?.airportName || segMatch?.origin?.AirportName
+      : segMatch?.destination?.airportName ||
+        segMatch?.destination?.AirportName;
     if (existing) return existing;
 
     // 2. Check bookingResult (confirmed itinerary)
-    const itinerary = journeyType === "return" 
-      ? bookingResult?.returnResponse?.Response?.Response?.FlightItinerary 
-      : (bookingResult?.onwardResponse || bookingResult?.providerResponse)?.Response?.Response?.FlightItinerary;
-    
+    const itinerary =
+      journeyType === "return"
+        ? bookingResult?.returnResponse?.Response?.Response?.FlightItinerary
+        : (bookingResult?.onwardResponse || bookingResult?.providerResponse)
+            ?.Response?.Response?.FlightItinerary;
+
     const tboSegs = itinerary?.Segments || [];
-    const tboMatch = tboSegs.find(s => (isOrigin ? s.Origin?.Airport?.AirportCode : s.Destination?.Airport?.AirportCode) === code);
-    if (tboMatch) return isOrigin ? tboMatch.Origin?.Airport?.AirportName : tboMatch.Destination?.Airport?.AirportName;
+    const tboMatch = tboSegs.find(
+      (s) =>
+        (isOrigin
+          ? s.Origin?.Airport?.AirportCode
+          : s.Destination?.Airport?.AirportCode) === code,
+    );
+    if (tboMatch)
+      return isOrigin
+        ? tboMatch.Origin?.Airport?.AirportName
+        : tboMatch.Destination?.Airport?.AirportName;
 
     // 3. Check fareQuoteResults (pre-booking snapshot)
-    for (const res of (fareQuoteResults || [])) {
-      for (const segGroup of (res.Segments || [])) {
+    for (const res of fareQuoteResults || []) {
+      for (const segGroup of res.Segments || []) {
         for (const s of segGroup) {
-          const matchCode = isOrigin ? s.Origin?.Airport?.AirportCode : s.Destination?.Airport?.AirportCode;
-          if (matchCode === code) return isOrigin ? s.Origin?.Airport?.AirportName : s.Destination?.Airport?.AirportName;
+          const matchCode = isOrigin
+            ? s.Origin?.Airport?.AirportCode
+            : s.Destination?.Airport?.AirportCode;
+          if (matchCode === code)
+            return isOrigin
+              ? s.Origin?.Airport?.AirportName
+              : s.Destination?.Airport?.AirportName;
         }
       }
     }
     return null;
   };
 
-  const originAirportName = resolveAirportName(journeyOrigin?.airportCode, true);
-  const destAirportName = resolveAirportName(journeyDestination?.airportCode, false);
+  const originAirportName = resolveAirportName(
+    journeyOrigin?.airportCode || journeyOrigin?.code,
+    true,
+  );
+  const destAirportName = resolveAirportName(
+    journeyDestination?.airportCode || journeyDestination?.code,
+    false,
+  );
 
   return (
-    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E0D8C8] overflow-hidden">
-      {/* Card header row */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E0D8C8]">
-        <div className="flex items-center gap-2">
-          <span className="text-[#A07840] text-xs">
-            {journeyType === "return" ? "↙" : "↗"}
-          </span>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-            {journeyType === "return" ? "Return" : "One-Way"}
-          </span>
-        </div>
+    <div className="bg-white border border-[#EAE4D9] mb-6">
+      {/* Top bar */}
+      <div className="px-6 py-[10px] border-b border-[#EAE4D9] flex justify-between items-center">
+        <span className="text-[9px] font-semibold tracking-[0.18em] uppercase text-[#A89F94]">
+          {journeyType === "return" ? "Return Journey" : "Onward Journey"}
+        </span>
         <div className="flex items-center gap-3">
-          {pnr && (
-            <span className="inline-flex items-center gap-1.5 bg-gray-900 text-white rounded-full px-3.5 py-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-widest opacity-50">
-                PNR
-              </span>
-              <span className="font-mono text-[13px] font-bold">{pnr}</span>
+          {supplierFare && (
+            <span className="text-[10px] font-semibold tracking-wide uppercase text-[#1A1714] bg-[#FAF8F4] px-2 py-0.5 rounded-sm border border-[#EAE4D9]">
+              {supplierFare}
             </span>
           )}
-          <span className="text-[11px] text-[#8B7355] font-medium tracking-wide">
+          {pnr && (
+            <span className="flex items-center gap-[6px] text-[11px] text-[#B5862A] border border-[#B5862A] px-[10px] py-[2px]">
+              <FiTag size={11} />
+              PNR · {pnr}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Body: image + details */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,340px)_1fr] gap-0">
+        {/* Airline Logo block */}
+        <div className="relative min-h-[280px] overflow-hidden bg-[#F0EBE1] flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-[#EAE4D9]">
+          <img
+            src={airlineLogo(firstSeg?.airlineCode)}
+            className="w-24 h-24 object-contain mb-4 drop-shadow-sm"
+            alt={firstSeg?.airlineName}
+          />
+          <p className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714] text-center leading-tight">
+            {firstSeg?.airlineName || "Airline"}
+          </p>
+          <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mt-3 text-center leading-relaxed">
             {airlineInfo}
-          </span>
-        </div>
-      </div>
-
-      {/* Main flight row */}
-      <div className="px-5 pt-5 pb-4">
-        <div className="flex flex-col md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-4">
-          {/* Origin */}
-          <div className="w-full md:w-auto text-center md:text-left">
-            <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
-              {formatDate(firstSeg?.departureDateTime)}
-            </p>
-            <p className="text-[32px] md:text-[44px] font-black tracking-tight leading-none text-gray-900">
-              {departureTime}
-            </p>
-            <div className="flex flex-col gap-0.5 mt-2">
-              <div className="flex items-baseline gap-2 justify-center md:justify-start">
-                <span className="text-[15px] font-bold text-gray-900">
-                  {journeyOrigin?.airportCode}
-                </span>
-                <span className="text-[12px] text-[#8B7355] font-medium uppercase tracking-wide">
-                  {journeyOrigin?.city}
-                </span>
-              </div>
-              <p className="text-[10px] text-gray-400 font-medium leading-tight">
-                {originAirportName}
-              </p>
-            </div>
-          </div>
-
-          {/* Connector */}
-          <div className="flex flex-col items-center gap-1.5 min-w-[160px]">
-            <span className="text-[11px] font-semibold text-[#8B7355]">
-              {totalDuration}
-            </span>
-            <div className="flex items-center w-full gap-0">
-              <div className="flex-1 border-t-[1.5px] border-dashed border-[#C8B898]" />
-              <span className="mx-2 text-[#A07840] text-sm">✈</span>
-              <div className="flex-1 border-t-[1.5px] border-dashed border-[#C8B898]" />
-            </div>
-            <span className="text-[10px] font-semibold text-[#8B7355] uppercase tracking-wide">
-              {stopLabel}
-            </span>
-          </div>
-
-          {/* Destination */}
-          <div className="w-full md:w-auto text-center md:text-right">
-            <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
-              {formatDate(lastSeg?.arrivalDateTime)}
-            </p>
-            <p className="text-[32px] md:text-[44px] font-black tracking-tight leading-none text-gray-900">
-              {arrivalTime}
-            </p>
-            <div className="flex flex-col gap-0.5 mt-2">
-              <div className="flex items-baseline gap-2 justify-center md:justify-end">
-                <span className="text-[12px] text-[#8B7355] font-medium uppercase tracking-wide">
-                  {journeyDestination?.city}
-                </span>
-                <span className="text-[15px] font-bold text-gray-900">
-                  {journeyDestination?.airportCode}
-                </span>
-              </div>
-              <p className="text-[10px] text-gray-400 font-medium leading-tight">
-                {destAirportName}
-              </p>
-            </div>
-          </div>
+          </p>
         </div>
 
-        {/* Layover banners (between segments) */}
-        {segments.length > 1 && (
-          <div className="mt-4 space-y-2">
-            {segments.slice(0, -1).map((seg, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 bg-white/60 border border-[#E0D8C8] rounded-xl px-4 py-2.5"
-              >
-                <span className="text-[#A07840] text-xs shrink-0">◎</span>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[13px] font-semibold text-gray-800">
-                    {seg.destination?.airportCode}
-                  </span>
-                  <span className="text-[12px] text-[#8B7355] font-medium ml-1.5 uppercase tracking-wide">
-                    {seg.destination?.city}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-[11px] text-[#8B7355] shrink-0">
-                  {seg.destination?.terminal &&
-                    segments[i + 1]?.origin?.terminal && (
-                      <span className="font-medium">
-                        T{seg.destination.terminal} → T
-                        {segments[i + 1].origin.terminal}
+        {/* Right content */}
+        <div className="p-6 md:p-9">
+          <div className="mb-6">
+            <h1 className="font-['Cormorant_Garamond'] text-[32px] md:text-[36px] font-bold leading-[1.1] text-[#1A1714] mb-2">
+              {journeyOrigin?.city} to {journeyDestination?.city}
+            </h1>
+            <div className="flex items-center gap-3 flex-wrap mb-[6px]">
+              <span className="flex items-center gap-1 text-[12px] text-[#7A7068]">
+                <FiMapPin size={13} className="text-[#B5862A]" />
+                {originAirportName} → {destAirportName}
+              </span>
+            </div>
+          </div>
+
+          <hr className="border-t border-[#EAE4D9] my-5" />
+
+          {/* Departure / Arrival Grid */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-6">
+            <div>
+              <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                Departure
+              </div>
+              <div className="font-['Cormorant_Garamond'] text-[32px] font-bold leading-none mb-[2px] text-[#1A1714]">
+                {departureTime}
+              </div>
+              <div className="text-[13px] text-[#7A7068] font-medium">
+                {formatDate(firstSeg?.departureDateTime)}
+              </div>
+              <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                {originAirportName ||
+                  journeyOrigin?.airportCode ||
+                  journeyOrigin?.code}{" "}
+                <br /> Terminal: {journeyOrigin?.terminal || "Not Available"}
+              </div>
+            </div>
+
+            <div className="text-center px-2">
+              <div className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#A89F94] mb-2">
+                {totalDuration}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-[6px] h-[6px] rounded-full border border-[#EAE4D9] inline-block" />
+                <div className="flex-1 border-t border-dashed border-[#EAE4D9] w-8 md:w-12" />
+                <FiClock size={14} className="text-[#A89F94]" />
+                <div className="flex-1 border-t border-dashed border-[#EAE4D9] w-8 md:w-12" />
+                <span className="w-[6px] h-[6px] rounded-full bg-[#B5862A] inline-block" />
+              </div>
+              <div className="text-[10px] text-[#A89F94] mt-2 max-w-[80px] text-center mx-auto">
+                {stopLabel}
+              </div>
+            </div>
+
+            <div className="text-right">
+              <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                Arrival
+              </div>
+              <div className="font-['Cormorant_Garamond'] text-[32px] font-bold leading-none mb-[2px] text-[#1A1714]">
+                {arrivalTime}
+              </div>
+              <div className="text-[13px] text-[#7A7068] font-medium">
+                {formatDate(lastSeg?.arrivalDateTime)}
+              </div>
+              <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                {destAirportName ||
+                  journeyDestination?.airportCode ||
+                  journeyDestination?.code}{" "}
+                <br /> Terminal:{" "}
+                {journeyDestination?.terminal || "Not Available"}
+              </div>
+            </div>
+          </div>
+
+          {/* Segment Details & Baggage */}
+          <div className="space-y-0 border border-[#EAE4D9] rounded-lg overflow-hidden mt-6">
+            {segments.map((seg, i) => {
+              const nextSeg = segments[i + 1];
+              const layoverMins = nextSeg ? layoverMinutes(seg, nextSeg) : null;
+
+              return (
+                <React.Fragment key={i}>
+                  <div className="flex flex-wrap items-center justify-between text-[12px] bg-white px-4 py-3 border-b border-[#EAE4D9] last:border-0 gap-4">
+                    <div className="flex flex-wrap items-center gap-3 min-w-[150px]">
+                      <span className="font-bold text-[#1A1714]">
+                        {seg.origin?.airportCode} →{" "}
+                        {seg.destination?.airportCode}
                       </span>
-                    )}
-                  <span className="flex items-center gap-1 font-semibold">
-                    <FiClock size={11} />
-                    {formatLayoverDuration(
-                      layoverMinutes(seg, segments[i + 1]),
-                    )}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-[#7A7068] font-medium text-[11px]">
+                      <span className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded">
+                        <FiBriefcase size={12} className="text-gray-400" />
+                        Cabin:{" "}
+                        <strong className="text-gray-700">
+                          {seg.baggage?.cabin || "Included"}
+                        </strong>
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded">
+                        <FiBriefcase size={12} className="text-[#B5862A]" />
+                        Check-in:{" "}
+                        <strong className="text-gray-700">
+                          {seg.baggage?.checkIn || "Included"}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
 
-      {/* Baggage chips footer */}
-      <div className="px-5 pb-4 flex items-center gap-2 flex-wrap">
-        {firstSeg?.origin?.terminal && (
-          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#D8CEB8] bg-white/50 text-[#6B5B3E]">
-            T{firstSeg.origin.terminal}
-          </span>
-        )}
-        {firstSeg?.baggage?.cabin && (
-          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#D8CEB8] bg-white/50 text-[#6B5B3E]">
-            {firstSeg.baggage.cabin} Cab
-          </span>
-        )}
-        {firstSeg?.baggage?.checkIn && (
-          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-[#D8CEB8] bg-white/50 text-[#6B5B3E]">
-            {firstSeg.baggage.checkIn} Check
-          </span>
-        )}
+                  {nextSeg && (
+                    <div className="flex items-center text-[11px] text-[#7A7068] bg-[#FAF8F4] px-4 py-2 border-b border-[#EAE4D9]">
+                      <div className="flex items-center gap-2">
+                        <FiRefreshCw size={11} className="text-[#B5862A]" />
+                        <span>
+                          <strong className="text-[#1A1714] font-medium">
+                            {formatLayoverDuration(layoverMins)}
+                          </strong>{" "}
+                          in {seg.destination?.city} (
+                          {seg.destination?.airportCode})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Payment & Booking Status                                       */
+/* ─────────────────────────────────────────────────────────────── */
+function PaymentStatusCard({
+  booking,
+  paymentSuccessful,
+  isConfirmed,
+  isTravelAdmin,
+}) {
+  const items = [
+    {
+      label: "Payment",
+      value: paymentSuccessful ? "Completed" : "Pending",
+      ok: paymentSuccessful,
+      icon: paymentSuccessful ? (
+        <FiCheckCircle size={13} />
+      ) : (
+        <FiAlertCircle size={13} />
+      ),
+      hidden: !isTravelAdmin,
+    },
+    {
+      label: "Ticket",
+      value: isConfirmed ? "Issued" : "Processing…",
+      ok: isConfirmed,
+      icon: isConfirmed ? (
+        <FiCheckCircle size={13} />
+      ) : (
+        <FiRefreshCw size={13} className="animate-spin" />
+      ),
+    },
+    {
+      label: "Passengers",
+      value: booking?.travellers?.length || 1,
+      ok: null,
+      icon: <FiUsers size={13} />,
+    },
+    {
+      label: "Purpose",
+      value: booking?.purposeOfTravel || "—",
+      ok: null,
+      icon: <FiBriefcase size={13} />,
+    },
+  ].filter((item) => !item.hidden);
+
+  return (
+    <div
+      className={`grid ${!isTravelAdmin ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-3"} gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9] mb-8`}
+    >
+      {items.map((item, i) => (
+        <div key={i} className="bg-white p-5">
+          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+            {item.label}
+          </div>
+          <div
+            className={`flex items-center gap-[6px] text-[15px] font-semibold ${
+              item.ok === true
+                ? "text-[#2C7A4B]"
+                : item.ok === false
+                  ? "text-[#8A6200]"
+                  : "text-[#1A1714]"
+            }`}
+          >
+            <span
+              className={
+                item.ok === true
+                  ? "text-[#2C7A4B]"
+                  : item.ok === false
+                    ? "text-[#8A6200]"
+                    : "text-[#A89F94]"
+              }
+            >
+              {item.icon}
+            </span>
+            {item.value}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -462,11 +675,15 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   };
 
   // Group all SSR items by travelerIndex
-  // Shape: { [travelerIndex]: { seats: [], meals: [], baggage: [], specialServices: [] } }
   const byTraveler = {};
 
   travellers.forEach((_, idx) => {
-    byTraveler[idx] = { seats: [], meals: [], baggage: [], specialServices: [] };
+    byTraveler[idx] = {
+      seats: [],
+      meals: [],
+      baggage: [],
+      specialServices: [],
+    };
   });
 
   seats.forEach((s) => {
@@ -495,18 +712,29 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
 
   if (!activeTravelers.length) return null;
 
-  return (
-    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
-        <FiStar size={13} className="text-[#A07840]" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-          Seat, Meal, Baggage &amp; Special Services
+  const renderPrice = (price) => {
+    if (price > 0)
+      return !isEmployee ? (
+        <span className="text-[11px] text-[#B5862A] ml-1 whitespace-nowrap">
+          (₹{price})
         </span>
-      </div>
+      ) : (
+        <span className="text-[11px] text-[#B5862A] ml-1 whitespace-nowrap">
+          (Selected)
+        </span>
+      );
+    return (
+      <span className="text-[11px] text-[#A89F94] italic ml-1 whitespace-nowrap">
+        (Free)
+      </span>
+    );
+  };
 
-      {/* One card per passenger */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  return (
+    <div className="mb-10 bg-white border border-[#EAE4D9] p-8">
+      <SectionHeader title="Seat, Meal, Baggage & Special Services" />
+
+      <div className="space-y-8 mt-6">
         {activeTravelers.map(([travelerIdx, data]) => {
           const idx = parseInt(travelerIdx);
           const t = travellers[idx];
@@ -526,150 +754,152 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
             ...data.specialServices.map((s) => s.price || s.Price || 0),
           ].reduce((a, b) => a + b, 0);
 
+          // Group by segment for this traveler
+          const bySegment = {};
+          const addBySeg = (item, type) => {
+            const sIdx =
+              item.segmentIndex !== undefined ? item.segmentIndex : "unknown";
+            if (!bySegment[sIdx]) {
+              bySegment[sIdx] = {
+                seats: [],
+                meals: [],
+                baggage: [],
+                specialServices: [],
+              };
+            }
+            bySegment[sIdx][type].push(item);
+          };
+
+          data.seats.forEach((i) => addBySeg(i, "seats"));
+          data.meals.forEach((i) => addBySeg(i, "meals"));
+          data.baggage.forEach((i) => addBySeg(i, "baggage"));
+          data.specialServices.forEach((i) => addBySeg(i, "specialServices"));
+
           return (
             <div
               key={travelerIdx}
-              className="bg-white rounded-xl border border-[#E8E0D0] p-4"
+              className="overflow-hidden border border-[#EAE4D9] shadow-sm"
             >
-              {/* Passenger header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-[#F5F0E8] border border-[#E0D8C8] flex items-center justify-center shrink-0">
-                    <FiUser size={12} className="text-[#A07840]" />
+              <div className="bg-[#FAF8F4] px-5 py-4 border-b border-[#EAE4D9] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white border border-[#F0E0A8] flex items-center justify-center shrink-0">
+                    <FiUser size={13} className="text-[#B5862A]" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-gray-900 leading-none truncate">
+                  <div>
+                    <h4 className="text-[14px] font-semibold text-[#1A1714]">
                       {travelerName(idx)}
-                    </p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">
+                    </h4>
+                    <span className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-widest">
                       {paxTypeLabel}
-                    </p>
+                    </span>
                   </div>
                 </div>
                 {passengerTotal > 0 && !isEmployee && (
-                  <span className="text-[12px] font-bold text-gray-900 shrink-0">
+                  <span className="text-[14px] font-bold text-[#1A1714] font-['DM_Mono'] tracking-wide">
                     ₹{passengerTotal}
                   </span>
                 )}
               </div>
-
-              <div className="border-t border-[#F0EBE0] pt-3 space-y-2">
-                {/* Seats */}
-                {data.seats.map((s, i) => (
-                  <div
-                    key={`seat-${i}`}
-                    className="flex items-start justify-between gap-3 py-1"
-                  >
-                    <div className="flex items-start gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
-                        S
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-gray-800 break-words">
-                          Seat {s.seatNo}
-                        </p>
-                        {segRoute(s.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
-                            {segRoute(s.segmentIndex)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
-                      {s.price > 0 ? (!isEmployee ? `₹${s.price}` : "Selected") : "Free"}
-                    </span>
-                  </div>
-                ))}
-
-                {/* Meals */}
-                {data.meals.map((m, i) => (
-                  <div
-                    key={`meal-${i}`}
-                    className="flex items-start justify-between gap-3 py-1"
-                  >
-                    <div className="flex items-start gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
-                        M
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-gray-800 break-words">
-                          {m.code}
-                          {m.description && typeof m.description === "string"
-                            ? ` · ${m.description}`
-                            : ""}
-                        </p>
-                        {segRoute(m.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
-                            {segRoute(m.segmentIndex)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
-                      {m.price > 0 ? (
-                        !isEmployee ? `₹${m.price}` : "Selected"
-                      ) : (
-                        <span className="text-[11px] text-gray-400 italic font-normal">
-                          Complimentary
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                ))}
-
-                {/* Baggage */}
-                {data.baggage.map((b, i) => (
-                  <div
-                    key={`bag-${i}`}
-                    className="flex items-start justify-between gap-3 py-1"
-                  >
-                    <div className="flex items-start gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
-                        B
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-gray-800 break-words">
-                          Baggage · {b.weight || b.description || "Extra"}
-                        </p>
-                        {segRoute(b.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
-                            {segRoute(b.segmentIndex)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
-                      {b.price > 0 ? (!isEmployee ? `₹${b.price}` : "Selected") : "Free"}
-                    </span>
-                  </div>
-                ))}
-
-                {/* Special Services */}
-                {data.specialServices.map((s, i) => (
-                  <div
-                    key={`special-${i}`}
-                    className="flex items-start justify-between gap-3 py-1"
-                  >
-                    <div className="flex items-start gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-md bg-[#F5F0E8] flex items-center justify-center text-[9px] font-bold text-[#A07840] shrink-0 mt-0.5">
-                        SS
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-gray-800 break-words">
-                          {s.text || s.Text || s.code || s.Code || "Special Service"}
-                        </p>
-                        {segRoute(s.segmentIndex) && (
-                          <p className="text-[10px] text-gray-400 uppercase tracking-wide break-all">
-                            {segRoute(s.segmentIndex)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[12px] font-semibold text-gray-700 shrink-0 text-right">
-                      {(s.price > 0 || s.Price > 0) ? (!isEmployee ? `₹${s.price || s.Price}` : "Selected") : "Free"}
-                    </span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#FAF8F4] border-b border-[#EAE4D9]">
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#B5862A] border-r border-[#EAE4D9] min-w-[120px]">
+                        Route
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[120px]">
+                        Seat
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[150px]">
+                        Meal
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] border-r border-[#EAE4D9] min-w-[150px]">
+                        Baggage
+                      </th>
+                      <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-[#A89F94] min-w-[150px]">
+                        Special Service
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(bySegment).map(
+                      ([sIdx, items], rowIdx, arr) => (
+                        <tr
+                          key={sIdx}
+                          className={
+                            rowIdx < arr.length - 1
+                              ? "border-b border-[#EAE4D9]"
+                              : ""
+                          }
+                        >
+                          <td className="px-5 py-4 text-[12px] font-semibold text-[#1A1714] border-r border-[#EAE4D9] whitespace-nowrap">
+                            {sIdx === "unknown"
+                              ? "Any Route"
+                              : segRoute(sIdx) || "Unknown Route"}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
+                            {items.seats.length > 0 ? (
+                              items.seats.map((s, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {s.seatNo} {renderPrice(s.price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
+                            {items.meals.length > 0 ? (
+                              items.meals.map((m, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {m.airlineDescription ||
+                                    m.AirlineDescription ||
+                                    m.code}{" "}
+                                  {m.description &&
+                                  typeof m.description === "string" &&
+                                  isNaN(Number(m.description))
+                                    ? `· ${m.description}`
+                                    : ""}{" "}
+                                  {renderPrice(m.price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714] border-r border-[#EAE4D9]">
+                            {items.baggage.length > 0 ? (
+                              items.baggage.map((b, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {b.weight || b.description || "Extra"}{" "}
+                                  {renderPrice(b.price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-[12px] font-medium text-[#1A1714]">
+                            {items.specialServices.length > 0 ? (
+                              items.specialServices.map((ss, i) => (
+                                <div key={i} className="mb-1 last:mb-0">
+                                  {ss.text ||
+                                    ss.Text ||
+                                    ss.code ||
+                                    ss.Code ||
+                                    "Special Service"}{" "}
+                                  {renderPrice(ss.price || ss.Price)}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[#A89F94]">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           );
@@ -686,11 +916,11 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
         ].reduce((a, b) => a + b, 0);
 
         return grandTotal > 0 && !isEmployee ? (
-          <div className="mt-4 flex justify-between items-center pt-4 border-t border-[#E0D8C8]">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
+          <div className="mt-6 flex justify-between items-center pt-4 border-t border-[#EAE4D9]">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#B5862A]">
               Total Add-on Charges
             </span>
-            <span className="text-[15px] font-bold text-gray-900">
+            <span className="text-[16px] font-bold text-[#1A1714] font-['DM_Mono']">
               ₹{grandTotal}
             </span>
           </div>
@@ -700,253 +930,383 @@ function SSRSection({ ssrSnapshot, travellers, segments, isEmployee }) {
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/*  Booking Summary card (restyled)                               */
-/* ────────────────────────────────────────────────────────────── */
-function BookingSummaryCard({ booking, displayPnr, isEmployee, userRole }) {
-  const approvalStatus = booking.approvalStatus || booking.status;
-  const isApproved =
-    approvalStatus === "approved" ||
-    approvalStatus === "Approved" ||
-    booking.executionStatus === "ticketed";
+const getTicketDate = (b) => {
+  if (b.ticketedAt) return b.ticketedAt;
+  const onwardIssueDate =
+    b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary
+      ?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (onwardIssueDate) return onwardIssueDate;
+  const providerIssueDate =
+    b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary
+      ?.Passenger?.[0]?.Ticket?.IssueDate;
+  if (providerIssueDate) return providerIssueDate;
+  if (b.executionStatus === "ticketed") return b.updatedAt;
+  return null;
+};
 
-  const topFields = [
+/* ────────────────────────────────────────────────────────────── */
+/*  Booking History / Timeline                                    */
+/* ────────────────────────────────────────────────────────────── */
+function BookingHistory({ booking, reissueRequest }) {
+  const isCancelled =
+    booking.executionStatus === "cancelled" || !!booking.cancellation;
+  const isTicketed =
+    booking.executionStatus === "ticketed" ||
+    (isCancelled && !!booking.bookingResult?.pnr);
+
+  const steps = [
     {
-      icon: <FiBriefcase size={11} className="text-[#A07840]" />,
-      label: "Project Name",
-      value: booking.projectName,
+      label: "Request Created",
+      date: booking.createdAt,
+      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
+      icon: <FiClock size={14} />,
+      active: true,
     },
     {
-      icon: <FiTag size={11} className="text-[#A07840]" />,
-      label: "Project Code",
-      value: booking.projectCodeId,
+      label: "Approval Status",
+      date: booking.approvedAt || booking.rejectedAt,
+      desc: (() => {
+        if (booking.rejectedAt) {
+          return `Rejected by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        if (booking.approvedAt) {
+          const requesterId = booking.userId?._id || booking.userId;
+          const approverId =
+            booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+
+          if (
+            booking.approverName === "Auto Approve" ||
+            (requesterId &&
+              approverId &&
+              requesterId.toString() === approverId.toString())
+          ) {
+            return "Auto Approved by System (Travel Policy)";
+          }
+
+          return `Approved by ${booking.approvedBy?.name?.firstName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+        }
+        return "Awaiting approval";
+      })(),
+      icon: <FiCheckCircle size={14} />,
+      active: !!(booking.approvedAt || booking.rejectedAt),
     },
     {
-      icon: <FiBriefcase size={11} className="text-[#A07840]" />,
-      label: "Project Client",
-      value: booking.projectClient,
-    },
-    {
-      icon: <FiMail size={11} className="text-[#A07840]" />,
-      label: "Approver Email",
-      value: booking.approverEmail,
-    },
-    {
-      icon: <FiShield size={11} className="text-[#A07840]" />,
-      label: "Approver Role",
-      value: booking.approverRole,
-    },
-    {
-      icon: <FiMessageSquare size={11} className="text-[#A07840]" />,
-      label: "Approver Comments",
-      value: booking.approverComments || "—",
+      label: "Ticketing",
+      date: getTicketDate(booking),
+      desc: isTicketed
+        ? "E-ticket generated and sent to employee"
+        : "Final ticketing pending",
+      icon: <FiTag size={14} />,
+      active: isTicketed,
     },
   ];
 
-  // Payment info (bottom row)
-  const paymentStatus = booking.payment?.status || "—";
-  const amountPaid = booking.pricingSnapshot?.totalAmount
-    ? `₹${booking.pricingSnapshot.totalAmount}`
-    : booking.fare?.totalFare
-      ? `₹${booking.fare.totalFare}`
-      : "—";
-  const paymentMethod =
-    booking.payment?.method || booking.payment?.gateway || "—";
-  const transactionId =
-    booking.payment?.transactionId || booking.payment?.orderId || "—";
+  if (isCancelled) {
+    steps.push({
+      label: "Cancelled",
+      date:
+        booking.cancelledAt ||
+        booking.cancellation?.cancelledAt ||
+        booking.updatedAt,
+      desc: `Booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
+      icon: <FiXCircle size={14} className="text-red-500" />,
+      active: true,
+      isError: true,
+    });
+  }
+
+  const hasOnlineReissue =
+    booking.amendment &&
+    booking.amendment.status === "completed" &&
+    !isCancelled;
+
+  if (reissueRequest || hasOnlineReissue) {
+    const isCompleted = reissueRequest
+      ? ["COMPLETED", "TICKET_GENERATED"].includes(reissueRequest.status)
+      : booking.amendment?.status === "completed";
+
+    const reqDate =
+      reissueRequest?.createdAt ||
+      booking.amendment?.requestedAt ||
+      booking.updatedAt;
+    const updDate =
+      reissueRequest?.updatedAt ||
+      reissueRequest?.createdAt ||
+      booking.amendment?.updatedAt ||
+      booking.updatedAt;
+
+    steps.push({
+      label: "Reissue Requested",
+      date: reqDate,
+      desc: `A request to reissue this booking was raised.`,
+      icon: <FiRefreshCw size={14} />,
+      active: true,
+    });
+    if (isCompleted) {
+      steps.push({
+        label: "Ticket Reissued",
+        date: updDate,
+        desc: `Booking has been successfully reissued.`,
+        icon: <FiCheckCircle size={14} />,
+        active: true,
+      });
+    }
+  }
 
   return (
-    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] overflow-hidden">
-      {/* ── Top: Booking Summary ── */}
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <FiBriefcase size={13} className="text-[#A07840]" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-              Booking Summary
-            </span>
-          </div>
-          {isApproved && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Approved
-            </span>
-          )}
-        </div>
+    <div className="bg-white border border-[#EAE4D9] p-8 mb-10">
+      <SectionHeader num={null} title="Booking Timeline & History" />
 
-        {/* 3-column fields grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-          {topFields.map((field, i) => (
-            <div key={i}>
-              <div className="flex items-center gap-1 mb-1">
-                {field.icon}
-                <span className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355]">
-                  {field.label}
-                </span>
+      <div className="relative mt-2">
+        {/* Vertical line */}
+        <div className="absolute left-[15px] top-2 bottom-2 w-[1px] bg-[#EAE4D9]" />
+
+        <div className="space-y-8">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative pl-10">
+              {/* Dot */}
+              <div
+                className={`absolute left-0 top-0 w-8 h-8 rounded-full border flex items-center justify-center bg-white z-10 transition-colors ${
+                  step.isError
+                    ? "border-red-500 text-red-600"
+                    : step.active
+                      ? "border-[#B5862A] text-[#B5862A]"
+                      : "border-[#EAE4D9] text-[#A89F94]"
+                }`}
+              >
+                {step.icon}
               </div>
-              <p className="text-[13px] font-semibold text-gray-900 break-words leading-snug">
-                {field.value || "—"}
-              </p>
+
+              <div className={step.active ? "opacity-100" : "opacity-40"}>
+                <div className="flex flex-wrap items-center gap-3 mb-1">
+                  <p
+                    className={`text-[13px] font-semibold ${step.active ? "text-[#1A1714]" : "text-[#A89F94]"}`}
+                  >
+                    {step.label}
+                  </p>
+                  {step.date && (
+                    <span className="text-[10px] font-bold text-[#B5862A] px-2 py-[2px] bg-[#FDF8EE] border border-[#F0E0A8] uppercase tracking-widest font-['DM_Mono']">
+                      {formatDate(step.date)} · {formatTime(step.date)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-[#7A7068] font-medium">
+                  {step.desc}
+                </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
-
-      {/* ── Bottom: Payment Status row ── */}
-      <div className={`border-t border-[#E0D8C8] grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[#E0D8C8]`}>
-        {[
-          {
-            label: "Status",
-            value: paymentStatus,
-            valueClass:
-              paymentStatus === "completed"
-                ? "text-emerald-700"
-                : paymentStatus === "failed"
-                  ? "text-red-600"
-                  : "text-amber-700",
-          },
-          {
-            label: "Amount Paid",
-            value: amountPaid,
-            valueClass: "text-gray-900",
-          },
-        ]
-        .filter(col => !(col.label === "Amount Paid" && userRole === "employee"))
-        .map((col, i) => (
-          <div key={i} className="px-4 py-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-1">
-              {col.label}
-            </p>
-            <p
-              className={`text-[13px] font-semibold truncate ${col.valueClass}`}
-            >
-              {col.value}
-            </p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
+
 /* ────────────────────────────────────────────────────────────── */
-/*  Invoice Section (restyled)                                     */
+/*  Booking Summary card (restyled)                               */
 /* ────────────────────────────────────────────────────────────── */
-function InvoiceSection({ bookingResult, isEmployee }) {
-  if (isEmployee) return null;
+function BookingSummaryCard({ booking, displayPnr }) {
+  const isConfirmed =
+    booking.executionStatus === "ticketed" ||
+    (booking.executionStatus === "cancelled" && !!booking.bookingResult?.pnr);
 
-  const invoices = [];
+  const approverName = (() => {
+    const requesterId = booking.userId?._id || booking.userId;
+    const approverId =
+      booking.approverId || booking.approvedBy?._id || booking.approvedBy;
+    if (
+      booking.approverName === "Auto Approve" ||
+      (requesterId &&
+        approverId &&
+        requesterId.toString() === approverId.toString())
+    ) {
+      return "Auto Approved (System)";
+    }
+    return booking.approvedBy?.name
+      ? `${booking.approvedBy.name.firstName} ${booking.approvedBy.name.lastName}`
+      : booking.approverName || "—";
+  })();
 
-  const onwardFI = safeGet(
-    bookingResult,
-    "onwardResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
-  const returnFI = safeGet(
-    bookingResult,
-    "returnResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
-  const singleFI = safeGet(
-    bookingResult,
-    "providerResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
+  const requesterName =
+    booking.requesterDetails?.name ||
+    (booking.userId?.name
+      ? `${booking.userId.name.firstName} ${booking.userId.name.lastName}`
+      : booking.travellers?.[0]
+        ? `${booking.travellers[0].firstName} ${booking.travellers[0].lastName}`
+        : "—");
 
-  if (onwardFI?.InvoiceNo) {
-    invoices.push({
-      label: "Onward",
-      no: onwardFI.InvoiceNo,
-      amount: onwardFI.InvoiceAmount,
-      date: onwardFI.InvoiceCreatedOn,
-    });
-  }
-  if (returnFI?.InvoiceNo) {
-    invoices.push({
-      label: "Return",
-      no: returnFI.InvoiceNo,
-      amount: returnFI.InvoiceAmount,
-      date: returnFI.InvoiceCreatedOn,
-    });
-  }
-
-  // Fallback for one-way trips
-  if (!invoices.length && singleFI?.InvoiceNo) {
-    invoices.push({
-      label: "Onward",
-      no: singleFI.InvoiceNo,
-      amount: singleFI.InvoiceAmount,
-      date: singleFI.InvoiceCreatedOn,
-    });
-  }
-
-  if (!invoices.length) return null;
+  const sections = [
+    {
+      heading: "Project Information",
+      fields: [
+        {
+          label: "Order ID",
+          value: booking.orderId || "—",
+          icon: <FiHash size={11} />,
+        },
+        {
+          label: "Project Name",
+          value: booking.projectName || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+        {
+          label: "Project Code",
+          value: booking.projectId || booking.projectCodeId || "—",
+          icon: <FiTag size={11} />,
+        },
+        {
+          label: "Project Client",
+          value: booking.projectClient || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
+    },
+    {
+      heading: "Requester Details",
+      fields: [
+        {
+          label: "Requester Name",
+          value: requesterName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Requester Email",
+          value:
+            booking.requesterDetails?.email ||
+            booking.userId?.email ||
+            booking.travellers?.[0]?.email ||
+            "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Purpose of Travel",
+          value: booking.purposeOfTravel || "—",
+          icon: <FiBriefcase size={11} />,
+        },
+      ],
+    },
+    {
+      heading: "Approval Details",
+      fields: [
+        {
+          label: "Selected Approver",
+          value: approverName,
+          icon: <FiUser size={11} />,
+        },
+        {
+          label: "Approver Email",
+          value: booking.approverEmail || booking.approvedBy?.email || "—",
+          icon: <FiMail size={11} />,
+          isEmail: true,
+        },
+        {
+          label: "Approver Role",
+          value: booking.approverRole
+            ? booking.approverRole
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+            : "—",
+          icon: <FiShield size={11} />,
+        },
+        ...(booking.approvedBy?.name
+          ? [
+              {
+                label: "Approved By",
+                value:
+                  `${booking.approvedBy.name.firstName || ""} ${booking.approvedBy.name.lastName || ""}`.trim() ||
+                  "—",
+                icon: <FiUser size={11} />,
+              },
+              {
+                label: "Approved By Email",
+                value: booking.approvedBy?.email || "—",
+                icon: <FiMail size={11} />,
+                isEmail: true,
+              },
+              {
+                label: "Approved By Role",
+                value: booking.approvedBy?.role
+                  ? booking.approvedBy.role
+                      .replace(/-/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                  : "—",
+                icon: <FiShield size={11} />,
+              },
+            ]
+          : []),
+        ...(booking.approverComments
+          ? [
+              {
+                label: "Approver Comments",
+                value: booking.approverComments,
+                icon: <FiMessageSquare size={11} />,
+              },
+            ]
+          : []),
+        ...(isConfirmed && getTicketDate(booking)
+          ? [
+              {
+                label: "Ticketed At",
+                value: `${formatDate(getTicketDate(booking))} ${formatTime(getTicketDate(booking))}`,
+                icon: <FiClock size={11} />,
+              },
+            ]
+          : []),
+      ],
+    },
+  ];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
-        <FiFileText size={14} /> Invoice Details
-      </h3>
-      <div className="grid gap-4 md:grid-cols-2">
-        {invoices.map((inv, i) => (
-          <div
-            key={i}
-            className="border border-gray-100 rounded-lg p-3 bg-gray-50"
-          >
-            <p className="text-sm font-semibold mb-2">{inv.label} Invoice</p>
-            <InfoRow label="Invoice No." value={inv.no} mono />
-            <InfoRow
-              label="Invoice Date"
-              value={inv.date ? formatDate(inv.date) : "—"}
-            />
-            <InfoRow
-              label="Invoice Amount"
-              value={inv.amount != null ? `₹${inv.amount}` : "—"}
-              accent
-            />
+    <section>
+      <SectionHeader num={null} title="Corporate Audit" />
+      <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+        {sections.map((section, si) => (
+          <div key={si} className={si > 0 ? "border-t border-[#EAE4D9]" : ""}>
+            {/* Section heading */}
+            <div className="px-6 pt-5 pb-3 bg-[#FAF8F4]">
+              <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A]">
+                {section.heading}
+              </div>
+            </div>
+            {/* Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[#EAE4D9]">
+              {section.fields.map((field, fi) => (
+                <div
+                  key={fi}
+                  className={`px-6 py-5 ${
+                    fi % 3 !== 2 ? "sm:border-r border-[#EAE4D9]" : ""
+                  } ${fi >= 3 ? "border-t border-[#EAE4D9]" : ""}`}
+                >
+                  <div className="flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                    <span className="text-[#B5862A]">{field.icon}</span>
+                    {field.label}
+                  </div>
+                  <div
+                    className={`text-[13px] font-semibold text-[#1A1714] leading-snug ${
+                      field.isEmail ? "break-all" : ""
+                    }`}
+                  >
+                    {field.value}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
 /* ────────────────────────────────────────────────────────────── */
-/*  Fare Rules (restyled, non-collapsible by default)            */
+/*  Fare Rules (restyled)                                         */
 /* ────────────────────────────────────────────────────────────── */
-
-function FareRulesSection({ bookingResult }) {
-  const [open, setOpen] = useState(true);
-
-  const rules = [];
-
-  // ── Round-trip paths ──
-  const onwardFI = safeGet(
-    bookingResult,
-    "onwardResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
-  const returnFI = safeGet(
-    bookingResult,
-    "returnResponse",
-    "Response",
-    "Response",
-    "FlightItinerary",
-  );
-
-  // ── One-way path ──
-  const singleFI =
+function FareRulesSection({ bookingResult, fareSnapshot, booking }) {
+  const onwardFI =
     safeGet(
       bookingResult,
-      "providerResponse",
+      "onwardResponse",
       "Response",
       "Response",
       "FlightItinerary",
@@ -954,12 +1314,22 @@ function FareRulesSection({ bookingResult }) {
     safeGet(
       bookingResult,
       "providerResponse",
-      "raw",
       "Response",
       "Response",
       "FlightItinerary",
     );
+  const returnFI = safeGet(
+    bookingResult,
+    "returnResponse",
+    "Response",
+    "Response",
+    "FlightItinerary",
+  );
+  const singleFI =
+    safeGet(bookingResult, "Response", "Response", "FlightItinerary") ||
+    safeGet(bookingResult, "raw", "Response", "Response", "FlightItinerary");
 
+  const rules = [];
   if (onwardFI?.FareRules?.length)
     rules.push({
       label: "Onward",
@@ -973,7 +1343,6 @@ function FareRulesSection({ bookingResult }) {
       rules: returnFI.FareRules,
     });
 
-  // Fallback: one-way trip — only add if round-trip paths yielded nothing
   if (!rules.length && singleFI?.FareRules?.length)
     rules.push({
       label: "Onward",
@@ -981,1613 +1350,154 @@ function FareRulesSection({ bookingResult }) {
       rules: singleFI.FareRules,
     });
 
-  if (!rules.length) return null;
+  const fareQuoteRules =
+    safeGet(booking, "flightRequest", "fareQuote", "Results", 0, "FareRules") ||
+    safeGet(booking, "flightRequest", "pricing", "Results", 0, "FareRules");
 
-  const staticNotes = [
-    "GST, RAF and any other applicable charges are extra.",
-    "Fees are indicative per pax and per sector.",
-    "Domestic: submit cancellation/reissue request at least 2 hours before the airline policy time limit.",
-    "International: submit cancellation/reissue request at least 4 hours before the airline policy time limit.",
-  ];
+  if (!rules.length && fareQuoteRules?.length) {
+    rules.push({
+      label: "Fare",
+      journeyType: "all",
+      rules: fareQuoteRules,
+    });
+  }
+
+  const miniRules = fareSnapshot?.miniFareRules || [];
+
+  if (!rules.length && !miniRules.length) return null;
+
+  const parseRuleDetail = (html) => {
+    if (!html) return [];
+    const items = [];
+    const liMatches = html.matchAll(/<li>([\s\S]*?)<\/li>/gi);
+    for (const match of liMatches) {
+      const text = match[1]
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (text) items.push({ type: "bullet", text });
+    }
+    const withoutLists = html
+      .replace(/<ul[\s\S]*?<\/ul>/gi, "")
+      .replace(/<ol[\s\S]*?<\/ol>/gi, "");
+    const paragraphText = withoutLists
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\r/g, "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return [
+      ...paragraphText.map((t) => ({ type: "paragraph", text: t })),
+      ...items,
+    ];
+  };
 
   return (
-    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-5">
-      {/* Section header */}
-      <button
-        className="w-full flex items-center justify-between mb-5"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-[#A07840]">
-            <FiFileText size={14} />
-          </span>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-            Fare Rules
-          </span>
-        </div>
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-          As per Airline Policy
-        </span>
-      </button>
+    <div className="bg-white border border-[#EAE4D9] p-8 mb-10">
+      <SectionHeader num={null} title="Fare Rules" />
 
-      {open && (
-        <>
-          {/* Rule cards grid */}
-          {rules.map((r, i) => {
-            const firstRule = r.rules[0];
-            const airlineCode = firstRule?.Airline || "";
-            const fareBasis = firstRule?.FareBasisCode || "";
-            const origin = firstRule?.Origin || "";
-            const destination =
-              r.rules[r.rules.length - 1]?.Destination ||
-              firstRule?.Destination ||
-              "";
+      <div className="space-y-6 mt-2">
+        {rules.map((r, i) => (
+          <div key={i} className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#B5862A]">
+                {r.label} Journey
+              </span>
+              <div className="flex-1 border-t border-[#EAE4D9] border-dashed" />
+            </div>
 
-            // ── Parse HTML into clean structured lines ──
-            const parseRuleDetail = (html) => {
-              if (!html) return [];
-              // Extract <li> items first
-              const liItems = [];
-              const liMatches = html.matchAll(/<li>([\s\S]*?)<\/li>/gi);
-              for (const match of liMatches) {
-                const text = match[1]
-                  .replace(/<[^>]+>/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-                if (text) liItems.push({ type: "bullet", text });
-              }
+            <div className="space-y-3">
+              {r.rules.map((rule, j) => {
+                const lines = parseRuleDetail(rule.FareRuleDetail);
 
-              // Extract text outside of <ul>/<ol> blocks as paragraph lines
-              const withoutLists = html
-                .replace(/<ul[\s\S]*?<\/ul>/gi, "")
-                .replace(/<ol[\s\S]*?<\/ol>/gi, "");
-
-              const paragraphText = withoutLists
-                .replace(/<br\s*\/?>/gi, "\n")
-                .replace(/<[^>]+>/g, "")
-                .replace(/\r/g, "")
-                .split("\n")
-                .map((s) => s.trim())
-                .filter(Boolean);
-
-              const paragraphs = paragraphText.map((t) => ({
-                type: "paragraph",
-                text: t,
-              }));
-
-              return [...paragraphs, ...liItems];
-            };
-
-            return (
-              <div
-                key={i}
-                className="bg-white rounded-xl border border-[#E8E0D0] p-4"
-              >
-                {/* Card header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[#A07840] text-xs">
-                      {r.journeyType === "return" ? "↙" : "↗"}
-                    </span>
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-                      {r.label}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-[#8B7355] font-medium">
-                    {airlineCode} · {fareBasis}
-                  </span>
-                </div>
-
-                {/* Route */}
-                <p className="text-[22px] font-bold text-gray-900 tracking-tight mb-3">
-                  {origin} → {destination}
-                </p>
-
-                {/* Fare basis pill */}
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#8B7355]">
-                    Fare Basis
-                  </span>
-                  <span className="bg-gray-900 text-white text-[11px] font-bold px-3 py-1 rounded-full font-mono">
-                    {fareBasis}
-                  </span>
-                </div>
-
-                {/* All fare rules for this journey — parsed cleanly */}
-                <div className="space-y-4">
-                  {r.rules.map((rule, j) => {
-                    const lines = parseRuleDetail(rule.FareRuleDetail);
-                    const paragraphs = lines.filter(
-                      (l) => l.type === "paragraph",
-                    );
-                    const bullets = lines.filter((l) => l.type === "bullet");
-
-                    // Skip rules with no content at all
-                    if (!lines.length && j > 0) return null;
-
-                    return (
-                      <div
-                        key={j}
-                        className={
-                          j > 0 ? "pt-3 border-t border-[#F0EBE0]" : ""
-                        }
-                      >
-                        {/* Sub-route label for multi-leg rules */}
-                        {j > 0 && (
-                          <p className="text-[11px] font-bold text-[#8B7355] uppercase tracking-wider mb-2">
+                return (
+                  <div
+                    key={j}
+                    className="bg-white border border-[#EAE4D9] transition-all duration-300"
+                  >
+                    <div className="w-full px-5 py-4 flex items-center justify-between text-left">
+                      <div className="flex items-center gap-4">
+                        <div className="w-[6px] h-[6px] bg-[#B5862A]" />
+                        <div>
+                          <p className="text-[13px] font-bold text-[#1A1714] uppercase tracking-tight">
                             {rule.Origin} → {rule.Destination}
                           </p>
-                        )}
-
-                        {/* Paragraph lines */}
-                        {paragraphs.map((p, k) => (
-                          <p
-                            key={k}
-                            className="text-[13px] text-gray-600 leading-relaxed mb-2 last:mb-0"
-                          >
-                            {p.text}
+                          <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-widest mt-0.5">
+                            {rule.Airline} · {rule.FareBasisCode}
                           </p>
-                        ))}
+                        </div>
+                      </div>
+                    </div>
 
-                        {/* Bullet list items */}
-                        {bullets.length > 0 && (
-                          <ul className="mt-2 space-y-1.5">
-                            {bullets.map((b, k) => (
-                              <li key={k} className="flex items-start gap-2.5">
-                                <span className="text-[#A07840] mt-[3px] shrink-0 text-[10px]">
+                    <div className="px-5 pb-5 pt-2 border-t border-[#EAE4D9] bg-[#FAF8F4]">
+                      {lines.length > 0 ? (
+                        <div className="space-y-3 mt-3">
+                          {lines.map((l, k) => (
+                            <div key={k} className="flex gap-2.5">
+                              {l.type === "bullet" && (
+                                <span className="text-[#B5862A] mt-1 text-[8px]">
                                   ●
                                 </span>
-                                <span className="text-[13px] text-gray-600 leading-relaxed">
-                                  {b.text}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-
-                        {/* Empty state for rules with no detail */}
-                        {!lines.length && (
-                          <p className="text-[12px] text-gray-400 italic">
-                            No additional details available for this sector.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Static policy notes */}
-          {/* <ul className="space-y-2 border-t border-[#E0D8C8] pt-4">
-            {staticNotes.map((note, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2.5 text-[13px] text-gray-600"
-              >
-                <span className="text-[#A07840] mt-0.5 shrink-0 text-xs">
-                  ●
-                </span>
-                {note}
-              </li>
-            ))}
-          </ul> */}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  ★ CANCELLATION CHARGES MODAL (NEW)                            */
-/* ─────────────────────────────────────────────────────────────── */
-
-/**
- * Step machine:
- *  "charges"         → show fetched charges + 3 action buttons
- *  "full-confirm"    → confirm dialog for full cancellation
- *  "partial-select"  → route selection for partial cancellation
- *  "partial-confirm" → confirm partial after route chosen
- *  "reissue"         → date picker for reissue
- *  "processing"      → spinner while API call in flight
- *  "success"         → success summary
- *  "error"           → error fallback
- */
-function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = true, eligibilityLoading = false }) {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-
-  const totalFare =
-    booking?.pricingSnapshot?.totalAmount ||
-    booking?.totalFare ||
-    booking?.fare?.totalFare ||
-    booking?.bookingResult?.providerResponse?.Response?.Response
-      ?.FlightItinerary?.Fare?.PublishedFare ||
-    0;
-
-  const [step, setStep] = useState("loading"); // starts loading charges
-  const [charges, setCharges] = useState(null);
-  const [chargesError, setChargesError] = useState(null);
-
-  const [selectedJourney, setSelectedJourney] = useState(null);
-  const [reissueDate, setReissueDate] = useState("");
-  const [returnReissueDate, setReturnReissueDate] = useState("");
-  const [remarksText, setRemarksText] = useState("");
-  const [successData, setSuccessData] = useState(null);
-  const [processingLabel, setProcessingLabel] = useState("Processing…");
-  const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
-
-  const [showQueryModal, setShowQueryModal] = useState(false);
-  // const [showReissueModal, setShowReissueModal] = useState(false);
-  const [queryPriority, setQueryPriority] = useState("MEDIUM");
-  const [queryRemarks, setQueryRemarks] = useState("");
-
-  const segments = booking?.flightRequest?.segments || [];
-  const journeyTypeOf = (seg) => {
-    const jt = (seg?.journeyType || "").toString().toLowerCase();
-    return jt === "return" ? "return" : "onward";
-  };
-  const onwardSegs = segments.filter((s) => journeyTypeOf(s) === "onward");
-  const returnSegs = segments.filter((s) => journeyTypeOf(s) === "return");
-  const hasReturn = returnSegs.length > 0;
-
-  const sectorLabel = (segList) => {
-    if (!segList.length) return "N/A";
-    const first = segList[0];
-    const last = segList[segList.length - 1];
-    return `${first?.origin?.airportCode || "?"} → ${last?.destination?.airportCode || "?"}`;
-  };
-
-  // Fetch charges on mount
-  useEffect(() => {
-    const isCancelled = sessionStorage.getItem(
-      `cancelRequested_${booking._id}`,
-    );
-
-    // 🚫 STOP API after cancellation OR manual block
-    if (isCancelled === "true" || !shouldFetchCharges) {
-      return;
-    }
-
-    (async () => {
-      try {
-        const res = await dispatch(fetchCancellationCharges(booking._id));
-
-        if (!fetchCancellationCharges.fulfilled.match(res)) {
-          throw new Error("Failed to fetch charges");
-        }
-
-        setCharges(res.payload);
-        setStep("charges");
-      } catch (err) {
-        console.warn("Charges API failed → allowing actions");
-
-        setChargesError(err.message);
-        setCharges(null); // important
-        setStep("charges"); // ✅ fallback instead of blocking UI
-      }
-    })();
-  }, [booking._id, dispatch, shouldFetchCharges]);
-
-  // Extract TicketCRInfo[0] from charges response
-  const isMulti = charges?.isRoundTrip;
-
-  const chargeList = isMulti
-    ? charges?.data || []
-    : charges
-      ? [{ bookingId: null, response: charges }]
-      : [];
-
-  const parsedCharges = chargeList.map((item) => {
-    const info = extractCancellationChargeInfo(item.response);
-
-    return {
-      bookingId: item.bookingId,
-      cancellationCharge: info?.cancellationCharge ?? null,
-      refundedAmount: info?.refundedAmount ?? null,
-      creditNoteNo: info?.creditNoteNo ?? null,
-      errorMessage: info?.errorMessage ?? null,
-    };
-  });
-  const creditNoteNo =
-    parsedCharges?.[0]?.creditNoteNo ?? charges?.CreditNoteNo ?? null;
-  const cancellationCharge = parsedCharges?.[0]?.cancellationCharge ?? null;
-  const refundedAmount = parsedCharges?.[0]?.refundedAmount ?? null;
-
-  /* ── Full Cancellation ── */
-  const handleFullCancel = async () => {
-    setStep("processing");
-    setProcessingLabel("Submitting cancellation request…");
-    try {
-      const res = await dispatch(
-        fullCancellation({
-          bookingId: booking._id,
-          remarks: remarksText || undefined,
-        }),
-      );
-      let changeRequestIds = [];
-      const responses = res.payload?.data || [];
-
-      if (responses.length > 0) {
-        changeRequestIds = responses
-          .map(
-            (item) =>
-              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-              item?.response?.Response?.ChangeRequestId,
-          )
-          .filter(Boolean);
-      } else {
-        // Fallback for direct response structure
-        const singleId =
-          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-          res.payload?.Response?.ChangeRequestId;
-        if (singleId) changeRequestIds = [singleId];
-      }
-
-      if (!changeRequestIds.length) {
-        throw new Error("No ChangeRequestId returned");
-      }
-
-      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-      setShouldFetchCharges(false);
-
-      toast.success("Cancellation request submitted successfully");
-      onClose();
-
-      await dispatch(fetchMyBookingById(booking._id));
-      // Force page refresh or reload if needed by navigating or reloading
-      navigate("/my-cancelled-bookings");
-    } catch (err) {
-      setChargesError(err?.message || "Cancellation failed. Please try again.");
-      setStep("error");
-    }
-  };
-
-  /* ── Partial Cancellation ── */
-  const buildSectors = () => {
-    const pick = selectedJourney === "return" ? returnSegs : onwardSegs;
-    return pick
-      .map((seg) => ({
-        Origin: seg?.origin?.airportCode,
-        Destination: seg?.destination?.airportCode,
-      }))
-      .filter((s) => s.Origin && s.Destination);
-  };
-
-  const handlePartialCancel = async () => {
-    const sectors = buildSectors();
-    if (!sectors.length) return;
-    setStep("processing");
-    setProcessingLabel("Submitting partial cancellation…");
-    try {
-      const res = await dispatch(
-        partialCancellation({
-          bookingId: booking._id,
-          segments: sectors,
-          remarks: remarksText || "User requested partial cancellation",
-        }),
-      );
-      if (res.error)
-        throw new Error(res.payload || "Partial cancellation failed");
-
-      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-      setShouldFetchCharges(false);
-
-      toast.success("Partial cancellation request submitted successfully");
-      onClose();
-
-      await dispatch(fetchMyBookingById(booking._id));
-      navigate("/my-cancelled-bookings");
-    } catch (err) {
-      setChargesError(err?.message || "Partial cancellation failed.");
-      setStep("error");
-    }
-  };
-
-  /* ── Online reissue handler ── */
-  const handleReissue = async () => {
-    if (!reissueDate) return;
-    if (hasReturn && !returnReissueDate) {
-      setChargesError("Please select the updated return travel date.");
-      setStep("error");
-      return;
-    }
-    setStep("processing");
-    setProcessingLabel("Submitting reissue request…");
-    try {
-      const request = await dispatch(
-        createReissueRequest({
-          bookingId: booking._id,
-          newJourney: {
-            departureDate: reissueDate,
-            ...(hasReturn ? { returnDate: returnReissueDate } : {}),
-          },
-          remarks: remarksText || "User requested reissue",
-        }),
-      ).unwrap();
-      toast.success(
-        `${request.reissueId} created in ${request.mode?.toLowerCase?.() || "servicing"} mode`,
-      );
-      onClose();
-      await dispatch(fetchMyBookingById(booking._id));
-    } catch (err) {
-      setChargesError(err?.message || "Reissue failed. Please try again.");
-      setStep("error");
-    }
-  };
-
-  /* ── Offline reissue handler — NEVER calls /reissue/search ── */
-  const handleOfflineReissue = async () => {
-    if (!reissueDate) {
-      setChargesError("Please select a preferred travel date.");
-      setStep("error");
-      return;
-    }
-    setStep("processing");
-    setProcessingLabel("Raising offline reissue request…");
-    try {
-      const request = await dispatch(
-        createOfflineReissueRequest({
-          bookingId: booking._id,
-          preferredDate: reissueDate,
-          remarks: remarksText || "Employee requested offline reissue",
-        }),
-      ).unwrap();
-      toast.success(
-        `Offline request ${request.requestId} raised. Our team will process it shortly.`,
-      );
-      onClose();
-      await dispatch(fetchMyBookingById(booking._id));
-    } catch (err) {
-      setChargesError(err?.message || "Failed to raise offline reissue request.");
-      setStep("error");
-    }
-  };
-
-  const handleSuccessClose = () => {
-    dispatch(resetAmendmentState());
-    onClose();
-    if (successData?.type === "full" || successData?.type === "partial") {
-      navigate("/my-cancelled-bookings");
-    }
-  };
-
-  const handleRaiseQuery = async () => {
-    try {
-      setShowQueryModal(false);
-      setStep("processing");
-      setProcessingLabel("Creating cancellation query...");
-
-      const payload = {
-        bookingId: booking._id,
-        orderId: booking.orderId || booking.bookingReference,
-        priority: queryPriority,
-        remarks:
-          queryRemarks || "User requested cancellation but charges API failed",
-
-        /* ✅ CORPORATE */
-        corporate: {
-          companyId: booking?.companyId,
-          companyName: booking?.companyName,
-          employeeId: booking?.employeeId,
-          employeeName: booking?.user?.name,
-          employeeEmail: booking?.user?.email,
-        },
-
-        /* ✅ BOOKING SNAPSHOT */
-        bookingSnapshot: {
-          journeyType: booking?.tripType,
-          travelDate: booking?.travelDate,
-          returnDate: booking?.returnDate,
-
-          totalFare: booking?.fare?.totalFare,
-          baseFare: booking?.fare?.baseFare,
-          taxes: booking?.fare?.taxes,
-          serviceFee: booking?.fare?.serviceFee,
-
-          airline: booking?.airline,
-          pnr: booking?.pnr,
-
-          sectors:
-            booking?.flightRequest?.segments?.map((seg) => ({
-              origin: seg?.origin?.airportCode,
-              destination: seg?.destination?.airportCode,
-              departureTime: seg?.departureDateTime,
-              arrivalTime: seg?.arrivalDateTime,
-              airline: seg?.airlineCode,
-              flightNumber: seg?.flightNumber,
-            })) || [],
-        },
-
-        /* ✅ PASSENGERS */
-        passengers:
-          booking?.travellers?.map((pax) => ({
-            name: `${pax.title} ${pax.firstName} ${pax.lastName}`,
-            type: pax.paxType,
-            ticketNumber: pax.ticketNumber,
-          })) || [],
-
-        /* ✅ USER */
-        user: {
-          id: booking?.user?._id,
-          name: booking?.user?.name,
-          email: booking?.user?.email,
-          phone: booking?.user?.phone,
-        },
-
-        /* ✅ LOGS */
-        logs: [
-          {
-            action: "CREATED",
-            by: "USER",
-            message: "Cancellation query created from UI",
-          },
-        ],
-      };
-
-      const res = await dispatch(createCancellationQuery(payload));
-
-      if (!createCancellationQuery.fulfilled.match(res)) {
-        throw new Error(res.payload || "Failed to create query");
-      }
-
-      toast.success("Cancellation query created successfully");
-      onClose();
-
-      await dispatch(fetchMyBookingById(booking._id));
-    } catch (err) {
-      setChargesError(err?.message || "Failed to create query");
-      setStep("error");
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={step !== "processing" ? onClose : undefined}
-      />
-
-      {/* Panel */}
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <span className="bg-red-50 rounded-xl p-2">
-              <FiXCircle size={16} className="text-red-500" />
-            </span>
-            <div>
-              <h2 className="text-base font-black text-slate-900">
-                {step === "reissue" ? "Reissue Flight" : "Cancellation"}
-              </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Order ID · {booking.orderId || booking.bookingReference}
-              </p>
+                              )}
+                              <p
+                                className={`text-[12px] leading-relaxed ${l.type === "bullet" ? "text-[#7A7068]" : "text-[#1A1714] font-medium"}`}
+                              >
+                                {l.text}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-[#A89F94] italic mt-3">
+                          No additional details available for this sector.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          {step !== "processing" && (
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition"
-            >
-              <FiX size={15} className="text-slate-500" />
-            </button>
-          )}
-        </div>
+        ))}
 
-        {/* Body */}
-        <div className="px-6 py-5">
-          {/* ── Loading ── */}
-          {step === "loading" && (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-red-400 animate-spin" />
-              <p className="text-sm text-slate-400 font-medium">
-                Fetching cancellation charges…
-              </p>
+        {miniRules.length > 0 && (
+          <div className="space-y-4 mt-8">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#B5862A]">
+                Mini Fare Rules
+              </span>
+              <div className="flex-1 border-t border-[#EAE4D9] border-dashed" />
             </div>
-          )}
-
-          {/* ── Processing ── */}
-          {step === "processing" && (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-indigo-400 animate-spin" />
-              <p className="text-sm text-slate-500 font-medium text-center">
-                {processingLabel}
-              </p>
-              <p className="text-xs text-slate-400">
-                Please do not close this window
-              </p>
-            </div>
-          )}
-
-          {/* ── Error ── */}
-          {step === "error" && (
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
-                <FiAlertTriangle size={24} className="text-red-400" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-800 mb-1">
-                  Something went wrong
-                </p>
-                <p className="text-xs text-slate-400">{chargesError}</p>
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+            <div className="space-y-3">
+              {miniRules.map((sectorRules, index) => (
+                <div
+                  key={`mini-${index}`}
+                  className="bg-white border border-[#EAE4D9] overflow-hidden"
                 >
-                  Close
-                </button>
-                {/* <button
-                  onClick={() => {
-                    setStep("loading");
-                    setChargesError(null);
-                  }}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition"
-                >
-                  Retry
-                </button> */}
-              </div>
-            </div>
-          )}
-
-          {/* ── Success ── */}
-          {step === "success" && successData && (
-            <div className="flex flex-col items-center gap-4 py-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                <FiCheckCircle size={28} className="text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-base font-black text-slate-800 mb-1">
-                  {successData.type === "full" && "Cancellation Successful"}
-                  {successData.type === "partial" &&
-                    "Partial Cancellation Submitted"}
-                  {successData.type === "reissue" &&
-                    "Reissue Request Submitted"}
-                  {successData.type === "query" && "Request Submitted"}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {successData.type === "full" &&
-                  successData.status !== "completed"
-                    ? "Your request is being processed. You'll be notified shortly."
-                    : successData.type === "full"
-                      ? "Your ticket has been cancelled successfully."
-                      : successData.type === "partial"
-                        ? `Route ${successData.route} cancellation submitted.`
-                        : successData.type === "reissue"
-                          ? `Reissue for ${successData.newDate} submitted.`
-                          : successData.type === "query"
-                            ? "Your cancellation request has been raised successfully. Our support team will process it shortly."
-                            : ""}
-                </p>
-              </div>
-
-              {/* Refund summary for full cancel */}
-              {successData.type === "full" && (
-                <div className="w-full bg-slate-50 rounded-xl p-4 space-y-2 text-left">
-                  {successData.cancellationCharge != null && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">
-                        Cancellation Charge
-                      </span>
-                      <span className="font-bold text-red-600">
-                        ₹{successData.cancellationCharge}
-                      </span>
-                    </div>
-                  )}
-                  {successData.refundedAmount != null && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Refund Amount</span>
-                      <span className="font-bold text-emerald-600">
-                        ₹{successData.refundedAmount}
-                      </span>
-                    </div>
-                  )}
-                  {successData.creditNoteNo && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Credit Note No.</span>
-                      <span className="font-mono text-xs font-semibold text-slate-700">
-                        {successData.creditNoteNo}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <button
-                onClick={handleSuccessClose}
-                className="w-full mt-2 py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition"
-              >
-                {successData.type === "full" || successData.type === "partial"
-                  ? "Go to Cancelled Bookings"
-                  : "Close"}
-              </button>
-            </div>
-          )}
-
-          {/* ── Charges view ── */}
-          {step === "charges" && (
-            <div className="space-y-5">
-              {/* Charges breakdown */}
-              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
-                  Cancellation Charges
-                </p>
-                <div className="flex justify-between items-center text-sm pb-1">
-                  <span className="text-slate-600">Total Fare</span>
-                  <span className="font-black text-slate-800">
-                    ₹{totalFare}
-                  </span>
-                </div>
-                {parsedCharges.map((c, i) => (
-                  <div
-                    key={`charge-${i}`}
-                    className="flex justify-between items-center text-sm border-t border-amber-200/50 pt-2"
-                  >
-                    <span className="text-slate-600">
-                      {c.bookingId
-                        ? `Cancellation Charge (Booking ${c.bookingId})`
-                        : "Cancellation Charge"}
-                    </span>
-                    <span className="font-black text-red-600">
-                      ₹{c.cancellationCharge ?? "0"}
-                    </span>
-                  </div>
-                ))}
-                {parsedCharges.map((c, i) => (
-                  <div
-                    key={`refund-${i}`}
-                    className="flex justify-between text-sm border-t border-amber-200/50 pt-2"
-                  >
-                    <span className="text-slate-600 font-bold">
-                      Refund Amount
-                    </span>
-                    <span className="font-black text-emerald-600">
-                      ₹{c.refundedAmount ?? "0"}
-                    </span>
-                  </div>
-                ))}
-                {creditNoteNo && (
-                  <div className="flex justify-between items-center text-sm border-t border-amber-200 pt-2">
-                    <span className="text-slate-600">Credit Note</span>
-                    <span className="font-mono text-xs font-semibold text-slate-700">
-                      {creditNoteNo}
-                    </span>
-                  </div>
-                )}
-                {(parsedCharges.length === 0 || chargesError) && (
-                  <p className="text-xs text-amber-600 italic">
-                    {chargesError
-                      ? "Unable to fetch charges. You can still proceed with cancellation. Final charges will be applied as per airline rules."
-                      : "Charges not available. They will be applied as per fare rules."}
-                  </p>
-                )}
-              </div>
-
-              {/* Mini fare rules quick reference */}
-              {/* {booking?.flightRequest?.fareSnapshot?.miniFareRules?.length >
-                0 && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                    Fare Rules Summary
-                  </p>
-                  {booking.flightRequest.fareSnapshot.miniFareRules
-                    .flat()
-                    .map((rule, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between text-xs"
-                      >
-                        <span
-                          className={`font-semibold ${rule.Type === "Cancellation" ? "text-red-600" : "text-blue-600"}`}
-                        >
-                          {rule.Type} · {rule.JourneyPoints}
-                        </span>
-                        <span className="text-slate-600">{rule.Details}</span>
-                      </div>
-                    ))}
-                </div>
-              )} */}
-
-              {/* 3 action buttons */}
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                <button
-                  onClick={() => setStep("full-confirm")}
-                  className="w-full py-3 bg-red-600 text-white font-bold text-sm rounded-xl hover:bg-red-700 transition flex items-center justify-center gap-2"
-                >
-                  <FiXCircle size={15} />
-                  Full Cancellation
-                </button>
-
-                {hasReturn && (
-                  <button
-                    onClick={() => setStep("partial-select")}
-                    className="w-full py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition flex items-center justify-center gap-2"
-                  >
-                    <FiAlertTriangle size={15} />
-                    Partial Cancellation
-                  </button>
-                )}
-
-                {/* ── Reissue button: eligibility-aware ── */}
-                {eligibilityLoading ? (
-                  <button
-                    disabled
-                    className="w-full py-3 bg-slate-100 text-slate-400 font-bold text-sm rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
-                  >
-                    <FiLoader size={15} className="animate-spin" />
-                    Checking eligibility…
-                  </button>
-                ) : isOnlineEligible ? (
-                  <button
-                    onClick={() => setStep("reissue")}
-                    className="w-full py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2"
-                  >
-                    <FiCalendar size={15} />
-                    Reissue Flight
-                  </button>
-                ) : (
-                  <>
-                    {/* <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                      <FiAlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-500" />
-                      <p className="text-xs leading-relaxed text-amber-800">
-                        <span className="font-bold">Online reissue is not available</span> for this booking/fare.
-                        Our operations team will process your request manually.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setStep("reissue")}
-                      className="w-full py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition flex items-center justify-center gap-2"
+                  {sectorRules.map((mr, mrIdx) => (
+                    <div
+                      key={mrIdx}
+                      className="px-5 py-4 border-b border-[#EAE4D9] last:border-0 flex justify-between items-center"
                     >
-                      <FiSend size={15} />
-                      Raise Offline Reissue Request
-                    </button> */}
-                  </>
-                )}
-
-                {/* ✅ NEW BUTTON (ONLY WHEN API FAILS) */}
-                {(chargesError || parsedCharges.length === 0) && (
-                  <button
-                    onClick={() => setShowQueryModal(true)}
-                    className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"
-                  >
-                    <FiFileText size={15} />
-                    Raise Cancellation Request
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Full cancel confirm ── */}
-          {step === "full-confirm" && (
-            <div className="space-y-5">
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
-                <FiAlertTriangle
-                  size={18}
-                  className="text-red-500 shrink-0 mt-0.5"
-                />
-                <div>
-                  <p className="text-sm font-bold text-red-800 mb-1">
-                    This action cannot be undone
-                  </p>
-                  <p className="text-xs text-red-600">
-                    Your ticket will be cancelled permanently. Refund (if
-                    applicable) will be processed as per fare rules.
-                  </p>
-                </div>
-              </div>
-
-              {cancellationCharge != null && (
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Cancellation Charge</span>
-                    <span className="font-bold text-red-600">
-                      ₹{cancellationCharge}
-                    </span>
-                  </div>
-                  {refundedAmount != null && (
-                    <div className="flex justify-between text-sm border-t border-slate-200 pt-2">
-                      <span className="text-slate-500 font-semibold">
-                        You will receive
-                      </span>
-                      <span className="font-black text-emerald-600">
-                        ₹{refundedAmount}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
-                  Remarks (optional)
-                </p>
-                <textarea
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-200 transition"
-                  rows={2}
-                  placeholder="Reason for cancellation…"
-                  value={remarksText}
-                  onChange={(e) => setRemarksText(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => setStep("charges")}
-                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleFullCancel}
-                  className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition"
-                >
-                  Confirm Cancellation
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Partial cancel — route selection ── */}
-          {step === "partial-select" && (
-            <div className="space-y-5">
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
-                  Select Route to Cancel
-                </p>
-                <div className="space-y-2">
-                  {onwardSegs.length > 0 && (
-                    <label
-                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition ${selectedJourney === "onward" ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="route"
-                        value="onward"
-                        checked={selectedJourney === "onward"}
-                        onChange={() => setSelectedJourney("onward")}
-                        className="accent-amber-500"
-                      />
                       <div>
-                        <p className="text-sm font-bold text-slate-800">
-                          ↗ Onward
+                        <p className="text-[13px] font-bold text-[#1A1714] uppercase tracking-tight">
+                          {mr.Type}
                         </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {sectorLabel(onwardSegs)}
-                        </p>
-                      </div>
-                    </label>
-                  )}
-                  {returnSegs.length > 0 && (
-                    <label
-                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition ${selectedJourney === "return" ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="route"
-                        value="return"
-                        checked={selectedJourney === "return"}
-                        onChange={() => setSelectedJourney("return")}
-                        className="accent-amber-500"
-                      />
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">
-                          ↩ Return
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {sectorLabel(returnSegs)}
+                        <p className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-widest mt-0.5">
+                          {mr.JourneyPoints}
                         </p>
                       </div>
-                    </label>
-                  )}
+                      <div className="text-[13px] font-bold text-[#B5862A]">
+                        {mr.Details}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
-                  Remarks (optional)
-                </p>
-                <textarea
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
-                  rows={2}
-                  placeholder="Add a note…"
-                  value={remarksText}
-                  onChange={(e) => setRemarksText(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStep("charges")}
-                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setStep("partial-confirm")}
-                  disabled={!selectedJourney}
-                  className="flex-1 py-2.5 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-40 rounded-xl transition"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Partial cancel confirm ── */}
-          {step === "partial-confirm" && (
-            <div className="space-y-5">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-                <FiAlertTriangle
-                  size={18}
-                  className="text-amber-500 shrink-0 mt-0.5"
-                />
-                <div>
-                  <p className="text-sm font-bold text-amber-800 mb-1">
-                    Confirm Partial Cancellation
-                  </p>
-                  <p className="text-xs text-amber-700">
-                    Cancelling:{" "}
-                    <strong>
-                      {selectedJourney === "return"
-                        ? `↩ Return · ${sectorLabel(returnSegs)}`
-                        : `↗ Onward · ${sectorLabel(onwardSegs)}`}
-                    </strong>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStep("partial-select")}
-                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handlePartialCancel}
-                  className="flex-1 py-2.5 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition"
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Reissue ── */}
-          {step === "reissue" && (
-            <div className="space-y-5">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                <FiInfo size={18} className="text-blue-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-blue-800 mb-1">
-                    Reissue Flight
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    Select a new travel date. Reissue charges may apply as per
-                    fare rules.
-                  </p>
-                  {booking?.flightRequest?.fareSnapshot?.miniFareRules && (
-                    <p className="text-xs text-blue-500 mt-1 font-semibold">
-                      Reissue fee:{" "}
-                      {booking.flightRequest.fareSnapshot.miniFareRules
-                        .flat()
-                        .find((r) => r.Type === "Reissue")?.Details ||
-                        "As per fare rules"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
-                  New Travel Date
-                </p>
-                <input
-                  type="date"
-                  value={reissueDate}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setReissueDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </div>
-
-              {hasReturn && (
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
-                    New Return Date
-                  </p>
-                  <input
-                    type="date"
-                    value={returnReissueDate}
-                    min={reissueDate || new Date().toISOString().split("T")[0]}
-                    onChange={(e) => setReturnReissueDate(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
-                </div>
-              )}
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
-                  Remarks (optional)
-                </p>
-                <textarea
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  rows={2}
-                  placeholder="Add a note…"
-                  value={remarksText}
-                  onChange={(e) => setRemarksText(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStep("charges")}
-                  className="flex-1 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-                >
-                  Back
-                </button>
-                {isOnlineEligible ? (
-                  <button
-                    onClick={handleReissue}
-                    disabled={!reissueDate || (hasReturn && !returnReissueDate)}
-                    className="flex-1 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 rounded-xl transition"
-                  >
-                    Confirm Reissue
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleOfflineReissue}
-                    disabled={!reissueDate}
-                    className="flex-1 py-2.5 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-40 rounded-xl transition flex items-center justify-center gap-2"
-                  >
-                    <FiSend size={13} /> Raise Offline Request
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showQueryModal && (
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-full max-w-md p-5 shadow-xl">
-            <h3 className="text-sm font-bold mb-4 text-slate-800">
-              Raise Cancellation Query
-            </h3>
-
-            {/* Priority */}
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                Priority
-              </p>
-              <select
-                value={queryPriority}
-                onChange={(e) => setQueryPriority(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-              </select>
-            </div>
-
-            {/* Remarks */}
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-slate-500 mb-1">
-                Remarks
-              </p>
-              <textarea
-                rows={3}
-                value={queryRemarks}
-                onChange={(e) => setQueryRemarks(e.target.value)}
-                placeholder="Describe your issue..."
-                className="w-full border border-slate-200 rounded-lg p-2 text-sm"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowQueryModal(false)}
-                className="flex-1 py-2 bg-slate-100 text-sm rounded-lg"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleRaiseQuery}
-                className="flex-1 py-2 bg-slate-900 text-white text-sm rounded-lg"
-              >
-                Confirm
-              </button>
+              ))}
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Legacy Amendment Modals (unchanged)                           */
-/* ─────────────────────────────────────────────────────────────── */
-function AmendmentModal({ type, booking, onClose }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-extrabold">
-            {type === "cancel" && "Cancel Ticket"}
-            {type === "reschedule" && "Reschedule Flight"}
-            {type === "modify" && "Modify Traveller"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
-        </div>
-        {type === "cancel" && (
-          <CancelScreen booking={booking} onClose={onClose} />
         )}
-        {type === "reschedule" && (
-          <RescheduleScreen booking={booking} onClose={onClose} />
-        )}
-        {type === "modify" && (
-          <ModifyTravellerScreen booking={booking} onClose={onClose} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function CancelScreen({ booking, onClose }) {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [confirm, setConfirm] = useState(false);
-  const [charges, setCharges] = useState(null);
-
-  useEffect(() => {
-    const isCancelled = sessionStorage.getItem(
-      `cancelRequested_${booking._id}`,
-    );
-
-    if (isCancelled === "true") return;
-
-    const fetchCharges = async () => {
-      const res = await dispatch(fetchCancellationCharges(booking._id));
-      if (res.payload) setCharges(res.payload);
-    };
-
-    fetchCharges();
-  }, [booking._id, dispatch]);
-
-  const handleCancel = async () => {
-    if (!confirm) return;
-    try {
-      setLoading(true);
-      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-      let changeRequestIds = [];
-
-      if (res.payload?.isRoundTrip) {
-        changeRequestIds = res.payload.data
-          ?.map(
-            (item) =>
-              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId,
-          )
-          .filter(Boolean);
-      } else {
-        const singleId =
-          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-          res.payload?.Response?.ChangeRequestId;
-
-        if (singleId) changeRequestIds = [singleId];
-      }
-
-      if (!changeRequestIds.length) {
-        throw new Error("No ChangeRequestId");
-      }
-      let status = "requested";
-      let attempts = 0;
-      while (
-        (status === "requested" || status === "in_progress") &&
-        attempts < 2
-      ) {
-        attempts++;
-        await new Promise((r) => setTimeout(r, 4000));
-        const statusResponses = await Promise.all(
-          changeRequestIds.map((id) =>
-            dispatch(
-              fetchChangeStatus({
-                changeRequestId: id,
-                bookingId: booking._id,
-              }),
-            ),
-          ),
-        );
-        let allCompleted = true;
-
-        for (const resItem of statusResponses) {
-          const apiStatus =
-            resItem.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
-
-          if (apiStatus !== 4) {
-            allCompleted = false;
-          }
-        }
-
-        status = allCompleted ? "completed" : "in_progress";
-      }
-      if (status === "failed")
-        throw new Error("Cancellation failed by airline/supplier");
-
-      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-
-      if (status !== "completed") {
-        Swal.fire({
-          icon: "info",
-          title: "Cancellation in Progress",
-          text: "Your cancellation request is being processed. Please check status later.",
-        });
-        navigate("/my-cancelled-bookings");
-        onClose();
-        return;
-      }
-      await dispatch(fetchMyBookingById(booking._id));
-      navigate("/my-cancelled-bookings");
-      onClose();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-      dispatch(fetchMyBookingById(booking._id));
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      {charges && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-2">
-          <p className="font-semibold text-amber-800">Cancellation Charges</p>
-          <div className="flex justify-between">
-            <span>Airline Charges</span>
-            <span>₹{charges?.AirlineCharge || 0}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Service Fee</span>
-            <span>₹{charges?.ServiceCharge || 0}</span>
-          </div>
-        </div>
-      )}
-      <label className="flex items-start gap-2 text-sm text-slate-600">
-        <input
-          type="checkbox"
-          checked={confirm}
-          onChange={(e) => setConfirm(e.target.checked)}
-        />
-        I confirm cancellation
-      </label>
-      <div className="flex justify-end gap-3">
-        <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">
-          Close
-        </button>
-        <button
-          onClick={handleCancel}
-          disabled={!confirm || loading}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg"
-        >
-          {loading ? "Processing..." : "Cancel Ticket"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function RescheduleScreen({ booking, onClose }) {
-  const [newDate, setNewDate] = useState("");
-  return (
-    <div className="space-y-4">
-      <label className="text-sm font-semibold">Select New Date</label>
-      <input
-        type="date"
-        value={newDate}
-        onChange={(e) => setNewDate(e.target.value)}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2"
-      />
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-        >
-          Close
-        </button>
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg"
-        >
-          Confirm Reschedule
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ModifyTravellerScreen({ booking, onClose }) {
-  const traveller = booking.travellers?.[0];
-  const [phone, setPhone] = useState(traveller?.phoneWithCode || "");
-  return (
-    <div className="space-y-4">
-      <label className="text-sm font-semibold">Update Phone</label>
-      <input
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2"
-      />
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-lg"
-        >
-          Close
-        </button>
-        <button className="px-4 py-2 text-sm font-bold bg-indigo-600 text-white rounded-lg">
-          Save Changes
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PartialCancelModal({ booking, onClose }) {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const [selectedJourney, setSelectedJourney] = useState(null);
-  const [remarks, setRemarks] = useState("User requested partial cancellation");
-  const [loading, setLoading] = useState(false);
-
-  const segments = booking?.flightRequest?.segments || [];
-  const journeyTypeOf = (seg) => {
-    const jt = (seg?.journeyType || "").toString().toLowerCase();
-    return jt === "return" ? "return" : "onward";
-  };
-  const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
-  const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
-  const hasReturn = returnSegments.length > 0;
-
-  useEffect(() => {
-    if (!hasReturn) setSelectedJourney("onward");
-  }, [hasReturn]);
-
-  const sectorLabel = (segList) => {
-    if (!segList.length) return "N/A";
-    const first = segList[0];
-    const last = segList[segList.length - 1];
-    return `${first?.origin?.airportCode || "-"} → ${last?.destination?.airportCode || "-"}`;
-  };
-
-  const buildSectors = () => {
-    const pick = selectedJourney === "return" ? returnSegments : onwardSegments;
-    return pick.map((seg) => ({
-      Origin: seg?.origin?.airportCode,
-      Destination: seg?.destination?.airportCode,
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedJourney) return;
-    const sectors = buildSectors().filter((s) => s.Origin && s.Destination);
-    if (!sectors.length) return;
-    try {
-      setLoading(true);
-      const res = await dispatch(
-        partialCancellation({
-          bookingId: booking._id,
-          segments: sectors,
-          remarks,
-        }),
-      );
-      if (res.error)
-        throw new Error(res.payload || "Partial cancellation failed");
-      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-      // 🔥 CLOSE MODAL IMMEDIATELY
-      onClose();
-      await dispatch(fetchMyBookingById(booking._id));
-      Swal.fire({
-        icon: "success",
-        title: "Cancellation request submitted successfully",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      navigate("/my-cancelled-bookings");
-      onClose();
-    } catch (err) {
-      Swal.fire({
-        icon: "error",
-        title: "Failed to submit cancellation",
-        text: err.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-extrabold">Partial Cancellation</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
-              Select Route
-            </p>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="route"
-                  disabled={!onwardSegments.length}
-                  checked={selectedJourney === "onward"}
-                  onChange={() => setSelectedJourney("onward")}
-                />
-                <span>Onward ({sectorLabel(onwardSegments)})</span>
-              </label>
-              {hasReturn && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="route"
-                    checked={selectedJourney === "return"}
-                    onChange={() => setSelectedJourney("return")}
-                  />
-                  <span>Return ({sectorLabel(returnSegments)})</span>
-                </label>
-              )}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase text-slate-400 mb-2">
-              Remarks (optional)
-            </p>
-            <textarea
-              className="w-full border border-slate-200 rounded-lg p-2 text-sm"
-              rows={3}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100"
-              disabled={loading}
-            >
-              Close
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!selectedJourney || loading}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-            >
-              {loading ? "Submitting..." : "Submit Cancellation"}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -2599,6 +1509,7 @@ function PartialCancelModal({ booking, onClose }) {
 export default function BookingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const passengerTableRef = useRef(null);
 
@@ -2615,9 +1526,12 @@ export default function BookingDetails() {
   const userRole = useSelector((s) => s.auth?.user?.role);
   const sessionRole =
     sessionStorage.getItem("userRole") || sessionStorage.getItem("role");
-  const isEmployee = userRole === "employee" || userRole === "manager" || sessionRole === "employee" || sessionRole === "manager";
+  const isEmployee =
+    userRole === "employee" ||
+    userRole === "manager" ||
+    sessionRole === "employee" ||
+    sessionRole === "manager";
 
-  const [downloading, setDownloading] = useState(null);
   const [amendmentType, setAmendmentType] = useState(null);
   const [showPartialCancel, setShowPartialCancel] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
@@ -2625,7 +1539,8 @@ export default function BookingDetails() {
   const [activeTab, setActiveTab] = useState("flight_details");
 
   // ── Reissue eligibility ──
-  const { eligibility, eligibilityLoading, bookingOfflineRequest } = useSelector((s) => s.reissue);
+  const { eligibility, eligibilityLoading, bookingOfflineRequest } =
+    useSelector((s) => s.reissue);
   const isOnlineEligible = eligibility?.support?.onlineReissueAllowed === true;
   const isOfflineRequired = Boolean(eligibility) && !isOnlineEligible;
   const offlineReissueBadge = bookingOfflineRequest
@@ -2635,7 +1550,9 @@ export default function BookingDetails() {
   const cancelRequested =
     sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
   const isCancelled =
-    ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase()) ||
+    ["cancelled", "cancel_requested"].includes(
+      booking?.executionStatus?.toLowerCase(),
+    ) ||
     (isEmployee && cancelRequested);
 
   useEffect(() => {
@@ -2667,7 +1584,9 @@ export default function BookingDetails() {
   useEffect(() => {
     if (
       !booking?._id ||
-      !["ticket_pending", "on_hold"].includes(booking.executionStatus)
+      !["ticket_pending", "on_hold"].includes(
+        (booking.executionStatus || "").toLowerCase(),
+      )
     )
       return;
     const iv = setInterval(
@@ -2692,6 +1611,11 @@ export default function BookingDetails() {
   const ssrSnapshot = booking.flightRequest?.ssrSnapshot;
   const fareQuoteResults = booking.flightRequest?.fareQuote?.Results || [];
   const bookingResult = booking.bookingResult;
+  const upsellList =
+    fareQuoteResults[0]?.UpsellOptionsList?.UpsellList ||
+    booking.flightRequest?.pricing?.Results?.[0]?.UpsellOptionsList
+      ?.UpsellList ||
+    [];
 
   // Group segments by journey type
   const journeyMap = {};
@@ -2725,27 +1649,36 @@ export default function BookingDetails() {
   }
 
   const paymentSuccessful = booking.payment?.status === "completed";
-  const executionStatus = isCancelled ? "cancelled" : booking.executionStatus;
+  const executionStatus = isCancelled
+    ? "cancelled"
+    : (booking.executionStatus || "").toLowerCase();
+  const bookingAmendmentStatus = booking?.amendment?.status || "";
+  const isAmendmentPending =
+    bookingAmendmentStatus === "requested" ||
+    bookingAmendmentStatus === "in_progress";
+
+  const isReissued =
+    booking?.executionStatus?.toLowerCase() === "reissued" ||
+    (bookingOfflineRequest &&
+      ["COMPLETED", "TICKET_GENERATED"].includes(
+        bookingOfflineRequest.status,
+      )) ||
+    (bookingAmendmentStatus === "completed" && !isCancelled);
+  const isReissuePending =
+    (bookingOfflineRequest &&
+      ["RAISED", "ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(
+        bookingOfflineRequest.status,
+      )) ||
+    (isAmendmentPending && !isCancelled);
+  const hasReissue = isReissued || isReissuePending;
+
   const departureTime = allSegments?.[0]?.departureDateTime;
   const isTravelPassed = departureTime && new Date() > new Date(departureTime);
   const showCancellationChargesBtn =
-    paymentSuccessful &&
+    (paymentSuccessful || executionStatus === "ticketed") &&
     executionStatus === "ticketed" &&
     !isCancelled &&
     !isTravelPassed;
-
-  const handleDownloadTicket = async (journeyType = "full") => {
-    setDownloading(journeyType);
-    try {
-      await dispatch(downloadTicketPdf({ bookingId: booking._id, journeyType })).unwrap();
-    } catch (err) {
-      // Surface real server message (e.g. 409 "Ticket generation is not allowed from status COMPLETED")
-      const message = err?.message || "Failed to download ticket. Please try again.";
-      toast.error(`⚠️ ${message}`);
-    } finally {
-      setDownloading(null);
-    }
-  };
 
   // Fare summary calculations (simplified)
   let baseFare = 0,
@@ -2767,266 +1700,615 @@ export default function BookingDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="w-full px-4 lg:px-10 h-14 flex items-center justify-between">
+    <div className="bg-[#FAF8F4] min-h-screen font-['DM_Sans'] selection:bg-[#B5862A20] selection:text-[#B5862A]">
+      <style>{`
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+      `}</style>
+
+      {/* ── Sticky nav ── */}
+      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] flex flex-col pt-4 px-8 gap-4">
+        {/* Top Row */}
+        <div className="flex items-center gap-4 w-full">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+            className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
           >
-            <FiArrowLeft size={16} /> Back
+            <FiArrowLeft size={14} />
+            Back
           </button>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 font-mono">
-                <span className="font-medium text-md text-green-500">Order ID:</span> {booking.orderId || booking.bookingReference}
+          <span className="w-[1px] h-4 bg-[#EAE4D9]" />
+          <h1 className="text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em]">
+            Flight Booking Details
+          </h1>
+
+          <div className="ml-auto flex items-center gap-4">
+            {(booking.orderId || booking.bookingReference) && (
+              <span className="text-[11px] text-[#A89F94]">
+                Order ID:{" "}
+                <strong className="text-[#1A1714] font-['DM_Mono']">
+                  {booking.orderId || booking.bookingReference}
+                </strong>
               </span>
-              <StatusPill status={executionStatus} />
-            </div>
-
-            {paymentSuccessful && !isCancelled && (
-              <div className="flex items-center gap-2 border-l border-gray-200 pl-4 ml-1">
-                <button
-                  onClick={() => handleDownloadTicket("full")}
-                  disabled={downloading === "full"}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition disabled:opacity-50 shadow-sm"
-                >
-                  <FiDownload size={13} className="text-teal-400" />
-                  {downloading === "full" ? "Downloading" : "Download E-Ticket"}
-                </button>
-              </div>
             )}
+            {(executionStatus === "ticketed" ||
+              executionStatus === "confirmed" ||
+              executionStatus === "booked") &&
+              !isCancelled && (
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
+                    <MdVerifiedUser size={11} /> Ticket Issued
+                  </span>
+                  <button
+                    onClick={() =>
+                      dispatch(downloadTicketPdf({ bookingId: booking._id }))
+                    }
+                    className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
+                  >
+                    <FiDownload size={11} /> Download Ticket
+                  </button>
+                </div>
+              )}
           </div>
         </div>
-      </div>
 
-      <main className="w-full px-4 lg:px-10 py-8 pb-24 space-y-6">
-        {/* ── Header: "Your trip is confirmed" ── */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
-              Reservation
-            </p>
-            <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
-              {isCancelled ? "Your trip is cancelled." : "Your trip is confirmed."}
-            </h1>
-            <p className="text-sm text-gray-500  leading-relaxed">
-              A clean, single-page record of your itinerary, passengers and
-              payment.
-            </p>
-          </div>
-        </div>
         {/* Tabs Navigation */}
-        <div className="flex items-center gap-6 border-b border-gray-200 overflow-x-auto pb-1 mt-6">
+        <div className="flex items-center gap-6 overflow-x-auto w-full">
           {[
             { id: "flight_details", label: "Flight Details" },
-            { id: "project", label: "Project" },
+            { id: "project", label: "Project Details" },
             { id: "charges_rules", label: "Charges and rules" },
             { id: "passengers", label: "Passengers" },
-            { id: "amendment", label: "Amendment" },
-            { id: "history", label: "Booking History" }
+            ...(upsellList && upsellList.length > 0
+              ? [{ id: "upsell_options", label: "Upsell Options" }]
+              : []),
+            {
+              id: "amendment",
+              label: isCancelled
+                ? "Cancellation Details"
+                : isAmendmentPending
+                  ? "Cancellation Request"
+                  : bookingAmendmentStatus &&
+                      bookingAmendmentStatus !== "not_requested"
+                    ? "Amendment Status"
+                    : "Cancellation",
+            },
+            { id: "history", label: "Booking Life Cycle" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
                 activeTab === tab.id
-                  ? "text-gray-900"
-                  : "text-gray-400 hover:text-gray-600"
+                  ? "text-[#1A1714]"
+                  : "text-[#A89F94] hover:text-[#7A7068]"
               }`}
             >
               {tab.label}
               {activeTab === tab.id && (
-                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-gray-900 rounded-t-md" />
+                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
               )}
             </button>
           ))}
         </div>
+      </header>
+
+      <main className="w-full px-4 lg:px-10 py-8 pb-24 space-y-6">
+        {/* ── Dynamic Header ── */}
+        {(() => {
+          let label = "Reservation";
+          let title = isCancelled
+            ? "The trip is cancelled."
+            : location.state?.isPastTrip
+              ? "The trip is completed."
+              : "The trip is confirmed.";
+          let subtitle =
+            "A clean, single-page record of the itinerary, passengers and payment.";
+
+          if (activeTab === "project") {
+            label = "Project Details";
+            title = "Project & Approvals";
+            subtitle =
+              "Information about the project code and the approval workflow for this trip.";
+          } else if (activeTab === "charges_rules") {
+            label = "Pricing Breakdown";
+            title = "Charges & Fare Rules";
+            subtitle =
+              "Detailed breakdown of the total fare, taxes, and airline policies.";
+          } else if (activeTab === "passengers") {
+            label = "Traveller Information";
+            title = "Passengers";
+            subtitle = "List of all passengers travelling on this reservation.";
+          } else if (activeTab === "upsell_options") {
+            label = "Upgrades & Add-ons";
+            title = "Upsell Options";
+            subtitle =
+              "Available upgrades and premium options for this reservation.";
+          } else if (activeTab === "amendment") {
+            if (isCancelled) {
+              label = "Cancellation";
+              title = "Cancellation Details";
+              subtitle =
+                "Your cancellation has been processed. See the full response and refund details below.";
+            } else if (isAmendmentPending) {
+              label = "Cancellation Request";
+              title = "Cancellation Request Pending";
+              subtitle =
+                "Your cancellation request has been submitted and is currently being processed.";
+            } else if (
+              bookingAmendmentStatus &&
+              bookingAmendmentStatus !== "not_requested"
+            ) {
+              label = "Amendment";
+              title = "Amendment Status";
+              subtitle =
+                "Review the current status of your cancellation or amendment request.";
+            } else {
+              label = "Cancellation";
+              title = "Request Cancellation";
+              subtitle =
+                "Initiate a cancellation request for this booking. Charges apply as per fare rules.";
+            }
+          } else if (activeTab === "history") {
+            label = "Audit Trail";
+            title = "Booking Life Cycle";
+            subtitle =
+              "Chronological history of status changes and events for this reservation.";
+          }
+
+          return (
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
+                  {label}
+                </p>
+                <h1 className="text-[36px] font-black text-gray-900 tracking-tight leading-none mb-3">
+                  {title}
+                </h1>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {subtitle}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Tab Contents */}
         <div className="pt-4">
           {activeTab === "flight_details" && (
-            <div className={`grid grid-cols-1 gap-6 ${userRole === "travel-admin" ? "lg:grid-cols-3" : ""}`}>
-              <div className={`space-y-6 ${userRole === "travel-admin" ? "lg:col-span-2" : ""}`}>
-                {journeyTypes.map((jt) => (
-                  <FlightCard
-                    key={jt}
-                    journeyType={jt}
-                    segments={journeyMap[jt]}
-                    pnr={pnrsByJourney[jt]}
-                    paymentSuccessful={paymentSuccessful}
-                    downloading={downloading}
-                    onDownload={handleDownloadTicket}
-                    showDownload={isRoundTrip}
-                    fareQuoteResults={fareQuoteResults}
-                    bookingResult={bookingResult}
-                  />
-                ))}
+            <>
+              <div
+                className={`grid grid-cols-1 gap-6 ${userRole === "travel-admin" ? "lg:grid-cols-3" : ""}`}
+              >
+                <div
+                  className={`space-y-6 ${userRole === "travel-admin" ? "lg:col-span-2" : ""}`}
+                >
+                  {/* Flight cards */}
+                  {journeyTypes.map((jt) => (
+                    <FlightCard
+                      key={jt}
+                      journeyType={jt}
+                      segments={journeyMap[jt]}
+                      pnr={pnrsByJourney[jt]}
+                      paymentSuccessful={paymentSuccessful}
+                      fareQuoteResults={fareQuoteResults}
+                      bookingResult={bookingResult}
+                    />
+                  ))}
+                </div>
+
+                {/* Fare summary (for travel-admin) */}
+                {userRole === "travel-admin" && (
+                  <div className="lg:col-span-1">
+                    <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-6 sticky top-[140px] mb-6">
+                      <div className="text-[11px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-5 flex items-center gap-2">
+                        <FiCreditCard size={14} className="text-[#B5862A]" />{" "}
+                        Fare Summary
+                      </div>
+                      <div className="grid grid-cols-1 gap-x-6">
+                        <InfoRow
+                          label="Currency"
+                          value={pricingSnap?.currency || "INR"}
+                        />
+                        <InfoRow
+                          label="Refundable"
+                          value={refundable ? "Yes" : "No"}
+                          accent={refundable}
+                        />
+                      </div>
+
+                      {/* ── SSR Charges: only render if any SSR data exists ── */}
+                      {(() => {
+                        const seats = ssrSnapshot?.seats || [];
+                        const meals = ssrSnapshot?.meals || [];
+                        const baggage = ssrSnapshot?.baggage || [];
+                        const hasSSR =
+                          seats.length > 0 ||
+                          meals.length > 0 ||
+                          baggage.length > 0;
+                        if (!hasSSR) return null;
+
+                        const travelerName = (idx) => {
+                          const t = travellers[idx];
+                          return t
+                            ? `${t.title} ${t.firstName} ${t.lastName}`
+                            : `Pax ${idx + 1}`;
+                        };
+                        const segLabel = (segIdx) => {
+                          const seg = allSegments[segIdx];
+                          if (!seg) return "";
+                          return `${seg.origin?.airportCode}→${seg.destination?.airportCode}`;
+                        };
+
+                        const ssrTotal = [
+                          ...seats.map((s) => s.price || 0),
+                          ...meals.map((m) => m.price || 0),
+                          ...baggage.map((b) => b.price || 0),
+                        ].reduce((a, b) => a + b, 0);
+
+                        return (
+                          <div className="mt-4 bg-[#FAF7F2] border border-[#E8E0D0] rounded-xl p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#A07840] mb-3 flex items-center gap-1.5">
+                              <FiPackage size={11} /> Seat, Meal &amp; Baggage
+                              Charges
+                            </p>
+                            <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-dashed border-[#D8CEB8] text-[12px]">
+                              <span className="text-gray-500 font-semibold">
+                                SSR Total
+                              </span>
+                              <span className="font-semibold text-gray-900">
+                                ₹{ssrTotal.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {pricingSnap?.totalAmount != null && (
+                        <div className="mt-5 pt-5 border-t border-[#EAE4D9]">
+                          <div className="flex justify-between items-end">
+                            <div>
+                              <div className="text-[12px] font-semibold text-[#1A1714]">
+                                Total Paid
+                              </div>
+                              <div className="text-[10px] text-[#A89F94] mt-[2px]">
+                                incl. taxes & fees
+                              </div>
+                            </div>
+                            <div className="font-['Cormorant_Garamond'] text-[24px] font-bold text-[#1A1714]">
+                              ₹
+                              {Number(pricingSnap.totalAmount).toLocaleString(
+                                "en-IN",
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-5">
+                {/* SSR Section */}
                 <SSRSection
                   ssrSnapshot={ssrSnapshot}
                   travellers={travellers}
                   segments={allSegments}
                   isEmployee={isEmployee}
                 />
+                {/* Payment Status Card */}
+                <PaymentStatusCard
+                  booking={booking}
+                  paymentSuccessful={paymentSuccessful}
+                  isConfirmed={
+                    executionStatus === "ticketed" ||
+                    executionStatus === "confirmed"
+                  }
+                  isTravelAdmin={userRole === "travel-admin"}
+                />
               </div>
-              {userRole === "travel-admin" && (
-                <div className="lg:col-span-1 space-y-6">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
-                      <FiCreditCard size={14} /> Fare Summary
-                    </h3>
-                    <div className="space-y-2">
-                      <InfoRow label="Base Fare" value={`₹${baseFare}`} />
-                      <InfoRow label="Tax" value={`₹${tax}`} />
-                      <InfoRow
-                        label="Currency"
-                        value={pricingSnap?.currency || "INR"}
-                      />
-                      <InfoRow
-                        label="Refundable"
-                        value={refundable ? "Yes" : "No"}
-                        accent={refundable}
-                      />
-                    </div>
-                    {(() => {
-                      const seats = ssrSnapshot?.seats || [];
-                      const meals = ssrSnapshot?.meals || [];
-                      const baggage = ssrSnapshot?.baggage || [];
-                      const ssrTotal = [...seats, ...meals, ...baggage].reduce((sum, item) => sum + (item.price || 0), 0);
-                      if (ssrTotal > 0) {
-                        return (
-                          <div className="mt-4 pt-4 border-t border-dashed border-[#D8CEB8]">
-                            <InfoRow label="SSR Total" value={`₹${ssrTotal}`} />
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                    {pricingSnap?.totalAmount != null && (
-                      <div className="mt-4 bg-teal-50 rounded-lg p-4 flex justify-between items-center">
-                        <span className="font-semibold text-teal-800">Total Paid</span>
-                        <span className="text-xl font-black text-gray-900">
-                          ₹{pricingSnap.totalAmount}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            </>
           )}
 
           {activeTab === "project" && (
             <div className="space-y-6">
               <BookingSummaryCard
                 booking={booking}
-                displayPnr={pnrsByJourney}
-                isEmployee={isEmployee}
-                userRole={userRole}
+                displayPnr={pnrsByJourney.onward || null}
               />
-              <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] overflow-hidden">
-                <div className="px-5 py-4 flex items-center justify-between border-b border-[#E0D8C8]">
-                  <div className="flex items-center gap-2">
-                    <FiCreditCard size={13} className="text-[#A07840]" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-[#8B7355]">
-                      Payment & Booking Status
-                    </span>
-                  </div>
-                  {["ticket_pending", "on_hold"].includes(executionStatus) && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          await dispatch(manualTicketNonLcc(booking._id)).unwrap();
-                          toast.success("✅ Ticket generation initiated successfully.");
-                        } catch (err) {
-                          const message = err?.message || "Ticket retry failed. Please contact support.";
-                          toast.error(`⚠️ ${message}`);
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 text-white rounded-full text-[11px] font-bold hover:bg-gray-800 transition-all"
-                    >
-                      <FiRefreshCw size={11} /> Retry Ticket
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#E0D8C8]">
-                  {!isEmployee && (
-                  <div className="px-5 py-4">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
-                      Payment
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          paymentSuccessful ? "bg-emerald-500" : "bg-amber-400"
-                        }`}
-                      />
-                      <p
-                        className={`text-[15px] font-bold ${
-                          paymentSuccessful ? "text-emerald-700" : "text-amber-700"
-                        }`}
-                      >
-                        {paymentSuccessful ? "Successful" : "Pending"}
-                      </p>
-                    </div>
-                  </div>
-                  )}
-                  <div className="px-5 py-4">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
-                      Ticket Status
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          executionStatus === "ticketed"
-                            ? "bg-emerald-500"
-                            : executionStatus === "cancelled"
-                              ? "bg-red-500"
-                              : "bg-amber-400"
-                        }`}
-                      />
-                      <p
-                        className={`text-[15px] font-bold ${
-                          executionStatus === "ticketed"
-                            ? "text-emerald-700"
-                            : executionStatus === "cancelled"
-                              ? "text-red-700"
-                              : "text-amber-700"
-                        }`}
-                      >
-                        {executionStatus === "ticketed"
-                          ? "Issued"
-                          : executionStatus === "cancelled"
-                            ? "Cancelled"
-                            : executionStatus === "on_hold"
-                              ? "On Hold"
-                              : "Issuing…"}
-                      </p>
-                    </div>
-                    {executionStatus === "ticket_pending" && (
-                      <p className="text-[10px] text-amber-500 mt-1 uppercase tracking-wide flex items-center gap-1">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                        Refreshing every 15s
-                      </p>
-                    )}
-                  </div>
-                  <div className="px-5 py-4">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#8B7355] mb-2">
-                      Purpose
-                    </p>
-                    <p className="text-[15px] font-bold text-gray-900 leading-snug">
-                      {booking.purposeOfTravel || "—"}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
           {activeTab === "charges_rules" && (
             <div className="space-y-6">
-              <FareRulesSection bookingResult={bookingResult} />
+              <FareRulesSection
+                bookingResult={bookingResult}
+                fareSnapshot={fareSnapshot}
+                booking={booking}
+              />
+
+              {/* Cancellation Details */}
+              {isCancelled &&
+                (() => {
+                  const raw =
+                    booking.amendment?.response || booking.amendment?.raw;
+                  let totalRefund = 0;
+                  let totalCharge = 0;
+                  let creditNotes = [];
+                  let providerRemarks = [];
+
+                  const onwardBookingId =
+                    booking.bookingResult?.onwardResponse?.Response?.Response
+                      ?.BookingId ||
+                    booking.bookingResult?.providerResponse?.Response?.Response
+                      ?.BookingId;
+                  const returnBookingId =
+                    booking.bookingResult?.returnResponse?.Response?.Response
+                      ?.BookingId;
+
+                  const sectorBreakdown = [];
+
+                  const getSectorLabel = (bId) => {
+                    if (bId && bId === onwardBookingId) {
+                      const segs =
+                        booking.flightRequest?.segments?.filter(
+                          (s) => s.journeyType === "onward",
+                        ) || [];
+                      if (segs.length > 0) {
+                        return `Onward: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}`;
+                      }
+                      return "Onward Journey";
+                    }
+                    if (bId && bId === returnBookingId) {
+                      const segs =
+                        booking.flightRequest?.segments?.filter(
+                          (s) => s.journeyType === "return",
+                        ) || [];
+                      if (segs.length > 0) {
+                        return `Return: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}`;
+                      }
+                      return "Return Journey";
+                    }
+                    return "Booking Segment";
+                  };
+
+                  if (Array.isArray(raw)) {
+                    raw.forEach((item) => {
+                      const info = item.response?.Response?.TicketCRInfo?.[0];
+                      if (info) {
+                        totalRefund += Number(info.RefundedAmount || 0);
+                        totalCharge += Number(info.CancellationCharge || 0);
+                        if (info.CreditNoteNo && info.CreditNoteNo !== "—")
+                          creditNotes.push(info.CreditNoteNo);
+                        if (info.Remarks && info.Remarks !== "Successful")
+                          providerRemarks.push(info.Remarks);
+
+                        sectorBreakdown.push({
+                          label: getSectorLabel(item.bookingId),
+                          refund: info.RefundedAmount,
+                          charge: info.CancellationCharge,
+                          creditNote: info.CreditNoteNo,
+                          remarks: info.Remarks,
+                        });
+                      }
+                    });
+                  } else {
+                    const info = raw?.Response?.TicketCRInfo?.[0];
+                    totalRefund = Number(
+                      info?.RefundedAmount ||
+                        booking.amendment?.refundedAmount ||
+                        0,
+                    );
+                    totalCharge = Number(
+                      info?.CancellationCharge ||
+                        booking.amendment?.cancellationCharge ||
+                        0,
+                    );
+                    if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
+                    if (info?.Remarks) providerRemarks.push(info.Remarks);
+                  }
+
+                  const displayRefund =
+                    totalRefund || booking.amendment?.refundedAmount || "_";
+                  const displayCharge =
+                    totalCharge || booking.amendment?.cancellationCharge || "_";
+                  const displayCreditNote =
+                    creditNotes.length > 0 ? creditNotes.join(", ") : "_";
+                  const displayRemarks =
+                    providerRemarks.length > 0
+                      ? providerRemarks.join(" | ")
+                      : Array.isArray(raw)
+                        ? "Successful"
+                        : "";
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Total Aggregated Summary */}
+                      <div className="bg-white border border-[#EAE4D9] p-8">
+                        <div className="flex items-center justify-between mb-8">
+                          <p className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714]">
+                            Overall Cancellation Summary
+                          </p>
+                          <div className="flex items-center gap-1.5 px-3 py-1 border border-[#F0C4BA] bg-[#FDF1EE]">
+                            <span className="w-1.5 h-1.5 bg-[#B5341A] animate-pulse" />
+                            <span className="text-[9px] font-bold uppercase text-[#B5341A] tracking-wider">
+                              {booking.amendment?.status || "Cancelled"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+                          <div>
+                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                              Cancelled On
+                            </p>
+                            <p className="text-[14px] font-semibold text-[#1A1714]">
+                              {new Date(
+                                booking.updatedAt ||
+                                  booking.amendment?.requestedAt,
+                              ).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "long",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                              Total Refund
+                            </p>
+                            <p className="text-[14px] font-semibold text-[#2C7A4B]">
+                              ₹{displayRefund}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                              Total Charges
+                            </p>
+                            <p className="text-[14px] font-semibold text-[#B5341A]">
+                              ₹{displayCharge}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                              Credit Note(s)
+                            </p>
+                            <p className="text-[14px] font-semibold text-[#1A1714] font-['DM_Mono']">
+                              {displayCreditNote}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-[#EAE4D9] flex gap-4">
+                          {eligibilityLoading ? (
+                            <button
+                              disabled
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#EAE4D9] text-[#7A7068] border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase cursor-not-allowed"
+                            >
+                              <FiLoader size={12} className="animate-spin" />{" "}
+                              Checking...
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                window.dispatchEvent(
+                                  new Event("openReissueModal"),
+                                );
+                              }}
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                            >
+                              <FiRefreshCw size={12} />{" "}
+                              {isOnlineEligible
+                                ? "Reissue Online"
+                                : "Raise Reissue Request"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Sector Breakdown Breakdown */}
+                      {sectorBreakdown.length > 1 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {sectorBreakdown.map((sector, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-[#FAF8F4] border border-[#EAE4D9] p-6"
+                            >
+                              <div className="flex items-center justify-between mb-4">
+                                <p className="text-[10px] font-bold text-[#1A1714] uppercase tracking-wider flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                  {sector.label}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Refund
+                                  </p>
+                                  <p className="text-sm font-bold text-emerald-600">
+                                    ₹{sector.refund || "0"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Charge
+                                  </p>
+                                  <p className="text-sm font-bold text-red-500">
+                                    ₹{sector.charge || "0"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Credit Note
+                                  </p>
+                                  <p className="text-sm font-mono font-bold text-slate-700">
+                                    {sector.creditNote || "—"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Remarks
+                                  </p>
+                                  <p
+                                    className="text-xs font-semibold text-blue-600 truncate"
+                                    title={sector.remarks}
+                                  >
+                                    {sector.remarks || "Successful"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Remarks Section */}
+                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
+                              <FiAlertCircle
+                                size={14}
+                                className="text-slate-400"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                                Cancellation Reason
+                              </p>
+                              <p className="text-sm text-gray-600 italic">
+                                "
+                                {booking.cancellation?.reason ||
+                                  booking.amendment?.remarks ||
+                                  "User Requested"}
+                                "
+                              </p>
+                            </div>
+                          </div>
+
+                          {(displayRemarks ||
+                            (Array.isArray(raw) && raw.length > 0)) && (
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                                <FiInfo size={14} className="text-blue-400" />
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                                  Provider Remarks
+                                </p>
+                                <p className="text-sm text-blue-600 font-medium">
+                                  {displayRemarks || "Successful"}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
           )}
 
@@ -3060,8 +2342,13 @@ export default function BookingDetails() {
                   </button>
                 </div>
               </div>
+
+              {/* Travelers Table */}
               <div className="bg-white rounded-xl border border-[#E8E0D0] overflow-hidden shadow-sm">
-                <div ref={passengerTableRef} className="overflow-x-auto scroll-smooth">
+                <div
+                  ref={passengerTableRef}
+                  className="overflow-x-auto scroll-smooth"
+                >
                   <table className="w-full text-left border-collapse min-w-[900px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-[#E8E0D0] text-[10px] font-bold uppercase tracking-widest text-[#8B7355]">
@@ -3071,7 +2358,9 @@ export default function BookingDetails() {
                         <th className="px-4 py-4">Date of Birth</th>
                         <th className="px-4 py-4">Ticket Details</th>
                         <th className="px-4 py-4">Add-ons</th>
-                        <th className="px-6 py-4 text-right">Contact/Identity</th>
+                        <th className="px-6 py-4 text-right">
+                          Contact/Identity
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -3110,7 +2399,8 @@ export default function BookingDetails() {
                           ) || [];
 
                         const isRoundTripBooking =
-                          onwardPassengers.length > 0 || returnPassengers.length > 0;
+                          onwardPassengers.length > 0 ||
+                          returnPassengers.length > 0;
                         const resolvedOnwardPax = isRoundTripBooking
                           ? onwardPassengers
                           : singleTripPassengers;
@@ -3118,26 +2408,38 @@ export default function BookingDetails() {
                           ? returnPassengers
                           : [];
 
-                        const TicketId = resolvedOnwardPax[idx]?.Ticket?.TicketId;
+                        const TicketId =
+                          resolvedOnwardPax[idx]?.Ticket?.TicketId;
                         const onwardTicket =
                           resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
                         const returnTicket =
                           resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
 
                         return (
-                          <tr key={trav._id || idx} className="hover:bg-slate-50/50 transition-colors">
+                          <tr
+                            key={trav._id || idx}
+                            className="hover:bg-slate-50/50 transition-colors"
+                          >
                             <td className="px-6 py-5">
                               <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-full bg-[#F5F0E8] flex items-center justify-center shrink-0 border border-[#E0D8C8]">
-                                  <FiUser size={16} className="text-[#A07840]" />
+                                  <FiUser
+                                    size={16}
+                                    className="text-[#A07840]"
+                                  />
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <p className="text-[14px] font-bold text-gray-900 leading-none">
-                                      {trav.title} {trav.firstName} {trav.lastName}
+                                      {trav.title} {trav.firstName}{" "}
+                                      {trav.lastName}
                                     </p>
                                     {trav.isLeadPassenger && (
-                                      <FiStar size={12} className="text-amber-500" title="Lead Passenger" />
+                                      <FiStar
+                                        size={12}
+                                        className="text-amber-500"
+                                        title="Lead Passenger"
+                                      />
                                     )}
                                   </div>
                                   <p className="text-[11px] text-gray-400 font-mono mt-1 uppercase tracking-tight">
@@ -3158,14 +2460,18 @@ export default function BookingDetails() {
                             </td>
                             <td className="px-4 py-5">
                               <p className="text-[12px] font-medium text-gray-600">
-                                {trav.dateOfBirth ? formatDateWithYear(trav.dateOfBirth) : "—"}
+                                {trav.dateOfBirth
+                                  ? formatDateWithYear(trav.dateOfBirth)
+                                  : "—"}
                               </p>
                             </td>
                             <td className="px-4 py-5">
                               <div className="space-y-1.5">
                                 {TicketId && (
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">ID:</span>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                                      ID:
+                                    </span>
                                     <span className="text-[11px] font-mono font-bold bg-gray-900 text-white px-2 py-0.5 rounded shadow-sm">
                                       {TicketId}
                                     </span>
@@ -3173,41 +2479,72 @@ export default function BookingDetails() {
                                 )}
                                 {onwardTicket && (
                                   <div className="flex items-center gap-2">
-                                    <FiTag size={10} className="text-emerald-500" />
-                                    <span className="text-[11px] font-mono text-gray-700">{onwardTicket}</span>
+                                    <FiTag
+                                      size={10}
+                                      className="text-emerald-500"
+                                    />
+                                    <span className="text-[11px] font-mono text-gray-700">
+                                      {onwardTicket}
+                                    </span>
                                   </div>
                                 )}
-                                {returnTicket && returnTicket !== onwardTicket && (
-                                  <div className="flex items-center gap-2">
-                                    <FiTag size={10} className="text-blue-500" />
-                                    <span className="text-[11px] font-mono text-gray-700">{returnTicket}</span>
-                                  </div>
+                                {returnTicket &&
+                                  returnTicket !== onwardTicket && (
+                                    <div className="flex items-center gap-2">
+                                      <FiTag
+                                        size={10}
+                                        className="text-blue-500"
+                                      />
+                                      <span className="text-[11px] font-mono text-gray-700">
+                                        {returnTicket}
+                                      </span>
+                                    </div>
+                                  )}
+                                {!onwardTicket && !returnTicket && (
+                                  <p className="text-[11px] text-gray-400 italic">
+                                    No tickets issued
+                                  </p>
                                 )}
-                                {!onwardTicket && !returnTicket && <p className="text-[11px] text-gray-400 italic">No tickets issued</p>}
                               </div>
                             </td>
                             <td className="px-4 py-5">
                               {seatNo ? (
                                 <div className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-100 text-amber-700 px-2.5 py-1 rounded-lg">
-                                  <span className="text-[10px] font-bold uppercase">Seat</span>
-                                  <span className="text-[12px] font-black">{seatNo}</span>
+                                  <span className="text-[10px] font-bold uppercase">
+                                    Seat
+                                  </span>
+                                  <span className="text-[12px] font-black">
+                                    {seatNo}
+                                  </span>
                                 </div>
                               ) : (
-                                <span className="text-[11px] text-gray-400">—</span>
+                                <span className="text-[11px] text-gray-400">
+                                  —
+                                </span>
                               )}
                             </td>
                             <td className="px-6 py-5 text-right">
                               <div className="flex flex-col items-end gap-1">
                                 {trav.phoneWithCode && (
                                   <div className="flex items-center gap-1.5 text-gray-600">
-                                    <span className="text-[12px] font-semibold">{trav.phoneWithCode}</span>
-                                    <FiPhone size={11} className="text-gray-400" />
+                                    <span className="text-[12px] font-semibold">
+                                      {trav.phoneWithCode}
+                                    </span>
+                                    <FiPhone
+                                      size={11}
+                                      className="text-gray-400"
+                                    />
                                   </div>
                                 )}
                                 {trav.email && (
                                   <div className="flex items-center gap-1.5 text-gray-500 max-w-[180px] truncate">
-                                    <span className="text-[11px] break-all">{trav.email}</span>
-                                    <FiMail size={11} className="text-gray-400" />
+                                    <span className="text-[11px] break-all">
+                                      {trav.email}
+                                    </span>
+                                    <FiMail
+                                      size={11}
+                                      className="text-gray-400"
+                                    />
                                   </div>
                                 )}
                                 {trav.passportNumber && (
@@ -3215,7 +2552,10 @@ export default function BookingDetails() {
                                     <span className="text-[11px] font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
                                       {trav.passportNumber}
                                     </span>
-                                    <FiCreditCard size={11} className="text-gray-400" />
+                                    <FiCreditCard
+                                      size={11}
+                                      className="text-gray-400"
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -3231,252 +2571,545 @@ export default function BookingDetails() {
           )}
 
           {activeTab === "amendment" && (
-            <div className="space-y-6">
-              {paymentSuccessful && executionStatus === "ticketed" && !isCancelled && !isTravelPassed && (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        Amendment actions
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Ticket is live — changes apply immediately
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {eligibilityLoading ? (
-                        <span className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 text-slate-400 rounded-lg text-sm font-semibold">
-                          <FiLoader size={14} className="animate-spin" /> Checking...
-                        </span>
-                      ) : bookingOfflineRequest ? (
-                        <button
-                          onClick={() => navigate(`/my-reissued?bookingId=${booking._id}`)}
-                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition"
-                        >
-                          <FiEye size={14} /> View Reissue Status
-                        </button>
-                      ) : isOnlineEligible ? (
-                        <button
-                          onClick={() => setShowReissueModal(true)}
-                          className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition"
-                        >
-                          <FiRefreshCw size={14} /> Reissue Online
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setShowReissueModal(true)}
-                          className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-100 transition"
-                        >
-                          <FiFileText size={14} /> Raise Reissue Request
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setShowCancellationModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-semibold hover:bg-red-100"
-                      >
-                        <FiXCircle size={14} /> Cancellation Charges
-                      </button>
-                    </div>
-                  </div>
-                  {eligibility && !eligibilityLoading && (
-                    <div className={`mt-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${
-                      bookingOfflineRequest
-                        ? offlineReissueBadge?.className || "bg-slate-50 text-slate-700 border border-slate-100"
-                        : isOnlineEligible
-                          ? "bg-green-50 text-green-700 border border-green-100"
-                          : "bg-amber-50 text-amber-700 border border-amber-100"
-                    }`}>
-                      {bookingOfflineRequest ? (
-                        <>
-                          <FiCheckCircle size={13} /> {offlineReissueBadge?.label}
-                          {bookingOfflineRequest.requestId ? ` • ${bookingOfflineRequest.requestId}` : ""}
-                        </>
-                      ) : isOnlineEligible ? (
-                        <><FiCheckCircle size={13} /> Online Reissue Available</>
-                      ) : (
-                        <><FiAlertCircle size={13} /> Offline Reissue Required — This booking/fare does not support online reissue</>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-[11px] text-gray-400 mt-3">
-                    Charges may apply as per fare rules. Cancellation cannot be
-                    undone.
-                  </p>
-                </div>
-              )}
+            <div className="space-y-8">
+              {/* Cancellation / Amendment Response — shown when cancelled or amendment requested */}
+              {!hasReissue &&
+                (isCancelled ||
+                  (bookingAmendmentStatus &&
+                    bookingAmendmentStatus !== "not_requested")) &&
+                (() => {
+                  const raw =
+                    booking.amendment?.response || booking.amendment?.raw;
+                  let totalRefund = 0;
+                  let totalCharge = 0;
+                  let creditNotes = [];
+                  let providerRemarks = [];
+                  const sectorBreakdown = [];
 
-              {isCancelled && (() => {
-                const raw = booking.amendment?.raw;
-                let totalRefund = 0;
-                let totalCharge = 0;
-                let creditNotes = [];
-                let providerRemarks = [];
-                
-                const onwardBookingId = booking.bookingResult?.onwardResponse?.Response?.Response?.BookingId || booking.bookingResult?.providerResponse?.Response?.Response?.BookingId;
-                const returnBookingId = booking.bookingResult?.returnResponse?.Response?.Response?.BookingId;
+                  const onwardBookingId =
+                    booking.bookingResult?.onwardResponse?.Response?.Response
+                      ?.BookingId ||
+                    booking.bookingResult?.providerResponse?.Response?.Response
+                      ?.BookingId;
+                  const returnBookingId =
+                    booking.bookingResult?.returnResponse?.Response?.Response
+                      ?.BookingId;
 
-                const sectorBreakdown = [];
-
-                const getSectorLabel = (bId) => {
-                  if (bId && bId === onwardBookingId) {
-                    const segs = booking.flightRequest?.segments?.filter(s => s.journeyType === "onward") || [];
-                    if (segs.length > 0) {
-                      return `Onward: ${segs[0].origin?.airportCode} → ${segs[segs.length-1].destination?.airportCode}`;
+                  const getSectorLabel = (bId) => {
+                    if (bId && bId === onwardBookingId) {
+                      const segs =
+                        booking.flightRequest?.segments?.filter(
+                          (s) => s.journeyType === "onward",
+                        ) || [];
+                      return segs.length > 0
+                        ? `Onward: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}`
+                        : "Onward Journey";
                     }
-                    return "Onward Journey";
+                    if (bId && bId === returnBookingId) {
+                      const segs =
+                        booking.flightRequest?.segments?.filter(
+                          (s) => s.journeyType === "return",
+                        ) || [];
+                      return segs.length > 0
+                        ? `Return: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}`
+                        : "Return Journey";
+                    }
+                    return "Booking Segment";
+                  };
+
+                  if (Array.isArray(raw)) {
+                    raw.forEach((item) => {
+                      const info = item.response?.Response?.TicketCRInfo?.[0];
+                      if (info) {
+                        totalRefund += Number(info.RefundedAmount || 0);
+                        totalCharge += Number(info.CancellationCharge || 0);
+                        if (info.CreditNoteNo && info.CreditNoteNo !== "—")
+                          creditNotes.push(info.CreditNoteNo);
+                        if (info.Remarks && info.Remarks !== "Successful")
+                          providerRemarks.push(info.Remarks);
+                        sectorBreakdown.push({
+                          label: getSectorLabel(item.bookingId),
+                          refund: info.RefundedAmount,
+                          charge: info.CancellationCharge,
+                          creditNote: info.CreditNoteNo,
+                          remarks: info.Remarks,
+                        });
+                      }
+                    });
+                  } else {
+                    const info = raw?.Response?.TicketCRInfo?.[0];
+                    totalRefund = Number(
+                      info?.RefundedAmount ||
+                        booking.amendment?.refundedAmount ||
+                        0,
+                    );
+                    totalCharge = Number(
+                      info?.CancellationCharge ||
+                        booking.amendment?.cancellationCharge ||
+                        0,
+                    );
+                    if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
+                    if (info?.Remarks) providerRemarks.push(info.Remarks);
                   }
-                  if (bId && bId === returnBookingId) {
-                    const segs = booking.flightRequest?.segments?.filter(s => s.journeyType === "return") || [];
-                    if (segs.length > 0) {
-                      return `Return: ${segs[0].origin?.airportCode} → ${segs[segs.length-1].destination?.airportCode}`;
-                    }
-                    return "Return Journey";
-                  }
-                  return "Booking Segment";
-                };
 
-                if (Array.isArray(raw)) {
-                  raw.forEach(item => {
-                    const info = item.response?.Response?.TicketCRInfo?.[0];
-                    if (info) {
-                      totalRefund += Number(info.RefundedAmount || 0);
-                      totalCharge += Number(info.CancellationCharge || 0);
-                      if (info.CreditNoteNo && info.CreditNoteNo !== "—") creditNotes.push(info.CreditNoteNo);
-                      if (info.Remarks && info.Remarks !== "Successful") providerRemarks.push(info.Remarks);
-                      
-                      sectorBreakdown.push({
-                        label: getSectorLabel(item.bookingId),
-                        refund: info.RefundedAmount,
-                        charge: info.CancellationCharge,
-                        creditNote: info.CreditNoteNo,
-                        remarks: info.Remarks
-                      });
-                    }
-                  });
-                } else {
-                  const info = raw?.Response?.TicketCRInfo?.[0];
-                  totalRefund = Number(info?.RefundedAmount || booking.amendment?.refundedAmount || 0);
-                  totalCharge = Number(info?.CancellationCharge || booking.amendment?.cancellationCharge || 0);
-                  if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
-                  if (info?.Remarks) providerRemarks.push(info.Remarks);
-                }
+                  const displayRefund =
+                    totalRefund || booking.amendment?.refundedAmount || "_";
+                  const displayCharge =
+                    totalCharge || booking.amendment?.cancellationCharge || "_";
+                  const displayCreditNote =
+                    creditNotes.length > 0 ? creditNotes.join(", ") : "_";
+                  const displayRemarks =
+                    providerRemarks.length > 0
+                      ? providerRemarks.join(" | ")
+                      : Array.isArray(raw)
+                        ? "Successful"
+                        : "";
 
-                const displayRefund = totalRefund || booking.amendment?.refundedAmount || "—";
-                const displayCharge = totalCharge || booking.amendment?.cancellationCharge || "—";
-                const displayCreditNote = creditNotes.length > 0 ? creditNotes.join(", ") : "—";
-                const displayRemarks = providerRemarks.length > 0 ? providerRemarks.join(" | ") : (Array.isArray(raw) ? "Successful" : "");
+                  const amendStatus =
+                    booking.amendment?.status ||
+                    (isCancelled ? "cancelled" : "");
+                  const statusLabel =
+                    {
+                      requested: "Pending",
+                      in_progress: "In Progress",
+                      approved: "Approved",
+                      rejected: "Rejected",
+                      cancelled: "Cancelled",
+                    }[amendStatus] || amendStatus;
+                  const statusColor =
+                    {
+                      requested: "text-[#8A6200] bg-[#FDF8EE] border-[#F0E0A8]",
+                      in_progress:
+                        "text-[#1A4A7A] bg-[#EEF4FD] border-[#C0D4F0]",
+                      approved: "text-[#2C7A4B] bg-[#EDF7F2] border-[#C3E4D2]",
+                      rejected: "text-[#B5341A] bg-[#FDF1EE] border-[#F0C4BA]",
+                      cancelled: "text-[#B5341A] bg-[#FDF1EE] border-[#F0C4BA]",
+                    }[amendStatus] ||
+                    "text-[#1A1714] bg-[#FAF8F4] border-[#EAE4D9]";
 
-                return (
-                  <div className="space-y-6">
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                      <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8B7355]">
-                          Overall Cancellation Summary
-                        </p>
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 border border-red-100">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                          <span className="text-[9px] font-bold uppercase text-red-600 tracking-wider">
-                            {booking.amendment?.status || "Cancelled"}
-                          </span>
+                  return (
+                    <div className="bg-white border border-[#EAE4D9] overflow-hidden">
+                      {/* Status header */}
+                      <div className="px-6 py-4 border-b border-[#EAE4D9] flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#A89F94]">
+                            {booking.amendment?.type === "AMENDMENT" ||
+                            hasReissue
+                              ? "Reissue Status"
+                              : "Cancellation Status"}
+                          </div>
+                          {statusLabel && (
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold tracking-[0.12em] uppercase border ${statusColor}`}
+                            >
+                              {statusLabel}
+                            </span>
+                          )}
                         </div>
-                      </div>
-                      <div className="p-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Cancelled On</p>
-                            <p className="text-[15px] font-bold text-gray-900">
-                              {new Date(booking.updatedAt || booking.amendment?.requestedAt).toLocaleDateString("en-IN", {
-                                day: "2-digit", month: "long", year: "numeric",
-                              })}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Total Refund</p>
-                            <p className="text-[15px] font-bold text-emerald-600">₹{displayRefund}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Total Charges</p>
-                            <p className="text-[15px] font-bold text-red-500">₹{displayCharge}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Credit Note(s)</p>
-                            <p className="text-[15px] font-bold text-gray-900 font-mono">{displayCreditNote}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {sectorBreakdown.length > 1 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sectorBreakdown.map((sector, idx) => (
-                          <div key={idx} className="bg-slate-50 rounded-xl border border-slate-200 p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                {sector.label}
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                              <div>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Refund</p>
-                                <p className="text-sm font-bold text-emerald-600">₹{sector.refund || "0"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Charge</p>
-                                <p className="text-sm font-bold text-red-500">₹{sector.charge || "0"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Credit Note</p>
-                                <p className="text-sm font-mono font-bold text-slate-700">{sector.creditNote || "—"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Remarks</p>
-                                <p className="text-xs font-semibold text-blue-600 truncate" title={sector.remarks}>
-                                  {sector.remarks || "Successful"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                            <FiAlertCircle size={14} className="text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Cancellation Reason</p>
-                            <p className="text-sm text-gray-600 italic">"{booking.cancellation?.reason || booking.amendment?.remarks || "User Requested"}"</p>
-                          </div>
-                        </div>
-                        {(displayRemarks || (Array.isArray(raw) && raw.length > 0)) && (
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                              <FiInfo size={14} className="text-blue-400" />
-                            </div>
-                            <div>
-                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Provider Remarks</p>
-                              <p className="text-sm text-blue-600 font-medium">{displayRemarks || "Successful"}</p>
-                            </div>
+                        {(booking.updatedAt ||
+                          booking.amendment?.requestedAt) && (
+                          <div className="text-[11px] text-[#A89F94]">
+                            {new Date(
+                              booking.updatedAt ||
+                                booking.amendment?.requestedAt,
+                            ).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "long",
+                              year: "numeric",
+                            })}
                           </div>
                         )}
                       </div>
+
+                      {/* Financial summary */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[#EAE4D9] border-b border-[#EAE4D9]">
+                        <div className="px-6 py-5">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                            Total Refund
+                          </div>
+                          <div className="text-[18px] font-bold text-[#2C7A4B]">
+                            {displayRefund !== "_"
+                              ? `₹${Number(displayRefund).toLocaleString("en-IN")}`
+                              : "Waiting"}
+                          </div>
+                        </div>
+                        <div className="px-6 py-5">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                            {booking.amendment?.type === "AMENDMENT" ||
+                            hasReissue
+                              ? "Reissue Charges"
+                              : "Cancellation Charges"}
+                          </div>
+                          <div className="text-[18px] font-bold text-[#B5341A]">
+                            {displayCharge !== "_"
+                              ? `₹${Number(displayCharge).toLocaleString("en-IN")}`
+                              : "Waiting"}
+                          </div>
+                        </div>
+                        <div className="px-6 py-5">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                            Credit Note(s)
+                          </div>
+                          <div className="text-[14px] font-semibold text-[#1A1714] font-['DM_Mono']">
+                            {displayCreditNote}
+                          </div>
+                        </div>
+                        <div className="px-6 py-5">
+                          <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                            {booking.amendment?.type === "AMENDMENT" ||
+                            hasReissue
+                              ? "Reissue Reason"
+                              : "Cancellation Reason"}
+                          </div>
+                          <div className="text-[13px] font-medium text-[#1A1714] italic">
+                            "
+                            {booking.cancellation?.reason ||
+                              booking.amendment?.remarks ||
+                              "User Requested"}
+                            "
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Provider remarks */}
+                      {displayRemarks && (
+                        <div className="px-6 py-4 bg-[#EEF4FD] border-b border-[#C0D4F0] flex items-start gap-3">
+                          <FiInfo
+                            size={13}
+                            className="text-[#1A4A7A] shrink-0 mt-0.5"
+                          />
+                          <p className="text-[12px] text-[#1A4A7A] font-medium">
+                            {displayRemarks}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Sector breakdown */}
+                      {sectorBreakdown.length > 1 && (
+                        <div className="p-6 border-b border-[#EAE4D9] bg-[#FAF8F4]">
+                          <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A] mb-4">
+                            Per-Sector Breakdown
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {sectorBreakdown.map((sector, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-white border border-[#EAE4D9] p-5"
+                              >
+                                <p className="text-[10px] font-bold text-[#1A1714] uppercase tracking-wider mb-4 flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#A89F94]" />
+                                  {sector.label}
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                                      Refund
+                                    </div>
+                                    <div className="text-[14px] font-bold text-[#2C7A4B]">
+                                      ₹{sector.refund || "0"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                                      Charges
+                                    </div>
+                                    <div className="text-[14px] font-bold text-[#B5341A]">
+                                      ₹{sector.charge || "0"}
+                                    </div>
+                                  </div>
+                                  {sector.creditNote &&
+                                    sector.creditNote !== "—" && (
+                                      <div className="col-span-2">
+                                        <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
+                                          Credit Note
+                                        </div>
+                                        <div className="text-[12px] font-semibold font-['DM_Mono'] text-[#1A1714]">
+                                          {sector.creditNote}
+                                        </div>
+                                      </div>
+                                    )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reissue action - hide if reissue is in progress or completed */}
+                      {!hasReissue && !isCancelled && (
+                        <div className="px-6 py-4 flex gap-3 flex-wrap">
+                          {eligibilityLoading ? (
+                            <button
+                              disabled
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#EAE4D9] text-[#7A7068] text-[11px] font-semibold tracking-[0.12em] uppercase cursor-not-allowed"
+                            >
+                              <FiLoader size={12} className="animate-spin" />{" "}
+                              Checking...
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                window.dispatchEvent(
+                                  new Event("openReissueModal"),
+                                );
+                              }}
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                            >
+                              <FiRefreshCw size={12} />{" "}
+                              {isOnlineEligible
+                                ? "Reissue Online"
+                                : "Raise Reissue Request"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+              {/* Active booking — show amendment action buttons */}
+              {!isCancelled &&
+                (() => {
+                  if (hasReissue) {
+                    return (
+                      <div className="bg-white border border-[#EAE4D9] p-8 text-center">
+                        <FiAlertCircle
+                          size={24}
+                          className="text-[#1A4A7A] mx-auto mb-3"
+                        />
+                        <p className="text-[13px] font-semibold text-[#1A1714]">
+                          {isReissued
+                            ? "Booking Reissued"
+                            : "Re-issue in Progress"}
+                        </p>
+                        <p className="text-[12px] text-[#7A7068] mt-1">
+                          {isReissued
+                            ? "This booking is re-issued no action can be perform now."
+                            : "A re-issue request is currently being processed. You cannot cancel or re-issue this booking again."}
+                        </p>
+                        <button
+                          onClick={() =>
+                            navigate(`/my-reissued?bookingId=${booking._id}`)
+                          }
+                          className="mt-4 inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
+                        >
+                          <FiEye size={12} /> View Reissue Status
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return showCancellationChargesBtn ? (
+                    <div className="bg-white border border-[#EAE4D9] p-6">
+                      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div>
+                          <p className="text-[13px] font-semibold text-[#1A1714]">
+                            Amendment Actions
+                          </p>
+                          <p className="text-[11px] text-[#A89F94] mt-0.5">
+                            Ticket is live — changes apply immediately
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {eligibilityLoading ? (
+                            <span className="flex items-center gap-1.5 px-4 py-[10px] bg-[#FAF8F4] text-[#A89F94] text-[11px] font-semibold tracking-[0.12em] uppercase">
+                              <FiLoader size={12} className="animate-spin" />{" "}
+                              Checking...
+                            </span>
+                          ) : bookingOfflineRequest ? (
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/my-reissued?bookingId=${booking._id}`,
+                                )
+                              }
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
+                            >
+                              <FiEye size={12} /> View Reissue Status
+                            </button>
+                          ) : isOnlineEligible ? (
+                            <button
+                              onClick={() => setShowReissueModal(true)}
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
+                            >
+                              <FiRefreshCw size={12} /> Reissue Online
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setShowReissueModal(true)}
+                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
+                            >
+                              <FiFileText size={12} /> Raise Reissue Request
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowCancellationModal(true)}
+                            className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#B5341A] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] transition"
+                          >
+                            <FiXCircle size={12} /> Cancellation Charges
+                          </button>
+                        </div>
+                      </div>
+                      {eligibility && !eligibilityLoading && (
+                        <div
+                          className={`flex items-center gap-2 px-4 py-2 text-[11px] font-semibold border ${
+                            bookingOfflineRequest
+                              ? offlineReissueBadge?.className ||
+                                "bg-[#FAF8F4] text-[#7A7068] border-[#EAE4D9]"
+                              : isOnlineEligible
+                                ? "bg-[#EDF7F2] text-[#2C7A4B] border-[#C3E4D2]"
+                                : "bg-[#FDF8EE] text-[#8A6200] border-[#F0E0A8]"
+                          }`}
+                        >
+                          {bookingOfflineRequest ? (
+                            <>
+                              <FiCheckCircle size={12} />{" "}
+                              {offlineReissueBadge?.label}
+                              {bookingOfflineRequest.requestId
+                                ? ` · ${bookingOfflineRequest.requestId}`
+                                : ""}
+                            </>
+                          ) : isOnlineEligible ? (
+                            <>
+                              <FiCheckCircle size={12} /> Online Reissue
+                              Available
+                            </>
+                          ) : (
+                            <>
+                              <FiAlertCircle size={12} /> Offline Reissue
+                              Required — This booking/fare does not support
+                              online reissue
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-[#A89F94] mt-4">
+                        Charges may apply as per fare rules. Cancellation cannot
+                        be undone.
+                      </p>
+                    </div>
+                  ) : isTravelPassed ? (
+                    <div className="bg-white border border-[#EAE4D9] p-8 text-center">
+                      <FiAlertCircle
+                        size={24}
+                        className="text-[#A89F94] mx-auto mb-3"
+                      />
+                      <p className="text-[13px] font-semibold text-[#1A1714]">
+                        No Amendments Available
+                      </p>
+                      <p className="text-[12px] text-[#7A7068] mt-1">
+                        Amendments cannot be made because the travel date has
+                        already passed.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[#EAE4D9] p-8 text-center">
+                      <FiAlertCircle
+                        size={24}
+                        className="text-[#A89F94] mx-auto mb-3"
+                      />
+                      <p className="text-[13px] font-semibold text-[#1A1714]">
+                        No Amendments Available
+                      </p>
+                      <p className="text-[12px] text-[#7A7068] mt-1">
+                        Amendments are only available for confirmed and ticketed
+                        bookings.
+                      </p>
+                    </div>
+                  );
+                })()}
+            </div>
+          )}
+
+          {activeTab === "upsell_options" && upsellList?.length > 0 && (
+            <div className="space-y-6">
+              {upsellList.map((upsell, i) => {
+                const segIdx = parseInt(upsell.FlightInfoIndex) - 1;
+                const matchedSeg = booking?.flightRequest?.segments?.[segIdx];
+                return (
+                  <div
+                    key={i}
+                    className="bg-white border border-[#EAE4D9] p-6 rounded-xl shadow-sm transition-all duration-300"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#EAE4D9]">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[12px] font-bold uppercase tracking-widest text-[#B5862A] bg-[#FDF8EE] px-3 py-1 rounded-md border border-[#F0E0A8]">
+                          {upsell.FareFamilyName || upsell.FareFamilyCode}
+                        </span>
+                        <span className="text-[10px] text-[#A89F94] font-semibold uppercase tracking-wider">
+                          Code: {upsell.FareFamilyCode}
+                        </span>
+                      </div>
+                      {matchedSeg && (
+                        <div className="flex items-center gap-2 text-[12px] text-[#1A1714] font-bold bg-[#FAF8F4] border border-[#EAE4D9] px-3 py-1.5 rounded-md">
+                          <span>
+                            {matchedSeg.origin?.airportCode} →{" "}
+                            {matchedSeg.destination?.airportCode}
+                          </span>
+                          <span className="text-[#A89F94] mx-1">|</span>
+                          <span className="text-[#8B7355]">
+                            {matchedSeg.airlineCode} {matchedSeg.flightNumber}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {upsell.ServicesList?.map((service, j) => (
+                        <div
+                          key={j}
+                          className="flex items-start gap-3 bg-[#FAF8F4] p-4 rounded-lg border border-[#EAE4D9]"
+                        >
+                          <div
+                            className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${service.IsIncluded === "Yes" ? "bg-[#EDF7F2] text-[#2C7A4B] border border-[#C3E4D2]" : "bg-white border border-[#EAE4D9] text-[#A89F94]"}`}
+                          >
+                            {service.IsIncluded === "Yes" ? (
+                              <FiCheckCircle size={12} />
+                            ) : service.IsChargeable === "Yes" ? (
+                              <span className="text-[10px] font-bold">₹</span>
+                            ) : (
+                              <span className="text-[12px] font-bold">-</span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-bold text-[#1A1714] leading-tight mb-1">
+                              {service.UpsellDescription}
+                            </p>
+                            <p className="text-[9px] font-bold tracking-widest uppercase">
+                              {service.IsIncluded === "Yes" ? (
+                                <span className="text-[#2C7A4B]">Included</span>
+                              ) : service.IsChargeable === "Yes" ? (
+                                <span className="text-[#B5862A]">
+                                  Chargeable
+                                </span>
+                              ) : (
+                                <span className="text-[#A89F94]">
+                                  Not Included
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
-              })()}
+              })}
             </div>
           )}
 
           {activeTab === "history" && (
-            <BookingHistory booking={booking} />
+            <div className="space-y-6">
+              <BookingHistory
+                booking={booking}
+                reissueRequest={bookingOfflineRequest}
+              />
+            </div>
           )}
         </div>
       </main>
 
-      {/* Modals – keep your existing modal components */}
-      {showCancellationModal && createPortal(
+      {/* Modals */}
+      {showCancellationModal && (
         <CancellationModal
           booking={booking}
           isOnlineEligible={isOnlineEligible}
@@ -3486,150 +3119,1062 @@ export default function BookingDetails() {
             dispatch(resetAmendmentState());
           }}
           onSuccess={() => setShowCancellationModal(false)}
-        />,
-        document.body
+        />
       )}
-      {amendmentType && createPortal(
+      {amendmentType && (
         <AmendmentModal
           type={amendmentType}
           booking={booking}
           onClose={() => setAmendmentType(null)}
-        />,
-        document.body
+        />
       )}
-      {showPartialCancel && createPortal(
+      {showPartialCancel && (
         <PartialCancelModal
           booking={booking}
           onClose={() => setShowPartialCancel(false)}
-        />,
-        document.body
+        />
       )}
-      {showReissueModal && createPortal(
+      {showReissueModal && (
         <ReissueModal
           booking={booking}
-          onClose={() => {
-            setShowReissueModal(false);
-            if (booking?._id) {
-              dispatch(fetchOfflineReissueRequestByBooking(booking._id));
-            }
-          }}
-        />,
-        document.body
+          onClose={() => setShowReissueModal(false)}
+        />
       )}
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Booking History / Timeline                                     */
+/*  ★ CANCELLATION CHARGES MODAL (FROM EMPLOYEE DASHBOARD)        */
 /* ─────────────────────────────────────────────────────────────── */
-const getTicketDate = (b) => {
-  if (b.ticketedAt) return b.ticketedAt;
-  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
-  if (onwardIssueDate) return onwardIssueDate;
-  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
-  if (providerIssueDate) return providerIssueDate;
-  if (b.executionStatus === "ticketed") return b.updatedAt;
-  return null;
-};
 
-function BookingHistory({ booking }) {
-  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
-  const isTicketed = booking.executionStatus === "ticketed" || (isCancelled && !!booking.bookingResult?.pnr);
+function CancellationModal({
+  booking,
+  onClose,
+  onSuccess,
+  isOnlineEligible,
+  eligibilityLoading,
+}) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  const steps = [
-    {
-      label: "Request Created",
-      date: booking.createdAt,
-      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
-      icon: <FiClock size={14} />,
-      active: true,
-    },
-    {
-      label: "Approval Status",
-      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
-      desc: (() => {
-        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
-        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
-        
-        if (isRejected) {
-          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
+  const totalFare =
+    booking?.pricingSnapshot?.totalAmount ||
+    booking?.totalFare ||
+    booking?.fare?.totalFare ||
+    booking?.bookingResult?.providerResponse?.Response?.Response
+      ?.FlightItinerary?.Fare?.PublishedFare ||
+    0;
+
+  const [step, setStep] = useState("loading"); // starts loading charges
+  const [charges, setCharges] = useState(null);
+  const [chargesError, setChargesError] = useState(null);
+
+  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [reissueDate, setReissueDate] = useState("");
+  const [returnReissueDate, setReturnReissueDate] = useState("");
+  const [remarksText, setRemarksText] = useState("");
+  const [successData, setSuccessData] = useState(null);
+  const [processingLabel, setProcessingLabel] = useState("Processing…");
+  const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
+
+  const [showQueryModal, setShowQueryModal] = useState(false);
+  const [queryPriority, setQueryPriority] = useState("MEDIUM");
+  const [queryRemarks, setQueryRemarks] = useState("");
+
+  const segments = booking?.flightRequest?.segments || [];
+  const journeyTypeOf = (seg) => {
+    const jt = (seg?.journeyType || "").toString().toLowerCase();
+    return jt === "return" ? "return" : "onward";
+  };
+  const onwardSegs = segments.filter((s) => journeyTypeOf(s) === "onward");
+  const returnSegs = segments.filter((s) => journeyTypeOf(s) === "return");
+  const hasReturn = returnSegs.length > 0;
+
+  const sectorLabel = (segList) => {
+    if (!segList.length) return "N/A";
+    const first = segList[0];
+    const last = segList[segList.length - 1];
+    return `${first?.origin?.airportCode || "?"} → ${last?.destination?.airportCode || "?"}`;
+  };
+
+  useEffect(() => {
+    const isCancelled = sessionStorage.getItem(
+      `cancelRequested_${booking._id}`,
+    );
+
+    if (isCancelled === "true" || !shouldFetchCharges) {
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await dispatch(fetchCancellationCharges(booking._id));
+
+        if (!fetchCancellationCharges.fulfilled.match(res)) {
+          throw new Error("Failed to fetch charges");
         }
-        if (isApproved) {
-          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
-          const appEmail = booking.approvedBy?.email || booking.approverEmail;
-          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
-          if (booking.approverName === "Auto Approve" || isSameUser) {
-             return "Auto Approved by System (Travel Policy)";
-          }
-          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
-        }
-        return "Waiting for manager approval";
-      })(),
-      icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
-    },
-    {
-      label: "Ticketing",
-      date: getTicketDate(booking),
-      desc: isTicketed ? "E-ticket generated and sent to employee" : "Final ticketing pending",
-      icon: <FiTag size={14} />,
-      active: isTicketed,
-    },
-    {
-      label: "Cancellation",
-      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
-      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
-      icon: <FiXCircle size={14} />,
-      active: isCancelled,
-      isLast: true,
-    },
-  ];
 
-  const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+        setCharges(res.payload);
+        setStep("charges");
+      } catch (err) {
+        console.warn("Charges API failed → allowing actions");
+        setChargesError(err.message);
+        setCharges(null);
+        setStep("charges");
+      }
+    })();
+  }, [booking._id, dispatch, shouldFetchCharges]);
 
-  return (
-    <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mt-6">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-8 h-8 rounded-full bg-[#A07840]/10 flex items-center justify-center">
-          <FiRefreshCw size={14} className="text-[#A07840]" />
+  const isMulti = charges?.isRoundTrip;
+  const chargeList = isMulti
+    ? charges?.data || []
+    : charges
+      ? [{ bookingId: null, response: charges }]
+      : [];
+
+  const parsedCharges = chargeList.map((item) => {
+    const info = extractCancellationChargeInfo(item.response);
+    return {
+      bookingId: item.bookingId,
+      cancellationCharge: info?.cancellationCharge ?? null,
+      refundedAmount: info?.refundedAmount ?? null,
+      creditNoteNo: info?.creditNoteNo ?? null,
+      errorMessage: info?.errorMessage ?? null,
+    };
+  });
+
+  const creditNoteNo =
+    parsedCharges?.[0]?.creditNoteNo ?? charges?.CreditNoteNo ?? null;
+  const cancellationCharge = parsedCharges?.[0]?.cancellationCharge ?? null;
+  const refundedAmount = parsedCharges?.[0]?.refundedAmount ?? null;
+
+  const handleFullCancel = async () => {
+    setStep("processing");
+    setProcessingLabel("Submitting cancellation request…");
+    try {
+      const res = await dispatch(
+        fullCancellation({
+          bookingId: booking._id,
+          remarks: remarksText || undefined,
+        }),
+      );
+      let changeRequestIds = [];
+      const responses = res.payload?.data || [];
+
+      if (responses.length > 0) {
+        changeRequestIds = responses
+          .map(
+            (item) =>
+              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+              item?.response?.Response?.ChangeRequestId,
+          )
+          .filter(Boolean);
+      } else {
+        const singleId =
+          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+          res.payload?.Response?.ChangeRequestId;
+        if (singleId) changeRequestIds = [singleId];
+      }
+
+      if (!changeRequestIds.length) {
+        throw new Error("No ChangeRequestId returned");
+      }
+
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      setShouldFetchCharges(false);
+      toast.success("Cancellation request submitted successfully");
+      onClose();
+      await dispatch(fetchMyBookingById(booking._id));
+      navigate("/my-bookings");
+    } catch (err) {
+      setChargesError(err?.message || "Cancellation failed. Please try again.");
+      setStep("error");
+    }
+  };
+
+  const buildSectors = () => {
+    const pick = selectedJourney === "return" ? returnSegs : onwardSegs;
+    return pick
+      .map((seg) => ({
+        Origin: seg?.origin?.airportCode,
+        Destination: seg?.destination?.airportCode,
+      }))
+      .filter((s) => s.Origin && s.Destination);
+  };
+
+  const handlePartialCancel = async () => {
+    const sectors = buildSectors();
+    if (!sectors.length) return;
+    setStep("processing");
+    setProcessingLabel("Submitting partial cancellation…");
+    try {
+      const res = await dispatch(
+        partialCancellation({
+          bookingId: booking._id,
+          segments: sectors,
+          remarks: remarksText || "User requested partial cancellation",
+        }),
+      );
+      if (res.error)
+        throw new Error(res.payload || "Partial cancellation failed");
+
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      setShouldFetchCharges(false);
+      toast.success("Partial cancellation request submitted successfully");
+      onClose();
+      await dispatch(fetchMyBookingById(booking._id));
+      navigate("/my-bookings");
+    } catch (err) {
+      setChargesError(err?.message || "Partial cancellation failed.");
+      setStep("error");
+    }
+  };
+
+  const handleReissue = async () => {
+    if (!reissueDate) return;
+    if (hasReturn && !returnReissueDate) {
+      setChargesError("Please select the updated return travel date.");
+      setStep("error");
+      return;
+    }
+    setStep("processing");
+    setProcessingLabel("Submitting reissue request…");
+    try {
+      const request = await dispatch(
+        createReissueRequest({
+          bookingId: booking._id,
+          newJourney: {
+            departureDate: reissueDate,
+            ...(hasReturn ? { returnDate: returnReissueDate } : {}),
+          },
+          remarks: remarksText || "User requested reissue",
+        }),
+      ).unwrap();
+      toast.success(
+        `${request.reissueId} created in ${request.mode?.toLowerCase?.() || "servicing"} mode`,
+      );
+      onClose();
+      await dispatch(fetchMyBookingById(booking._id));
+    } catch (err) {
+      setChargesError(err?.message || "Reissue failed. Please try again.");
+      setStep("error");
+    }
+  };
+
+  const handleRaiseQuery = async () => {
+    try {
+      setShowQueryModal(false);
+      setStep("processing");
+      setProcessingLabel("Creating cancellation query...");
+
+      const payload = {
+        bookingId: booking._id,
+        orderId: booking.orderId || booking.bookingReference,
+        priority: queryPriority,
+        remarks:
+          queryRemarks || "User requested cancellation but charges API failed",
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+        bookingSnapshot: {
+          journeyType: booking?.tripType,
+          travelDate: booking?.travelDate,
+          returnDate: booking?.returnDate,
+          totalFare: booking?.fare?.totalFare,
+          baseFare: booking?.fare?.baseFare,
+          taxes: booking?.fare?.taxes,
+          serviceFee: booking?.fare?.serviceFee,
+          airline: booking?.airline,
+          pnr: booking?.pnr,
+          sectors:
+            booking?.flightRequest?.segments?.map((seg) => ({
+              origin: seg?.origin?.airportCode,
+              destination: seg?.destination?.airportCode,
+              departureTime: seg?.departureDateTime,
+              arrivalTime: seg?.arrivalDateTime,
+              airline: seg?.airlineCode,
+              flightNumber: seg?.flightNumber,
+            })) || [],
+        },
+        passengers:
+          booking?.travellers?.map((pax) => ({
+            name: `${pax.title} ${pax.firstName} ${pax.lastName}`,
+            type: pax.paxType,
+            ticketNumber: pax.ticketNumber,
+          })) || [],
+        user: {
+          id: booking?.user?._id,
+          name: booking?.user?.name,
+          email: booking?.user?.email,
+          phone: booking?.user?.phone,
+        },
+        logs: [
+          {
+            action: "CREATED",
+            by: "USER",
+            message: "Cancellation query created from UI",
+          },
+        ],
+      };
+
+      const res = await dispatch(createCancellationQuery(payload));
+      if (!createCancellationQuery.fulfilled.match(res)) {
+        throw new Error(res.payload || "Failed to create query");
+      }
+      toast.success("Cancellation query created successfully");
+      onClose();
+      await dispatch(fetchMyBookingById(booking._id));
+    } catch (err) {
+      setChargesError(err?.message || "Failed to create query");
+      setStep("error");
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={step !== "processing" ? onClose : undefined}
+      />
+      <div className="relative bg-white border border-[#EAE4D9] w-full max-w-lg shadow-2xl font-['DM_Sans']">
+        <div className="px-6 py-4 border-b border-[#EAE4D9] flex justify-between items-center bg-[#FDF8EE]">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center justify-center w-6 h-6 border border-[#B5341A] bg-[#FDF1EE]">
+              <FiXCircle size={12} className="text-[#B5341A]" />
+            </span>
+            <div>
+              <h2 className="text-[14px] font-bold text-[#1A1714] tracking-[0.04em]">
+                {step === "reissue" ? "Reissue Flight" : "Cancellation"}
+              </h2>
+              <p className="text-[11px] text-[#A89F94] mt-0.5 font-['DM_Mono']">
+                Order ID · {booking.orderId || booking.bookingReference}
+              </p>
+            </div>
+          </div>
+          {step !== "processing" && (
+            <button
+              onClick={onClose}
+              className="w-6 h-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] flex items-center justify-center transition-colors bg-white text-[#A89F94]"
+            >
+              <FiX size={12} />
+            </button>
+          )}
         </div>
-        <div>
-          <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Booking Lifecycle</h3>
-          <p className="text-[10px] text-[#8B7355] font-bold uppercase tracking-widest mt-0.5">Audit Trail & Timeline</p>
-        </div>
-      </div>
 
-      <div className="relative pl-1.5">
-        <div className="absolute left-[13px] top-3 bottom-3 w-[1.5px] bg-gradient-to-b from-[#A07840]/40 via-[#E8E0D0] to-transparent" />
-        
-        <div className="space-y-8">
-          {steps.map((step, idx) => (
-            <div key={idx} className="relative flex gap-6">
-              <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-500 mt-0.5 ${
-                step.active ? "bg-[#A07840] text-white shadow-md shadow-[#A07840]/20" : "bg-white border-2 border-[#E8E0D0] text-[#D8CEB8]"
-              }`}>
-                {step.icon}
+        <div className="p-6">
+          {step === "loading" && (
+            <div className="flex flex-col items-center gap-3 py-10">
+              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-red-400 animate-spin" />
+              <p className="text-sm text-slate-400 font-medium">
+                Fetching cancellation charges…
+              </p>
+            </div>
+          )}
+
+          {step === "processing" && (
+            <div className="flex flex-col items-center gap-3 py-10">
+              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-indigo-400 animate-spin" />
+              <p className="text-sm text-slate-500 font-medium text-center">
+                {processingLabel}
+              </p>
+              <p className="text-xs text-slate-400">
+                Please do not close this window
+              </p>
+            </div>
+          )}
+
+          {step === "error" && (
+            <div className="flex flex-col items-center gap-4 py-8 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
+                <FiAlertTriangle size={24} className="text-red-400" />
               </div>
-
-              <div className="flex-1 pb-2">
-                <div className="flex items-center gap-3 mb-1.5">
-                  <p className={`text-[11px] font-bold uppercase tracking-widest ${step.active ? "text-gray-900" : "text-gray-400"}`}>
-                    {step.label}
-                  </p>
-                  {step.date && step.active && (
-                    <span className="text-[10px] font-semibold text-[#8B7355] bg-white border border-[#E8E0D0] px-2 py-0.5 rounded uppercase tracking-wide shadow-sm">
-                      {formatDateStr(step.date)} · {formatTimeStr(step.date)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[13px] text-gray-500 font-medium leading-relaxed">{step.desc}</p>
+              <div>
+                <p className="text-sm font-bold text-slate-800 mb-1">
+                  Something went wrong
+                </p>
+                <p className="text-xs text-slate-400">{chargesError}</p>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                >
+                  Close
+                </button>
               </div>
             </div>
-          ))}
+          )}
+
+          {step === "charges" && (
+            <div className="space-y-6">
+              <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-5 space-y-3">
+                <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                  Cancellation Charges
+                </p>
+                {cancellationCharge != null ? (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[13px] text-[#7A7068] font-medium">
+                      Airline Fee
+                    </span>
+                    <span className="text-[15px] font-bold text-[#1A1714]">
+                      ₹{cancellationCharge}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-[#A89F94] italic font-['DM_Mono']">
+                    Fetching real-time charges from airline...
+                  </p>
+                )}
+                {refundedAmount != null && (
+                  <div className="flex justify-between items-center pt-3 border-t border-[#EAE4D9]">
+                    <span className="text-[13px] text-[#7A7068] font-medium">
+                      Estimated Refund
+                    </span>
+                    <span className="text-[15px] font-bold text-[#2C7A4B]">
+                      ₹{refundedAmount}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                  Select Action
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setStep("full-confirm")}
+                    className="flex flex-col items-center justify-center gap-3 p-5 border border-[#EAE4D9] bg-white hover:bg-[#FDF1EE] hover:border-[#F0C4BA] transition-colors group"
+                  >
+                    <span className="flex items-center justify-center w-8 h-8 border border-[#EAE4D9] bg-[#FAF8F4] group-hover:bg-[#FDF1EE] group-hover:border-[#F0C4BA] transition-colors">
+                      <FiXCircle className="text-[#B5341A]" size={14} />
+                    </span>
+                    <span className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#1A1714]">
+                      Full Cancel
+                    </span>
+                  </button>
+                  {hasReturn && (
+                    <button
+                      onClick={() => setStep("partial-select")}
+                      className="flex flex-col items-center justify-center gap-3 p-5 border border-[#EAE4D9] bg-white hover:bg-[#FDF8EE] hover:border-[#F0E0A8] transition-colors group"
+                    >
+                      <span className="flex items-center justify-center w-8 h-8 border border-[#EAE4D9] bg-[#FAF8F4] group-hover:bg-[#FDF8EE] group-hover:border-[#F0E0A8] transition-colors">
+                        <FiAlertCircle className="text-[#8A6200]" size={14} />
+                      </span>
+                      <span className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#1A1714]">
+                        Partial Cancel
+                      </span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setStep("reissue")}
+                    className="flex flex-col items-center justify-center gap-3 p-5 border border-[#EAE4D9] bg-white hover:bg-[#EDF7F2] hover:border-[#C3E4D2] transition-colors group"
+                  >
+                    <span className="flex items-center justify-center w-8 h-8 border border-[#EAE4D9] bg-[#FAF8F4] group-hover:bg-[#EDF7F2] group-hover:border-[#C3E4D2] transition-colors">
+                      <FiRefreshCw className="text-[#2C7A4B]" size={14} />
+                    </span>
+                    <span className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#1A1714]">
+                      Reissue
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setShowQueryModal(true)}
+                    className="flex flex-col items-center justify-center gap-3 p-5 border border-[#EAE4D9] bg-white hover:bg-[#FAF8F4] transition-colors group"
+                  >
+                    <span className="flex items-center justify-center w-8 h-8 border border-[#EAE4D9] bg-[#FAF8F4] transition-colors">
+                      <FiMessageSquare className="text-[#A89F94]" size={14} />
+                    </span>
+                    <span className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#1A1714]">
+                      Raise Query
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === "full-confirm" && (
+            <div className="space-y-4">
+              <div className="p-4 bg-[#FDF1EE] border border-[#F0C4BA]">
+                <p className="text-[13px] text-[#B5341A]">
+                  Are you sure you want to cancel the entire booking? This
+                  action cannot be undone.
+                </p>
+              </div>
+              <textarea
+                placeholder="Remarks (optional)..."
+                className="w-full p-4 border border-[#EAE4D9] bg-[#FAF8F4] text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] placeholder:text-[#A89F94] font-['DM_Sans'] transition-colors resize-y min-h-[100px]"
+                rows={3}
+                value={remarksText}
+                onChange={(e) => setRemarksText(e.target.value)}
+              />
+              <div className="flex gap-4 pt-2">
+                <button
+                  onClick={() => setStep("charges")}
+                  className="flex-1 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleFullCancel}
+                  className="flex-1 py-[10px] bg-[#B5341A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] transition-colors"
+                >
+                  Confirm Full Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "partial-select" && (
+            <div className="space-y-5">
+              <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                Select Journey to Cancel
+              </p>
+              <div className="grid gap-3">
+                <label
+                  className={`relative flex items-center justify-between p-4 border cursor-pointer transition-colors ${selectedJourney === "onward" ? "border-[#B5862A] bg-[#FDF8EE]" : "border-[#EAE4D9] bg-white hover:bg-[#FAF8F4]"}`}
+                >
+                  <input
+                    type="radio"
+                    name="pj"
+                    className="absolute opacity-0"
+                    onChange={() => setSelectedJourney("onward")}
+                  />
+                  <span className="text-[13px] font-semibold text-[#1A1714]">
+                    Onward:{" "}
+                    <span className="font-normal text-[#7A7068]">
+                      {sectorLabel(onwardSegs)}
+                    </span>
+                  </span>
+                  {selectedJourney === "onward" && (
+                    <FiCheckCircle className="text-[#B5862A]" />
+                  )}
+                </label>
+                {hasReturn && (
+                  <label
+                    className={`relative flex items-center justify-between p-4 border cursor-pointer transition-colors ${selectedJourney === "return" ? "border-[#B5862A] bg-[#FDF8EE]" : "border-[#EAE4D9] bg-white hover:bg-[#FAF8F4]"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="pj"
+                      className="absolute opacity-0"
+                      onChange={() => setSelectedJourney("return")}
+                    />
+                    <span className="text-[13px] font-semibold text-[#1A1714]">
+                      Return:{" "}
+                      <span className="font-normal text-[#7A7068]">
+                        {sectorLabel(returnSegs)}
+                      </span>
+                    </span>
+                    {selectedJourney === "return" && (
+                      <FiCheckCircle className="text-[#B5862A]" />
+                    )}
+                  </label>
+                )}
+              </div>
+              <div className="flex gap-4 pt-2">
+                <button
+                  onClick={() => setStep("charges")}
+                  className="flex-1 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  disabled={!selectedJourney}
+                  onClick={() => setStep("partial-confirm")}
+                  className="flex-1 py-[10px] bg-[#B5341A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] disabled:bg-[#D4A8A0] transition-colors"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "partial-confirm" && (
+            <div className="space-y-4">
+              <div className="p-4 bg-[#FDF8EE] border border-[#F0E0A8]">
+                <p className="text-[13px] text-[#8A6200]">
+                  Confirm cancellation for {selectedJourney} journey (
+                  {selectedJourney === "onward"
+                    ? sectorLabel(onwardSegs)
+                    : sectorLabel(returnSegs)}
+                  ).
+                </p>
+              </div>
+              <textarea
+                placeholder="Remarks (optional)..."
+                className="w-full p-4 border border-[#EAE4D9] bg-[#FAF8F4] text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] placeholder:text-[#A89F94] font-['DM_Sans'] transition-colors resize-y min-h-[100px]"
+                rows={3}
+                value={remarksText}
+                onChange={(e) => setRemarksText(e.target.value)}
+              />
+              <div className="flex gap-4 pt-2">
+                <button
+                  onClick={() => setStep("partial-select")}
+                  className="flex-1 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handlePartialCancel}
+                  className="flex-1 py-[10px] bg-[#B5341A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] transition-colors"
+                >
+                  Confirm Partial Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "reissue" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                  New Travel Date
+                </p>
+                <input
+                  type="date"
+                  className="w-full p-3 border border-[#EAE4D9] bg-white text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] font-['DM_Sans'] transition-colors"
+                  value={reissueDate}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setReissueDate(e.target.value)}
+                />
+              </div>
+              {hasReturn && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                    New Return Date
+                  </p>
+                  <input
+                    type="date"
+                    className="w-full p-3 border border-[#EAE4D9] bg-white text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] font-['DM_Sans'] transition-colors"
+                    value={returnReissueDate}
+                    min={reissueDate || new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setReturnReissueDate(e.target.value)}
+                  />
+                </div>
+              )}
+              <textarea
+                placeholder="Reason for reissue..."
+                className="w-full p-4 border border-[#EAE4D9] bg-[#FAF8F4] text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] placeholder:text-[#A89F94] font-['DM_Sans'] transition-colors resize-y min-h-[100px]"
+                rows={3}
+                value={remarksText}
+                onChange={(e) => setRemarksText(e.target.value)}
+              />
+              <div className="flex gap-4 pt-2">
+                <button
+                  onClick={() => setStep("charges")}
+                  className="flex-1 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  disabled={!reissueDate || (hasReturn && !returnReissueDate)}
+                  onClick={handleReissue}
+                  className="flex-1 py-[10px] bg-[#B5862A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#966B1F] disabled:bg-[#D8CEB8] transition-colors"
+                >
+                  Submit Reissue
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {showQueryModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowQueryModal(false)}
+          />
+          <div className="relative bg-white border border-[#EAE4D9] w-full max-w-md shadow-2xl font-['DM_Sans']">
+            <div className="px-6 py-4 border-b border-[#EAE4D9] bg-[#FDF8EE] flex justify-between items-center">
+              <h2 className="text-[14px] font-bold text-[#1A1714] tracking-[0.04em]">
+                Raise Support Query
+              </h2>
+              <button
+                onClick={() => setShowQueryModal(false)}
+                className="text-[#A89F94] hover:text-[#1A1714] transition-colors"
+              >
+                <FiX size={14} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-[12px] text-[#A89F94] mb-6">
+                Our support team will manually process your cancellation
+                request.
+              </p>
+              <div className="mb-6">
+                <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                  Priority
+                </p>
+                <select
+                  value={queryPriority}
+                  onChange={(e) => setQueryPriority(e.target.value)}
+                  className="w-full border border-[#EAE4D9] bg-white text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] font-['DM_Sans'] px-4 py-3 transition-colors"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                </select>
+              </div>
+              <div className="mb-8">
+                <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
+                  Remarks
+                </p>
+                <textarea
+                  rows={4}
+                  value={queryRemarks}
+                  onChange={(e) => setQueryRemarks(e.target.value)}
+                  placeholder="Describe your request details..."
+                  className="w-full border border-[#EAE4D9] bg-[#FAF8F4] text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] placeholder:text-[#A89F94] font-['DM_Sans'] p-4 resize-y min-h-[100px] transition-colors"
+                />
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowQueryModal(false)}
+                  className="flex-1 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRaiseQuery}
+                  className="flex-1 py-[10px] bg-[#1A1714] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#000000] transition-colors"
+                >
+                  Submit Request
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+function AmendmentModal({ type, booking, onClose }) {
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
+      <div className="bg-white border border-[#EAE4D9] w-full max-w-xl shadow-2xl font-['DM_Sans']">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-[#EAE4D9] bg-[#FDF8EE]">
+          <h2 className="text-[14px] font-bold text-[#1A1714] tracking-[0.04em]">
+            {type === "cancel" && "Cancel Ticket"}
+            {type === "reschedule" && "Reschedule Flight"}
+            {type === "modify" && "Modify Traveller"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] flex items-center justify-center transition-colors bg-white text-[#A89F94]"
+          >
+            <FiX size={12} />
+          </button>
+        </div>
+        <div className="p-6">
+          {type === "cancel" && (
+            <CancelScreen booking={booking} onClose={onClose} />
+          )}
+          {type === "reschedule" && (
+            <RescheduleScreen booking={booking} onClose={onClose} />
+          )}
+          {type === "modify" && (
+            <ModifyTravellerScreen booking={booking} onClose={onClose} />
+          )}
+        </div>
+      </div>
+    </div>,
+  );
+}
+
+function CancelScreen({ booking, onClose }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [charges, setCharges] = useState(null);
+
+  useEffect(() => {
+    const fetchCharges = async () => {
+      const res = await dispatch(fetchCancellationCharges(booking._id));
+      if (res.payload) setCharges(res.payload);
+    };
+    fetchCharges();
+  }, [booking._id, dispatch]);
+
+  const handleCancel = async () => {
+    if (!confirm) return;
+    try {
+      setLoading(true);
+      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      toast.success("Cancellation request submitted successfully");
+      await dispatch(fetchMyBookingById(booking._id));
+      navigate("/my-bookings");
+      onClose();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {charges && (
+        <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-5 space-y-3">
+          <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+            Cancellation Charges
+          </p>
+          <div className="flex justify-between items-center">
+            <span className="text-[13px] text-[#7A7068] font-medium">
+              Airline Charges
+            </span>
+            <span className="text-[15px] font-bold text-[#1A1714]">
+              ₹{charges?.AirlineCharge || 0}
+            </span>
+          </div>
+          <div className="flex justify-between items-center pt-3 border-t border-[#EAE4D9]">
+            <span className="text-[13px] text-[#7A7068] font-medium">
+              Service Fee
+            </span>
+            <span className="text-[15px] font-bold text-[#1A1714]">
+              ₹{charges?.ServiceCharge || 0}
+            </span>
+          </div>
+        </div>
+      )}
+      <label className="flex items-start gap-3 text-[13px] text-[#1A1714] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={confirm}
+          onChange={(e) => setConfirm(e.target.checked)}
+          className="mt-1 border-[#EAE4D9] text-[#B5862A] focus:ring-[#B5862A]"
+        />
+        I confirm cancellation
+      </label>
+      <div className="flex justify-end gap-4 pt-2">
+        <button
+          onClick={onClose}
+          className="px-5 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+        >
+          Close
+        </button>
+        <button
+          onClick={handleCancel}
+          disabled={!confirm || loading}
+          className="px-5 py-[10px] bg-[#B5341A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] disabled:bg-[#D4A8A0] transition-colors"
+        >
+          {loading ? "Processing..." : "Cancel Ticket"}
+        </button>
+      </div>
     </div>
+  );
+}
+
+function RescheduleScreen({ booking, onClose }) {
+  const [newDate, setNewDate] = useState("");
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <label className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+          Select New Date
+        </label>
+        <input
+          type="date"
+          value={newDate}
+          onChange={(e) => setNewDate(e.target.value)}
+          className="w-full border border-[#EAE4D9] bg-white text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] font-['DM_Sans'] px-4 py-3 transition-colors"
+        />
+      </div>
+      <div className="flex justify-end gap-4 pt-2">
+        <button
+          onClick={onClose}
+          className="px-5 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+        >
+          Close
+        </button>
+        <button
+          onClick={onClose}
+          className="px-5 py-[10px] bg-[#B5862A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#966B1F] transition-colors"
+        >
+          Confirm Reschedule
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModifyTravellerScreen({ booking, onClose }) {
+  const traveller = booking.travellers?.[0];
+  const [phone, setPhone] = useState(traveller?.phoneWithCode || "");
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <label className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+          Update Phone
+        </label>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="w-full border border-[#EAE4D9] bg-white text-[13px] text-[#1A1714] focus:outline-none focus:border-[#B5862A] font-['DM_Sans'] px-4 py-3 transition-colors"
+        />
+      </div>
+      <div className="flex justify-end gap-4 pt-2">
+        <button
+          onClick={onClose}
+          className="px-5 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+        >
+          Close
+        </button>
+        <button className="px-5 py-[10px] bg-[#1A1714] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#000000] transition-colors">
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PartialCancelModal({ booking, onClose }) {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [remarks, setRemarks] = useState("User requested partial cancellation");
+  const [loading, setLoading] = useState(false);
+
+  const segments = booking?.flightRequest?.segments || [];
+  const journeyTypeOf = (seg) => {
+    const jt = (seg?.journeyType || "").toString().toLowerCase();
+    return jt === "return" ? "return" : "onward";
+  };
+  const onwardSegments = segments.filter((s) => journeyTypeOf(s) === "onward");
+  const returnSegments = segments.filter((s) => journeyTypeOf(s) === "return");
+  const hasReturn = returnSegments.length > 0;
+
+  useEffect(() => {
+    if (!hasReturn) setSelectedJourney("onward");
+  }, [hasReturn]);
+
+  const sectorLabel = (segList) => {
+    if (!segList.length) return "N/A";
+    const first = segList[0];
+    const last = segList[segList.length - 1];
+    return `${first?.origin?.airportCode || "-"} → ${last?.destination?.airportCode || "-"}`;
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedJourney) return;
+    const sectors = onwardSegments.map((s) => ({
+      Origin: s.origin.airportCode,
+      Destination: s.destination.airportCode,
+    }));
+    try {
+      setLoading(true);
+      await dispatch(
+        partialCancellation({
+          bookingId: booking._id,
+          segments: sectors,
+          remarks,
+        }),
+      );
+      sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
+      onClose();
+      await dispatch(fetchMyBookingById(booking._id));
+      navigate("/my-bookings");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
+      <div className="bg-white border border-[#EAE4D9] w-full max-w-xl shadow-2xl font-['DM_Sans']">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-[#EAE4D9] bg-[#FDF8EE]">
+          <h2 className="text-[14px] font-bold text-[#1A1714] tracking-[0.04em]">
+            Partial Cancellation
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] flex items-center justify-center transition-colors bg-white text-[#A89F94]"
+          >
+            <FiX size={12} />
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-3">
+              Select Route
+            </p>
+            <div className="space-y-3">
+              <label
+                className={`relative flex items-center p-4 border cursor-pointer transition-colors ${selectedJourney === "onward" ? "border-[#B5862A] bg-[#FDF8EE]" : "border-[#EAE4D9] bg-white hover:bg-[#FAF8F4]"}`}
+              >
+                <input
+                  type="radio"
+                  name="route"
+                  className="absolute opacity-0"
+                  disabled={!onwardSegments.length}
+                  checked={selectedJourney === "onward"}
+                  onChange={() => setSelectedJourney("onward")}
+                />
+                <span className="text-[13px] font-semibold text-[#1A1714]">
+                  Onward:{" "}
+                  <span className="font-normal text-[#7A7068]">
+                    {sectorLabel(onwardSegments)}
+                  </span>
+                </span>
+                {selectedJourney === "onward" && (
+                  <FiCheckCircle className="text-[#B5862A] ml-auto" />
+                )}
+              </label>
+              {hasReturn && (
+                <label
+                  className={`relative flex items-center p-4 border cursor-pointer transition-colors ${selectedJourney === "return" ? "border-[#B5862A] bg-[#FDF8EE]" : "border-[#EAE4D9] bg-white hover:bg-[#FAF8F4]"}`}
+                >
+                  <input
+                    type="radio"
+                    name="route"
+                    className="absolute opacity-0"
+                    checked={selectedJourney === "return"}
+                    onChange={() => setSelectedJourney("return")}
+                  />
+                  <span className="text-[13px] font-semibold text-[#1A1714]">
+                    Return:{" "}
+                    <span className="font-normal text-[#7A7068]">
+                      {sectorLabel(returnSegments)}
+                    </span>
+                  </span>
+                  {selectedJourney === "return" && (
+                    <FiCheckCircle className="text-[#B5862A] ml-auto" />
+                  )}
+                </label>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-4 pt-2 border-t border-[#EAE4D9]">
+            <button
+              onClick={onClose}
+              className="px-5 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
+            >
+              Close
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!selectedJourney || loading}
+              className="px-5 py-[10px] bg-[#B5341A] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] disabled:bg-[#D4A8A0] transition-colors"
+            >
+              {loading ? "Submitting..." : "Submit Cancellation"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

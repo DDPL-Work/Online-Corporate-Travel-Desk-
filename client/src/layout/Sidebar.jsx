@@ -70,14 +70,14 @@ export default function Sidebar({ isOpen, onClose }) {
   const [hasPendingTransfers, setHasPendingTransfers] = useState(false);
 
   useEffect(() => {
-    if (token) {
+    if (token && role === "finance_team") {
       api.get("/approvals/second-approver/check")
         .then((res) => {
           setHasPendingTransfers(res.data.data.hasPending);
         })
         .catch(console.error);
     }
-  }, [token, location.pathname]);
+  }, [token, location.pathname, role]);
 
   const handleLogout = () => {
     dispatch(logoutUser());
@@ -134,7 +134,7 @@ export default function Sidebar({ isOpen, onClose }) {
     }
     menu.push(
       {
-        to: "/travel-profile-settings",
+        to: "/corporate-profile",
         label: "Corporate Profile",
         icon: <FaBuilding />,
       },
@@ -192,18 +192,7 @@ export default function Sidebar({ isOpen, onClose }) {
   }, [classification]);
 
   const financeTeamMenu = useMemo(() => {
-    const menu = [
-      {
-        to: "/project-management",
-        label: "Project Management",
-        icon: <FaFileExcel />,
-      },
-      {
-        to: "/projects-table",
-        label: "Project Expenditures",
-        icon: <GrProjects />,
-      },
-    ];
+    const menu = [];
     if (classification === "prepaid") {
       menu.push({
         to: "/corporate-wallet",
@@ -422,7 +411,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const [openGroups, setOpenGroups] = useState({});
 
   const toggleGroup = (label) =>
-    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+    setOpenGroups((prev) => ({
+      [label]: !prev[label]
+    }));
 
   const roleLabels = {
     "super-admin": "Super Admin",

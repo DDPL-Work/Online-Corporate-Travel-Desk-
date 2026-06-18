@@ -67,6 +67,7 @@ const ssrPolicySlice = createSlice({
           mealPriceRange: { min: 0, max: 99999 },
           baggagePriceRange: { min: 0, max: 99999 },
           approvalRequired: true,
+          bookingLimit: 0,
           isDefault: true,
         };
       });

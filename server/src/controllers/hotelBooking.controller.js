@@ -15,13 +15,24 @@ const EVENTS = require("../events/eventConstants");
 const User = require("../models/User");
 const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 const logger = require("../utils/logger");
+const MarkupAccountingService = require("../modules/markup/services/markupAccounting.service");
+const serviceFeeService = require("../services/serviceFee.service");
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
 // @access  Private
 
 exports.preBookHotel = asyncHandler(async (req, res) => {
-  const { BookingCode } = req.body;
+  const { 
+    BookingCode, 
+    corporateId, 
+    hotelRequest,
+    CityCode, cityCode, city,
+    CityName, cityName,
+    CountryCode, countryCode, country,
+    CountryName, countryName,
+    StarRating, starRating
+  } = req.body;
 
   /* ================= VALIDATION ================= */
   if (!BookingCode) {
@@ -34,14 +45,20 @@ exports.preBookHotel = asyncHandler(async (req, res) => {
       ? BookingCode.join(",")
       : BookingCode,
     EndUserIp: process.env.TBO_END_USER_IP,
+    corporateId: corporateId || req.corporate?._id,
+    CityCode: CityCode || cityCode || hotelRequest?.cityCode || hotelRequest?.CityCode || "",
+    CityName: CityName || cityName || city || hotelRequest?.city || hotelRequest?.cityName || hotelRequest?.rawHotelData?.CityName || "",
+    CountryCode: CountryCode || countryCode || hotelRequest?.countryCode || hotelRequest?.CountryCode || "",
+    CountryName: CountryName || countryName || country || hotelRequest?.country || hotelRequest?.countryName || hotelRequest?.rawHotelData?.CountryName || "",
+    StarRating: StarRating || starRating || hotelRequest?.starRating || hotelRequest?.StarRating || 0
   };
 
-  console.log("PREBOOK PAYLOAD:", payload);
+  // console.log("PREBOOK PAYLOAD:", payload);
 
   /* ================= CALL SERVICE ================= */
   const preBookResp = await hotelService.preBookHotel(payload);
 
-  console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
+  // console.log("PREBOOK RESPONSE:", JSON.stringify(preBookResp, null, 2));
 
   /* ================= VALIDATION ================= */
   if (preBookResp?.Status?.Code !== 200 && preBookResp?.Status !== 1) {
@@ -122,6 +139,56 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   if (!hotelRequest) throw new ApiError(400, "Hotel request data missing");
   if (!travellers?.length)
     throw new ApiError(400, "At least one guest required");
+
+  // ── SERVICE FEE CALCULATION ──
+  const b = req.body;
+  const cCode = (b.CountryCode || b.countryCode || b.country || b.CountryName || b.countryName || hotelRequest?.countryCode || hotelRequest?.selectedHotel?.country || hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || hotelRequest?.hotelDetails?.CountryCode || hotelRequest?.hotelDetails?.CountryName || "in").toLowerCase();
+  const isDomesticHotel = ["in", "ind", "india"].includes(cCode);
+  const sRating = b.StarRating || b.starRating || hotelRequest?.selectedHotel?.starRating || hotelRequest?.selectedHotel?.StarRating || hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || hotelRequest?.starRating || hotelRequest?.hotelDetails?.StarRating || 1; // Default to 1 if unknown, though better to pass it.
+
+  const serviceFeePayload = {
+    productType: "Hotel",
+    operation: "Book",
+    tripType: isDomesticHotel ? "Domestic" : "International",
+    starRating: Number(sRating),
+    roomCount: hotelRequest?.noOfRooms || hotelRequest?.roomGuests?.length || hotelRequest?.roomDetails?.length || 1,
+    baseFare: Number(pricingSnapshot?.totalAmount || 0)
+  };
+
+  const serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
+  let totalServiceFee = 0;
+  if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
+    totalServiceFee = serviceFeeDetails.feeAmount;
+    pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount || 0) + totalServiceFee;
+    pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
+  }
+
+  // ── BALANCE CHECK START ──
+  // const env = process.env.TBO_ENV || "live";
+  const env = "dummy";
+  const requiredAmount = Number(pricingSnapshot?.totalAmount || 0);
+
+  const { getAgencyBalance } = require("../services/tboBalance.service");
+  const balance = await getAgencyBalance(env);
+
+  if (balance.availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`
+    );
+  }
+
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
+  }
+  // ── BALANCE CHECK END ──
 
   /* ================= APPROVER RESOLUTION ================= */
   let resolvedApproverId = approverId;
@@ -273,19 +340,27 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   let finalApproverName = approverName;
   let finalApprovedAt = null;
 
-  try {
-    const ssrPolicy = await EmployeeSsrPolicy.findOne({
-      corporateId: corporate._id,
-      employeeEmail: user.email?.toLowerCase().trim(),
-    }).lean();
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
 
-    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
-      requestStatus = "approved";
-      finalApproverName = "Auto Approve";
-      finalApprovedAt = new Date();
+  if (isAutoApproveIntent && user.role === "travel-admin") {
+    requestStatus = "approved";
+    finalApproverName = "Auto Approve (Travel Admin)";
+    finalApprovedAt = new Date();
+  } else {
+    try {
+      const ssrPolicy = await EmployeeSsrPolicy.findOne({
+        corporateId: corporate._id,
+        employeeEmail: user.email?.toLowerCase().trim(),
+      }).lean();
+
+      if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
+        requestStatus = "approved";
+        finalApproverName = "Auto Approve";
+        finalApprovedAt = new Date();
+      }
+    } catch (policyErr) {
+      // Safe fallback
     }
-  } catch (policyErr) {
-    // Safe fallback
   }
 
   const orderId = await generateSequentialOrderId("hotel");
@@ -319,8 +394,34 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
       ...pricingSnapshot,
       capturedAt: new Date(),
     },
+    markupSnapshot: (() => {
+      let snapshot = req.body.markupSnapshot || null;
+      
+      // The frontend might pass the raw room data inside hotelRequest.selectedRoom.rawRoomData
+      // Due to transformation, it might be nested at transformedHotelRequest.selectedRoom.rawRoomData.rawRoomData
+      // or transformedHotelRequest.selectedRoom.rawRoomData
+      const roomData = transformedHotelRequest?.selectedRoom?.rawRoomData;
+      const actualRawRoom = roomData?.rawRoomData || roomData || {};
+      
+      if (!snapshot && actualRawRoom?.markupAmount > 0) {
+        snapshot = {
+          supplierFare: actualRawRoom?.supplierFare || 0,
+          finalFare: actualRawRoom?.TotalFare || actualRawRoom?.totalFare || transformedHotelRequest.selectedRoom.totalFare || 0,
+          markupAmount: actualRawRoom.markupAmount,
+          markupBreakdown: actualRawRoom.markupBreakdown || []
+        };
+      }
+      
+      // Ensure markupBreakdown is included
+      if (snapshot && (!snapshot.markupBreakdown || snapshot.markupBreakdown.length === 0)) {
+        snapshot.markupBreakdown = actualRawRoom?.markupBreakdown || [];
+      }
+      
+      return snapshot;
+    })(),
     bookingSnapshot,
   });
+
 
   const isAutoApproved = requestStatus === "approved";
 
@@ -437,7 +538,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         IsVoucherBooking: true,
         GuestNationality: transformedHotelRequest.guestNationality,
         EndUserIp: process.env.TBO_END_USER_IP,
-        NetAmount: transformedHotelRequest.selectedRoom.totalFare, // Skip PreBook, use original fare
+        NetAmount: hotelRequest?.preBookResponse?.HotelResult?.[0]?.Rooms?.[0]?.NetAmount,
         ClientReferenceId: bookingRequest.bookingReference,
         TraceId: hotelRequest.traceId || hotelRequest.TraceId,
         HotelRoomsDetails,
@@ -472,6 +573,36 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
         bookingRequest.executionStatus = "voucher_generated";
         bookingRequest.voucheredAt = new Date();
         await bookingRequest.save();
+
+        await MarkupAccountingService.recordBookingRevenue(bookingRequest, corporate).catch(err => {
+          logger.error("Failed to record markup revenue for instant hotel booking", err);
+        });
+
+        try {
+          await serviceFeeService.applyServiceFee(
+            corporate._id,
+            user._id,
+            bookingRequest._id,
+            bookingRequest.orderId,
+            {
+              productType: "Hotel",
+              operation: "Book",
+              tripType: (() => {
+                const cCode = (bookingRequest.hotelRequest?.countryCode || bookingRequest.hotelRequest?.selectedHotel?.country || bookingRequest.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || bookingRequest.hotelRequest?.hotelDetails?.CountryCode || bookingRequest.hotelRequest?.hotelDetails?.CountryName || bookingRequest.bookingSnapshot?.country || "in").toLowerCase();
+                return ["in", "ind", "india"].includes(cCode) ? "Domestic" : "International";
+              })(),
+              starRating: bookingRequest.hotelRequest?.selectedHotel?.starRating || bookingRequest.hotelRequest?.selectedHotel?.StarRating || bookingRequest.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || bookingRequest.hotelRequest?.hotelDetails?.StarRating || bookingRequest.hotelRequest?.starRating || 1,
+              roomCount: bookingRequest.hotelRequest?.noOfRooms || bookingRequest.hotelRequest?.roomGuests?.length || bookingRequest.hotelRequest?.roomDetails?.length || 1,
+              baseFare: Number(bookingRequest.pricingSnapshot?.totalAmount || 0)
+            },
+            null
+          );
+        } catch (feeErr) {
+          logger.error("Failed to apply service fee ledger for hotel booking", {
+            bookingId: bookingRequest._id,
+            error: feeErr.message,
+          });
+        }
 
         await notificationService.sendBookingNotification(
           bookingRequest,
@@ -784,19 +915,27 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   let finalApproverName = approverName;
   let finalApprovedAt = null;
 
-  try {
-    const ssrPolicy = await EmployeeSsrPolicy.findOne({
-      corporateId: corporate._id,
-      employeeEmail: user.email?.toLowerCase().trim(),
-    }).lean();
+  const isAutoApproveIntent = !approverId || (approverName && String(approverName).trim().toLowerCase() === "auto approve");
 
-    if (ssrPolicy && ssrPolicy.approvalRequired === false) {
-      requestStatus = "approved";
-      finalApproverName = "Auto Approve";
-      finalApprovedAt = new Date();
+  if (isAutoApproveIntent && user.role === "travel-admin") {
+    requestStatus = "approved";
+    finalApproverName = "Auto Approve (Travel Admin)";
+    finalApprovedAt = new Date();
+  } else {
+    try {
+      const ssrPolicy = await EmployeeSsrPolicy.findOne({
+        corporateId: corporate._id,
+        employeeEmail: user.email?.toLowerCase().trim(),
+      }).lean();
+
+      if (isAutoApproveIntent && ssrPolicy && ssrPolicy.approvalRequired === false) {
+        requestStatus = "approved";
+        finalApproverName = "Auto Approve";
+        finalApprovedAt = new Date();
+      }
+    } catch (policyErr) {
+      // Safe fallback
     }
-  } catch (policyErr) {
-    // Safe fallback — keep pending_approval
   }
 
   const orderId = await generateSequentialOrderId("hotel");
@@ -836,8 +975,15 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
       ...pricingSnapshot,
       capturedAt: new Date(),
     },
+    markupSnapshot: req.body.markupSnapshot || (transformedHotelRequest?.selectedRoom?.rawRoomData?.markupAmount > 0 ? {
+      supplierFare: transformedHotelRequest.selectedRoom.rawRoomData?.supplierFare || 0,
+      finalFare: transformedHotelRequest.selectedRoom.rawRoomData?.TotalFare || transformedHotelRequest.selectedRoom.totalFare || 0,
+      markupAmount: transformedHotelRequest.selectedRoom.rawRoomData.markupAmount,
+      markupBreakdown: transformedHotelRequest.selectedRoom.rawRoomData.markupBreakdown || []
+    } : null),
     bookingSnapshot,
   });
+
 
   const isAutoApproved = requestStatus === "approved";
 
@@ -981,6 +1127,38 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
   if (booking.requestStatus !== "approved") {
     throw new ApiError(400, "Booking not approved");
   }
+
+  // ── BALANCE CHECK START ──
+  const corporate = await Corporate.findById(booking.corporateId);
+  if (!corporate) {
+    throw new ApiError(404, "Corporate not found");
+  }
+
+  // const env = process.env.TBO_ENV || "live";
+  const env = "dummy";
+  const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+
+  const { getAgencyBalance } = require("../services/tboBalance.service");
+  const balance = await getAgencyBalance(env);
+
+  if (balance.availableBalance < requiredAmount) {
+    throw new ApiError(
+      400,
+      `Insufficient agency balance. Available ₹${balance.availableBalance}, Required ₹${requiredAmount}`
+    );
+  }
+
+  if (corporate.classification === "prepaid") {
+    if ((corporate.walletBalance || 0) < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate wallet balance. Available ₹${corporate.walletBalance || 0}, Required ₹${requiredAmount}`);
+    }
+  } else {
+    const availableCredit = (corporate.creditLimit || 0) - (corporate.currentCredit || 0);
+    if (availableCredit < requiredAmount) {
+      throw new ApiError(400, `Insufficient corporate credit limit. Available ₹${availableCredit}, Required ₹${requiredAmount}`);
+    }
+  }
+  // ── BALANCE CHECK END ──
 
   booking.executionStatus = "booking_initiated";
   await booking.save();
@@ -1357,6 +1535,33 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     booking.voucheredAt = new Date();
     await booking.save();
 
+    await MarkupAccountingService.recordBookingRevenue(booking, corporate).catch(err => {
+      console.error("Failed to record markup revenue for approved hotel booking", err);
+    });
+
+    try {
+      await serviceFeeService.applyServiceFee(
+        corporate._id,
+        booking.userId,
+        booking._id,
+        booking.orderId,
+        {
+          productType: "Hotel",
+          operation: "Book",
+          tripType: (() => {
+            const cCode = (booking.hotelRequest?.countryCode || booking.hotelRequest?.selectedHotel?.country || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryCode || booking.hotelRequest?.hotelDetails?.CountryName || booking.bookingSnapshot?.country || "in").toLowerCase();
+            return ["in", "ind", "india"].includes(cCode) ? "Domestic" : "International";
+          })(),
+          starRating: booking.hotelRequest?.selectedHotel?.starRating || booking.hotelRequest?.selectedHotel?.StarRating || booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || booking.hotelRequest?.hotelDetails?.StarRating || booking.hotelRequest?.starRating || 1,
+          roomCount: booking.hotelRequest?.noOfRooms || booking.hotelRequest?.roomGuests?.length || booking.hotelRequest?.roomDetails?.length || 1,
+          baseFare: Number(booking.pricingSnapshot?.totalAmount || 0)
+        },
+        null
+      );
+    } catch (feeErr) {
+      console.error("Failed to apply service fee ledger for approved hotel booking:", feeErr.message);
+    }
+
     // Notify User
     await notificationService.sendBookingNotification(
       booking,
@@ -1523,6 +1728,17 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     voucheredAt,
     createdAt,
     updatedAt,
+    corporateId,
+    userId,
+    projectName,
+    projectId,
+    projectClient,
+    approverId,
+    approverEmail,
+    approverName,
+    approverRole,
+    requesterDetails,
+    gstDetails,
   } = booking;
 
   const amendment = booking.amendment || null;
@@ -1701,7 +1917,19 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       orderId: booking.orderId,
       purposeOfTravel: booking.purposeOfTravel,
 
-      // ✅ DB (stable)
+      corporateId,
+      userId,
+      projectName,
+      projectId,
+      projectClient,
+      approverId,
+      approverEmail,
+      approverName,
+      approverRole,
+      requesterDetails,
+      gstDetails,
+
+      // 📌 DB (stable)
       executionStatus,
       requestStatus,
       bookingSnapshot,
@@ -1934,8 +2162,10 @@ exports.getProjectHotelExpenses = asyncHandler(async (req, res) => {
   }
 
   const expenses = await HotelBookingRequest.find(query)
+    .select(
+      "_id userId executionStatus status cancelStatus amendment.status hotelRequest.purposeOfTravel pricingSnapshot.totalAmount bookingSnapshot.amount bookingSnapshot.hotelName hotelRequest.selectedHotel.hotelName hotelRequest.city hotelRequest.cityName hotelRequest.selectedHotel.city hotelRequest.selectedHotel.cityName bookingSnapshot.city createdAt orderId travellers bookingType"
+    )
     .populate("userId", "name email")
-    .populate("approvedBy", "name email role")
     .sort({ createdAt: -1 });
 
   res

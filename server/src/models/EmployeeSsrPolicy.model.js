@@ -10,6 +10,20 @@ const priceRangeSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const flightLimitSchema = new mongoose.Schema({
+  location: { type: String, enum: ['Domestic', 'International'], required: true },
+  cabinClass: { type: Number, required: true },
+  isUnlimited: { type: Boolean, default: true },
+  limit: { type: Number, default: 0 }
+}, { _id: false });
+
+const hotelLimitSchema = new mongoose.Schema({
+  location: { type: String, enum: ['Domestic', 'International'], required: true },
+  starRating: { type: Number, required: true },
+  isUnlimited: { type: Boolean, default: true },
+  limit: { type: Number, default: 0 }
+}, { _id: false });
+
 const employeeSsrPolicySchema = new mongoose.Schema(
   {
     // Link record to specific corporate
@@ -45,8 +59,10 @@ const employeeSsrPolicySchema = new mongoose.Schema(
     mealPriceRange: { type: priceRangeSchema, default: () => ({ min: 0, max: 99999 }) },
     baggagePriceRange: { type: priceRangeSchema, default: () => ({ min: 0, max: 99999 }) },
 
-    // ── Approval Flow ─────────────────────────────────────
+    // ✨ Approval Flow ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨
     approvalRequired: { type: Boolean, default: true },
+    flightLimits: [flightLimitSchema],
+    hotelLimits: [hotelLimitSchema],
 
     // ── Audit ─────────────────────────────────────────────
     createdBy: {

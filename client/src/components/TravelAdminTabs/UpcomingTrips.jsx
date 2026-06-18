@@ -27,6 +27,7 @@ import {
   dateCls,
 } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { Pagination } from "./Shared/Pagination";
 import { airlineLogo } from "../../utils/formatter";
 import { C } from "../Shared/color";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
@@ -97,29 +98,34 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
     });
   }, [trips, search, empFilter, dateFrom, dateTo]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Upcoming Flights" value={filtered.length} Icon={FaPlane} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
-        <StatCard label="Confirmed Plans" value={filtered.filter(t => t.status === "Confirmed").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Confirmed Flights" value={filtered.filter(t => t.status === "Confirmed").length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
         <StatCard label="Next 7 Days" value={filtered.filter(t => {
           const d = new Date(t.departureDate);
-          const limit = new Date();
-          limit.setDate(limit.getDate() + 7);
-          return d <= limit;
+          const now = new Date();
+          const in7 = new Date();
+          in7.setDate(now.getDate() + 7);
+          return d >= now && d <= in7;
         }).length} Icon={FiCalendar} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Total Units" value={new Set(filtered.map(t => t.originalData?.userId?.department)).size} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Departments" value={new Set(filtered.map(t => t.originalData?.userId?.department)).size} Icon={FiList} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Name, Reference or Destination..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-3">
+          <LabeledField label="Employee Name" className="lg:col-span-3">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField label="Departure Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -133,50 +139,52 @@ function FlightSection({ trips, refreshing, employeeOptions }) {
       </div>
 
       <ResponsiveDataTable 
-        title="Flight Deployment Manifest" 
-        subtitle={`${filtered.length} scheduled departures`} 
+        title="Flight Schedule" 
+        subtitle={`${filtered.length} upcoming flights`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
-          pageHeader: "Flight Deployment Manifest",
+          pageHeader: "Flight Schedule",
           statCards: [
             { label: "Upcoming Flights", value: filtered.length },
-            { label: "Confirmed Plans", value: filtered.filter(t => t.status === "Confirmed").length },
+            { label: "Confirmed Flights", value: filtered.filter(t => t.status === "Confirmed").length },
             { label: "Next 7 Days", value: filtered.filter(t => {
                 const d = new Date(t.departureDate);
-                const limit = new Date();
-                limit.setDate(limit.getDate() + 7);
-                return d <= limit;
+                const now = new Date();
+                const in7 = new Date();
+                in7.setDate(now.getDate() + 7);
+                return d >= now && d <= in7;
               }).length 
             },
-            { label: "Total Units", value: new Set(filtered.map(t => t.originalData?.userId?.department)).size }
+            { label: "Departments", value: new Set(filtered.map(t => t.originalData?.userId?.department)).size }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Departure Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
           ],
           data: filtered,
           columns: adminUpcomingFlightsExportTemplate,
           filenamePrefix: "upcoming_flight_trips"
         })}
         wrapperClass="!border-none !shadow-none"
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
               <Th className="!px-6 !py-5">Route</Th>
               <Th className="!px-6 !py-5">Departure Date</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Email</Th>
               <Th className="!px-6 !py-5 text-center">Status</Th>
               <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map((t, i) => (
+            {paginated.length > 0 ? paginated.map((t, i) => (
               <tr key={t.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
                 <td className="!px-6 !py-5"><IdCell id={t.orderId} /></td>
                 <td className="!px-6 !py-5">
@@ -249,24 +257,28 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
     });
   }, [trips, search, empFilter, dateFrom, dateTo]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const paginated = useMemo(() => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filtered, currentPage]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Upcoming Stays" value={filtered.length} Icon={FaHotel} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
-        <StatCard label="Confirmed Assets" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-        <StatCard label="Active Locations" value={new Set(filtered.map(t => t.city)).size} Icon={FiList} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
-        <StatCard label="Personnel" value={new Set(filtered.map(t => t.employee)).size} Icon={FiCalendar} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+        <StatCard label="Upcoming Hotels" value={filtered.length} Icon={FaHotel} borderCls="border-[#003399]" iconBgCls="bg-[#003399]10" iconColorCls="text-[#003399]" />
+        <StatCard label="Confirmed Hotels" value={filtered.length} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+        <StatCard label="Unique Hotels" value={new Set(filtered.map(t => t.city)).size} Icon={FiList} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+        <StatCard label="Employee Name" value={new Set(filtered.map(t => t.employee)).size} Icon={FiCalendar} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
       </div>
 
       <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-          <LabeledField label={<><FiSearch size={10} /> Manifest Search</>} className="lg:col-span-4">
+          <LabeledField label={<><FiSearch size={10} /> Search</>} className="lg:col-span-4">
             <SearchBar value={search} onChange={setSearch} placeholder="Hotel, Guest or Order ID..." />
           </LabeledField>
-          <LabeledField label="Personnel" className="lg:col-span-3">
+          <LabeledField label="Employee Name" className="lg:col-span-3">
             <CustomDropdown value={empFilter} onChange={setEmp} options={employeeOptions} />
           </LabeledField>
-          <LabeledField label="Check-In Window" className="lg:col-span-3">
+          <LabeledField label="Date Range" className="lg:col-span-3">
              <div className="flex items-center gap-2">
                 <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={dateCls} style={{ borderColor: C.border }} />
                 <span className="text-slate-300">to</span>
@@ -281,43 +293,44 @@ function HotelSection({ trips, refreshing, employeeOptions }) {
 
       <ResponsiveDataTable 
         title="Hotel Deployment Manifest" 
-        subtitle={`${filtered.length} scheduled stays`} 
+        subtitle={`${filtered.length} upcoming hotels`} 
         exportLabel="Export Excel"
         exportLoading={isExporting}
         exportDisabled={isExporting}
         onExport={() => exportExcel({
           pageHeader: "Hotel Deployment Manifest",
           statCards: [
-            { label: "Upcoming Stays", value: filtered.length },
-            { label: "Confirmed Assets", value: filtered.length },
-            { label: "Active Locations", value: new Set(filtered.map(t => t.city)).size },
-            { label: "Personnel", value: new Set(filtered.map(t => t.employee)).size }
+            { label: "Upcoming Hotels", value: filtered.length },
+            { label: "Confirmed Hotels", value: filtered.length },
+            { label: "Unique Hotels", value: new Set(filtered.map(t => t.city)).size },
+            { label: "Employee Name", value: new Set(filtered.map(t => t.employee)).size }
           ],
           appliedFilters: [
             { label: "Search", value: search || "None" },
-            { label: "Personnel", value: empFilter },
-            { label: "Check-In Window", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
+            { label: "Employee Name", value: empFilter },
+            { label: "Date Range", value: `${dateFrom || "Any"} to ${dateTo || "Any"}` }
           ],
           data: filtered,
           columns: adminUpcomingHotelsExportTemplate,
           filenamePrefix: "upcoming_hotel_stays"
         })}
         wrapperClass="!border-none !shadow-none"
+        pagination={<Pagination currentPage={currentPage} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
       >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-              <Th className="!px-6 !py-5">Order ID</Th>
-              <Th className="!px-6 !py-5">Personnel</Th>
-              <Th className="!px-6 !py-5">Asset Detail</Th>
+              <Th className="!px-6 !py-5">Booking ID</Th>
+              <Th className="!px-6 !py-5">Employee Name</Th>
+              <Th className="!px-6 !py-5">Hotel Name</Th>
               <Th className="!px-6 !py-5">Duration</Th>
-              <Th className="!px-6 !py-5">Email Identifier</Th>
+              <Th className="!px-6 !py-5">Email</Th>
               <Th className="!px-6 !py-5 text-center">Status</Th>
               <Th className="!px-6 !py-5 text-center">Action</Th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length > 0 ? filtered.map((t, i) => (
+            {paginated.length > 0 ? paginated.map((t, i) => (
               <tr key={t.id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
                 <td className="!px-6 !py-5"><IdCell id={t.orderId} /></td>
                 <td className="!px-6 !py-5">
@@ -466,7 +479,7 @@ export default function UpcomingTrips() {
                  <FiCalendar size={28} />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Future Manifest</h1>
+                 <h1 className="text-3xl font-black tracking-tight leading-none">Upcoming Trips</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
                    Validated Registry of Scheduled Corporate Travel Deployments
                  </p>

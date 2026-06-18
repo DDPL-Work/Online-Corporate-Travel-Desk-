@@ -36,7 +36,7 @@ const validateTravelAdmin = (req) => {
 exports.getBrandingDetails = async (req, res) => {
   try {
     const corporateId = validateTravelAdmin(req);
-    const corporate = await Corporate.findById(corporateId).select("corporateName branding classification ssoConfig registeredAddress");
+    const corporate = await Corporate.findById(corporateId).select("corporateName branding classification ssoConfig registeredAddress corporateUrl corporateSlug");
 
     if (!corporate) {
       return res.status(404).json({ success: false, message: "Corporate not found" });
@@ -73,10 +73,8 @@ exports.updateBrandingDetails = async (req, res) => {
       welcomeMessage, 
       primaryColor, 
       secondaryColor, 
-      companyType,
       supportEmail,
-      supportPhone,
-      corporateName 
+      supportPhone
     } = req.body;
 
     // Update basic branding info
@@ -93,12 +91,10 @@ exports.updateBrandingDetails = async (req, res) => {
       };
     }
 
-    if (corporateName) corporate.corporateName = corporateName;
     if (landingPageTitle) corporate.branding.landingPageTitle = landingPageTitle;
     if (welcomeMessage) corporate.branding.welcomeMessage = welcomeMessage;
     if (primaryColor) corporate.branding.primaryColor = primaryColor;
     if (secondaryColor) corporate.branding.secondaryColor = secondaryColor;
-    if (companyType) corporate.branding.companyType = companyType;
     if (supportEmail !== undefined) corporate.branding.supportEmail = supportEmail;
     if (supportPhone !== undefined) corporate.branding.supportPhone = supportPhone;
 

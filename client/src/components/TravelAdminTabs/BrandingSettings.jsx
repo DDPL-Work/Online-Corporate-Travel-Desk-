@@ -10,6 +10,8 @@ import {
   FiEdit3,
   FiArrowRight,
   FiRefreshCw,
+  FiLink,
+  FiCopy,
 } from "react-icons/fi";
 import { FaBuilding } from "react-icons/fa";
 import { toast } from "sonner";
@@ -51,8 +53,9 @@ export default function BrandingSettings() {
         corporateName: branding.corporateName || "",
         landingPageTitle: bObj.landingPageTitle || DEFAULTS.landingPageTitle,
         welcomeMessage: bObj.welcomeMessage || DEFAULTS.welcomeMessage,
-        companyType: branding.classification || DEFAULTS.companyType,
+        companyType: bObj.companyType || DEFAULTS.companyType,
         logo: null,
+        corporateUrl: branding.corporateUrl || "",
       });
       setLogoPreview(bObj.logo?.url || null);
     }
@@ -84,20 +87,23 @@ export default function BrandingSettings() {
         corporateName: branding.corporateName || "",
         landingPageTitle: bObj.landingPageTitle || DEFAULTS.landingPageTitle,
         welcomeMessage: bObj.welcomeMessage || DEFAULTS.welcomeMessage,
-        companyType: branding.classification || DEFAULTS.companyType,
+        companyType: bObj.companyType || DEFAULTS.companyType,
         logo: null,
+        corporateUrl: branding.corporateUrl || "",
       });
       setLogoPreview(bObj.logo?.url || null);
     }
     setIsEditing(!isEditing);
   };
 
+  const handleRefresh = () => {
+    dispatch(getBrandingDetails());
+  };
+
   const handleSubmit = async () => {
     const data = new FormData();
-    data.append("corporateName", formData.corporateName);
     data.append("landingPageTitle", formData.landingPageTitle);
     data.append("welcomeMessage", formData.welcomeMessage);
-    data.append("companyType", formData.companyType);
     if (formData.logo) {
       data.append("companyLogo", formData.logo);
     }
@@ -117,7 +123,7 @@ export default function BrandingSettings() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.offWhite }}>
          <div className="flex flex-col items-center gap-4">
             <FiRefreshCw className="animate-spin" size={32} style={{ color: C.gold }} />
-            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Synchronizing Branding...</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: C.navy }}>Loading Branding...</p>
          </div>
       </div>
     );
@@ -133,16 +139,16 @@ export default function BrandingSettings() {
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => window.history.back()} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
-               <div className={`p-3 rounded-xl bg-white/10 border border-white/10 ${isLoading ? "animate-spin" : ""}`}>
-                  <FiRefreshCw size={20} />
-               </div>
+               <button onClick={handleRefresh} disabled={isLoading} className={`p-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <FiRefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
+               </button>
              </div>
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
              <div className="flex items-center gap-5">
                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiLayout size={28} /></div>
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Branding & Identity</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Configure your organization's look and feel for employees</p>
+                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Set up your portal's look and feel</p>
                </div>
              </div>
           </div>
@@ -203,8 +209,8 @@ export default function BrandingSettings() {
                       <FiType style={{ color: C.navy }} />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Portal Personalization</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Configure Display Text & Messaging</p>
+                      <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Portal Settings</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Change Text & Messages</p>
                     </div>
                   </div>
                   
@@ -234,7 +240,7 @@ export default function BrandingSettings() {
                       label="Organization Name"
                       name="corporateName"
                       value={formData.corporateName}
-                      editing={isEditing}
+                      editing={false} // Strictly read-only
                       onChange={handleInputChange}
                       icon={FaBuilding}
                     />
@@ -257,6 +263,32 @@ export default function BrandingSettings() {
                         type="textarea"
                       />
                     </div>
+                    <div className="md:col-span-2">
+                      <div className="flex flex-col gap-2 text-left">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                          <FiLink size={10} style={{ color: C.gold }} />
+                          Corporate Portal Link
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <div className="w-full px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all truncate cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+                            {branding?.corporateUrl || <span className="text-slate-400 italic font-bold">Not generated yet</span>}
+                          </div>
+                          {branding?.corporateUrl && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(branding.corporateUrl);
+                                toast.success("Portal link copied to clipboard");
+                              }}
+                              className="p-3.5 shrink-0 rounded-[1.25rem] border hover:-translate-y-0.5 transition-all shadow-sm"
+                              style={{ backgroundColor: C.navy, color: C.white, borderColor: C.navy }}
+                              title="Copy Link"
+                            >
+                              <FiCopy size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                </div>
             </div>
@@ -268,8 +300,8 @@ export default function BrandingSettings() {
                   <FiDroplet />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Corporate Classification</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Organization Type for Billing & Analytics</p>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">Company Type</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Your Organization's Type</p>
                 </div>
               </div>
 
@@ -280,25 +312,9 @@ export default function BrandingSettings() {
                       <FiDroplet size={10} style={{ color: C.gold }} />
                       Company Classification
                     </label>
-                    {isEditing ? (
-                      <select
-                        name="companyType"
-                        value={formData.companyType}
-                        onChange={handleInputChange}
-                        className="w-full px-5 py-3 text-sm text-slate-900 border-1.5 rounded-[1.25rem] outline-none transition-all font-bold shadow-sm"
-                        style={{ backgroundColor: C.gold + "11", borderColor: C.gold + "44" }}
-                      >
-                        <option value="Private Limited">Private Limited</option>
-                        <option value="Limited">Limited</option>
-                        <option value="Proprietorship">Proprietorship</option>
-                        <option value="NGO">NGO</option>
-                        <option value="Government">Government</option>
-                      </select>
-                    ) : (
-                      <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
-                        {formData.companyType || "—"}
-                      </div>
-                    )}
+                    <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+                      {formData.companyType || "—"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -308,10 +324,10 @@ export default function BrandingSettings() {
             <div className="rounded-[2rem] p-8 border border-gold/20" style={{ background: `${C.gold}08` }}>
               <div className="flex items-center gap-3 mb-2">
                 <FiImage style={{ color: C.gold }} size={20} />
-                <h4 className="font-black text-sm uppercase tracking-widest" style={{ color: C.navy }}>Why Branding Matters?</h4>
+                <h4 className="font-black text-sm uppercase tracking-widest" style={{ color: C.navy }}>Why Branding is Important</h4>
               </div>
               <p className="text-xs leading-relaxed font-medium" style={{ color: C.muted }}>
-                Consistent branding builds trust within your organization. Your logo and portal title will be visible to all employees throughout their booking journey.
+                A consistent look helps build trust. Your logo and title will be seen by all employees when they book travel.
               </p>
             </div>
 
@@ -350,7 +366,7 @@ function Field({ label, name, value, editing, onChange, icon: Icon, type = "text
           />
         )
       ) : (
-        <div className={`px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all ${type === "textarea" ? "items-start" : ""}`} style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
+        <div className={`px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all ${type === "textarea" ? "items-start" : ""} cursor-not-allowed opacity-80`} style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
           {value || <span className="text-slate-400 italic font-bold">Not configured</span>}
         </div>
       )}

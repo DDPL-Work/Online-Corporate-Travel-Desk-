@@ -15,6 +15,7 @@ import {
   promoteEmployeeAdmin,
   promoteEmployeeToFinanceAdmin,
   getEmployeeExpensesAdmin,
+  getFinanceTeamAdmin,
 } from "../Actions/travelAdmin.thunks";
 
 const initialState = {
@@ -23,6 +24,7 @@ const initialState = {
   cancelledHotelBookings: [],
   managerRequests: [],
   allEmployees: [],
+  financeTeam: [],
   employeeExpenses: {},
 
   loadingFlights: false,
@@ -30,6 +32,7 @@ const initialState = {
   loadingCancelledHotels: false,
   loadingManagerRequests: false,
   loadingEmployees: false,
+  loadingFinanceTeam: false,
   loadingEmployeeExpenses: false,
 
   errorFlights: null,
@@ -37,6 +40,7 @@ const initialState = {
   errorCancelledHotels: null,
   errorManagerRequests: null,
   errorEmployees: null,
+  errorFinanceTeam: null,
 
   singleBooking: null,
   loadingSingleBooking: false,
@@ -280,6 +284,23 @@ const adminBookingSlice = createSlice({
       })
       .addCase(promoteEmployeeToFinanceAdmin.rejected, (state, action) => {
         state.errorEmployees = action.payload;
+      })
+      /**
+       * ============================================================
+       * 💼 FINANCE TEAM
+       * ============================================================
+       */
+      .addCase(getFinanceTeamAdmin.pending, (state) => {
+        state.loadingFinanceTeam = true;
+        state.errorFinanceTeam = null;
+      })
+      .addCase(getFinanceTeamAdmin.fulfilled, (state, action) => {
+        state.loadingFinanceTeam = false;
+        state.financeTeam = action.payload;
+      })
+      .addCase(getFinanceTeamAdmin.rejected, (state, action) => {
+        state.loadingFinanceTeam = false;
+        state.errorFinanceTeam = action.payload;
       });
   },
 });

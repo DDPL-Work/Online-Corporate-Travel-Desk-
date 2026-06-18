@@ -29,7 +29,7 @@ router.get(
 // ✅ Check for pending transferred requests
 router.get(
   '/second-approver/check',
-  authorizeRoles('travel-admin', 'manager', 'corporate-super-admin', 'finance_team','employee'),
+  authorizeRoles('finance_team'),
   approvalController.checkSecondApproverPending
 );
 
@@ -51,6 +51,13 @@ router.post(
   '/:id/approve',
   authorizeRoles('travel-admin', 'manager', 'employee'),
   approvalController.approveRequest
+);
+
+// ✅ Validate booking request (ADMIN/MANAGER/SECOND APPROVER)
+router.post(
+  '/:id/validate',
+  authorizeRoles('travel-admin', 'manager', 'employee'),
+  approvalController.validateFlightApproval
 );
 
 // ✅ Reject booking request (ADMIN/MANAGER/SECOND APPROVER)
@@ -85,6 +92,13 @@ router.post(
   "/hotel/:id/approve",
   authorizeRoles("travel-admin", "manager", "employee"),
   approvalController.approveHotelRequest
+);
+
+// ✅ Validate HOTEL request
+router.post(
+  "/hotel/:id/validate",
+  authorizeRoles("travel-admin", "manager", "employee"),
+  approvalController.validateHotelApproval
 );
 
 // ✅ Reject HOTEL request

@@ -1527,6 +1527,7 @@ class PaymentService {
         balanceBefore,
         balanceAfter: corporate.walletBalance,
         description: booking.bookingType === 'flight' ? "Wallet debited for flight booking" : "Wallet debited for booking",
+        operationType: booking.bookingType === 'flight' ? "Flight-Booking" : "Hotel-Booking",
         status: "completed",
       });
 
@@ -1576,7 +1577,8 @@ class PaymentService {
         return { method: "agency", alreadyProcessed: true };
       }
 
-      const env = process.env.TBO_ENV || "live";
+      // const env = process.env.TBO_ENV || "live";
+      const env = "dummy";
       const balance = await getAgencyBalance(env);
 
       if (balance.availableBalance < amount) {
@@ -1622,6 +1624,7 @@ class PaymentService {
         description: `${
           booking.bookingType === "hotel" ? "Hotel" : "Flight"
         } booking on credit (postpaid)`,
+        operationType: booking.bookingType === 'flight' ? "Flight-Booking" : "Hotel-Booking",
         metadata: {
           bookingType: booking.bookingType,
           flightNumber: booking.flightNumber,

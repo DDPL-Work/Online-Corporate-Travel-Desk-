@@ -513,6 +513,85 @@ const HeroWithSearch = ({
       setReturnDate(departureDate);
   }, [departureDate]);
 
+  // ─── Auto-fill from session-expired "Search Again" ───
+  useEffect(() => {
+    const prefill = location.state?.prefillFlightSearch;
+    if (!prefill) return;
+
+    // Helper: look up airport in local DB by IATA code
+    const findAirport = (code) => {
+      if (!code) return null;
+      const found = airportDatabase.find(
+        (a) => a.iata_code?.toUpperCase() === code?.toUpperCase(),
+      );
+      return found
+        ? { code: found.iata_code, city: found.city }
+        : { code, city: code };
+    };
+
+    const jt = prefill.journeyType;
+
+    // Set trip type
+    if (jt === 1) setTripType("one-way");
+    else if (jt === 2) setTripType("round-trip");
+    else if (jt === 3) setTripType("multi-city");
+
+    if (jt === 3) {
+      // Multi-city: segments array
+      const segs = prefill.segments || [];
+      setMultiCityFlights(
+        segs.map((s) => ({
+          from: findAirport(s.origin || s.Origin) || "",
+          to: findAirport(s.destination || s.Destination) || "",
+          date: (s.departureDate || s.PreferredDepartureTime || "").split("T")[0],
+        })),
+      );
+    } else {
+      // One-way / Round-trip
+      const origin =
+        prefill.origin ||
+        prefill.Segments?.[0]?.Origin ||
+        "";
+      const destination =
+        prefill.destination ||
+        prefill.Segments?.[0]?.Destination ||
+        "";
+      const depDate = (
+        prefill.departureDate ||
+        prefill.Segments?.[0]?.PreferredDepartureTime ||
+        ""
+      ).split("T")[0];
+      const retDate = (
+        prefill.returnDate ||
+        prefill.ReturnDate ||
+        prefill.Segments?.[1]?.PreferredDepartureTime ||
+        ""
+      ).split("T")[0];
+
+      if (origin) setFromAirport(findAirport(origin));
+      if (destination) setToAirport(findAirport(destination));
+      if (depDate) setDepartureDate(depDate);
+      if (retDate && jt === 2) setReturnDate(retDate);
+    }
+
+    // Passengers & class
+    const REVERSE_CABIN = {
+      economy: "Economy",
+      business: "Business",
+      premium_economy: "Premium Economy",
+      first_class: "First",
+      first: "First",
+    };
+    handleApply({
+      adults: prefill.adults ?? prefill.Adults ?? 1,
+      children: prefill.children ?? prefill.Children ?? 0,
+      infants: prefill.infants ?? prefill.Infants ?? 0,
+      childAges: [],
+      travelClass: REVERSE_CABIN[prefill.cabinClass] || "Economy",
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.prefillFlightSearch]);
+
   const validateSearch = () => {
     const e = {};
     if (!fromAirport?.code) e.from = "Please select origin airport";

@@ -174,10 +174,10 @@ export default function EmployeeManagement() {
     const name = `${employee.name?.firstName || ""} ${employee.name?.lastName || ""}`.trim();
 
     const result = await Swal.fire({
-      title: isActivating ? "Activate Personnel?" : "Deactivate Personnel?",
+      title: isActivating ? "Activate Employee?" : "Deactivate Employee?",
       text: isActivating 
-        ? `${name}'s access will be restored and system permissions granted.`
-        : `${name}'s access will be suspended and all active sessions terminated.`,
+        ? `${name}'s access will be restored.`
+        : `${name}'s access will be suspended.`,
       icon: isActivating ? "question" : "warning",
       showCancelButton: true,
       confirmButtonColor: isActivating ? "#10B981" : "#ef4444",
@@ -197,10 +197,10 @@ export default function EmployeeManagement() {
     
     try {
       await dispatch(toggleEmployeeStatusAdmin(id)).unwrap();
-      ToastWithTimer({ message: `Personnel ${isActivating ? "activated" : "deactivated"} successfully`, type: "success" });
+      ToastWithTimer({ message: `Employee ${isActivating ? "activated" : "deactivated"} successfully`, type: "success" });
     } catch (err) {
       setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], isActive: !isActivating } }));
-      ToastWithTimer({ message: err || "Protocol Failure", type: "error" });
+      ToastWithTimer({ message: err || "Action Failed", type: "error" });
     } finally {
       setStatusLoading(prev => ({ ...prev, [id]: false }));
     }
@@ -235,7 +235,7 @@ export default function EmployeeManagement() {
     try {
       await dispatch(demoteEmployeeAdmin(id)).unwrap();
       setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], role: "employee" } }));
-      ToastWithTimer({ message: `Personnel ${name} role demoted to employee successfully`, type: "success" });
+      ToastWithTimer({ message: `${name} demoted to employee successfully`, type: "success" });
     } catch (err) {
       ToastWithTimer({ message: err || "Failed to modify role", type: "error" });
     } finally {
@@ -269,7 +269,7 @@ export default function EmployeeManagement() {
     try {
       await dispatch(promoteEmployeeAdmin(id)).unwrap();
       setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], role: "manager" } }));
-      ToastWithTimer({ message: `Personnel ${name} promoted to manager successfully`, type: "success" });
+      ToastWithTimer({ message: `${name} promoted to manager successfully`, type: "success" });
     } catch (err) {
       ToastWithTimer({ message: err || "Failed to promote employee", type: "error" });
     } finally {
@@ -303,7 +303,7 @@ export default function EmployeeManagement() {
     try {
       await dispatch(promoteEmployeeToFinanceAdmin(id)).unwrap();
       setLocalOverrides(prev => ({ ...prev, [id]: { ...prev[id], role: "finance_team" } }));
-      ToastWithTimer({ message: `Personnel ${name} assigned to Finance Team successfully`, type: "success" });
+      ToastWithTimer({ message: `${name} assigned to Finance Team successfully`, type: "success" });
     } catch (err) {
       ToastWithTimer({ message: err || "Failed to assign Finance Team role", type: "error" });
     } finally {
@@ -348,7 +348,7 @@ export default function EmployeeManagement() {
                <div>
                  <h1 className="text-3xl font-black tracking-tight leading-none">Employee Directory</h1>
                  <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                   Manage organizational personnel, departmental roles, and system access permissions
+                   Manage employees, roles, and access
                  </p>
                </div>
              </div>
@@ -380,27 +380,27 @@ export default function EmployeeManagement() {
         {activeTab === "employees" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard label="Total Employees" value={stats.total} Icon={FiUsers} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
-            <StatCard label="Unit Managers" value={stats.managers} Icon={FiShield} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
-            <StatCard label="Active Status" value={stats.active} Icon={FiUserCheck} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+            <StatCard label="Managers" value={stats.managers} Icon={FiShield} borderCls="border-violet-500" iconBgCls="bg-violet-50" iconColorCls="text-violet-600" />
+            <StatCard label="Active" value={stats.active} Icon={FiUserCheck} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
             <StatCard label="Deactivated" value={stats.suspended} Icon={FiUserX} borderCls="border-red-500" iconBgCls="bg-red-50" iconColorCls="text-red-600" />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard label="Total Outlay" value={expenseStats.totalSpend} Icon={FiDollarSign} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
+            <StatCard label="Total Spend" value={expenseStats.totalSpend} Icon={FiDollarSign} borderCls="border-[#000D26]" iconBgCls="bg-slate-100" iconColorCls="text-[#000D26]" />
             <StatCard label="Top Spender" value={expenseStats.topSpenderName} Icon={FiTrendingUp} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
             <StatCard label="Total Spenders" value={expenseStats.spendersCount} Icon={FiUsers} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
-            <StatCard label="Ledger Timeline" value={expenseStats.timeline} Icon={FiCalendar} borderCls="border-blue-500" iconBgCls="bg-blue-50" iconColorCls="text-blue-600" />
+            <StatCard label="Timeline" value={expenseStats.timeline} Icon={FiCalendar} borderCls="border-blue-500" iconBgCls="bg-blue-50" iconColorCls="text-blue-600" />
           </div>
         )}
 
         {/* Filters */}
         <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
           <div className="flex flex-wrap items-end gap-4">
-            <LabeledField label={<><FiSearch size={10} /> Search Directory</>} className="flex-grow min-w-[200px]">
+            <LabeledField label={<><FiSearch size={10} /> Search</>} className="flex-grow min-w-[200px]">
               <SearchBar value={search} onChange={(val) => { setSearch(val); setCurrentPage(1); }} placeholder="Search name, email, department..." />
             </LabeledField>
             
-            <LabeledField label="Organizational Role" className="w-full sm:w-auto flex-1 min-w-[140px]">
+            <LabeledField label="Role" className="w-full sm:w-auto flex-1 min-w-[140px]">
               <CustomDropdown value={roleFilter} onChange={(val) => { setRoleFilter(val); setCurrentPage(1); }} options={["All", "Manager", "Employee", "Finance Team"]} />
             </LabeledField>
             
@@ -408,7 +408,7 @@ export default function EmployeeManagement() {
               <CustomDropdown value={deptFilter} onChange={(val) => { setDeptFilter(val); setCurrentPage(1); }} options={departments} />
             </LabeledField>
             
-            <LabeledField label="System Access" className="w-full sm:w-auto flex-1 min-w-[140px]">
+            <LabeledField label="Status" className="w-full sm:w-auto flex-1 min-w-[140px]">
               <CustomDropdown value={statusFilter} onChange={(val) => { setStatusFilter(val); setCurrentPage(1); }} options={["All", "Active", "Inactive"]} />
             </LabeledField>
 
@@ -444,7 +444,7 @@ export default function EmployeeManagement() {
         {/* Data Table */}
         <ResponsiveDataTable 
           title="Employee Records" 
-          subtitle={`${filtered.length} registered personnel`} 
+          subtitle={`${filtered.length} employees`} 
           wrapperClass="!border-none !shadow-none"
           exportLabel="Export Excel"
           exportLoading={isExporting}
@@ -453,14 +453,14 @@ export default function EmployeeManagement() {
             pageHeader: "Employee Records",
             statCards: activeTab === "employees" ? [
               { label: "Total Employees", value: stats.total },
-              { label: "Unit Managers", value: stats.managers },
-              { label: "Active Status", value: stats.active },
+              { label: "Managers", value: stats.managers },
+              { label: "Active", value: stats.active },
               { label: "Deactivated", value: stats.suspended }
             ] : [
-              { label: "Total Outlay", value: expenseStats.totalSpend },
+              { label: "Total Spend", value: expenseStats.totalSpend },
               { label: "Top Spender", value: expenseStats.topSpenderName },
               { label: "Total Spenders", value: expenseStats.spendersCount },
-              { label: "Ledger Timeline", value: expenseStats.timeline }
+              { label: "Timeline", value: expenseStats.timeline }
             ],
             appliedFilters: [
               { label: "Search", value: search || "None" },
@@ -491,9 +491,9 @@ export default function EmployeeManagement() {
             <thead>
               <tr className="bg-linear-to-r from-[#003399] to-[#000d26] text-white">
                 <Th className="!px-6 !py-5">Employee</Th>
-                <Th className="!px-6 !py-5">Credentials & Department</Th>
-                <Th className="!px-6 !py-5">Designated Role</Th>
-                <Th className="!px-6 !py-5">{activeTab === "expenses" ? "Total Spend Amount" : "Access Status"}</Th>
+                <Th className="!px-6 !py-5">Contact & Department</Th>
+                <Th className="!px-6 !py-5">Role</Th>
+                <Th className="!px-6 !py-5">{activeTab === "expenses" ? "Total Spend Amount" : "Status"}</Th>
                 <Th className="!px-6 !py-5">Joining Date</Th>
               </tr>
             </thead>
@@ -629,7 +629,7 @@ export default function EmployeeManagement() {
                       <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
                         <FiUsers size={32} />
                       </div>
-                      <p className="text-sm font-bold text-slate-400">No personnel records found matching the criteria.</p>
+                      <p className="text-sm font-bold text-slate-400">No employees found matching your search.</p>
                     </div>
                   </td>
                 </tr>
