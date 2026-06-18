@@ -1577,7 +1577,8 @@ class PaymentService {
         return { method: "agency", alreadyProcessed: true };
       }
 
-      const env = process.env.TBO_ENV || "live";
+      // const env = process.env.TBO_ENV || "live";
+      const env = "dummy";
       const balance = await getAgencyBalance(env);
 
       if (balance.availableBalance < amount) {

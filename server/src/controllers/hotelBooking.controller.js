@@ -164,7 +164,8 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   }
 
   // ── BALANCE CHECK START ──
-  const env = process.env.TBO_ENV || "live";
+  // const env = process.env.TBO_ENV || "live";
+  const env = "dummy";
   const requiredAmount = Number(pricingSnapshot?.totalAmount || 0);
 
   const { getAgencyBalance } = require("../services/tboBalance.service");
@@ -1133,7 +1134,8 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Corporate not found");
   }
 
-  const env = process.env.TBO_ENV || "live";
+  // const env = process.env.TBO_ENV || "live";
+  const env = "dummy";
   const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
 
   const { getAgencyBalance } = require("../services/tboBalance.service");
