@@ -65,8 +65,8 @@ module.exports = {
   /* ---------------- LIVE (FULL FLOW) ---------------- */
   live: {
     // base: "https://HotelBE.tektravels.com",
-    base1: "https://affiliate.travelboutiqueonline.com/HotelAPI/",
-    base2: "https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest/",
+    base1: "https://affiliate.travelboutiqueonline.com/HotelAPI",
+    base2: "https://hotelbooking.travelboutiqueonline.com/HotelAPI_V10/HotelService.svc/rest",
     sharedBase: "https://Sharedapi.tektravels.com",
     staticBase: "http://affiliate.travelboutiqueonline.com/TBOHolidays_HotelAPI",
 
