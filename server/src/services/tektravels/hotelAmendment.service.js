@@ -74,7 +74,7 @@ class HotelAmendmentService {
         payload,
       });
 
-      const url = `${config[env].base}${config[env].endpoints[endpoint]}`;
+      const url = `${config[env].base2}${config[env].endpoints[endpoint]}`;
 
       const response = await axios.post(url, payload, {
         headers: {
