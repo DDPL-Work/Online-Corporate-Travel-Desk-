@@ -5,7 +5,7 @@ import { FaPlane, FaHotel } from "react-icons/fa";
 const SearchLoadingModal = ({ type = "flight", origin, destination, date }) => {
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4 flex flex-col items-center text-center animate-in fade-in zoom-in duration-300">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-[calc(100%-2rem)] flex flex-col items-center text-center animate-in fade-in zoom-in duration-300">
         {/* Animated Icon Container */}
         <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
           <div className="absolute inset-0 bg-amber-100 rounded-full animate-ping opacity-25"></div>
@@ -51,8 +51,8 @@ const SearchLoadingModal = ({ type = "flight", origin, destination, date }) => {
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-8 overflow-hidden">
-          <div className="bg-[#C9A84C] h-full rounded-full animate-progress-wide"></div>
+        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-8 overflow-hidden relative transform-gpu" style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}>
+          <div className="bg-[#C9A84C] h-full rounded-full animate-progress-wide absolute left-0 top-0"></div>
         </div>
       </div>
 
@@ -60,9 +60,9 @@ const SearchLoadingModal = ({ type = "flight", origin, destination, date }) => {
         dangerouslySetInnerHTML={{
           __html: `
         @keyframes progress-wide {
-          0% { width: 0%; transform: translateX(-100%); }
-          50% { width: 100%; transform: translateX(0); }
-          100% { width: 0%; transform: translateX(100%); }
+          0% { width: 0%; left: 0%; }
+          50% { width: 100%; left: 0%; }
+          100% { width: 0%; left: 100%; }
         }
         .animate-progress-wide {
           animation: progress-wide 2s infinite ease-in-out;

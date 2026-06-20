@@ -149,6 +149,7 @@ const FlightFilterSidebar = ({
   setPriceValues,
   durationValues,
   setDurationValues,
+  onClose,
 }) => {
   const [priceRange, setPriceRange] = useState({ min: 1000, max: 15000 });
   const [durationRange, setDurationRange] = useState({ min: 0, max: 1440 });
@@ -576,7 +577,19 @@ const FlightFilterSidebar = ({
     <div className="w-full p-4 bg-white rounded-lg shadow-md space-y-4 border border-gray-200">
       {/* Header */}
       <div className="flex justify-between items-center pb-3 border-b border-gray-200">
-        <h2 className="text-lg font-bold text-gray-800">Filters</h2>
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1 hover:bg-slate-100 rounded-full text-slate-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
+          <h2 className="text-lg font-bold text-gray-800">Filters</h2>
+        </div>
         <button
           onClick={resetAllFilters}
           className="text-sm cursor-pointer text-[#C9A84C] hover:text-[#b08f3a] uppercase font-medium"

@@ -12,32 +12,20 @@ import {
   FaMapMarkerAlt,
   FaChevronDown,
   FaUserFriends,
-  FaMinus,
-  FaPlus,
-  FaGlobe,
-  FaBed,
-  FaHistory,
 } from "react-icons/fa";
-import { BsCalendar4, BsBell } from "react-icons/bs";
+import { BsCalendar4 } from "react-icons/bs";
 import CustomCalendar from "../../../components/CustomCalendar";
 import { MdArrowForward, MdAltRoute } from "react-icons/md";
 import {
   RiFlightTakeoffLine,
   RiHotelLine,
   RiShieldCheckLine,
-  RiTimeLine,
   RiFileTextLine,
   RiPhoneLine,
   RiMailLine,
-  RiArrowRightLine,
   RiAlertLine,
-  RiMenuLine,
-  RiBriefcaseLine,
   RiBarChartLine,
-  RiUserLine,
-  RiCheckLine,
 } from "react-icons/ri";
-import { LuPlane } from "react-icons/lu";
 import {
   useNavigate,
   useSearchParams,
@@ -46,7 +34,6 @@ import {
 } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import LandingFooter from "../../../layout/LandingFooter";
-import { logoutUser } from "../../../Redux/Slice/authSlice";
 import LandingHeader from "../../../layout/LandingHeader";
 import { airportDatabase } from "../../../data/airportDatabase";
 import { useFlightSearch } from "../../../context/FlightSearchContext";
@@ -1179,7 +1166,6 @@ const HeroWithSearch = ({
                                 {isModalOpen && (
                                   <div className="absolute top-full right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
                                     <TravelersClassModal
-                                      className="w-full"
                                       onClose={closeDropdown}
                                       onApply={handleApply}
                                       initialData={{ passengers, travelClass }}
@@ -1322,7 +1308,6 @@ const HeroWithSearch = ({
                           {isModalOpen && (
                             <div className="absolute top-full right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
                               <TravelersClassModal
-                                className="w-full"
                                 onClose={closeDropdown}
                                 onApply={handleApply}
                                 initialData={{ passengers, travelClass }}
@@ -1607,7 +1592,7 @@ const HeroWithSearch = ({
                       />
                     </button>
                     {showGuestDropdown && (
-                      <div className="absolute top-full right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
+                      <div className="absolute top-full left-0 right-0 sm:left-auto sm:right-0 z-[1000] mt-1 shadow-2xl animate-fade-in block">
                         <HotelGuestSelection
                           rooms={rooms}
                           setRooms={setRooms}
@@ -2234,11 +2219,6 @@ export default function InternalTravelDeskLanding() {
   // We map publicBranding to branding so the rest of the file continues to work unchanged
   const branding = publicBranding;
 
-  const handleLogout = () => {
-    dispatch(logoutUser());
-    navigate("/login");
-  };
-
   useEffect(() => {
     const nextActiveTab = location.state?.activeTab || queryActiveTab;
     if (nextActiveTab) {
@@ -2349,22 +2329,8 @@ export default function InternalTravelDeskLanding() {
       />
       <FeatureStrip />
       <HowToBook />
-      {/* <TravelPolicies branding={branding} /> */}
-      {/* <Restrictions /> */}
       <SupportSection branding={branding} />
       <LandingFooter onTabChange={setLandingActiveTab} />
-
-      {/* Floating contact button */}
-      {/* <button
-        className="fixed bottom-8 right-8 w-14 h-14 rounded-full flex items-center justify-center z-50 shadow-2xl transition-all hover:scale-110 active:scale-95"
-        style={{
-          background: GOLD,
-          color: C.navy,
-          boxShadow: `0 8px 24px -4px ${GOLD_30}`,
-        }}
-      >
-        <RiPhoneLine size={22} />
-      </button> */}
     </div>
   );
 }

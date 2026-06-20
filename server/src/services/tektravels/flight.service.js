@@ -601,6 +601,45 @@ class FlightService {
 
     const env = this.getEnv();
 
+    if (resultIndex.includes(",")) {
+      const indexes = resultIndex.split(",");
+      const [onwardRes, returnRes] = await Promise.all([
+        this.postLive(
+          "flightFareUpsell",
+          { TraceId: traceId, ResultIndex: indexes[0] },
+          env,
+        ),
+        this.postLive(
+          "flightFareUpsell",
+          { TraceId: traceId, ResultIndex: indexes[1] },
+          env,
+        )
+      ]);
+
+      // Apply markup to both if Corporate context exists
+      if (corporateId) {
+        const MarkupCalculatorService = require("../../modules/markup/services/markupCalculator.service");
+        if (onwardRes?.Response?.Results) {
+          onwardRes.Response.Results = await MarkupCalculatorService.applyFlightMarkup(
+            onwardRes.Response.Results,
+            corporateId
+          );
+        }
+        if (returnRes?.Response?.Results) {
+          returnRes.Response.Results = await MarkupCalculatorService.applyFlightMarkup(
+            returnRes.Response.Results,
+            corporateId
+          );
+        }
+      }
+
+      return {
+        isSplitResponse: true,
+        onward: onwardRes,
+        return: returnRes
+      };
+    }
+
     const response = await this.postLive(
       "flightFareUpsell",
       { TraceId: traceId, ResultIndex: resultIndex },

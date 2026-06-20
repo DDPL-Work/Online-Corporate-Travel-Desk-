@@ -288,6 +288,18 @@ export default function FlightSearchResults() {
   const [currentSearchPayload, setCurrentSearchPayload] = useState(searchPayload);
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  useEffect(() => {
+    if (mobileFilterOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileFilterOpen]);
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -1081,7 +1093,7 @@ export default function FlightSearchResults() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className={`min-h-screen bg-gray-50 font-sans ${mobileFilterOpen ? 'h-screen overflow-y-hidden w-full overflow-x-hidden' : ''}`}>
       <LandingHeader />
 
       {loading && (
@@ -1110,10 +1122,133 @@ export default function FlightSearchResults() {
       />
 
       {/* ================= BODY ================= */}
-      <div className="max-w-full mx-10  py-6">
+      <div className="max-w-full mx-4 lg:mx-10 py-6">
+        
+        {/* ── Mobile Filter Trigger Bar ── */}
+        <div className="lg:hidden z-[90] bg-white border-b border-slate-200 shadow-sm mb-4">
+          <div className="flex items-center justify-between px-3 py-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMobileFilterOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm active:scale-95 transition-transform shrink-0"
+              style={{ background: "#C9A84C" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 10h12M10 16h4" />
+              </svg>
+              Filters
+              {(() => {
+                let count = 0;
+                if (activeFiltersState.selectedStops?.length) count++;
+                if (activeFiltersState.selectedAirlines?.length) count++;
+                if (activeFiltersState.selectedFareTypes?.length) count++;
+                if (activeFiltersState.selectedTime) count++;
+                if (activeFiltersState.priceValues?.[0] !== priceRange.min || activeFiltersState.priceValues?.[1] !== priceRange.max) count++;
+                return count > 0 ? (
+                  <span className="bg-white text-amber-700 text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                    {count}
+                  </span>
+                ) : null;
+              })()}
+            </button>
+            <span className="text-[11px] text-slate-400 font-medium flex-1 text-center">
+              <span className="font-black text-amber-600">{flightsCount}</span> flights
+            </span>
+          </div>
+
+          {/* Active filter chips row */}
+          {(() => {
+            const chips = [];
+            if (activeFiltersState.selectedStops?.length) chips.push({ label: `🛑 Stops`, clear: () => setActiveFilters(f => ({ ...f, selectedStops: [] })) });
+            if (activeFiltersState.selectedAirlines?.length) chips.push({ label: `✈ Airlines`, clear: () => setActiveFilters(f => ({ ...f, selectedAirlines: [] })) });
+            if (activeFiltersState.selectedTime) chips.push({ label: `🕒 ${activeFiltersState.selectedTime}`, clear: () => setActiveFilters(f => ({ ...f, selectedTime: "" })) });
+            if (activeFiltersState.priceValues?.[0] !== priceRange.min || activeFiltersState.priceValues?.[1] !== priceRange.max) {
+               chips.push({ label: `💰 Price`, clear: () => setActiveFilters(f => ({ ...f, priceValues: [priceRange.min, priceRange.max] })) });
+            }
+
+            if (chips.length === 0) return (
+              <div className="flex gap-2 px-3 pb-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                <button onClick={() => setMobileFilterOpen(true)} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-slate-600 bg-slate-50 whitespace-nowrap active:bg-slate-100">
+                  💰 Price
+                </button>
+                <button onClick={() => setMobileFilterOpen(true)} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-slate-600 bg-slate-50 whitespace-nowrap active:bg-slate-100">
+                  🛑 Stops
+                </button>
+                <button onClick={() => setMobileFilterOpen(true)} className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 text-[10px] font-bold text-slate-600 bg-slate-50 whitespace-nowrap active:bg-slate-100">
+                  ✈ Airlines
+                </button>
+              </div>
+            );
+
+            return (
+              <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                {chips.map((chip, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap border"
+                    style={{ background: "#C9A84C18", color: "#7a5c1a", borderColor: "#C9A84C50" }}
+                  >
+                    {chip.label}
+                    <button
+                      type="button"
+                      onClick={chip.clear}
+                      className="ml-0.5 text-[11px] leading-none opacity-60 hover:opacity-100 font-black"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* ── Mobile Filter Drawer ── */}
+        <div
+          onClick={() => setMobileFilterOpen(false)}
+          className={`lg:hidden fixed top-[75px] inset-0 bg-black/50 backdrop-blur-sm z-[9100] transition-opacity duration-300 ${mobileFilterOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{ touchAction: "none" }}
+        />
+        <div
+          className={`lg:hidden fixed top-[75px] right-0 z-[9200] bg-white shadow-2xl w-[85vw] max-w-sm h-[calc(100vh-75px)] overflow-y-auto overscroll-none transition-all duration-300 ease-in-out ${mobileFilterOpen ? 'translate-x-0 opacity-100 visible' : 'translate-x-full opacity-0 invisible'}`}
+        >
+          <div className="p-3">
+            <FlightFilterSidebar
+              onClose={() => setMobileFilterOpen(false)}
+              flights={normalizedFlights}
+              selectedStops={activeFiltersState.selectedStops}
+              setSelectedStops={(val) => setActiveFilters((prev) => ({ ...prev, selectedStops: val }))}
+              selectedTime={activeFiltersState.selectedTime}
+              setSelectedTime={(val) => setActiveFilters((prev) => ({ ...prev, selectedTime: val }))}
+              selectedAirlines={activeFiltersState.selectedAirlines}
+              setSelectedAirlines={(val) => setActiveFilters((prev) => ({ ...prev, selectedAirlines: val }))}
+              selectedFareTypes={activeFiltersState.selectedFareTypes}
+              setSelectedFareTypes={(val) => setActiveFilters((prev) => ({ ...prev, selectedFareTypes: val }))}
+              selectedTerminals={activeFiltersState.selectedTerminals}
+              setSelectedTerminals={(val) => setActiveFilters((prev) => ({ ...prev, selectedTerminals: val }))}
+              selectedAirports={activeFiltersState.selectedAirports}
+              setSelectedAirports={(val) => setActiveFilters((prev) => ({ ...prev, selectedAirports: val }))}
+              selectedDestinationAirports={activeFiltersState.selectedDestinationAirports}
+              setSelectedDestinationAirports={(val) => setActiveFilters((prev) => ({ ...prev, selectedDestinationAirports: val }))}
+              selectedLayoverAirports={activeFiltersState.selectedLayoverAirports}
+              setSelectedLayoverAirports={(val) => setActiveFilters((prev) => ({ ...prev, selectedLayoverAirports: val }))}
+              lowCO2={activeFiltersState.lowCO2}
+              setLowCO2={(val) => setActiveFilters((prev) => ({ ...prev, lowCO2: val }))}
+              popularFilters={activeFiltersState.popularFilters}
+              setPopularFilters={(val) => setActiveFilters((prev) => ({ ...prev, popularFilters: val }))}
+              priceValues={activeFiltersState.priceValues}
+              setPriceValues={(val) => setActiveFilters((prev) => ({ ...prev, priceValues: val }))}
+              durationValues={activeFiltersState.durationValues}
+              setDurationValues={(val) => setActiveFilters((prev) => ({ ...prev, durationValues: val }))}
+              selectedMaxDuration={activeFiltersState.selectedMaxDuration}
+              setSelectedMaxDuration={(val) => setActiveFilters((prev) => ({ ...prev, selectedMaxDuration: val }))}
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* FILTER SIDEBAR */}
-          <aside className="lg:col-span-3">
+          {/* FILTER SIDEBAR (Desktop) */}
+          <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-[165px] h-[calc(100vh-165px)] overflow-y-auto pr-2">
               <FlightFilterSidebar
                 flights={normalizedFlights}
@@ -1238,7 +1373,7 @@ export default function FlightSearchResults() {
           )}
 
           {/* RESULTS */}
-          <section className="lg:col-span-9 space-y-4">
+          <section className={`lg:col-span-9 space-y-4 ${Number(journeyType) === 2 && !isInternationalReturnGrouped ? 'pb-32' : 'pb-10'}`}>
             {!loading && noFlightsAfterFilters && (
               <div className="bg-white p-6 rounded-lg text-center text-gray-500">
                 No flights match your filters
@@ -1249,7 +1384,7 @@ export default function FlightSearchResults() {
               <>
                 {/* Return Flight Tabs */}
                 {Number(journeyType) === 2 && !isInternationalReturnGrouped && (
-                  <div className="sticky top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
+                  <div className="sticky top-[72px] sm:top-[165px] z-30 bg-slate-50 border-b border-slate-200 rounded-lg shadow-sm">
                 <div className="flex gap-1 p-2">
                   {/* ONWARD ROUTE */}
                   <button

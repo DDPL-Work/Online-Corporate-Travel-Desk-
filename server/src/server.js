@@ -11,6 +11,8 @@ console.log("GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
 console.log("GOOGLE_CALLBACK_URL:", process.env.GOOGLE_CALLBACK_URL);
 
 const { initCronJobs } = require("./utils/cronJobs");
+const { initSocketIO } = require("./sockets/search.socket");
+require("./workers/searchChunk.worker"); // Ensure worker runs in the same process for simplicity
 
 (async () => {
   try {
@@ -20,6 +22,9 @@ const { initCronJobs } = require("./utils/cronJobs");
     initCronJobs();
 
     const server = http.createServer(app);
+    
+    // Initialize Socket.IO
+    initSocketIO(server);
 
     server.listen(PORT, () => {
       logger.info(`

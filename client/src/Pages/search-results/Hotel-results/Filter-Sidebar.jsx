@@ -39,6 +39,7 @@ const FilterSidebar = ({
   pagination,
   selectedLocation,
   setSelectedLocation,
+  onClose,
 }) => {
   const inputRef = useRef(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
@@ -159,34 +160,27 @@ const FilterSidebar = ({
 
   // Update dropdown position on scroll or resize
   useEffect(() => {
-    const updatePos = () => {
-      if (inputRef.current) {
-        const rect = inputRef.current.getBoundingClientRect();
-        setDropdownPos({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
-          width: rect.width,
-        });
-      }
-    };
-
-    if (openLocation) {
-      updatePos();
-      window.addEventListener("scroll", updatePos, true);
-      window.addEventListener("resize", updatePos);
-    }
-    return () => {
-      window.removeEventListener("scroll", updatePos, true);
-      window.removeEventListener("resize", updatePos);
-    };
+    // Dropdown position is now handled via native CSS absolute positioning.
   }, [openLocation]);
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
-        <h2 className="text-lg font-bold" style={{ color: AZURE }}>
-          Filters
-        </h2>
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition"
+              aria-label="Close filters"
+            >
+              <IoClose className="text-xl" />
+            </button>
+          )}
+          <h2 className="text-lg font-bold" style={{ color: AZURE }}>
+            Filters
+          </h2>
+        </div>
         {activeFilterCount > 0 && (
           <button
             onClick={clearAllFilters}
@@ -271,19 +265,11 @@ const FilterSidebar = ({
                   <IoClose size={14} />
                 </button>
               )}
-            </div>
-
-            {/* Combined Dropdown for Nominatim and Local Areas using Portal */}
-            {(nominatimResults.length > 0 || (openLocation && filteredLocalLocations.length > 0) || (searching && locationQuery.length >= 2)) &&
-              createPortal(
+            {(nominatimResults.length > 0 || (openLocation && filteredLocalLocations.length > 0) || (searching && locationQuery.length >= 2)) && (
                 <div
-                  className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden pointer-events-auto"
+                  className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden pointer-events-auto absolute left-0 w-full mt-1 z-40"
                   style={{
-                    position: "absolute",
-                    top: dropdownPos.top + 4,
-                    left: dropdownPos.left,
-                    width: dropdownPos.width,
-                    zIndex: 99999,
+                    top: "100%",
                     maxHeight: "320px",
                     overflowY: "auto",
                   }}
@@ -352,9 +338,9 @@ const FilterSidebar = ({
                         <p className="text-[10px] text-slate-400 mt-1">Try a different area or landmark</p>
                       </div>
                     )}
-                </div>,
-                document.body
+                </div>
               )}
+            </div>
           </div>
         {/* End of mb-3 */}
 

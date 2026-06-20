@@ -58,6 +58,12 @@ function makeRedisLimiter(limiterInstance, label = "API") {
       res.setHeader("X-RateLimit-Reset", Math.ceil(result.msBeforeNext / 1000));
       next();
     } catch (rej) {
+      // rate-limiter-flexible throws an Error object if Redis connection fails
+      if (rej instanceof Error) {
+        logger.error(`[RateLimit:${label}] Redis error: ${rej.message}`);
+        return next(); // Fail open: allow request if Redis is down
+      }
+
       logger.warn(`[RateLimit:${label}] Blocked: ${key}`);
       return res.status(429).json({
         success: false,

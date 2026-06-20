@@ -32,6 +32,39 @@ import {
 import { BsStarFill } from "react-icons/bs";
 import LandingHeader from "../../../layout/LandingHeader";
 
+// ─── Premium palette ──────────────────────────────────────────────────────────
+const C = {
+  black: "#000000",
+  navy: "#000D26",
+  navyDeep: "#04112F",
+  navyMid: "#0A243D",
+  nearBlack: "#0C0C0C",
+  navyDark: "#102238",
+  muted: "#65758B",
+  gold: "#C9A240",
+  border: "#E1E7EF",
+  lightGray: "#F5F5F5",
+  offWhite: "#F8FAFC",
+  white: "#FFFFFF",
+};
+const GOLD = "#C9A240";
+const GOLD_10 = "rgba(201,162,64,0.10)";
+const GOLD_20 = "rgba(201,162,64,0.20)";
+const GOLD_30 = "rgba(201,162,64,0.30)";
+const WHITE_5 = "rgba(255,255,255,0.05)";
+const WHITE_10 = "rgba(255,255,255,0.10)";
+const WHITE_20 = "rgba(255,255,255,0.20)";
+const WHITE_40 = "rgba(255,255,255,0.40)";
+const WHITE_60 = "rgba(255,255,255,0.60)";
+const HERO_TOP = "#000D26";
+const HERO_SPLIT = "#F8FAFC";
+const CARD_BORDER = "rgba(255,255,255,0.10)";
+const FIELD_BG = "#FFFFFF";
+const FIELD_BORDER = "#E1E7EF";
+const FIELD_FOCUS = "#C9A240";
+const FIELD_TEXT = "#000D26";
+const FIELD_MUTED = "#65758B";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => "₹" + Math.round(n).toLocaleString("en-IN");
 
@@ -84,9 +117,6 @@ function extractUpsellResponse(payload) {
 }
 
 // ─── Service categorizer (purely from UpsellDescription strings) ───────────────
-// API format: "Carry on baggage|Taking bags on board"
-// We group by keyword matching on the label portion.
-
 const ICON_MAP = {
   baggage: MdLuggage,
   flexibility: MdLoop,
@@ -103,8 +133,8 @@ const SERVICE_CATEGORY_RULES = [
   {
     group: "Baggage",
     icon: "baggage",
-    color: "#0ea5e9",
-    bgColor: "#f0f9ff",
+    color: C.navy,
+    bgColor: C.offWhite,
     keywords: [
       "cabin baggage",
       "carry on",
@@ -118,8 +148,8 @@ const SERVICE_CATEGORY_RULES = [
   {
     group: "Flexibility",
     icon: "flexibility",
-    color: "#8b5cf6",
-    bgColor: "#f5f3ff",
+    color: GOLD,
+    bgColor: GOLD_10,
     keywords: [
       "reissue",
       "rebooking",
@@ -132,8 +162,8 @@ const SERVICE_CATEGORY_RULES = [
   {
     group: "Seat",
     icon: "seat",
-    color: "#f59e0b",
-    bgColor: "#fffbeb",
+    color: C.navyMid,
+    bgColor: C.offWhite,
     keywords: ["seat", "legroom", "advance seat"],
   },
   {
@@ -146,8 +176,8 @@ const SERVICE_CATEGORY_RULES = [
   {
     group: "Connectivity",
     icon: "wifi",
-    color: "#3b82f6",
-    bgColor: "#eff6ff",
+    color: C.navy,
+    bgColor: C.offWhite,
     keywords: [
       "wifi",
       "wi-fi",
@@ -161,15 +191,15 @@ const SERVICE_CATEGORY_RULES = [
   {
     group: "Miles & Rewards",
     icon: "rewards",
-    color: "#f97316",
-    bgColor: "#fff7ed",
+    color: GOLD,
+    bgColor: GOLD_10,
     keywords: ["miles", "mileage", "reward", "points", "accrual", "bonus"],
   },
   {
     group: "Priority Services",
     icon: "priority",
-    color: "#ec4899",
-    bgColor: "#fdf2f8",
+    color: C.navyDark,
+    bgColor: C.offWhite,
     keywords: [
       "priority",
       "fast track",
@@ -182,8 +212,8 @@ const SERVICE_CATEGORY_RULES = [
   {
     group: "Upgrades",
     icon: "upgrade",
-    color: "#14b8a6",
-    bgColor: "#f0fdfa",
+    color: GOLD,
+    bgColor: GOLD_10,
     keywords: ["upgrade"],
   },
 ];
@@ -191,8 +221,8 @@ const SERVICE_CATEGORY_RULES = [
 const OTHER_GROUP = {
   group: "Other Benefits",
   icon: "other",
-  color: "#6b7280",
-  bgColor: "#f9fafb",
+  color: C.muted,
+  bgColor: C.lightGray,
 };
 
 function categorizeServices(servicesList = []) {
@@ -202,8 +232,7 @@ function categorizeServices(servicesList = []) {
     if (!svc.UpsellDescription) return;
     const [labelRaw, descRaw] = svc.UpsellDescription.split("|");
     let description = (descRaw || labelRaw).trim();
-    
-    // Clean up routing prefix like "DEL-AMS: "
+
     description = description.replace(/^[A-Z]{3}-[A-Z]{3}:\s*/i, "");
 
     const lowerDesc = description.toLowerCase();
@@ -225,7 +254,6 @@ function categorizeServices(servicesList = []) {
     const groupKey = matchedGroup || OTHER_GROUP.group;
     if (!grouped[groupKey]) grouped[groupKey] = [];
 
-    // Deduplicate by description
     const exists = grouped[groupKey].some((s) => s.description === description);
     if (!exists && description) {
       grouped[groupKey].push({ description, status });
@@ -251,7 +279,6 @@ function normalizeResults(results = [], traceId = "") {
     const cabinClass = seg0?.CabinClass;
     const cabin = getCabinLabel(cabinClass);
 
-    // Merge all services from UpsellList (deduplicated by label)
     const seenLabels = new Set();
     const allServices = [];
     (r.UpsellOptionsList?.UpsellList || []).forEach((ul) => {
@@ -266,24 +293,46 @@ function normalizeResults(results = [], traceId = "") {
 
     const categorizedServices = categorizeServices(allServices);
 
-    // Baggage from FareBreakdown
     const seg0Baggage = r.FareBreakdown?.[0]?.SegmentDetails?.[0];
     const checkedBagVal = seg0Baggage?.CheckedInBaggage?.Value;
     const cabinBagVal = seg0Baggage?.CabinBaggage?.Value;
     const checkedBagPieces = seg0Baggage?.CheckedInBaggage?.NoOfPiece;
     const checkedBagFreeText = seg0Baggage?.CheckedInBaggage?.FreeText;
 
-    // Fare family name from UpsellList
     const fareFamilyName =
       r.UpsellOptionsList?.UpsellList?.[0]?.FareFamilyName ||
       r.FareClassification?.Type;
 
-    // Mini fare rules
     const miniRules = (r.MiniFareRules?.[0] || []).map((rule) => ({
       type: rule.Type,
       details: rule.Details,
       points: rule.JourneyPoints,
     }));
+
+    const allMiniRules = (r.MiniFareRules || []).map((group) =>
+      (group || []).map((rule) => ({
+        type: rule.Type,
+        details: rule.Details,
+        points: rule.JourneyPoints,
+      })),
+    );
+
+    const allBaggage = (r.FareBreakdown?.[0]?.SegmentDetails || []).map(
+      (segBaggage) => ({
+        flightInfoIndex: segBaggage.FlightInfoIndex,
+        checkedBagVal: segBaggage.CheckedInBaggage?.Value,
+        checkedBagPieces: segBaggage.CheckedInBaggage?.NoOfPiece,
+        checkedBagFreeText: segBaggage.CheckedInBaggage?.FreeText,
+        cabinBagVal: segBaggage.CabinBaggage?.Value,
+        cabinBagFreeText: segBaggage.CabinBaggage?.FreeText,
+      }),
+    );
+
+    const allFareClasses = (r.Segments || []).map((segGroup) => {
+      return (
+        segGroup[0]?.SupplierFareClass || segGroup[0]?.Airline?.FareClass || ""
+      );
+    });
 
     return {
       id: r.ResultIndex,
@@ -307,7 +356,12 @@ function normalizeResults(results = [], traceId = "") {
       lastTicketDate: r.LastTicketDate,
       categorizedServices,
       miniRules,
+      allMiniRules,
+      allBaggage,
+      allFareClasses,
       segments: r.Segments?.[0],
+      allSegments: r.Segments,
+      upsellLists: r.UpsellOptionsList?.UpsellList || [],
       ranking: r.SmartChoiceRanking,
     };
   });
@@ -316,61 +370,47 @@ function normalizeResults(results = [], traceId = "") {
 // ─── Cabin theme config ───────────────────────────────────────────────────────
 const CABIN_CFG = {
   Economy: {
-    accent: "#0A203E",
-    accentLight: "#f0f4f8",
-    accentRing: "#d0dbf0",
-    popularBg: "from-[#0A203E] to-[#1a3a5a]",
-    tabActive:
-      "bg-[#0A203E] text-white border-transparent shadow-md shadow-[#0A203E]/20",
-    tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-[#0A203E] hover:bg-slate-50",
-    selectBtn:
-      "bg-[#0A203E] hover:bg-[#1a3a5a] text-white shadow-md shadow-[#0A203E]/20",
-    selectBtnOutline: "border-2 border-slate-200 text-[#0A203E] hover:bg-slate-50",
+    accent: C.navy,
+    accentLight: C.offWhite,
+    accentRing: C.border,
+    popularBg: `from-[${C.navy}] to-[${C.navyMid}]`,
+    tabActive: `bg-[${C.navy}] text-white border-transparent shadow-md shadow-[${C.navy}]/20`,
+    tabIdle: `text-[${C.muted}] border-[${C.border}] bg-white hover:text-[${C.navy}] hover:bg-[${C.offWhite}]`,
+    selectBtn: `bg-[${C.navy}] hover:bg-[${C.navyMid}] text-white shadow-md shadow-[${C.navy}]/20`,
+    selectBtnOutline: `border-2 border-[${C.border}] text-[${C.navy}] hover:bg-[${C.offWhite}]`,
     icon: MdFlight,
   },
   "Premium Economy": {
-    accent: "#C9A84C",
-    accentLight: "#fcfaf4",
-    accentRing: "#f1e8d0",
-    popularBg: "from-[#C9A84C] to-[#d4b96a]",
-    tabActive:
-      "bg-[#C9A84C] text-[#0A203E] border-transparent shadow-md shadow-[#C9A84C]/20",
-    tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-[#C9A84C] hover:bg-slate-50",
-    selectBtn:
-      "bg-[#C9A84C] hover:bg-[#d4b96a] text-[#0A203E] shadow-md shadow-[#C9A84C]/20",
-    selectBtnOutline:
-      "border-2 border-[#C9A84C]/30 text-[#C9A84C] hover:bg-slate-50",
+    accent: GOLD,
+    accentLight: GOLD_10,
+    accentRing: GOLD_20,
+    popularBg: `from-[${GOLD}] to-[#d8b75c]`,
+    tabActive: `bg-[${GOLD}] text-[${C.navy}] border-transparent shadow-md shadow-[${GOLD}]/20`,
+    tabIdle: `text-[${C.muted}] border-[${C.border}] bg-white hover:text-[${GOLD}] hover:bg-[${C.offWhite}]`,
+    selectBtn: `bg-[${GOLD}] hover:bg-[#b5903a] text-[${C.navy}] shadow-md shadow-[${GOLD}]/20`,
+    selectBtnOutline: `border-2 border-[${GOLD}]/30 text-[${GOLD}] hover:bg-[${C.offWhite}]`,
     icon: MdAirlineSeatReclineExtra,
   },
   Business: {
-    accent: "#0A203E",
-    accentLight: "#f0f4f8",
-    accentRing: "#d0dbf0",
-    popularBg: "from-[#0A203E] to-[#1a3a5a]",
-    tabActive:
-      "bg-[#0A203E] text-[#C9A84C] border-[#C9A84C]/30 shadow-md shadow-[#0A203E]/20",
-    tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-[#0A203E] hover:bg-slate-50",
-    selectBtn:
-      "bg-[#0A203E] hover:bg-[#1a3a5a] text-[#C9A84C] shadow-md shadow-[#0A203E]/20 border border-[#C9A84C]/40",
-    selectBtnOutline:
-      "border-2 border-[#0A203E]/30 text-[#0A203E] hover:bg-slate-50",
+    accent: C.navy,
+    accentLight: C.offWhite,
+    accentRing: C.border,
+    popularBg: `from-[${C.navy}] to-[${C.navyMid}]`,
+    tabActive: `bg-[${C.navy}] text-[${GOLD}] border-[${GOLD}]/30 shadow-md shadow-[${C.navy}]/20`,
+    tabIdle: `text-[${C.muted}] border-[${C.border}] bg-white hover:text-[${C.navy}] hover:bg-[${C.offWhite}]`,
+    selectBtn: `bg-[${C.navy}] hover:bg-[${C.navyMid}] text-[${GOLD}] shadow-md shadow-[${C.navy}]/20 border border-[${GOLD}]/40`,
+    selectBtnOutline: `border-2 border-[${C.navy}]/30 text-[${C.navy}] hover:bg-[${C.offWhite}]`,
     icon: MdWorkspacePremium,
   },
   First: {
-    accent: "#C9A84C",
-    accentLight: "#fcfaf4",
-    accentRing: "#f1e8d0",
-    popularBg: "from-[#C9A84C] to-[#b5953e]",
-    tabActive:
-      "bg-[#C9A84C] text-[#0A203E] border-transparent shadow-md shadow-[#C9A84C]/30",
-    tabIdle:
-      "text-slate-500 border-slate-200 bg-white hover:text-[#C9A84C] hover:bg-slate-50",
-    selectBtn:
-      "bg-[#C9A84C] hover:bg-[#b5953e] text-[#0A203E] shadow-md shadow-[#C9A84C]/30",
-    selectBtnOutline: "border-2 border-[#C9A84C] text-[#C9A84C] hover:bg-slate-50",
+    accent: GOLD,
+    accentLight: GOLD_10,
+    accentRing: GOLD_20,
+    popularBg: `from-[${GOLD}] to-[#a8863a]`,
+    tabActive: `bg-[${GOLD}] text-[${C.navy}] border-transparent shadow-md shadow-[${GOLD}]/30`,
+    tabIdle: `text-[${C.muted}] border-[${C.border}] bg-white hover:text-[${GOLD}] hover:bg-[${C.offWhite}]`,
+    selectBtn: `bg-[${GOLD}] hover:bg-[#a8863a] text-[${C.navy}] shadow-md shadow-[${GOLD}]/30`,
+    selectBtnOutline: `border-2 border-[${GOLD}] text-[${GOLD}] hover:bg-[${C.offWhite}]`,
     icon: BsStarFill,
   },
 };
@@ -386,8 +426,11 @@ function StatusIcon({ status }) {
     );
   if (status === "chargeable")
     return (
-      <span className="inline-flex items-center justify-center size-4 rounded-full bg-amber-100 shrink-0">
-        <MdCurrencyRupee size={9} className="text-amber-600" />
+      <span
+        className="inline-flex items-center justify-center size-4 rounded-full shrink-0"
+        style={{ background: GOLD_10 }}
+      >
+        <MdCurrencyRupee size={9} style={{ color: GOLD }} />
       </span>
     );
   return (
@@ -415,35 +458,51 @@ function SegmentRow({ segments }) {
   const stops = segments.length - 1;
 
   return (
-    <div className="flex items-center gap-4 bg-white/5 rounded-2xl border border-white/10 px-5 py-4 mt-4 text-left">
+    <div
+      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 rounded-2xl px-4 sm:px-5 py-4 mt-4 text-left"
+      style={{ background: WHITE_5, border: `1px solid ${WHITE_10}` }}
+    >
       {/* Origin */}
       <div className="text-left min-w-16">
-        <p className="text-xl font-bold text-white font-mono tracking-tight">
+        <p className="text-lg sm:text-xl font-bold text-white font-mono tracking-tight">
           {fmtT(dep)}
         </p>
-        <p className="text-[11px] font-bold text-slate-300 mt-0.5">
+        <p className="text-[11px] font-bold mt-0.5" style={{ color: WHITE_60 }}>
           {first.Origin?.Airport?.AirportCode}
         </p>
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px]" style={{ color: WHITE_40 }}>
           {first.Origin?.Airport?.CityName}
         </p>
       </div>
 
       {/* Line */}
-      <div className="flex-1 flex flex-col items-center gap-1.5 px-2">
+      <div className="flex-1 flex flex-col items-center gap-1.5 px-0 sm:px-2">
         <div className="flex items-center w-full gap-1.5">
-          <div className="flex-1 h-px bg-white/20" />
-          <div className="size-7 rounded-full bg-white/10 border border-white/20 shadow-sm flex items-center justify-center shrink-0">
-            <MdFlightTakeoff size={14} className="text-[#C9A84C]" />
+          <div className="flex-1 h-px" style={{ background: WHITE_20 }} />
+          <div
+            className="size-7 rounded-full shadow-sm flex items-center justify-center shrink-0"
+            style={{ background: WHITE_10, border: `1px solid ${WHITE_20}` }}
+          >
+            <MdFlightTakeoff size={14} style={{ color: GOLD }} />
           </div>
-          <div className="flex-1 h-px bg-white/20" />
+          <div className="flex-1 h-px" style={{ background: WHITE_20 }} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-slate-300">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span
+            className="text-[10px] font-semibold"
+            style={{ color: WHITE_60 }}
+          >
             {hh}h {mm}m
           </span>
           {stops > 0 ? (
-            <span className="text-[10px] font-bold text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/30 px-2 py-0.5 rounded-full">
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full text-center"
+              style={{
+                color: GOLD,
+                background: GOLD_10,
+                border: `1px solid ${GOLD_30}`,
+              }}
+            >
               {stops} stop{stops > 1 ? "s" : ""} · via{" "}
               {segments
                 .slice(0, -1)
@@ -460,26 +519,30 @@ function SegmentRow({ segments }) {
 
       {/* Destination */}
       <div className="text-right min-w-16">
-        <p className="text-xl font-bold text-white font-mono tracking-tight">
+        <p className="text-lg sm:text-xl font-bold text-white font-mono tracking-tight">
           {fmtT(arr)}
         </p>
-        <p className="text-[11px] font-bold text-slate-300 mt-0.5">
+        <p className="text-[11px] font-bold mt-0.5" style={{ color: WHITE_60 }}>
           {last.Destination?.Airport?.AirportCode}
         </p>
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px]" style={{ color: WHITE_40 }}>
           {last.Destination?.Airport?.CityName}
         </p>
       </div>
 
       {/* Per-leg detail */}
       {segments.length > 0 && (
-        <div className="hidden lg:flex flex-col gap-1 border-l border-white/10 pl-4 ml-2">
+        <div
+          className="hidden lg:flex flex-col gap-1 pl-4 ml-2"
+          style={{ borderLeft: `1px solid ${WHITE_10}` }}
+        >
           {segments.map((seg, i) => (
             <div
               key={i}
-              className="flex items-center gap-1.5 text-[10px] text-slate-400"
+              className="flex items-center gap-1.5 text-[10px]"
+              style={{ color: WHITE_40 }}
             >
-              <span className="font-semibold text-slate-200">
+              <span className="font-semibold" style={{ color: WHITE_60 }}>
                 {seg.Airline?.AirlineCode}
                 {seg.Airline?.FlightNumber}
               </span>
@@ -505,12 +568,16 @@ function MiniRulesBadges({ rules }) {
       {rules.map((rule, i) => (
         <div
           key={i}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+          style={{ background: C.offWhite, border: `1px solid ${C.border}` }}
         >
-          <span className="text-[10px] font-semibold text-slate-500">
+          <span
+            className="text-[10px] font-semibold"
+            style={{ color: C.muted }}
+          >
             {rule.type}:
           </span>
-          <span className="text-[10px] font-bold text-slate-700">
+          <span className="text-[10px] font-bold" style={{ color: C.navy }}>
             {rule.details}
           </span>
         </div>
@@ -519,14 +586,31 @@ function MiniRulesBadges({ rules }) {
   );
 }
 
-function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules, journeyTab, bookingPath, bookingPayload }) {
+function FareCard({
+  fare,
+  cfg,
+  isSelected,
+  isPopular,
+  onSelect,
+  onViewFareRules,
+  journeyTab,
+  bookingPath,
+  bookingPayload,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState(0);
 
   const servicesToUse =
-    journeyTab === "onward" ? fare.onwardServices : fare.returnServices;
+    journeyTab === "onward"
+      ? fare.onwardServices
+      : journeyTab === "return"
+        ? fare.returnServices
+        : null;
 
-  const groupedServices = categorizeServices(servicesToUse);
+  const groupedServices = servicesToUse
+    ? categorizeServices(servicesToUse)
+    : fare.categorizedServices;
 
   const includedCount = groupedServices.reduce(
     (acc, g) => acc + g.services.filter((s) => s.status === "included").length,
@@ -537,22 +621,92 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
     g.services.some((s) => s.status === "unavailable"),
   );
 
+  const renderGroupedServices = (categories) => (
+    <>
+      {categories.map((group) => {
+        const GroupIcon = ICON_MAP[group.icon] || MdUpdate;
+        const displayed = expanded
+          ? group.services
+          : group.services.filter((s) => s.status !== "unavailable");
+        if (!displayed.length) return null;
+
+        return (
+          <div
+            key={group.group}
+            className="rounded-xl p-3.5"
+            style={{
+              background: "rgba(248,250,252,0.7)",
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                style={{ background: group.bgColor }}
+              >
+                <GroupIcon size={16} style={{ color: group.color }} />
+              </div>
+              <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
+                {group.group}
+              </span>
+            </div>
+
+            <div className="space-y-2.5 pl-1">
+              {displayed.map((svc, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <StatusIcon status={svc.status} />
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                      {svc.description}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-[11px] font-bold shrink-0 uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                      svc.status === "included"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : svc.status === "chargeable"
+                          ? ""
+                          : "bg-slate-100 text-slate-500"
+                    }`}
+                    style={
+                      svc.status === "chargeable"
+                        ? { background: GOLD_10, color: "#8a6d22" }
+                        : undefined
+                    }
+                  >
+                    {svc.status === "included"
+                      ? "Free"
+                      : svc.status === "chargeable"
+                        ? "Paid"
+                        : "N/A"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+
   return (
     <div
-      className={`relative flex flex-col rounded-2xl bg-white transition-all duration-300 hover:scale-[1.015] hover:shadow-xl ${
-        isSelected ? "scale-[1.01] shadow-2xl" : "shadow-md shadow-slate-100"
-      }`}
+      className="relative flex flex-col rounded-2xl bg-white transition-all duration-300 hover:scale-[1.015] hover:shadow-xl"
       style={{
-        border: isSelected ? "2.5px solid #C9A84C" : "1.5px solid #e2e8f0",
+        border: isSelected ? `2.5px solid ${GOLD}` : `1.5px solid ${C.border}`,
         boxShadow: isSelected
-          ? "0 12px 30px -10px rgba(199, 168, 76, 0.25), 0 0 0 1px #C9A84C"
-          : undefined,
+          ? `0 12px 30px -10px ${GOLD_30}, 0 0 0 1px ${GOLD}`
+          : "0 1px 2px rgba(0,0,0,0.04)",
+        transform: isSelected ? "scale(1.01)" : undefined,
       }}
     >
       {/* Popular banner */}
       {isPopular && (
         <div
-          className="bg-linear-to-r from-[#0A203E] via-[#C9A84C] to-[#0A203E] text-white text-center text-[9.5px] font-black tracking-[0.18em] py-2 uppercase shadow-inner"
+          className="text-white text-center text-[9.5px] font-black tracking-[0.18em] py-2 uppercase shadow-inner"
+          style={{
+            background: `linear-gradient(to right, ${C.navy}, ${GOLD}, ${C.navy})`,
+          }}
         >
           ★ MOST POPULAR ★
         </div>
@@ -562,67 +716,85 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
       {!isPopular && (
         <div
           className="h-1.5 w-full"
-          style={{ background: isSelected ? "#C9A84C" : "#e2e8f0" }}
+          style={{ background: isSelected ? GOLD : C.border }}
         />
       )}
 
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100 text-left">
-        {/* Fare family + badges */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="text-left">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-              {fare.cabin}
-            </p>
-            <p
-              className="text-[15px] font-black mt-0.5"
-              style={{ color: isSelected ? "#C9A84C" : "#1e293b" }}
+      <div
+        className="p-4"
+        style={{
+          borderBottom: `1px dashed ${C.border}`,
+          background: "rgba(248,250,252,0.4)",
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h3
+              className="text-sm font-black truncate"
+              style={{ color: C.navy }}
             >
               {fare.fareFamilyName}
+            </h3>
+            <p
+              className="text-[11px] font-medium mt-0.5"
+              style={{ color: C.muted }}
+            >
+              {fare.cabin}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {isSelected && (
-              <span
-                className="text-[9px] px-2 py-0.5 rounded-full font-black border bg-[#C9A84C]/10 border-[#C9A84C]/40 text-[#C9A84C]"
-              >
-                ✓ Selected
-              </span>
+          <div className="text-right shrink-0">
+            {fare.discount > 0 && (
+              <p className="text-[10px] font-bold text-emerald-600 line-through mb-0.5">
+                {fmt(fare.publishedFare)}
+              </p>
             )}
-            {fare.isRefundable && (
-              <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
-                Refundable
-              </span>
-            )}
+            <p
+              className="text-xl font-black tracking-tight"
+              style={{ color: C.navy }}
+            >
+              {fmt(fare.offeredFare)}
+            </p>
           </div>
         </div>
 
-        {/* Price */}
-        <p
-          className="text-[28px] font-black leading-none tracking-tight"
-          style={{ color: isSelected ? "#0A203E" : "#0f172a" }}
-        >
-          {fmt(fare.publishedFare)}
-        </p>
-        <p className="text-[10px] text-slate-400 mt-0.5">
-          per person · incl. taxes
-        </p>
-        {fare.offeredFare > 0 && fare.offeredFare < fare.publishedFare && (
-          <div className="mt-1.5 inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200/50 rounded-lg px-2.5 py-0.5 text-emerald-700 font-extrabold text-[10.5px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Net payable: {fmt(fare.offeredFare)}
-          </div>
-        )}
-
-        {/* Seats + included count */}
-        <div className="flex flex-wrap gap-1.5 mt-3">
+        {/* Badges */}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {fare.allFareClasses?.[0] && (
+            <span
+              className="text-[9.5px] px-2 py-0.5 rounded-full font-bold uppercase"
+              style={{
+                color: C.navy,
+                background: GOLD_10,
+                border: `1px solid ${GOLD_30}`,
+              }}
+            >
+              Class: {fare.allFareClasses[0]}
+            </span>
+          )}
+          {fare.isRefundable ? (
+            <span className="text-[9.5px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+              Refundable
+            </span>
+          ) : (
+            <span className="text-[9.5px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full font-medium">
+              Non-refundable
+            </span>
+          )}
           {fare.noOfSeats <= 5 ? (
-            <span className="flex items-center gap-1 text-[9.5px] text-red-600 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+            <span className="text-[9.5px] text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
               <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
               {fare.noOfSeats} left!
             </span>
           ) : (
-            <span className="text-[9.5px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+            <span
+              className="text-[9.5px] px-2 py-0.5 rounded-full"
+              style={{
+                color: C.muted,
+                background: C.offWhite,
+                border: `1px solid ${C.border}`,
+              }}
+            >
               {fare.noOfSeats} seats
             </span>
           )}
@@ -631,23 +803,31 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
           </span>
         </div>
 
-        {/* Baggage summary — from FareBreakdown, always shown */}
-        <div className="mt-3.5 flex items-center gap-2.5 bg-[#0a203e]/5 rounded-xl px-3.5 py-2.5 border border-dashed border-[#0a203e]/20 text-left">
-          <MdLuggage size={18} className="text-[#0a203e] shrink-0" />
+        {/* Baggage summary */}
+        <div
+          className="mt-3.5 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
+          style={{
+            background: "rgba(0,13,38,0.04)",
+            border: `1px dashed rgba(0,13,38,0.18)`,
+          }}
+        >
+          <MdLuggage size={18} style={{ color: C.navy }} className="shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-extrabold text-[#0a203e]">
+            <p className="text-[11px] font-extrabold" style={{ color: C.navy }}>
               Check-in: {fare.checkedBagPieces} pc × {fare.checkedBagVal} kg
               {" · "}Cabin: {fare.cabinBagVal} kg
             </p>
             {fare.checkedBagFreeText && (
-              <p className="text-[9.5px] text-slate-500 mt-0.5 leading-snug">
+              <p
+                className="text-[9.5px] mt-0.5 leading-snug"
+                style={{ color: C.muted }}
+              >
                 {fare.checkedBagFreeText}
               </p>
             )}
           </div>
         </div>
 
-        {/* Mini fare rules */}
         <MiniRulesBadges rules={fare.miniRules} />
       </div>
 
@@ -671,7 +851,8 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
             e.stopPropagation();
             setShowModal(true);
           }}
-          className="text-[12px] font-bold text-blue-600 hover:text-blue-800 underline underline-offset-2 mt-2 inline-block transition-colors"
+          className="text-[12px] font-bold underline underline-offset-2 mt-2 inline-block transition-colors"
+          style={{ color: C.navy }}
         >
           View full details
         </button>
@@ -687,98 +868,310 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
       </div>
 
       {/* Full Details Modal */}
-      {showModal && createPortal(
-        <div 
-          className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowModal(false);
-          }}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+      {showModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-9999 flex items-center justify-center p-4 backdrop-blur-sm"
+            style={{ background: "rgba(0,13,38,0.6)" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowModal(false);
+            }}
           >
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-[20px] font-black text-[#0A203E]">{fare.fareFamilyName} Benefits</h3>
-                <p className="text-[13px] text-slate-500 font-medium mt-0.5">{fare.cabin}</p>
-              </div>
-              <button 
-                onClick={() => setShowModal(false)} 
-                className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+            <div
+              className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="p-5 flex items-center justify-between shrink-0"
+                style={{ borderBottom: `1px solid ${C.border}` }}
               >
-                <MdClose size={20} />
-              </button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto space-y-5">
-              {groupedServices.map((group) => {
-                const GroupIcon = ICON_MAP[group.icon] || MdUpdate;
-                // Only show unavailable items if requested
-                const displayed = expanded
-                  ? group.services
-                  : group.services.filter((s) => s.status !== "unavailable");
-                if (!displayed.length) return null;
+                <div>
+                  <h3
+                    className="text-[20px] font-black"
+                    style={{ color: C.navy }}
+                  >
+                    {fare.fareFamilyName} Benefits
+                  </h3>
+                  <p
+                    className="text-[13px] font-medium mt-0.5"
+                    style={{ color: C.muted }}
+                  >
+                    {fare.cabin}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="size-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ background: C.lightGray, color: C.muted }}
+                >
+                  <MdClose size={20} />
+                </button>
+              </div>
 
-                return (
-                  <div key={group.group} className="bg-slate-50/50 rounded-xl p-3.5 border border-slate-100">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div
-                        className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
-                        style={{ background: group.bgColor }}
+              {fare.upsellLists?.length > 1 && (
+                <div
+                  className="px-5 pt-3 flex gap-2 border-b shrink-0"
+                  style={{ borderColor: C.border }}
+                >
+                  {fare.upsellLists.map((ul, uIdx) => {
+                    let routeTitle = uIdx === 0 ? "Onward" : "Return";
+                    if (
+                      fare.allSegments &&
+                      fare.allSegments[uIdx] &&
+                      fare.allSegments[uIdx].length > 0
+                    ) {
+                      const segs = fare.allSegments[uIdx];
+                      routeTitle = `${segs[0].Origin.Airport.AirportCode} - ${segs[segs.length - 1].Destination.Airport.AirportCode} (${uIdx === 0 ? "Onward" : "Return"})`;
+                    }
+                    const isActive = activeModalTab === uIdx;
+                    return (
+                      <button
+                        key={uIdx}
+                        onClick={() => setActiveModalTab(uIdx)}
+                        className="px-4 py-2 text-[13px] font-black transition-all border-b-2"
+                        style={{
+                          borderColor: isActive ? GOLD : "transparent",
+                          color: isActive ? C.navy : C.muted,
+                        }}
                       >
-                        <GroupIcon size={16} style={{ color: group.color }} />
-                      </div>
-                      <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
-                        {group.group}
-                      </span>
-                    </div>
+                        {routeTitle}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-                    <div className="space-y-2.5 pl-1">
-                      {displayed.map((svc, idx) => (
-                        <div key={idx} className="flex items-start gap-3">
-                          <StatusIcon status={svc.status} />
-                          <div className="flex-1 min-w-0 pt-0.5">
-                            <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
-                              {svc.description}
-                            </p>
-                          </div>
-                          <span
-                            className={`text-[11px] font-bold shrink-0 uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                              svc.status === "included"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : svc.status === "chargeable"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-slate-100 text-slate-500"
-                            }`}
+              <div className="p-5 overflow-y-auto space-y-5">
+                {fare.upsellLists?.length > 1 ? (
+                  (() => {
+                    const ul = fare.upsellLists[activeModalTab];
+                    if (!ul) return null;
+                    const services = ul.ServicesList || [];
+                    const seenLabels = new Set();
+                    const uniqueServices = [];
+                    services.forEach((svc) => {
+                      const label =
+                        svc.UpsellDescription?.split("|")[0]?.trim() || "";
+                      if (!seenLabels.has(label)) {
+                        seenLabels.add(label);
+                        uniqueServices.push(svc);
+                      }
+                    });
+                    const categorized = categorizeServices(uniqueServices);
+
+                    const bag = fare.allBaggage?.[activeModalTab];
+                    const mRules = fare.allMiniRules?.[activeModalTab] || [];
+
+                    return (
+                      <div className="space-y-4">
+                        {bag && (
+                          <div
+                            className="rounded-xl p-3.5"
+                            style={{
+                              background: "rgba(248,250,252,0.7)",
+                              border: `1px solid ${C.border}`,
+                            }}
                           >
-                            {svc.status === "included"
-                              ? "Free"
-                              : svc.status === "chargeable"
-                                ? "Paid"
-                                : "N/A"}
+                            <div className="flex items-center gap-2 mb-3">
+                              <div
+                                className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                                style={{ background: GOLD_10 }}
+                              >
+                                <MdLuggage size={16} style={{ color: GOLD }} />
+                              </div>
+                              <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
+                                Baggage Allowance
+                              </span>
+                            </div>
+                            <div className="space-y-2.5 pl-1">
+                              <div className="flex items-start gap-3">
+                                <StatusIcon status="included" />
+                                <div className="flex-1 min-w-0 pt-0.5">
+                                  <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                                    Check-in: {bag.checkedBagPieces} pc ×{" "}
+                                    {bag.checkedBagVal} kg
+                                    <br />
+                                    <span className="text-[11px] text-slate-500">
+                                      {bag.checkedBagFreeText}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3">
+                                <StatusIcon status="included" />
+                                <div className="flex-1 min-w-0 pt-0.5">
+                                  <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                                    Cabin: {bag.cabinBagVal} kg
+                                    <br />
+                                    <span className="text-[11px] text-slate-500">
+                                      {bag.cabinBagFreeText}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {mRules.length > 0 && (
+                          <div
+                            className="rounded-xl p-3.5"
+                            style={{
+                              background: "rgba(248,250,252,0.7)",
+                              border: `1px solid ${C.border}`,
+                            }}
+                          >
+                            <div className="flex items-center gap-2 mb-3">
+                              <div
+                                className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                                style={{ background: GOLD_10 }}
+                              >
+                                <MdInfo size={16} style={{ color: GOLD }} />
+                              </div>
+                              <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
+                                Cancellation & Changes
+                              </span>
+                            </div>
+                            <div className="space-y-2.5 pl-1">
+                              {mRules.map((rule, rIdx) => (
+                                <div
+                                  key={rIdx}
+                                  className="flex items-start gap-3"
+                                >
+                                  <StatusIcon
+                                    status={
+                                      rule.type === "Reissue"
+                                        ? "chargeable"
+                                        : "unavailable"
+                                    }
+                                  />
+                                  <div className="flex-1 min-w-0 pt-0.5">
+                                    <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                                      {rule.type}: {rule.details}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {renderGroupedServices(categorized)}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="space-y-4">
+                    {fare.allBaggage?.[0] && (
+                      <div
+                        className="rounded-xl p-3.5"
+                        style={{
+                          background: "rgba(248,250,252,0.7)",
+                          border: `1px solid ${C.border}`,
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div
+                            className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                            style={{ background: GOLD_10 }}
+                          >
+                            <MdLuggage size={16} style={{ color: GOLD }} />
+                          </div>
+                          <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
+                            Baggage Allowance
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+                        <div className="space-y-2.5 pl-1">
+                          <div className="flex items-start gap-3">
+                            <StatusIcon status="included" />
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                                Check-in: {fare.allBaggage[0].checkedBagPieces}{" "}
+                                pc × {fare.allBaggage[0].checkedBagVal} kg
+                                <br />
+                                <span className="text-[11px] text-slate-500">
+                                  {fare.allBaggage[0].checkedBagFreeText}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <StatusIcon status="included" />
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                                Cabin: {fare.allBaggage[0].cabinBagVal} kg
+                                <br />
+                                <span className="text-[11px] text-slate-500">
+                                  {fare.allBaggage[0].cabinBagFreeText}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-              {hasHiddenItems && (
-                <button
-                  onClick={() => setExpanded((p) => !p)}
-                  className="text-[13px] font-bold text-[#C9A84C] hover:text-[#b5953e] flex items-center justify-center gap-1.5 w-full py-2 bg-[#C9A84C]/5 hover:bg-[#C9A84C]/10 rounded-xl transition-colors"
-                >
-                  {expanded ? "▲ Hide unavailable services" : "▼ Show unavailable services"}
-                </button>
-              )}
+                    {fare.allMiniRules?.[0]?.length > 0 && (
+                      <div
+                        className="rounded-xl p-3.5"
+                        style={{
+                          background: "rgba(248,250,252,0.7)",
+                          border: `1px solid ${C.border}`,
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div
+                            className="size-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                            style={{ background: GOLD_10 }}
+                          >
+                            <MdInfo size={16} style={{ color: GOLD }} />
+                          </div>
+                          <span className="text-[13px] font-black uppercase tracking-widest text-slate-700">
+                            Cancellation & Changes
+                          </span>
+                        </div>
+                        <div className="space-y-2.5 pl-1">
+                          {fare.allMiniRules[0].map((rule, rIdx) => (
+                            <div key={rIdx} className="flex items-start gap-3">
+                              <StatusIcon
+                                status={
+                                  rule.type === "Reissue"
+                                    ? "chargeable"
+                                    : "unavailable"
+                                }
+                              />
+                              <div className="flex-1 min-w-0 pt-0.5">
+                                <p className="text-[14px] text-slate-800 font-medium leading-relaxed">
+                                  {rule.type}: {rule.details}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {renderGroupedServices(groupedServices)}
+                  </div>
+                )}
+
+                {hasHiddenItems && (
+                  <button
+                    onClick={() => setExpanded((p) => !p)}
+                    className="text-[13px] font-bold flex items-center justify-center gap-1.5 w-full py-2 rounded-xl transition-colors"
+                    style={{ color: GOLD, background: GOLD_10 }}
+                  >
+                    {expanded
+                      ? "▲ Hide unavailable services"
+                      : "▼ Show unavailable services"}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* Select button */}
       <div className="px-4 pb-4 pt-2 mt-auto">
@@ -789,21 +1182,40 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
             rel="noreferrer"
             onClick={() => {
               if (bookingPayload) {
-                localStorage.setItem("flightBookingState", JSON.stringify(bookingPayload));
-                
+                localStorage.setItem(
+                  "flightBookingState",
+                  JSON.stringify(bookingPayload),
+                );
+
                 const token = sessionStorage.getItem("token");
                 if (token) {
                   localStorage.setItem("tab_sync_token", token);
-                  localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
-                  localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
+                  localStorage.setItem(
+                    "tab_sync_role",
+                    sessionStorage.getItem("role") || "",
+                  );
+                  localStorage.setItem(
+                    "tab_sync_user",
+                    sessionStorage.getItem("user") || "",
+                  );
                 }
               }
             }}
-            className={`w-full h-11 flex items-center justify-center rounded-xl text-[13px] font-black transition-all duration-150 cursor-pointer border ${
-              isSelected 
-                ? "bg-[#C9A84C] text-[#0A203E] border-[#C9A84C] hover:bg-[#b5953e] hover:scale-[1.02] shadow-md shadow-[#C9A84C]/25" 
-                : "border-2 border-[#0A203E]/20 text-[#0A203E] bg-white hover:bg-slate-50 hover:border-[#0A203E]/40"
-            }`}
+            className="w-full h-11 flex items-center justify-center rounded-xl text-[13px] font-black transition-all duration-150 cursor-pointer"
+            style={
+              isSelected
+                ? {
+                    background: GOLD,
+                    color: C.navy,
+                    border: `1px solid ${GOLD}`,
+                    boxShadow: `0 6px 16px -6px ${GOLD_30}`,
+                  }
+                : {
+                    border: `2px solid rgba(0,13,38,0.2)`,
+                    color: C.navy,
+                    background: C.white,
+                  }
+            }
           >
             {isSelected ? (
               <span className="flex items-center justify-center gap-2">
@@ -816,11 +1228,21 @@ function FareCard({ fare, cfg, isSelected, isPopular, onSelect, onViewFareRules,
         ) : (
           <button
             onClick={() => onSelect(fare)}
-            className={`w-full h-11 rounded-xl text-[13px] font-black transition-all duration-150 cursor-pointer border ${
-              isSelected 
-                ? "bg-[#C9A84C] text-[#0A203E] border-[#C9A84C] hover:bg-[#b5953e] hover:scale-[1.02] shadow-md shadow-[#C9A84C]/25" 
-                : "border-2 border-[#0A203E]/20 text-[#0A203E] bg-white hover:bg-slate-50 hover:border-[#0A203E]/40"
-            }`}
+            className="w-full h-11 rounded-xl text-[13px] font-black transition-all duration-150 cursor-pointer"
+            style={
+              isSelected
+                ? {
+                    background: GOLD,
+                    color: C.navy,
+                    border: `1px solid ${GOLD}`,
+                    boxShadow: `0 6px 16px -6px ${GOLD_30}`,
+                  }
+                : {
+                    border: `2px solid rgba(0,13,38,0.2)`,
+                    color: C.navy,
+                    background: C.white,
+                  }
+            }
           >
             {isSelected ? (
               <span className="flex items-center justify-center gap-2">
@@ -848,12 +1270,15 @@ export default function FareUpsellPage() {
 
   const isDomesticRT = localData?.type === "domesticRT";
 
-  const fareUpsellData = !isDomesticRT
-    ? stateData.fareUpsellData || localData.fareUpsellData
-    : null;
+  const rawFareUpsellData =
+    stateData.fareUpsellData || localData.fareUpsellData;
 
-  const onwardUpsell = isDomesticRT ? localData?.onward : null;
-  const returnUpsell = isDomesticRT ? localData?.return : null;
+  const fareUpsellData = isDomesticRT
+    ? rawFareUpsellData?.onward
+    : rawFareUpsellData;
+
+  const onwardUpsell = isDomesticRT ? rawFareUpsellData?.onward : null;
+  const returnUpsell = isDomesticRT ? rawFareUpsellData?.return : null;
   const searchPayload = stateData.searchPayload || localData.searchPayload;
   const journeyType = stateData.journeyType || localData.journeyType;
   const searchTraceId = stateData.traceId || localData.traceId;
@@ -943,7 +1368,7 @@ export default function FareUpsellPage() {
 
   const cabinOrder = ["Economy", "Premium Economy", "Business", "First"];
   const categories = useMemo(() => {
-    if (isInternationalRT) return ["Economy"]; // force single tab
+    if (isInternationalRT) return ["Economy"];
 
     const seen = new Set(allFares.map((f) => f.cabin));
     return cabinOrder.filter((c) => seen.has(c));
@@ -984,65 +1409,139 @@ export default function FareUpsellPage() {
     setCurrentIndex(0);
   }, [resolvedCat]);
 
-  // Route info — derived purely from allFares data
-  const routeInfo = useMemo(() => {
-    const first = allFares[0];
+  const buildRouteInfo = (fares) => {
+    const first = fares[0];
     if (!first) return {};
-    const segs = first.segments || [];
-    const origin = segs[0]?.Origin?.Airport;
-    const dest = segs[segs.length - 1]?.Destination?.Airport;
-    const airline = segs[0]?.Airline?.AirlineName;
-    const flightNos = segs
-      .map((s) => `${s.Airline?.AirlineCode || ""}${s.Airline?.FlightNumber || ""}`)
-      .join(" + ");
-    const depDate = segs[0]?.Origin?.DepTime
-      ? new Date(segs[0].Origin.DepTime).toLocaleDateString("en-IN", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "";
-    const aircraft = [
-      ...new Set(segs.map((s) => s.Craft).filter(Boolean)),
-    ].join(", ");
-    return { origin, dest, airline, flightNos, depDate, aircraft };
-  }, [allFares]);
 
-  const airlineRemark = allFares[0]?.airlineRemark || "";
-  const lastTicketDate = allFares[0]?.lastTicketDate
-    ? new Date(allFares[0].lastTicketDate).toLocaleDateString("en-IN", {
+    const allSegGroups = first.allSegments || [first.segments];
+
+    const routes = allSegGroups
+      .map((segs) => {
+        if (!segs || segs.length === 0) return null;
+        const origin = segs[0]?.Origin?.Airport;
+        const dest = segs[segs.length - 1]?.Destination?.Airport;
+        const airline = segs[0]?.Airline?.AirlineName;
+        const flightNos = segs
+          .map(
+            (s) =>
+              `${s.Airline?.AirlineCode || ""}${s.Airline?.FlightNumber || ""}`,
+          )
+          .join(" · ");
+        const depDate = segs[0]?.Origin?.DepTime
+          ? new Date(segs[0].Origin.DepTime).toLocaleDateString("en-IN", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "";
+        const aircraft = [
+          ...new Set(segs.map((s) => s.Craft).filter(Boolean)),
+        ].join(", ");
+        const routeLabel =
+          origin && dest ? `${origin.AirportCode}-${dest.AirportCode}` : "";
+        return {
+          origin,
+          dest,
+          airline,
+          flightNos,
+          depDate,
+          aircraft,
+          routeLabel,
+        };
+      })
+      .filter(Boolean);
+
+    if (routes.length === 0) return {};
+
+    const origin = routes[0].origin;
+    const dest = routes[0].dest;
+    const airline = [...new Set(routes.map((r) => r.airline))].join(" & ");
+    const flightNos = routes.map((r) => r.flightNos).join(" | ");
+    const depDate =
+      routes.length > 1
+        ? routes
+            .map((r, i) => `${i === 0 ? "Out" : "In"}: ${r.depDate}`)
+            .join(" · ")
+        : routes[0].depDate;
+    const aircraft = [...new Set(routes.flatMap((r) => r.aircraft.split(", ")))]
+      .filter(Boolean)
+      .join(", ");
+    const routeLabel = routes.map((r) => r.routeLabel).join(" | ");
+
+    return {
+      origin,
+      dest,
+      airline,
+      flightNos,
+      depDate,
+      aircraft,
+      routeLabel,
+      routes,
+    };
+  };
+
+  const routeInfo = useMemo(() => buildRouteInfo(allFares), [allFares]);
+  const onwardRouteInfo = useMemo(
+    () => buildRouteInfo(onwardFares),
+    [onwardFares],
+  );
+  const returnRouteInfo = useMemo(
+    () => buildRouteInfo(returnFares),
+    [returnFares],
+  );
+
+  // For domesticRT, use tab-specific route info; otherwise use allFares info
+  const activeRouteInfo = isDomesticRT
+    ? activeJourneyTab === "onward"
+      ? onwardRouteInfo
+      : returnRouteInfo
+    : routeInfo;
+
+  const airlineRemark =
+    (isDomesticRT ? activeFares[0] : allFares[0])?.airlineRemark || "";
+  const lastTicketDateSrc = (isDomesticRT ? activeFares[0] : allFares[0])
+    ?.lastTicketDate;
+  const lastTicketDate = lastTicketDateSrc
+    ? new Date(lastTicketDateSrc).toLocaleDateString("en-IN", {
         day: "numeric",
         month: "short",
         year: "numeric",
       })
     : "";
 
-  // Most popular: the second fare (index 1) per cabin (as in original)
   const popularIdx = 1;
 
   const [selectedOnwardFare, setSelectedOnwardFare] = useState(null);
   const [selectedReturnFare, setSelectedReturnFare] = useState(null);
 
   const totalRoundTripPrice = useMemo(() => {
-    return (selectedOnwardFare?.publishedFare || 0) + (selectedReturnFare?.publishedFare || 0);
-  }, [selectedOnwardFare, selectedReturnFare]);
+    const onwardFarePrice = selectedOnwardFare ? selectedOnwardFare.publishedFare : (onwardFares[0]?.publishedFare || 0);
+    const returnFarePrice = selectedReturnFare ? selectedReturnFare.publishedFare : (returnFares[0]?.publishedFare || 0);
+    
+    return onwardFarePrice + returnFarePrice;
+  }, [selectedOnwardFare, selectedReturnFare, onwardFares, returnFares]);
 
   function handleSelect(fare) {
     if (!isDomesticRT) {
-      // For non-domestic RT, navigate to booking details page
       const isInternational = isInternationalFlight(fare.rawResult);
-      const journeyType = activeJourneyType || 1; // 1 = one-way, 2 = round-trip
-      
-      const bookingPath = journeyType === 2 
-        ? "/round-trip-flight/booking"
-        : "/one-way-flight/booking";
-      
+      const journeyType = activeJourneyType || 1;
+
+      const bookingPath =
+        journeyType === 2
+          ? "/round-trip-flight/booking"
+          : "/one-way-flight/booking";
+
       navigate(bookingPath, {
         state: {
           selectedFlight: fare.rawResult,
           rawFlightData: fare.rawResult,
-          searchParams: { traceId, passengers: getPassengerCounts(searchPayload) },
+          traceId, 
+          resultIndex: fare.rawResult.ResultIndex,
+          searchParams: {
+            traceId,
+            passengers: getPassengerCounts(searchPayload),
+          },
           tripType: journeyType === 2 ? "round-trip" : "one-way",
           isInternational,
         },
@@ -1061,8 +1560,20 @@ export default function FareUpsellPage() {
     setSelectedFareForRules(fare);
     setShowFareRulesModal(true);
     setIsFetchingRules(true);
+
+    let rIdx = fare.rawResult.ResultIndex;
+    if (isDomesticRT) {
+      if (activeJourneyTab === "onward") {
+        rIdx = `${fare.rawResult.ResultIndex},${selectedReturnFare?.rawResult?.ResultIndex}`;
+      } else {
+        rIdx = `${selectedOnwardFare?.rawResult?.ResultIndex},${fare.rawResult.ResultIndex}`;
+      }
+    }
+
     try {
-      const response = await dispatch(getFareRule({ traceId, resultIndex: fare.rawResult.ResultIndex })).unwrap();
+      const response = await dispatch(
+        getFareRule({ traceId, resultIndex: rIdx }),
+      ).unwrap();
       const rawRules = response?.Response?.FareRules;
       if (rawRules) {
         setFareRulesData(processFareRulesData(rawRules));
@@ -1085,403 +1596,767 @@ export default function FareUpsellPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100/60 font-sans">
+    <div className="min-h-screen font-sans" style={{ background: HERO_SPLIT }}>
       <LandingHeader />
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Back */}
-        {/* <button
-          onClick={() => navigate(-1)}
-          className="mb-5 flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-slate-800 transition-colors group"
+      {/* ── Full-width Flight header ── */}
+      <div
+        className="w-full px-4 sm:px-8 py-5 sm:py-6 text-white"
+        style={{
+          background: `linear-gradient(135deg, ${HERO_TOP} 0%, ${C.navyDeep} 55%, ${C.navyDark} 100%)`,
+          borderBottom: `1px solid ${WHITE_10}`,
+        }}
+      >
+        <div
+          className="max-w-7xl mx-auto flex flex-wrap items-start justify-between gap-4 pb-5"
+          style={{ borderBottom: `1px solid ${WHITE_10}` }}
         >
-          <span className="size-7 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-slate-300 shadow-sm transition-colors">
-            <MdArrowBack size={15} />
-          </span>
-          Back to results
-        </button> */}
-
-        {/* Card shell */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
-          {/* ── Flight header ── */}
-          <div className="px-6 py-6 bg-[#0A203E] text-white border-b border-[#0A203E]/95">
-            <div className="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-white/10">
-              {/* Route */}
-              <div className="text-left">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#C9A84C] mb-3">
-                  Select your fare
-                </p>
-                {routeInfo.origin && (
-                  <div className="flex items-center gap-3">
+          {/* Route */}
+          <div className="text-left">
+            <p
+              className="text-[10px] font-extrabold uppercase tracking-[0.12em] mb-3"
+              style={{ color: GOLD }}
+            >
+              Select your fare
+            </p>
+            {activeRouteInfo.routes && activeRouteInfo.routes.length > 1 ? (
+              <div className="flex flex-col gap-4">
+                {activeRouteInfo.routes.map((rt, i) => (
+                  <div key={i} className="flex items-center gap-2 sm:gap-3">
                     <div className="text-left">
-                      <p className="text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
-                        {routeInfo.origin.AirportCode}
+                      <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
+                        {rt.origin?.AirportCode}
                       </p>
-                      <p className="text-[11px] text-slate-300 mt-0.5">
-                        {routeInfo.origin.CityName},{" "}
-                        {routeInfo.origin.CountryCode}
+                      <p
+                        className="text-[11px] mt-0.5"
+                        style={{ color: WHITE_60 }}
+                      >
+                        {rt.origin?.CityName}, {rt.origin?.CountryCode}
                       </p>
                     </div>
-                    <MdFlightTakeoff
-                      size={20}
-                      className="text-[#C9A84C] mx-1 animate-pulse"
-                    />
+                    {i === 0 ? (
+                      <MdFlightTakeoff
+                        size={18}
+                        className="mx-1 animate-pulse"
+                        style={{ color: GOLD }}
+                      />
+                    ) : (
+                      <MdFlightTakeoff
+                        size={18}
+                        className="mx-1 animate-pulse"
+                        style={{ color: GOLD, transform: "scaleX(-1)" }}
+                      />
+                    )}
                     <div className="text-left">
-                      <p className="text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
-                        {routeInfo.dest?.AirportCode}
+                      <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
+                        {rt.dest?.AirportCode}
                       </p>
-                      <p className="text-[11px] text-slate-300 mt-0.5">
-                        {routeInfo.dest?.CityName},{" "}
-                        {routeInfo.dest?.CountryCode}
+                      <p
+                        className="text-[11px] mt-0.5"
+                        style={{ color: WHITE_60 }}
+                      >
+                        {rt.dest?.CityName}, {rt.dest?.CountryCode}
                       </p>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
-
-              {/* Meta pills */}
-              {routeInfo.origin && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {routeInfo.airline && (
-                    <span className="text-[11px] font-semibold text-white bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
-                      {routeInfo.airline}
-                    </span>
-                  )}
-                  {routeInfo.flightNos && (
-                    <span className="text-[11px] font-mono text-white bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
-                      {routeInfo.flightNos}
-                    </span>
-                  )}
-                  {routeInfo.aircraft && (
-                    <span className="text-[11px] text-slate-200 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-                      {routeInfo.aircraft}
-                    </span>
-                  )}
-                  {routeInfo.depDate && (
-                    <span
-                      className="text-[11px] font-black px-3 py-1.5 rounded-full border bg-[#C9A84C]/10 border-[#C9A84C]/30 text-[#C9A84C]"
+            ) : (
+              activeRouteInfo.origin && (
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="text-left">
+                    <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
+                      {activeRouteInfo.origin.AirportCode}
+                    </p>
+                    <p
+                      className="text-[11px] mt-0.5"
+                      style={{ color: WHITE_60 }}
                     >
-                      {routeInfo.depDate}
-                    </span>
-                  )}
-                  {lastTicketDate && (
-                    <span className="text-[11px] text-slate-300 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-                      Last ticket:{" "}
-                      <span className="font-semibold text-[#C9A84C]">
-                        {lastTicketDate}
-                      </span>
-                    </span>
-                  )}
+                      {activeRouteInfo.origin.CityName},{" "}
+                      {activeRouteInfo.origin.CountryCode}
+                    </p>
+                  </div>
+                  <MdFlightTakeoff
+                    size={18}
+                    className="mx-1 animate-pulse"
+                    style={{ color: GOLD }}
+                  />
+                  <div className="text-left">
+                    <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-tight leading-none">
+                      {activeRouteInfo.dest?.AirportCode}
+                    </p>
+                    <p
+                      className="text-[11px] mt-0.5"
+                      style={{ color: WHITE_60 }}
+                    >
+                      {activeRouteInfo.dest?.CityName},{" "}
+                      {activeRouteInfo.dest?.CountryCode}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Segment timing row */}
-            {allFares[0] && <SegmentRow segments={allFares[0].segments} />}
+              )
+            )}
           </div>
 
-          {/* Airline remark */}
-          {airlineRemark && (
-            <div className="mx-6 mt-4 flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400 rounded-xl">
-              <MdInfo className="text-amber-500 shrink-0 mt-0.5" size={16} />
-              <p className="text-[11.5px] text-amber-800 leading-relaxed">
-                {(() => {
-                  const remark = airlineRemark || "";
-                  return remark.replace(/(.+?)\1{3,}/g, "$1");
-                })()}
+          {/* Meta pills */}
+          {activeRouteInfo.origin && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {activeRouteInfo.airline && (
+                <span
+                  className="text-[11px] font-semibold text-white px-3 py-1.5 rounded-full"
+                  style={{
+                    background: WHITE_10,
+                    border: `1px solid ${WHITE_20}`,
+                  }}
+                >
+                  {activeRouteInfo.airline}
+                </span>
+              )}
+              {activeRouteInfo.flightNos && (
+                <span
+                  className="text-[11px] font-mono text-white px-3 py-1.5 rounded-full"
+                  style={{
+                    background: WHITE_10,
+                    border: `1px solid ${WHITE_20}`,
+                  }}
+                >
+                  {activeRouteInfo.flightNos}
+                </span>
+              )}
+              {activeRouteInfo.aircraft && (
+                <span
+                  className="text-[11px] px-3 py-1.5 rounded-full"
+                  style={{
+                    color: WHITE_60,
+                    background: WHITE_5,
+                    border: `1px solid ${WHITE_10}`,
+                  }}
+                >
+                  {activeRouteInfo.aircraft}
+                </span>
+              )}
+              {activeRouteInfo.depDate && (
+                <span
+                  className="text-[11px] font-black px-3 py-1.5 rounded-full"
+                  style={{
+                    color: GOLD,
+                    background: GOLD_10,
+                    border: `1px solid ${GOLD_30}`,
+                  }}
+                >
+                  {activeRouteInfo.depDate}
+                </span>
+              )}
+              {lastTicketDate && (
+                <span
+                  className="text-[11px] px-3 py-1.5 rounded-full"
+                  style={{
+                    color: WHITE_60,
+                    background: WHITE_5,
+                    border: `1px solid ${WHITE_10}`,
+                  }}
+                >
+                  Last ticket:{" "}
+                  <span className="font-semibold" style={{ color: GOLD }}>
+                    {lastTicketDate}
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Segment timing row */}
+        {activeFares[0] && (
+          <div className="max-w-7xl mx-auto pt-4">
+            <SegmentRow segments={activeFares[0].segments} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Content area ── */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Airline remark */}
+        {airlineRemark && (
+          <div
+            className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl"
+            style={{
+              background: GOLD_10,
+              border: `1px solid ${GOLD_30}`,
+              borderLeft: `4px solid ${GOLD}`,
+            }}
+          >
+            <MdInfo
+              className="shrink-0 mt-0.5"
+              size={16}
+              style={{ color: GOLD }}
+            />
+            <p
+              className="text-[11.5px] leading-relaxed"
+              style={{ color: "#7a611f" }}
+            >
+              {(() => {
+                const remark = airlineRemark || "";
+                return remark.replace(/(.+?)\1{3,}/g, "$1");
+              })()}
+            </p>
+          </div>
+        )}
+
+        {/* ── Journey Tabs (Onward / Return) ── */}
+        {activeJourneyType === 2 && isDomesticRT && (
+          <div className="mb-1">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveJourneyTab("onward")}
+                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer"
+                style={
+                  activeJourneyTab === "onward"
+                    ? {
+                        background: C.navy,
+                        color: C.white,
+                        border: `1px solid ${C.navy}`,
+                        boxShadow: "0 8px 18px -8px rgba(0,13,38,0.4)",
+                      }
+                    : {
+                        background: C.white,
+                        color: C.muted,
+                        border: `1px solid ${C.border}`,
+                      }
+                }
+              >
+                <MdFlightTakeoff size={14} />
+                <span className="font-mono font-black tracking-widest">
+                  {onwardRouteInfo.routeLabel || "Onward"}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveJourneyTab("return")}
+                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer"
+                style={
+                  activeJourneyTab === "return"
+                    ? {
+                        background: C.navy,
+                        color: C.white,
+                        border: `1px solid ${C.navy}`,
+                        boxShadow: "0 8px 18px -8px rgba(0,13,38,0.4)",
+                      }
+                    : {
+                        background: C.white,
+                        color: C.muted,
+                        border: `1px solid ${C.border}`,
+                      }
+                }
+              >
+                <MdFlight size={14} style={{ transform: "rotate(180deg)" }} />
+                <span className="font-mono font-black tracking-widest">
+                  {returnRouteInfo.routeLabel || "Return"}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Cabin tabs ── */}
+        {!isInternationalRT && categories.length > 1 && (
+          <div className="pt-4">
+            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
+              {categories.map((cat) => {
+                const isActive = resolvedCat === cat;
+                const catCfg = CABIN_CFG[cat] || CABIN_CFG.Economy;
+                const count = allFares.filter((f) => f.cabin === cat).length;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCat(cat)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold transition-all whitespace-nowrap"
+                    style={
+                      isActive
+                        ? cat === "Premium Economy" || cat === "First"
+                          ? {
+                              background: GOLD,
+                              color: C.navy,
+                              border: "1px solid transparent",
+                              boxShadow: `0 8px 18px -8px ${GOLD_30}`,
+                            }
+                          : {
+                              background: C.navy,
+                              color: cat === "Business" ? GOLD : C.white,
+                              border:
+                                cat === "Business"
+                                  ? `1px solid ${GOLD_30}`
+                                  : "1px solid transparent",
+                              boxShadow: "0 8px 18px -8px rgba(0,13,38,0.4)",
+                            }
+                        : {
+                            color: C.muted,
+                            border: `1px solid ${C.border}`,
+                            background: C.white,
+                          }
+                    }
+                  >
+                    {tabIcons[cat]}
+                    {cat}
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                      style={
+                        isActive
+                          ? { background: "rgba(255,255,255,0.25)" }
+                          : { background: C.lightGray, color: C.muted }
+                      }
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Fare cards ── */}
+        <div className="py-4 sm:py-6">
+          {catFares.length === 0 ? (
+            <div className="py-20 text-center">
+              <MdFlight className="mx-auto mb-3 text-slate-300" size={48} />
+              <p className="font-bold text-slate-400 text-lg">
+                No fares available for {resolvedCat}
+              </p>
+              <p className="text-sm mt-1 text-slate-400">
+                Please select a different cabin class.
               </p>
             </div>
-          )}
-
-          {/* ── Journey Tabs (Onward / Return) ── */}
-          {activeJourneyType === 2 && (
-            <div className="px-6 pt-5">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActiveJourneyTab("onward")}
-                  className={`px-6 py-2.5 rounded-xl text-sm font-black border transition-all cursor-pointer uppercase tracking-wider ${
-                    activeJourneyTab === "onward"
-                      ? "bg-[#0A203E] text-white border-[#0A203E] shadow-lg"
-                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  ✈️ Onward
-                </button>
-
-                <button
-                  onClick={() => setActiveJourneyTab("return")}
-                  className={`px-6 py-2.5 rounded-xl text-sm font-black border transition-all cursor-pointer uppercase tracking-wider ${
-                    activeJourneyTab === "return"
-                      ? "bg-[#0A203E] text-white border-[#0A203E] shadow-lg"
-                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  🔁 Return
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Cabin tabs ── */}
-          {!isInternationalRT && categories.length > 1 && (
-            <div className="px-6 pt-5">
-              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
-                {categories.map((cat) => {
-                  const isActive = resolvedCat === cat;
-                  const catCfg = CABIN_CFG[cat] || CABIN_CFG.Economy;
-                  const count = allFares.filter((f) => f.cabin === cat).length;
+          ) : (
+            <div className="relative">
+              <div
+                className="grid gap-4"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(visibleFares.length, 4)}, minmax(240px, 320px))`,
+                  justifyContent: visibleFares.length < 3 ? "start" : "stretch",
+                }}
+              >
+                {visibleFares.map((fare, idx) => {
+                  const globalIdx = currentIndex + idx;
+                  const isSelected = isDomesticRT
+                    ? (activeJourneyTab === "onward" 
+                        ? (selectedOnwardFare?.id === fare.id || selectedOnwardFare?.ResultIndex === fare.id || selectedOnwardFare?.rawResult?.ResultIndex === fare.rawResult?.ResultIndex)
+                        : (selectedReturnFare?.id === fare.id || selectedReturnFare?.ResultIndex === fare.id || selectedReturnFare?.rawResult?.ResultIndex === fare.rawResult?.ResultIndex))
+                    : (selectedFareFamily?.id === fare.id ||
+                      selectedFareFamily?.ResultIndex === fare.id);
                   return (
-                    <button
-                      key={cat}
-                      onClick={() => setActiveCat(cat)}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold border transition-all whitespace-nowrap ${
-                        isActive ? catCfg.tabActive : catCfg.tabIdle
-                      }`}
-                    >
-                      {tabIcons[cat]}
-                      {cat}
-                      <span
-                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                          isActive
-                            ? "bg-white/25"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
+                    <FareCard
+                      key={fare.id}
+                      fare={fare}
+                      cfg={cfg}
+                      isSelected={isSelected}
+                      isPopular={globalIdx === popularIdx}
+                      onSelect={handleSelect}
+                      onViewFareRules={handleViewFareRules}
+                      journeyTab={activeJourneyTab}
+                      bookingPath={
+                        !isDomesticRT
+                          ? activeJourneyType === 2
+                            ? "/round-trip-flight/booking"
+                            : "/one-way-flight/booking"
+                          : null
+                      }
+                      bookingPayload={
+                        !isDomesticRT
+                          ? {
+                              selectedFlight: fare.rawResult,
+                              rawFlightData: fare.rawResult,
+                              traceId, 
+                              resultIndex: fare.rawResult.ResultIndex,
+                              searchParams: {
+                                traceId,
+                                passengers: getPassengerCounts(searchPayload),
+                              },
+                              tripType:
+                                activeJourneyType === 2
+                                  ? "round-trip"
+                                  : "one-way",
+                              isInternational: isInternationalFlight(
+                                fare.rawResult,
+                              ),
+                            }
+                          : null
+                      }
+                    />
                   );
                 })}
               </div>
-            </div>
-          )}
 
-          {/* ── Fare cards ── */}
-          <div className="p-6">
-            {catFares.length === 0 ? (
-              <div className="py-20 text-center">
-                <MdFlight className="mx-auto mb-3 text-slate-300" size={48} />
-                <p className="font-bold text-slate-400 text-lg">
-                  No fares available for {resolvedCat}
-                </p>
-                <p className="text-sm mt-1 text-slate-400">
-                  Please select a different cabin class.
-                </p>
-              </div>
-            ) : (
-              <div className="relative">
-                <div
-                  className="grid gap-4"
-                  style={{
-                    gridTemplateColumns: `repeat(${Math.min(CARDS_PER_VIEW, visibleFares.length)}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {visibleFares.map((fare, idx) => {
-                    const globalIdx = currentIndex + idx;
-                    const isSelected =
-                      selectedFareFamily?.id === fare.id ||
-                      selectedFareFamily?.ResultIndex === fare.id;
-                    return (
-                      <FareCard
-                        key={fare.id}
-                        fare={fare}
-                        cfg={cfg}
-                        isSelected={isSelected}
-                        isPopular={globalIdx === popularIdx}
-                        onSelect={handleSelect}
-                        onViewFareRules={handleViewFareRules}
-                        journeyTab={activeJourneyTab}
-                        bookingPath={!isDomesticRT ? (activeJourneyType === 2 ? "/round-trip-flight/booking" : "/one-way-flight/booking") : null}
-                        bookingPayload={!isDomesticRT ? {
-                          selectedFlight: fare.rawResult,
-                          rawFlightData: fare.rawResult,
-                          searchParams: { traceId, passengers: getPassengerCounts(searchPayload) },
-                          tripType: activeJourneyType === 2 ? "round-trip" : "one-way",
-                          isInternational: isInternationalFlight(fare.rawResult),
-                        } : null}
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* Carousel nav */}
-                {totalCards > CARDS_PER_VIEW && (
-                  <>
+              {/* Carousel nav */}
+              {totalCards > CARDS_PER_VIEW && (
+                <>
+                  <button
+                    onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
+                    disabled={!canScrollPrev}
+                    className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-5 w-10 h-10 rounded-full shadow-lg items-center justify-center transition-all z-10 cursor-pointer"
+                    style={
+                      canScrollPrev
+                        ? {
+                            background: C.navy,
+                            border: `1px solid ${C.navy}`,
+                            color: C.white,
+                          }
+                        : {
+                            background: C.lightGray,
+                            border: `1px solid ${C.border}`,
+                            color: "#cbd5e1",
+                            cursor: "not-allowed",
+                            opacity: 0.4,
+                          }
+                    }
+                  >
+                    <MdChevronLeft size={24} />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentIndex((p) => Math.min(maxIndex, p + 1))
+                    }
+                    disabled={!canScrollNext}
+                    className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-5 w-10 h-10 rounded-full shadow-lg items-center justify-center transition-all z-10 cursor-pointer"
+                    style={
+                      canScrollNext
+                        ? {
+                            background: C.navy,
+                            border: `1px solid ${C.navy}`,
+                            color: C.white,
+                          }
+                        : {
+                            background: C.lightGray,
+                            border: `1px solid ${C.border}`,
+                            color: "#cbd5e1",
+                            cursor: "not-allowed",
+                            opacity: 0.4,
+                          }
+                    }
+                  >
+                    <MdChevronRight size={24} />
+                  </button>
+                  {/* Mobile nav row */}
+                  <div className="sm:hidden flex items-center justify-center gap-3 mt-4">
                     <button
                       onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
                       disabled={!canScrollPrev}
-                      className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-5 w-10 h-10 rounded-full border shadow-lg flex items-center justify-center transition-all z-10 cursor-pointer ${
+                      className="w-9 h-9 rounded-full flex items-center justify-center"
+                      style={
                         canScrollPrev
-                          ? "bg-[#0A203E] border-[#0A203E] text-white hover:bg-[#1a3a5a] hover:scale-105"
-                          : "bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40"
-                      }`}
+                          ? { background: C.navy, color: C.white }
+                          : { background: C.lightGray, color: "#cbd5e1" }
+                      }
                     >
-                      <MdChevronLeft size={24} />
+                      <MdChevronLeft size={20} />
                     </button>
                     <button
                       onClick={() =>
                         setCurrentIndex((p) => Math.min(maxIndex, p + 1))
                       }
                       disabled={!canScrollNext}
-                      className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-5 w-10 h-10 rounded-full border shadow-lg flex items-center justify-center transition-all z-10 cursor-pointer ${
+                      className="w-9 h-9 rounded-full flex items-center justify-center"
+                      style={
                         canScrollNext
-                          ? "bg-[#0A203E] border-[#0A203E] text-white hover:bg-[#1a3a5a] hover:scale-105"
-                          : "bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40"
-                      }`}
+                          ? { background: C.navy, color: C.white }
+                          : { background: C.lightGray, color: "#cbd5e1" }
+                      }
                     >
-                      <MdChevronRight size={24} />
+                      <MdChevronRight size={20} />
                     </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {isDomesticRT && (
-              <div className="mt-6 p-5 bg-[#0a203e]/5 border border-[#0a203e]/10 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Combined Fare</span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl font-black text-[#0A203E]">
-                      {fmt(totalRoundTripPrice)}
-                    </span>
-                    <span className="text-xs text-slate-500 font-medium">for 1 traveler</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Onward: <span className="font-semibold text-slate-700">{selectedOnwardFare ? fmt(selectedOnwardFare.publishedFare) : "Not selected"}</span> · Return: <span className="font-semibold text-slate-700">{selectedReturnFare ? fmt(selectedReturnFare.publishedFare) : "Not selected"}</span>
-                  </p>
-                </div>
-                <a
-                  href={(!selectedOnwardFare || !selectedReturnFare) ? "#" : "/round-trip-flight/booking"}
-                  target={(!selectedOnwardFare || !selectedReturnFare) ? "_self" : "_blank"}
-                  rel="noreferrer"
-                  onClick={(e) => {
-                    if (!selectedOnwardFare || !selectedReturnFare) {
-                      e.preventDefault();
-                      return;
-                    }
-                    const stateObj = {
-                      onward: {
-                        ...selectedOnwardFare.rawResult,
-                        ResultIndex: selectedOnwardFare.ResultIndex,
-                      },
-                      return: {
-                        ...selectedReturnFare.rawResult,
-                        ResultIndex: selectedReturnFare.ResultIndex,
-                      },
-                      traceId,
-                      journeyType: 2,
-                    };
-                    localStorage.setItem("flightBookingState", JSON.stringify(stateObj));
-                    
-                    const token = sessionStorage.getItem("token");
-                    if (token) {
-                      localStorage.setItem("tab_sync_token", token);
-                      localStorage.setItem("tab_sync_role", sessionStorage.getItem("role") || "");
-                      localStorage.setItem("tab_sync_user", sessionStorage.getItem("user") || "");
-                    }
-                  }}
-                  className={`flex items-center justify-center px-8 h-13 font-black rounded-xl uppercase tracking-widest transition-all cursor-pointer ${
-                    (!selectedOnwardFare || !selectedReturnFare)
-                      ? "bg-slate-100 text-slate-400 shadow-none pointer-events-none"
-                      : "bg-[#C9A84C] text-[#0A203E] shadow-xl hover:bg-[#b5953e] hover:scale-[1.02]"
-                  }`}
-                >
-                  Continue with Selected Fares
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* ── Footer legend ── */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-5">
-              <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                <span className="inline-flex items-center justify-center size-4 rounded-full bg-emerald-100">
-                  <MdCheck size={10} className="text-emerald-600" />
-                </span>
-                Included free
-              </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                <span className="inline-flex items-center justify-center size-4 rounded-full bg-amber-100">
-                  <MdCurrencyRupee size={9} className="text-amber-600" />
-                </span>
-                Chargeable
-              </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                <span className="inline-flex items-center justify-center size-4">
-                  <MdRemove size={13} className="text-slate-300" />
-                </span>
-                Not available
-              </span>
-            </div>
-            <p className="text-[10.5px] text-slate-400">
-              All prices per person · inclusive of taxes & fees
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Fare Rules Modal */}
-      {showFareRulesModal && createPortal(
-        <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-          onClick={() => setShowFareRulesModal(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-[20px] font-black text-[#0A203E]">Fare Rules</h3>
-                <p className="text-[13px] text-slate-500 font-medium mt-0.5">{selectedFareForRules?.fareFamilyName} · {selectedFareForRules?.cabin}</p>
-              </div>
-              <button 
-                onClick={() => setShowFareRulesModal(false)} 
-                className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
-              >
-                <MdClose size={20} />
-              </button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto bg-slate-50">
-              {isFetchingRules ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <MdLoop className="animate-spin text-[#C9A84C] text-4xl mb-4" />
-                  <p className="text-slate-600 font-medium">Fetching fare rules...</p>
-                </div>
-              ) : fareRulesData && fareRulesData.length > 0 ? (
-                <div className="space-y-8">
-                  {fareRulesData.map((rule, idx) => (
-                    <div key={idx}>
-                      {fareRulesData.length > 1 && (
-                        <div className="flex items-center gap-3 mb-6 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                          <div className="w-8 h-8 rounded-lg bg-[#0A203E] flex items-center justify-center shrink-0">
-                            <MdFlight size={16} className="text-white transform rotate-90" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-black text-[#0A203E] uppercase tracking-wider">
-                              {rule.origin} to {rule.destination}
-                            </h4>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
-                              {rule.airline} • {rule.fareType || "Standard Fare"}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      <FareRulesRenderer rule={rule} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-20 text-slate-500">
-                  <p className="font-bold">No fare rules available</p>
-                </div>
+                </>
               )}
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          )}
+
+          {isDomesticRT && (
+            <div
+              className="mt-6 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4"
+              style={{
+                background: "rgba(0,13,38,0.04)",
+                border: `1px solid rgba(0,13,38,0.08)`,
+              }}
+            >
+              <div className="flex flex-col text-left">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: C.muted }}
+                >
+                  Total Combined Fare
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span
+                    className="text-2xl font-black"
+                    style={{ color: C.navy }}
+                  >
+                    {fmt(totalRoundTripPrice)}
+                  </span>
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: C.muted }}
+                  >
+                    for 1 traveler
+                  </span>
+                </div>
+                <p className="text-[11px] mt-1" style={{ color: C.muted }}>
+                  Onward:{" "}
+                  <span className="font-semibold text-slate-700">
+                    {fmt(selectedOnwardFare ? selectedOnwardFare.publishedFare : (onwardFares[0]?.publishedFare || 0))}
+                  </span>{" "}
+                  · Return:{" "}
+                  <span className="font-semibold text-slate-700">
+                    {fmt(selectedReturnFare ? selectedReturnFare.publishedFare : (returnFares[0]?.publishedFare || 0))}
+                  </span>
+                </p>
+              </div>
+              <a
+                href="/round-trip-flight/booking"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  const finalOnward = selectedOnwardFare || onwardFares[0];
+                  const finalReturn = selectedReturnFare || returnFares[0];
+
+                  if (!finalOnward || !finalReturn) {
+                    e.preventDefault();
+                    return;
+                  }
+                  const stateObj = {
+                    rawFlightData: {
+                      onward: finalOnward.rawResult,
+                      return: finalReturn.rawResult,
+                    },
+                    traceId,
+                    journeyType: 2,
+                    passengers: getPassengerCounts(searchPayload),
+                  };
+                  localStorage.setItem(
+                    "flightBookingState",
+                    JSON.stringify(stateObj),
+                  );
+
+                  const token = sessionStorage.getItem("token");
+                  if (token) {
+                    localStorage.setItem("tab_sync_token", token);
+                    localStorage.setItem(
+                      "tab_sync_role",
+                      sessionStorage.getItem("role") || "",
+                    );
+                    localStorage.setItem(
+                      "tab_sync_user",
+                      sessionStorage.getItem("user") || "",
+                    );
+                  }
+                }}
+                className="w-full md:w-auto flex items-center justify-center px-8 h-13 font-black rounded-xl uppercase tracking-widest transition-all cursor-pointer"
+                style={{
+                  background: GOLD,
+                  color: C.navy,
+                  boxShadow: `0 16px 30px -12px ${GOLD_30}`,
+                }}
+              >
+                Continue to Booking
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Footer legend ── */}
+      <div
+        className="py-4 flex flex-wrap items-center justify-between gap-3 border-t"
+        style={{ borderColor: C.border }}
+      >
+        <div className="flex flex-wrap items-center gap-5">
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-medium"
+            style={{ color: C.muted }}
+          >
+            <span className="inline-flex items-center justify-center size-4 rounded-full bg-emerald-100">
+              <MdCheck size={10} className="text-emerald-600" />
+            </span>
+            Included free
+          </span>
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-medium"
+            style={{ color: C.muted }}
+          >
+            <span
+              className="inline-flex items-center justify-center size-4 rounded-full"
+              style={{ background: GOLD_10 }}
+            >
+              <MdCurrencyRupee size={9} style={{ color: GOLD }} />
+            </span>
+            Chargeable
+          </span>
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-medium"
+            style={{ color: C.muted }}
+          >
+            <span className="inline-flex items-center justify-center size-4">
+              <MdRemove size={13} className="text-slate-300" />
+            </span>
+            Not available
+          </span>
+        </div>
+        <p className="text-[10.5px]" style={{ color: "#94a3b8" }}>
+          All prices per person · inclusive of taxes & fees
+        </p>
+      </div>
+
+      {/* Fare Rules Modal */}
+      {showFareRulesModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm"
+            style={{ background: "rgba(0,13,38,0.6)" }}
+            onClick={() => setShowFareRulesModal(false)}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="p-5 flex items-center justify-between shrink-0"
+                style={{ borderBottom: `1px solid ${C.border}` }}
+              >
+                <div>
+                  <h3
+                    className="text-[20px] font-black"
+                    style={{ color: C.navy }}
+                  >
+                    Fare Rules
+                  </h3>
+                  <p
+                    className="text-[13px] font-medium mt-0.5"
+                    style={{ color: C.muted }}
+                  >
+                    {selectedFareForRules?.fareFamilyName} ·{" "}
+                    {selectedFareForRules?.cabin}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowFareRulesModal(false)}
+                  className="size-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ background: C.lightGray, color: C.muted }}
+                >
+                  <MdClose size={20} />
+                </button>
+              </div>
+
+              <div
+                className="p-5 overflow-y-auto"
+                style={{ background: C.offWhite }}
+              >
+                {isFetchingRules ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <MdLoop
+                      className="animate-spin text-4xl mb-4"
+                      style={{ color: GOLD }}
+                    />
+                    <p className="font-medium" style={{ color: C.muted }}>
+                      Fetching fare rules...
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {selectedFareForRules?.allMiniRules?.map(
+                      (miniGroup, mIdx) => {
+                        if (!miniGroup || miniGroup.length === 0) return null;
+                        return (
+                          <div
+                            key={`mini-${mIdx}`}
+                            className="bg-white p-4 rounded-xl shadow-sm border border-slate-200"
+                          >
+                            <div className="flex items-center gap-2 mb-3">
+                              <div
+                                className="size-8 rounded-lg flex items-center justify-center shrink-0"
+                                style={{ background: GOLD_10 }}
+                              >
+                                <MdInfo size={18} style={{ color: GOLD }} />
+                              </div>
+                              <span className="text-[14px] font-black uppercase tracking-widest text-slate-700">
+                                Quick Rules: {miniGroup[0]?.points || "Journey"}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {miniGroup.map((rule, rIdx) => (
+                                <div
+                                  key={rIdx}
+                                  className="flex justify-between items-center text-sm py-2 border-b border-slate-100 last:border-0"
+                                >
+                                  <span className="font-semibold text-slate-600">
+                                    {rule.type}
+                                  </span>
+                                  <span className="font-bold text-slate-800">
+                                    {rule.details}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
+
+                    {fareRulesData && fareRulesData.length > 0 ? (
+                      fareRulesData.map((rule, idx) => (
+                        <div key={`detailed-${idx}`}>
+                          {fareRulesData.length > 1 && (
+                            <div
+                              className="flex items-center gap-3 mb-6 p-3 rounded-xl shadow-sm"
+                              style={{
+                                background: C.white,
+                                border: `1px solid ${C.border}`,
+                              }}
+                            >
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                                style={{ background: C.navy }}
+                              >
+                                <MdFlight
+                                  size={16}
+                                  className="text-white transform rotate-90"
+                                />
+                              </div>
+                              <div>
+                                <h4
+                                  className="text-sm font-black uppercase tracking-wider"
+                                  style={{ color: C.navy }}
+                                >
+                                  {rule.origin} to {rule.destination}
+                                </h4>
+                                <p
+                                  className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                                  style={{ color: C.muted }}
+                                >
+                                  {rule.airline} •{" "}
+                                  {rule.fareType || "Standard Fare"}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          <FareRulesRenderer rule={rule} />
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        className="text-center py-10"
+                        style={{ color: C.muted }}
+                      >
+                        <p className="font-bold">
+                          No detailed fare rules available
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

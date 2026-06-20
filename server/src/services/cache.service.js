@@ -1,7 +1,7 @@
 const redis = require("../config/redis");
 const logger = require("../utils/logger");
 
-const DEFAULT_SEARCH_CACHE_TTL_SECONDS = 600;
+const DEFAULT_SEARCH_CACHE_TTL_SECONDS = 900;
 const REFRESH_THRESHOLD_SECONDS = 120;
 const REFRESH_LOCK_TTL_SECONDS = 90;
 

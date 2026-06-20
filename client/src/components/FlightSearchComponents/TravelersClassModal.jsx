@@ -26,7 +26,6 @@ export default function TravelersClassModal({
   },
 }) {
   const modalRef = useRef(null);
-  const [isMobile, setIsMobile] = useState(false);
 
   const [counts, setCounts] = useState({
     adults: initialData.passengers?.adults ?? 1,
@@ -38,14 +37,6 @@ export default function TravelersClassModal({
     initialData.travelClass || "Economy",
   );
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 640);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (modalRef.current && !modalRef.current.contains(e.target)) {
@@ -139,8 +130,7 @@ export default function TravelersClassModal({
   );
 
   const combinedStyle = {
-    position: isMobile ? undefined : "absolute",
-    right: isMobile ? undefined : 0,
+    position: "absolute",
     ...style,
     ...(modalPosition || {}),
   };
@@ -148,8 +138,8 @@ export default function TravelersClassModal({
   const content = (
     <div
       ref={modalRef}
-      className={`${className} bg-white rounded-t-[2rem] sm:rounded-[1.5rem] shadow-[0_32px_80px_rgba(0,0,0,0.3)] border border-slate-100 overflow-hidden flex flex-col w-full sm:w-[580px] max-w-[95vw] animate-premium-pop origin-top-right transition-all duration-300`}
-      style={isMobile ? {} : combinedStyle}
+      className={`${className} bg-white rounded-xl sm:rounded-[1.5rem] shadow-[0_32px_80px_rgba(0,0,0,0.3)] border border-slate-100 overflow-hidden flex flex-col w-[85vw] sm:w-[580px] max-w-[95vw] left-0 right-0 mx-auto sm:mx-0 sm:left-auto sm:right-0 animate-premium-pop sm:origin-top-right transition-all duration-300 z-50`}
+      style={combinedStyle}
     >
       {/* Premium Header Container */}
       <div className="bg-[#000D26] p-3 text-white relative overflow-hidden shrink-0">
@@ -347,14 +337,6 @@ export default function TravelersClassModal({
       />
     </div>
   );
-
-  if (isMobile) {
-    return (
-      <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-        {content}
-      </div>
-    );
-  }
 
   return content;
 }

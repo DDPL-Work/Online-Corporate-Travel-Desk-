@@ -269,8 +269,8 @@ export default function OneFlightBooking() {
   }, []);
 
   useEffect(() => {
-    const resultIndex = selectedFlight?.ResultIndex;
-    const tId = searchParams?.traceId || traceId;
+    const resultIndex = selectedFlight?.ResultIndex || location.state?.resultIndex || localState?.resultIndex;
+    const tId = searchParams?.traceId || traceId || location.state?.traceId || localState?.traceId;
 
     console.log("FareQuote Trigger Check:", { resultIndex, tId });
 
@@ -285,9 +285,9 @@ export default function OneFlightBooking() {
     );
   }, [
     dispatch,
-    searchParams?.traceId, // ✅ IMPORTANT
+    searchParams?.traceId,
     traceId,
-    selectedFlight, // ✅ FULL OBJECT (NOT nested field)
+    selectedFlight,
   ]);
 
   useEffect(() => {
