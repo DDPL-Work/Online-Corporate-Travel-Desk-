@@ -47,6 +47,44 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+    /* 🔥 Unified approval fields (mirrors BookingRequest) */
+    approvalStage: {
+      type: String,
+      enum: ["MANAGER", "TRAVEL_ADMIN", "TRAVEL_ADMIN_APPROVER", "EXECUTED"],
+      index: true,
+    },
+
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travelAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travadminApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
+
+    approvalAudit: [
+      {
+        action: { type: String, required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: String,
+        timestamp: { type: Date, default: Date.now },
+        remarks: String,
+      },
+    ],
+
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     approvedAt: Date,
 

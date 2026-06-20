@@ -101,6 +101,12 @@ const cancellationQuerySchema = new mongoose.Schema(
       index: true,
     },
 
+    bookingType: {
+      type: String,
+      enum: ["flight", "hotel"],
+      default: "flight",
+    },
+
     /* STATUS */
     type: {
       type: String,
@@ -114,6 +120,78 @@ const cancellationQuerySchema = new mongoose.Schema(
       default: "OPEN",
       index: true,
     },
+
+    /* ================= UNIFIED APPROVAL FIELDS ================= */
+
+    approvalStage: {
+      type: String,
+      enum: ["MANAGER", "TRAVEL_ADMIN", "TRAVEL_ADMIN_APPROVER", "EXECUTED", "PENDING_PARALLEL_APPROVAL", "PENDING_MANAGER_APPROVAL", "MANAGER_APPROVED", "REJECTED"],
+      index: true,
+    },
+
+    requestStatus: {
+      type: String,
+      enum: ["PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL", "approved", "rejected", "transferred"],
+      index: true,
+    },
+
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travelAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    providerExecutionStatus: {
+      type: String,
+      enum: ["PENDING", "COMPLETED", "FAILED", "OPS_ASSIGNED"],
+      default: "PENDING",
+    },
+
+    isOnlineCancellation: {
+      type: Boolean,
+      default: false,
+    },
+
+    approvalType: {
+      type: String,
+      enum: ["ONLINE", "OFFLINE"],
+      default: "OFFLINE",
+    },
+
+    travelAdminApprovedAt: {
+      type: Date,
+      default: null,
+    },
+
+    managerApprovedAt: {
+      type: Date,
+      default: null,
+    },
+
+    travadminApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
+
+    approvalAudit: [
+      {
+        action: { type: String, required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: String,
+        timestamp: { type: Date, default: Date.now },
+        remarks: String,
+      },
+    ],
 
     priority: {
       type: String,
@@ -240,6 +318,14 @@ const cancellationQuerySchema = new mongoose.Schema(
     strict: true, // 🔥 IMPORTANT
   }
 );
+
+/* ─────────────────────────────
+   COMPOUND INDEXES for badge/queue queries
+───────────────────────────── */
+cancellationQuerySchema.index({ corporateId: 1, approvalStage: 1, managerId: 1 });
+cancellationQuerySchema.index({ corporateId: 1, approvalStage: 1, travelAdminId: 1 });
+cancellationQuerySchema.index({ corporateId: 1, approvalStage: 1, "travadminApprover.userId": 1 });
+cancellationQuerySchema.index({ approvalStage: 1, providerExecutionStatus: 1 });
 
 /* ─────────────────────────────
    MODEL EXPORT (SAFE)

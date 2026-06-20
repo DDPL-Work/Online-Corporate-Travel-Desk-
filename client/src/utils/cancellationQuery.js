@@ -34,11 +34,21 @@ export const resolveCancellationBookingReference = (booking) => {
 export const isCancellationChargesUnavailableResponse = (response) => {
   const root = response?.Response || response || {};
 
-  return (
-    response?.success === false ||
-    root?.success === false ||
-    root?.CancelChargeDetails === null ||
-    (Array.isArray(root?.CancelChargeDetails) &&
-      root.CancelChargeDetails.length === 0)
-  );
+  const responseStatus = root?.ResponseStatus;
+  const errorCode = root?.Error?.ErrorCode;
+  const refundAmount = root?.RefundAmount;
+  const cancellationCharge = root?.CancellationCharge;
+
+  if (responseStatus !== 1) return true;
+  if (errorCode !== undefined && errorCode !== null && errorCode !== 0) return true;
+
+  const isOnline =
+    (typeof refundAmount === "number" && refundAmount > 0) ||
+    (typeof cancellationCharge === "number" && cancellationCharge >= 0);
+
+  return !isOnline;
+};
+
+export const isOnlineCancellationResponse = (response) => {
+  return !isCancellationChargesUnavailableResponse(response);
 };

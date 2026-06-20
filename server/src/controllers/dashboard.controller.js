@@ -8,6 +8,11 @@ const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const moment = require("moment-timezone");
 
+const BookingRequest = require("../models/BookingRequest");
+const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+const CancellationQuery = require("../models/CancellationQuery");
+const FlightReissue = require("../models/FlightReissueRequest");
+
 /* =========================================================
    EMPLOYEE DASHBOARD
 ========================================================= */
@@ -371,5 +376,159 @@ exports.getSuperAdminDashboard = asyncHandler(async (req, res) => {
       },
       "Super admin dashboard fetched successfully",
     ),
+  );
+});
+
+// @desc    Get sidebar badge counts (role-aware)
+// @route   GET /api/v1/dashboard/sidebar-badges
+// @access  Private
+exports.getSidebarBadges = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const corporateId = req.user.corporateId;
+  const role = req.user.role;
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  let pendingRequests = 0;
+  let offlineCancellations = 0;
+  let reissueRequests = 0;
+  let approvedRequests = 0;
+
+  // Helper to count reissues across all schemas
+  const countReissues = async (corpId, stage, field, value) => {
+    let total = 0;
+    const query = { approvalStage: stage };
+    if (corpId) query["corporate.companyId"] = String(corpId);
+    if (field) query[field] = value;
+    try {
+      total += await FlightReissue.countDocuments(query);
+    } catch (_) { /* skip */ }
+    try {
+      const OfflineReissueRequest = require("../modules/servicing/reissue/schemas/OfflineReissueRequest.schema");
+      const oq = { approvalStage: stage };
+      if (corpId) oq.corporateId = corpId;
+      if (field) oq[field] = value;
+      total += await OfflineReissueRequest.countDocuments(oq);
+    } catch (_) { /* skip */ }
+    try {
+      const OnlineReissueRequest = require("../modules/servicing/reissue/schemas/ReissueRequest.schema");
+      const rq = { approvalStage: stage };
+      if (corpId) rq.corporateId = corpId;
+      if (field) rq[field] = value;
+      total += await OnlineReissueRequest.countDocuments(rq);
+    } catch (_) { /* skip */ }
+    return total;
+  };
+
+  if (role === "manager") {
+    const [flightPending, hotelPending, cancelPending, reissuePending, flightApproved, hotelApproved] = await Promise.all([
+      BookingRequest.countDocuments({
+        corporateId,
+        requestStatus: "pending_approval",
+      }),
+      HotelBookingRequest.countDocuments({
+        corporateId,
+        requestStatus: "pending_approval",
+      }),
+      CancellationQuery.countDocuments({
+        corporateId,
+        approvalStage: { $in: ["MANAGER", "PENDING_PARALLEL_APPROVAL"] },
+        managerId: userId,
+        requestStatus: "PENDING_MANAGER_APPROVAL",
+      }),
+      countReissues(corporateId, "MANAGER", "managerId", userId),
+      BookingRequest.countDocuments({
+        corporateId,
+        requestStatus: "approved",
+        approvedAt: { $gte: sevenDaysAgo },
+      }),
+      HotelBookingRequest.countDocuments({
+        corporateId,
+        requestStatus: "approved",
+        approvedAt: { $gte: sevenDaysAgo },
+      }),
+    ]);
+    pendingRequests = flightPending + hotelPending + cancelPending + reissuePending;
+    approvedRequests = flightApproved + hotelApproved;
+  }
+
+  if (role === "travel-admin") {
+    const [flightPending, hotelPending, cancelPending, reissuePending] = await Promise.all([
+      BookingRequest.countDocuments({
+        corporateId,
+        requestStatus: { $in: ["pending_approval", "manager_approved"] },
+      }),
+      HotelBookingRequest.countDocuments({
+        corporateId,
+        requestStatus: { $in: ["pending_approval", "manager_approved"] },
+      }),
+      CancellationQuery.countDocuments({
+        corporateId,
+        travelAdminId: userId,
+        approvalStage: { $in: ["TRAVEL_ADMIN", "PENDING_PARALLEL_APPROVAL", "MANAGER_APPROVED"] },
+        requestStatus: { $in: ["PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_MANAGER_APPROVAL"] },
+      }),
+      countReissues(corporateId, "TRAVEL_ADMIN", "travelAdminId", userId),
+    ]);
+    pendingRequests = flightPending + hotelPending + cancelPending + reissuePending;
+    offlineCancellations = cancelPending;
+    reissueRequests = reissuePending;
+  }
+
+  // Configured approver — checks travadminApprover.userId
+  if (role === "travel-admin" || role === "configured-approver") {
+    const [cancelAdmin, reissueAdmin] = await Promise.all([
+      CancellationQuery.countDocuments({
+        corporateId,
+        "travadminApprover.userId": userId,
+        approvalStage: "TRAVEL_ADMIN_APPROVER",
+        requestStatus: "PENDING_ADMIN_APPROVAL",
+      }),
+      countReissues(corporateId, "TRAVEL_ADMIN_APPROVER", "travadminApprover.userId", userId),
+    ]);
+    pendingRequests += cancelAdmin + reissueAdmin;
+    offlineCancellations += cancelAdmin;
+    reissueRequests += reissueAdmin;
+  }
+
+  if (role === "ops-member" || role === "super-admin") {
+    const [cancelOps, reissueOps] = await Promise.all([
+      CancellationQuery.countDocuments({
+        approvalStage: "EXECUTED",
+        providerExecutionStatus: { $in: ["OPS_ASSIGNED", "FAILED"] },
+      }),
+      countReissues(null, "EXECUTED"),
+    ]);
+    offlineCancellations = cancelOps;
+    reissueRequests = reissueOps;
+  }
+
+  if (role === "employee") {
+    const [myRecentBookings, myCancellations, myReissues] = await Promise.all([
+      BookingRequest.countDocuments({
+        userId,
+        createdAt: { $gte: sevenDaysAgo },
+      }),
+      CancellationQuery.countDocuments({
+        "user.id": userId,
+        status: { $in: ["RESOLVED", "IN_PROGRESS"] },
+      }),
+      FlightReissue.countDocuments({
+        "user.id": userId,
+        createdAt: { $gte: sevenDaysAgo },
+      }),
+    ]);
+    pendingRequests = myRecentBookings;
+    offlineCancellations = myCancellations;
+    reissueRequests = myReissues;
+  }
+
+  res.status(200).json(
+    new ApiResponse(200, {
+      pendingRequests,
+      offlineCancellations,
+      reissueRequests,
+      approvedRequests,
+    }, "Sidebar badges fetched"),
   );
 });

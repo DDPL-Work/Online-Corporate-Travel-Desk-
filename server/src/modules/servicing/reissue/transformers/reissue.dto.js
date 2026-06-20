@@ -109,6 +109,7 @@ function toReissueDto(doc) {
   return {
     _type: "ONLINE",
     id: item._id,
+    _id: item._id,
     reissueId: item.reissueId,
     bookingId: item.bookingId,
     originalBookingId: item.originalBookingId,

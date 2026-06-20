@@ -2440,6 +2440,35 @@ exports.getMyBookings = asyncHandler(async (req, res) => {
       return normalizeBookingForResponse(booking, originalBooking._id);
     });
 
+  /* ================= CANCELLATION QUERY DATA ================= */
+  try {
+    const CancellationQuery = require("../models/CancellationQuery");
+    const bookingIds = bookings.map(b => b._id);
+    const pendingQueries = await CancellationQuery.find({
+      bookingId: { $in: bookingIds },
+    })
+      .sort({ createdAt: -1 })
+      .select("bookingId approvalStage requestStatus")
+      .lean();
+
+    const queryByBookingId = {};
+    pendingQueries.forEach(q => {
+      const bId = q.bookingId?.toString();
+      if (bId && !queryByBookingId[bId]) {
+        queryByBookingId[bId] = q;
+      }
+    });
+
+    bookings.forEach(b => {
+      const bId = b._id?.toString();
+      if (bId && queryByBookingId[bId]) {
+        b.cancellationQuery = queryByBookingId[bId];
+      }
+    });
+  } catch (e) {
+    // Silently continue
+  }
+
   /* ================= RESPONSE ================= */
   return res.status(200).json(
     new ApiResponse(
@@ -2534,6 +2563,23 @@ exports.getMyBookingById = asyncHandler(async (req, res) => {
   // FALLBACK
   else {
     booking.payment = { status: "pending" };
+  }
+
+  /* ================= CANCELLATION QUERY (APPROVAL STATUS) ================= */
+  try {
+    const CancellationQuery = require("../models/CancellationQuery");
+    const pendingQuery = await CancellationQuery.findOne({
+      bookingId: booking._id,
+    })
+      .sort({ createdAt: -1 })
+      .select("approvalStage requestStatus approvalAudit segments")
+      .lean();
+
+    if (pendingQuery) {
+      booking.cancellationQuery = pendingQuery;
+    }
+  } catch (e) {
+    // Silently continue if CancellationQuery model is unavailable
   }
 
   /* ================= RESPONSE ================= */
@@ -2701,6 +2747,15 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
     );
 });
 
+// @desc    Get unified booking lifecycle timeline
+// @route   GET /api/v1/bookings/:id/lifecycle-timeline
+// @access  Private
+exports.getBookingLifecycleTimeline = asyncHandler(async (req, res) => {
+  const { buildBookingLifecycleTimeline } = require("../services/bookingLifecycle.service");
+  const timeline = await buildBookingLifecycleTimeline(req.params.id);
+  res.status(200).json(new ApiResponse(200, timeline, "Timeline fetched successfully"));
+});
+
 module.exports = {
   createBookingRequest: exports.createBookingRequest,
   instantFlightBooking: exports.instantFlightBooking,
@@ -2717,4 +2772,5 @@ module.exports = {
   getBooking: exports.getBooking,
   cancelBooking: exports.cancelBooking,
   getProjectFlightExpenses: exports.getProjectFlightExpenses,
+  getBookingLifecycleTimeline: exports.getBookingLifecycleTimeline,
 };

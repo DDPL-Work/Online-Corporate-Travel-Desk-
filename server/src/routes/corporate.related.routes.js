@@ -178,6 +178,14 @@ router.patch(
   corporateController.updateCancellationQueryStatus
 );
 
+// Reassign cancellation query to another Ops member
+router.patch(
+  "/cancellation-queries/:id/reassign",
+  authorizeRoles("super-admin", "ops-member"),
+  requireOpsPermission("Manage Cancellations"),
+  corporateController.reassignCancellationQuery
+);
+
 // Get Single Corporate
 router.get(
   "/:id",

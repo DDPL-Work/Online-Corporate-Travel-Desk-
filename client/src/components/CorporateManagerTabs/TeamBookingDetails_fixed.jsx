@@ -1235,41 +1235,63 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
   // Fetch charges on mount
   useEffect(() => {
-    const isCancelled = sessionStorage.getItem(
-      `cancelRequested_${booking._id}`,
-    );
-
-    // 🚫 STOP API after cancellation OR manual block
-    if (isCancelled === "true" || !shouldFetchCharges) {
+    if (!shouldFetchCharges) {
       return;
     }
-
+    const existingRequest = sessionStorage.getItem(
+      `cancelRequested_${booking._id}`,
+    );
+    if (existingRequest === "true") {
+      setStep("charges");
+      return;
+    }
     (async () => {
       try {
         const res = await dispatch(fetchCancellationCharges(booking._id));
-
         if (!fetchCancellationCharges.fulfilled.match(res)) {
           throw new Error("Failed to fetch charges");
         }
-
         if (isCancellationChargesUnavailableResponse(res.payload)) {
           setChargesError(CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE);
           setCharges(null);
           setStep("charges");
           return;
         }
-
         setCharges(res.payload);
         setStep("charges");
       } catch (err) {
         console.warn("Charges API failed → allowing actions");
-
         setChargesError(err.message);
-        setCharges(null); // important
-        setStep("charges"); // ✅ fallback instead of blocking UI
+        setCharges(null);
+        setStep("charges");
       }
     })();
   }, [booking._id, dispatch, shouldFetchCharges]);
+
+  const querySuccess = useSelector((s) => s.amendment?.querySuccess);
+  const queryError = useSelector((s) => s.amendment?.queryError);
+  const queryDataState = useSelector((s) => s.amendment?.queryData);
+
+  useEffect(() => {
+    if (step !== "processing") return;
+    if (querySuccess && queryDataState) {
+      const successType = selectedJourney ? "partial" : "full";
+      setSuccessData({
+        type: successType,
+        status: queryDataState?.requestStatus || "pending",
+        route: selectedJourney,
+        queryData: queryDataState,
+      });
+      setStep("success");
+    } else if (queryError) {
+      const msg =
+        typeof queryError === "string"
+          ? queryError
+          : queryError?.message || "Cancellation request failed. Please try again.";
+      setChargesError(msg);
+      setStep("error");
+    }
+  }, [querySuccess, queryError, queryDataState, step, selectedJourney]);
 
   // Extract TicketCRInfo[0] from charges response
   const isMulti = charges?.isRoundTrip;
@@ -3210,7 +3232,7 @@ export default function TeamBookingDetails() {
                     <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 border border-red-100">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                       <span className="text-[9px] font-bold uppercase text-red-600 tracking-wider">
-                        {booking.amendment?.status || "Cancelled"}
+                        {booking.executionStatus === "cancelled" ? "CANCELLED" : booking.amendment?.status || "Cancelled"}
                       </span>
                     </div>
                   </div>

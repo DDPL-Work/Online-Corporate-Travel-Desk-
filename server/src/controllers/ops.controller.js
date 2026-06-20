@@ -17,10 +17,9 @@ const cache = require("../utils/cache");
 // @route   POST /ops/create
 // @access  Super Admin
 exports.createOpsMember = asyncHandler(async (req, res) => {
-  const { name, email, phone, permissions, password } = req.body;
+  const { name, email, phone, permissions, password, maxConcurrentReissues, maxConcurrentCancellations } = req.body;
   const normalizedOpsFields = normalizeOpsMemberInput(req.body);
 
-  // Validation
   if (
     !name ||
     !email ||
@@ -32,13 +31,11 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All required fields must be filled");
   }
 
-  // Check if email unique
   const existingMember = await OpsMember.findOne({ email: email.toLowerCase() });
   if (existingMember) {
     throw new ApiError(400, "OPS team member with this email already exists");
   }
 
-  // Auto-generate password if not provided
   const actualPassword = password || crypto.randomBytes(4).toString("hex");
 
   const newMember = await OpsMember.create({
@@ -51,9 +48,10 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
     servicingScope: normalizedOpsFields.servicingScope,
     permissions: permissions || [],
     password: actualPassword,
+    maxConcurrentReissues: Math.max(1, Math.min(999, maxConcurrentReissues ?? 10)),
+    maxConcurrentCancellations: Math.max(1, Math.min(999, maxConcurrentCancellations ?? 10)),
   });
 
-  // Send email with credentials via orchestrator
   try {
     notify(EVENTS.OPS_MEMBER_CREATED, {
       userId: newMember._id,
@@ -79,6 +77,8 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
         department: newMember.department,
         designation: newMember.designation,
         servicingScope: newMember.servicingScope,
+        maxConcurrentReissues: newMember.maxConcurrentReissues,
+        maxConcurrentCancellations: newMember.maxConcurrentCancellations,
         generatedPassword: password ? undefined : actualPassword,
       },
       "OPS team member created successfully"
@@ -90,7 +90,7 @@ exports.createOpsMember = asyncHandler(async (req, res) => {
 // @route   GET /ops/list
 // @access  Super Admin
 exports.listOpsMembers = asyncHandler(async (req, res) => {
-  const { search, role, status, department, designation } = req.query;
+  const { search, role, status, department, designation, availabilityStatus } = req.query;
 
   let query = { isDeleted: false };
 
@@ -107,6 +107,7 @@ exports.listOpsMembers = asyncHandler(async (req, res) => {
   if (department) query.department = department;
   if (designation) query.designation = designation;
   if (status) query.status = status;
+  if (availabilityStatus) query.availabilityStatus = availabilityStatus;
 
   const members = await OpsMember.find(query)
     .sort({ createdAt: -1 })
@@ -130,7 +131,7 @@ exports.listOpsMembers = asyncHandler(async (req, res) => {
 // @access  Super Admin
 exports.updateOpsMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, phone, permissions, email } = req.body;
+  const { name, phone, permissions, email, maxConcurrentReissues, maxConcurrentCancellations, availabilityStatus, autoAssignmentEnabled } = req.body;
 
   const member = await OpsMember.findOne({ _id: id, isDeleted: false });
   if (!member) {
@@ -139,7 +140,6 @@ exports.updateOpsMember = asyncHandler(async (req, res) => {
 
   const normalizedOpsFields = normalizeOpsMemberInput(req.body, member);
 
-  // Check if email is being changed and if it's unique
   if (email && email.toLowerCase() !== member.email) {
     const existing = await OpsMember.findOne({ email: email.toLowerCase() });
     if (existing) {
@@ -154,13 +154,31 @@ exports.updateOpsMember = asyncHandler(async (req, res) => {
   member.department = normalizedOpsFields.department;
   member.designation = normalizedOpsFields.designation;
   member.servicingScope = normalizedOpsFields.servicingScope;
-  
+
+  if (maxConcurrentReissues != null) {
+    member.maxConcurrentReissues = Math.max(1, Math.min(999, maxConcurrentReissues));
+  }
+  if (maxConcurrentCancellations != null) {
+    member.maxConcurrentCancellations = Math.max(1, Math.min(999, maxConcurrentCancellations));
+  }
+
+  if (availabilityStatus) {
+    const validStatuses = ["AVAILABLE", "BUSY", "BREAK", "OFFLINE", "ON_LEAVE"];
+    if (!validStatuses.includes(availabilityStatus)) {
+      throw new ApiError(400, "Invalid availability status");
+    }
+    member.availabilityStatus = availabilityStatus;
+  }
+
+  if (autoAssignmentEnabled != null) {
+    member.autoAssignmentEnabled = autoAssignmentEnabled;
+  }
+
   let permissionsChanged = false;
   let oldPermissions = [...member.permissions];
-  
+
   if (Array.isArray(permissions)) {
     const nextPermissions = [...permissions];
-    // Check if permissions actually changed
     if (
       JSON.stringify([...nextPermissions].sort()) !==
       JSON.stringify([...oldPermissions].sort())
@@ -172,7 +190,7 @@ exports.updateOpsMember = asyncHandler(async (req, res) => {
 
   await member.save();
   await cache.del(`user:ops-member:${member._id}`);
-  
+
   if (permissionsChanged) {
     notify(EVENTS.OPS_PERMISSION_CHANGED, {
       userId: member._id,
@@ -295,4 +313,111 @@ exports.opsHeartbeat = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json(new ApiResponse(200, member, "OPS heartbeat refreshed"));
+});
+
+// @desc    Update OPS member availability status
+// @route   PATCH /ops/availability
+// @access  Ops Member
+exports.updateMyAvailability = asyncHandler(async (req, res) => {
+  if (req.user.role !== "ops-member" && req.user.role !== "super-admin") {
+    throw new ApiError(403, "Only OPS members can update their availability");
+  }
+
+  const { availabilityStatus } = req.body;
+  const validStatuses = ["AVAILABLE", "BUSY", "BREAK", "OFFLINE", "ON_LEAVE"];
+  if (!validStatuses.includes(availabilityStatus)) {
+    throw new ApiError(400, `Invalid availability status. Must be one of: ${validStatuses.join(", ")}`);
+  }
+
+  const member = await OpsMember.findByIdAndUpdate(
+    req.user.id,
+    { availabilityStatus },
+    { new: true },
+  ).select("-password");
+
+  if (!member) {
+    throw new ApiError(404, "OPS member not found");
+  }
+
+  res.status(200).json(new ApiResponse(200, member, `Availability updated to ${availabilityStatus}`));
+});
+
+// @desc    Capacity diagnostics for Super Admin
+// @route   GET /ops/diagnostics
+// @access  Super Admin
+exports.getAssignmentDiagnostics = asyncHandler(async (req, res) => {
+  const OfflineReissueRequest = require("../modules/servicing/reissue/schemas/OfflineReissueRequest.schema");
+  const CancellationQuery = require("../models/CancellationQuery.model");
+
+  const ACTIVE_REISSUE_STATUSES = ["PENDING_ASSIGNMENT", "ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE", "TICKET_GENERATED"];
+  const ACTIVE_CANCELLATION_STATUSES = ["OPEN", "OPS_ASSIGNED", "OPS_PROCESSING", "PENDING_APPROVAL"];
+
+  const members = await OpsMember.find({ isDeleted: false }).select("-password").lean();
+
+  const activeReissues = await OfflineReissueRequest.find({
+    assignedOpsMember: { $ne: null },
+    status: { $in: ACTIVE_REISSUE_STATUSES },
+  }).lean();
+
+  const activeCancellations = await CancellationQuery.find({
+    assignedTo: { $ne: null },
+    status: { $in: ACTIVE_CANCELLATION_STATUSES },
+  }).lean();
+
+  const diagnostics = members.map((member) => {
+    const memberReissues = activeReissues.filter(
+      (r) => String(r.assignedOpsMember) === String(member._id),
+    );
+    const memberCancellations = activeCancellations.filter(
+      (c) => String(c.assignedTo) === String(member._id),
+    );
+
+    const actualActiveReissues = memberReissues.length;
+    const actualActiveCancellations = memberCancellations.length;
+    const reissueEligible = member.permissions.includes("Manage Reissues")
+      && member.autoAssignmentEnabled
+      && member.availabilityStatus === "AVAILABLE"
+      && actualActiveReissues < member.maxConcurrentReissues;
+    const cancellationEligible = member.permissions.includes("Manage Cancellations")
+      && member.autoAssignmentEnabled
+      && member.availabilityStatus === "AVAILABLE"
+      && actualActiveCancellations < member.maxConcurrentCancellations;
+
+    const reissueReasons = [];
+    if (!member.permissions.includes("Manage Reissues")) reissueReasons.push("Permission Missing");
+    if (!member.autoAssignmentEnabled) reissueReasons.push("Auto Assignment Disabled");
+    if (member.availabilityStatus !== "AVAILABLE") reissueReasons.push(`Availability: ${member.availabilityStatus}`);
+    if (actualActiveReissues >= member.maxConcurrentReissues) reissueReasons.push(`Capacity Full (${actualActiveReissues}/${member.maxConcurrentReissues})`);
+
+    const cancellationReasons = [];
+    if (!member.permissions.includes("Manage Cancellations")) cancellationReasons.push("Permission Missing");
+    if (!member.autoAssignmentEnabled) cancellationReasons.push("Auto Assignment Disabled");
+    if (member.availabilityStatus !== "AVAILABLE") cancellationReasons.push(`Availability: ${member.availabilityStatus}`);
+    if (actualActiveCancellations >= member.maxConcurrentCancellations) cancellationReasons.push(`Capacity Full (${actualActiveCancellations}/${member.maxConcurrentCancellations})`);
+
+    return {
+      memberId: member._id,
+      name: member.name,
+      email: member.email,
+      availabilityStatus: member.availabilityStatus,
+      permissions: member.permissions,
+      autoAssignmentEnabled: member.autoAssignmentEnabled,
+      reissue: {
+        eligible: reissueEligible,
+        current: actualActiveReissues,
+        max: member.maxConcurrentReissues,
+        storedCounter: member.currentActiveReissues,
+        reasons: reissueReasons,
+      },
+      cancellation: {
+        eligible: cancellationEligible,
+        current: actualActiveCancellations,
+        max: member.maxConcurrentCancellations,
+        storedCounter: member.currentActiveCancellations,
+        reasons: cancellationReasons,
+      },
+    };
+  });
+
+  res.status(200).json(new ApiResponse(200, diagnostics, "Assignment diagnostics fetched"));
 });

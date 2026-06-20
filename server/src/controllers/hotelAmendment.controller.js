@@ -1,6 +1,7 @@
 //server\src\controllers\hotelAmendment.controller.js
 const hotelAmendmentService = require("../services/tektravels/hotelAmendment.service");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+const CancellationQuery = require("../models/CancellationQuery");
 
 exports.amendHotelBooking = async (req, res) => {
   let booking;
@@ -8,7 +9,19 @@ exports.amendHotelBooking = async (req, res) => {
   try {
     const body = req.body;
     const bookingId = body.bookingId;
+    const { cancellationQueryId } = body;
     remarks = body.remarks;
+
+    // 🔒 EXECUTION GATING: Must have EXECUTED CancellationQuery
+    if (cancellationQueryId) {
+      const cancellationQuery = await CancellationQuery.findById(cancellationQueryId);
+      if (cancellationQuery && cancellationQuery.approvalStage !== undefined && cancellationQuery.approvalStage !== "EXECUTED") {
+        return res.status(400).json({ success: false, message: "Awaiting approval before execution" });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: "Cancellation query ID required. Request must be approved first." });
+    }
+
     /* 1. FETCH BOOKING FROM DB */
     booking = await HotelBookingRequest.findById(bookingId);
 

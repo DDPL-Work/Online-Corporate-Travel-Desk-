@@ -1,0 +1,14 @@
+{"error":"Cannot find module '../config/firebase-service-account.json'\nRequire stack:\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\services\\notificationDispatcher.service.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\utils\\notificationService.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\services\\notification.service.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\controllers\\booking.controller.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\routes\\bookings.routes.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\[eval]","level":"warn","message":"Firebase Admin initialization failed. Push notifications will be disabled.","timestamp":"2026-06-17 18:36:13"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:14"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:14"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:15"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:17"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:19"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:21"}
+{"error":"Cannot find module '../config/firebase-service-account.json'\nRequire stack:\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\services\\notificationDispatcher.service.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\utils\\notificationService.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\services\\notification.service.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\server\\src\\controllers\\booking.controller.js\n- C:\\corporate_2\\Online-Corporate-Travel-Desk-\\[eval]","level":"warn","message":"Firebase Admin initialization failed. Push notifications will be disabled.","timestamp":"2026-06-17 18:36:30"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:30"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:31"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:32"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:33"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:35"}
+{"level":"error","message":"[Redis] Error:","timestamp":"2026-06-17 18:36:38"}

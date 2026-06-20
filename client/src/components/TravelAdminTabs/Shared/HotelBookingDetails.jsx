@@ -76,7 +76,7 @@ function BookingHistory({ booking }) {
       date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
       desc: (() => {
         const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
-        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved" || booking.requestStatus === "EXECUTED";
         
         if (isRejected) {
           return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
@@ -90,10 +90,14 @@ function BookingHistory({ booking }) {
           }
           return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
         }
+        if (booking.requestStatus === "PENDING_MANAGER_APPROVAL") return "Waiting for manager approval";
+        if (booking.requestStatus === "PENDING_TRAVEL_ADMIN_APPROVAL") return "Waiting for travel admin approval";
+        if (booking.requestStatus === "PENDING_ADMIN_APPROVAL") return "Waiting for admin approval";
+        if (booking.requestStatus === "transferred") return "Transferred to another approver";
         return "Waiting for manager approval";
       })(),
       icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected", "PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL"].includes(booking.requestStatus)),
     },
     {
       label: "Voucher Issued",
@@ -1389,7 +1393,7 @@ function CancellationSection({
     booking.amendment?.changeRequestId ||
     "—";
 
-  let displayStatusLabel = booking.amendment?.status || "Cancelled";
+  let displayStatusLabel = booking.executionStatus === "cancelled" ? "CANCELLED" : booking.amendment?.status || "Cancelled";
   if (
     hotelChangeResult?.ChangeRequestStatus === 3
   )

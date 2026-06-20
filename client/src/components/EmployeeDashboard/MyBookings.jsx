@@ -108,7 +108,24 @@ function FlightSection() {
   useEffect(() => { dispatch(fetchMyBookings()); }, [dispatch]);
 
   const formattedBookings = useMemo(() => (flightBookings || []).map(b => {
-    const status = b.executionStatus === "ticketed" ? "Confirmed" : b.executionStatus === "cancel_requested" ? "Cancelled" : "Pending";
+    // Derive status from cancellation query when present
+    const cq = b.cancellationQuery;
+    const status = cq
+        ? cq.requestStatus === "approved" && cq.approvalStage === "EXECUTED"
+            ? cq.providerExecutionStatus === "COMPLETED"
+                ? "Cancelled"
+                : "Processing"
+            : cq.requestStatus === "rejected" || cq.approvalStage === "REJECTED"
+                ? "Rejected"
+                : cq.requestStatus === "transferred"
+                    ? "Transferred"
+                    : cq.approvalStage === "PENDING_PARALLEL_APPROVAL" ||
+                      cq.requestStatus === "PENDING_MANAGER_APPROVAL" ||
+                      cq.requestStatus === "PENDING_TRAVEL_ADMIN_APPROVAL" ||
+                      cq.requestStatus === "PENDING_ADMIN_APPROVAL"
+                        ? "Pending approval"
+                        : "Pending"
+        : b.executionStatus === "ticketed" ? "Confirmed" : b.executionStatus === "cancel_requested" ? "Cancelled" : "Pending";
     const pnr = b.bookingResult?.pnr || b.bookingResult?.ticketResponse?.pnr || "-";
     const amount = b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
 

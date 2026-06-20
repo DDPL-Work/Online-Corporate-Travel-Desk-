@@ -4,11 +4,6 @@ const AssignmentRotation = require("../../../models/AssignmentRotation");
 const ApiError = require("../../../utils/ApiError");
 const logger = require("../../../utils/logger");
 const { sendNotification } = require("../../../utils/notificationService");
-const {
-  MANAGE_REISSUES_PERMISSION,
-  evaluateReissueAssignmentEligibility,
-  normalizeServicingScope,
-} = require("../../../utils/reissueAssignmentEligibility.util");
 
 const QUEUE_TYPES = {
   reissue: "REISSUE",
@@ -16,16 +11,34 @@ const QUEUE_TYPES = {
   refund: "REFUND",
 };
 
-const PERMISSION_MAP = {
-  reissue: MANAGE_REISSUES_PERMISSION,
-  cancellation: "Manage Cancellations",
-  refund: "View Finance",
-  amendment: "Manage Cancellations",
-};
-
 class RoundRobinAssignmentService {
-  async getRequiredPermission(requestType) {
-    return PERMISSION_MAP[requestType] || MANAGE_REISSUES_PERMISSION;
+  getEligibilityQuery(requestType) {
+    const base = {
+      isDeleted: false,
+      autoAssignmentEnabled: true,
+      availabilityStatus: "AVAILABLE",
+      status: "Active",
+    };
+
+    if (requestType === "reissue") {
+      base.permissions = "Manage Reissues";
+      base.$expr = {
+        $lt: [
+          { $ifNull: ["$currentActiveReissues", 0] },
+          { $ifNull: ["$maxConcurrentReissues", 10] },
+        ],
+      };
+    } else if (requestType === "cancellation") {
+      base.permissions = "Manage Cancellations";
+      base.$expr = {
+        $lt: [
+          { $ifNull: ["$currentActiveCancellations", 0] },
+          { $ifNull: ["$maxConcurrentCancellations", 10] },
+        ],
+      };
+    }
+
+    return base;
   }
 
   getQueueType(requestType) {
@@ -36,62 +49,37 @@ class RoundRobinAssignmentService {
     return queueType;
   }
 
-  async getEligibleOpsMembers({ requestType, department, session } = {}) {
-    const permission = await this.getRequiredPermission(requestType);
-    const onlineCutoff = new Date(Date.now() - 5 * 60 * 1000);
-    const query = {
-      isDeleted: false,
-      autoAssignmentEnabled: true,
-      availabilityStatus: "AVAILABLE",
-      $or: [
-        { isOnline: true },
-        { lastSeenAt: { $gte: onlineCutoff } },
-        { isOnline: { $exists: false } },
-      ],
-    };
-
-    if (requestType === "cancellation") {
-      query.lastLoginAt = { $ne: null };
-    }
-
-    const sort =
-      requestType === "cancellation"
-        ? { lastLoginAt: 1, createdAt: 1, name: 1 }
-        : { currentActiveAssignments: 1, lastAssignedAt: 1, name: 1 };
+  async getEligibleOpsMembers({ requestType, session } = {}) {
+    const query = this.getEligibilityQuery(requestType);
+    const sort = { lastAssignedAt: 1, name: 1 };
 
     const candidates = await OpsMember.find(query)
       .sort(sort)
       .session(session || null);
 
-    return candidates.filter((member) => {
-      if (requestType === "reissue") {
-        const eligibility = evaluateReissueAssignmentEligibility(member, {
-          context: {
-            service: "roundRobinAssignmentService.getEligibleOpsMembers",
-            requestType,
-            department,
-          },
-        });
+    const currentField = requestType === "reissue" ? "currentActiveReissues" : "currentActiveCancellations";
+    const maxField = requestType === "reissue" ? "maxConcurrentReissues" : "maxConcurrentCancellations";
 
-        if (!eligibility.eligible) {
-          return false;
-        }
-
-        if (!department) {
-          return true;
-        }
-
-        return ["Flights", "Both"].includes(
-          normalizeServicingScope(member.servicingScope || department),
-        );
-      }
-
-      if (member.status !== "Active" || member.isDeleted) {
+    const eligible = candidates.filter((member) => {
+      const permission = requestType === "reissue" ? "Manage Reissues" : "Manage Cancellations";
+      if (!Array.isArray(member.permissions) || !member.permissions.includes(permission)) {
         return false;
       }
-
-      return Array.isArray(member.permissions) && member.permissions.includes(permission);
+      if (member.availabilityStatus !== "AVAILABLE") return false;
+      if (!member.autoAssignmentEnabled) return false;
+      const current = member[currentField] ?? 0;
+      const max = member[maxField] ?? 10;
+      return current < max;
     });
+
+    logger.info("ops_eligible_members", {
+      requestType,
+      candidatesCount: candidates.length,
+      eligibleCount: eligible.length,
+      eligibleNames: eligible.map((m) => m.name),
+    });
+
+    return eligible;
   }
 
   async getOrCreateRotation(queueType, session) {
@@ -103,14 +91,11 @@ class RoundRobinAssignmentService {
     );
   }
 
-  async findNextEligibleAgent({ requestType, department, session } = {}) {
+  async findNextEligibleAgent({ requestType, session } = {}) {
     const queueType = this.getQueueType(requestType);
-    const eligibleAgents = await this.getEligibleOpsMembers({ requestType, department, session });
+    const eligibleAgents = await this.getEligibleOpsMembers({ requestType, session });
     if (!eligibleAgents.length) {
-      logger.warn("ops_assignment_no_eligible_agents", {
-        requestType,
-        department,
-      });
+      logger.warn("ops_assignment_no_eligible_agents", { requestType });
       return null;
     }
 
@@ -120,9 +105,6 @@ class RoundRobinAssignmentService {
     for (let i = 0; i < eligibleAgents.length; i += 1) {
       const index = (rotation.currentIndex + i) % eligibleAgents.length;
       const candidate = eligibleAgents[index];
-      if (candidate.currentActiveAssignments >= candidate.maxConcurrentAssignments) {
-        continue;
-      }
 
       rotation.currentIndex = (index + 1) % eligibleAgents.length;
       rotation.lastAssignedUserId = candidate._id;
@@ -141,7 +123,6 @@ class RoundRobinAssignmentService {
 
     logger.warn("ops_assignment_all_agents_at_capacity", {
       requestType,
-      department,
       eligibleCount: eligibleAgents.length,
     });
     return null;
@@ -152,22 +133,54 @@ class RoundRobinAssignmentService {
     if (!agent) {
       throw new ApiError(404, "OPS agent not found");
     }
+
+    if (requestType === "reissue") {
+      agent.currentActiveReissues = Math.max(0, (agent.currentActiveReissues || 0) + 1);
+    } else if (requestType === "cancellation") {
+      agent.currentActiveCancellations = Math.max(0, (agent.currentActiveCancellations || 0) + 1);
+    }
+
     agent.currentActiveAssignments = Math.max(0, (agent.currentActiveAssignments || 0) + 1);
+    agent.currentWorkload = Math.max(0, Number(agent.currentWorkload || 0) + 1);
     agent.lastAssignedAt = new Date();
     agent.lastAssignmentType = requestType ? requestType.toUpperCase() : agent.lastAssignmentType;
     agent.assignmentStats = agent.assignmentStats || {};
     agent.assignmentStats.totalAssigned = (agent.assignmentStats.totalAssigned || 0) + 1;
     await agent.save({ session });
+
+    logger.info("ops_counter_incremented", {
+      agentId: String(agentId),
+      requestType,
+      currentActiveReissues: agent.currentActiveReissues,
+      currentActiveCancellations: agent.currentActiveCancellations,
+    });
+
     return agent;
   }
 
-  async decrementAgentCounters(agentId, session) {
+  async decrementAgentCounters(agentId, requestType, session) {
     const agent = await OpsMember.findById(agentId).session(session);
     if (!agent) {
       return null;
     }
+
+    if (requestType === "reissue") {
+      agent.currentActiveReissues = Math.max(0, (agent.currentActiveReissues || 0) - 1);
+    } else if (requestType === "cancellation") {
+      agent.currentActiveCancellations = Math.max(0, (agent.currentActiveCancellations || 0) - 1);
+    }
+
     agent.currentActiveAssignments = Math.max(0, (agent.currentActiveAssignments || 0) - 1);
+    agent.currentWorkload = Math.max(0, Number(agent.currentWorkload || 0) - 1);
     await agent.save({ session });
+
+    logger.info("ops_counter_decremented", {
+      agentId: String(agentId),
+      requestType,
+      currentActiveReissues: agent.currentActiveReissues,
+      currentActiveCancellations: agent.currentActiveCancellations,
+    });
+
     return agent;
   }
 
@@ -176,37 +189,26 @@ class RoundRobinAssignmentService {
     if (!agent) {
       throw new ApiError(404, "OPS agent not found");
     }
-    if (requestType === "reissue") {
-      const eligibility = evaluateReissueAssignmentEligibility(agent, {
-        context: {
-          service: "roundRobinAssignmentService.validateAgent",
-          requestType,
-          agentId: String(agentId),
-        },
-      });
 
-      if (!eligibility.eligible) {
-        throw new ApiError(
-          400,
-          "Selected OPS member is not eligible for offline reissue assignment",
-        );
-      }
+    const permission = requestType === "reissue" ? "Manage Reissues" : "Manage Cancellations";
+    const currentField = requestType === "reissue" ? "currentActiveReissues" : "currentActiveCancellations";
+    const maxField = requestType === "reissue" ? "maxConcurrentReissues" : "maxConcurrentCancellations";
 
-      return agent;
-    }
     if (agent.status !== "Active" || agent.isDeleted) {
       throw new ApiError(400, "OPS agent is not currently active");
     }
     if (!agent.autoAssignmentEnabled || agent.availabilityStatus !== "AVAILABLE") {
       throw new ApiError(400, "OPS agent is not available for assignment");
     }
-    if (agent.isOnline === false) {
-      throw new ApiError(400, "OPS agent is not currently online");
+    if (!Array.isArray(agent.permissions) || !agent.permissions.includes(permission)) {
+      throw new ApiError(403, `OPS agent does not have required permission: ${permission}`);
     }
-    const permission = await this.getRequiredPermission(requestType);
-    if (!agent.permissions.includes(permission)) {
-      throw new ApiError(403, "OPS agent does not have required permissions");
+    const current = agent[currentField] ?? 0;
+    const max = agent[maxField] ?? 10;
+    if (current >= max) {
+      throw new ApiError(400, `OPS agent is at capacity (${current}/${max}) for ${requestType}`);
     }
+
     return agent;
   }
 
@@ -221,10 +223,18 @@ class RoundRobinAssignmentService {
     };
   }
 
+  buildAuditMessage({ agent, requestType }) {
+    const currentField = requestType === "reissue" ? "currentActiveReissues" : "currentActiveCancellations";
+    const maxField = requestType === "reissue" ? "maxConcurrentReissues" : "maxConcurrentCancellations";
+    const current = agent[currentField] ?? 0;
+    const max = agent[maxField] ?? 10;
+    const type = requestType === "reissue" ? "Reissue" : "Cancellation";
+    return `Assigned to ${agent.name} via Round Robin — ${type} Capacity: ${current}/${max}`;
+  }
+
   async autoAssignRequest({
     request,
     requestType,
-    department,
     assignedBy,
     reason,
     statusOnAssign,
@@ -233,7 +243,7 @@ class RoundRobinAssignmentService {
     session.startTransaction();
 
     try {
-      const agent = await this.findNextEligibleAgent({ requestType, department, session });
+      const agent = await this.findNextEligibleAgent({ requestType, session });
       if (!agent) {
         await session.abortTransaction();
         return null;
@@ -257,6 +267,14 @@ class RoundRobinAssignmentService {
           assignedAt: request.assignedAt,
         }),
       );
+
+      request.assignmentAudit = request.assignmentAudit || [];
+      request.assignmentAudit.push({
+        action: "AUTO_ASSIGNED",
+        message: this.buildAuditMessage({ agent, requestType }),
+        assignedBy: assignedBy || "SYSTEM",
+        at: new Date(),
+      });
 
       await request.save({ session });
       await this.incrementAgentCounters(agent._id, requestType, session);
@@ -332,7 +350,7 @@ class RoundRobinAssignmentService {
       await request.save({ session });
       await this.incrementAgentCounters(newAgent._id, requestType, session);
       if (oldAgentId) {
-        await this.decrementAgentCounters(oldAgentId, session);
+        await this.decrementAgentCounters(oldAgentId, requestType, session);
       }
 
       await session.commitTransaction();

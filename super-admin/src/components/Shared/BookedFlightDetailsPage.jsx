@@ -61,6 +61,7 @@ import {
 } from "../../utils/formatter";
 import Swal from "sweetalert2";
 import ReissueModal from "./ReissueModal";
+import api from "../../API/axios";
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Utility helpers (unchanged)                                   */
@@ -1655,33 +1656,30 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
     return `${first?.origin?.airportCode || "?"} → ${last?.destination?.airportCode || "?"}`;
   };
 
-  // Fetch charges on mount
   useEffect(() => {
-    const isCancelled = sessionStorage.getItem(
-      `cancelRequested_${booking._id}`,
-    );
-
-    // 🚫 STOP API after cancellation OR manual block
-    if (isCancelled === "true" || !shouldFetchCharges) {
+    if (!shouldFetchCharges) {
       return;
     }
-
+    const existingRequest = sessionStorage.getItem(
+      `cancelRequested_${booking._id}`,
+    );
+    if (existingRequest === "true") {
+      setStep("charges");
+      return;
+    }
     (async () => {
       try {
         const res = await dispatch(fetchCancellationCharges(booking._id));
-
         if (!fetchCancellationCharges.fulfilled.match(res)) {
           throw new Error("Failed to fetch charges");
         }
-
         setCharges(res.payload);
         setStep("charges");
       } catch (err) {
         console.warn("Charges API failed → allowing actions");
-
         setChargesError(err.message);
-        setCharges(null); // important
-        setStep("charges"); // ✅ fallback instead of blocking UI
+        setCharges(null);
+        setStep("charges");
       }
     })();
   }, [booking._id, dispatch, shouldFetchCharges]);
@@ -2757,7 +2755,11 @@ function CancelScreen({ booking, onClose }) {
         onClose();
         return;
       }
-      await dispatch(fetchMyBookingById(booking._id));
+      try {
+        await dispatch(fetchMyBookingById(booking._id));
+      } catch (_) {
+        // swallow
+      }
       navigate("/my-cancelled-bookings");
       onClose();
     } catch (err) {
@@ -2915,7 +2917,11 @@ function PartialCancelModal({ booking, onClose }) {
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       // 🔥 CLOSE MODAL IMMEDIATELY
       onClose();
-      await dispatch(fetchMyBookingById(booking._id));
+      try {
+        await dispatch(fetchMyBookingById(booking._id));
+      } catch (_) {
+        // swallow
+      }
       Swal.fire({
         icon: "success",
         title: "Cancellation request submitted successfully",
@@ -3953,94 +3959,52 @@ export default function BookedFlightDetails() {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Booking History / Timeline                                     */
+/*  Booking History / Timeline (unified API)                       */
 /* ─────────────────────────────────────────────────────────────── */
-const getTicketDate = (b) => {
-  if (b.ticketedAt) return b.ticketedAt;
-  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
-  if (onwardIssueDate) return onwardIssueDate;
-  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
-  if (providerIssueDate) return providerIssueDate;
-  if (b.executionStatus === "ticketed") return b.updatedAt;
-  return null;
-};
-
-const getCancellationRequestedDate = (b) =>
-  b.cancellationRequestedAt ||
-  b.cancelRequestedAt ||
-  b.cancellation?.requestedAt ||
-  b.cancellation?.createdAt ||
-  b.amendment?.requestedAt ||
-  b.amendment?.createdAt ||
-  b.amendmentHistory?.[0]?.createdAt ||
-  ((b.executionStatus || "").toLowerCase() === "cancel_requested"
-    ? b.updatedAt
-    : null);
-
-const getCancellationDoneDate = (b) => {
-  const providerDoneDate = normalizeCancellationResponses(b)
-    .map(({ info }) => info?.CreditNoteCreatedOn)
-    .filter(Boolean)
-    .sort()
-    .at(-1);
-
-  return (
-    b.cancelledAt ||
-    b.cancellation?.cancelledAt ||
-    b.cancellation?.completedAt ||
-    b.amendment?.completedAt ||
-    providerDoneDate ||
-    (((b.executionStatus || "").toLowerCase() === "cancelled" ||
-      b.cancellation ||
-      b.amendment?.status === "COMPLETED")
-      ? b.amendment?.updatedAt || b.updatedAt
-      : null)
-  );
-};
-
 function BookingHistory({ booking }) {
-  const ticketDate = getTicketDate(booking);
-  const cancellationRequestedDate = getCancellationRequestedDate(booking);
-  const cancellationDoneDate = getCancellationDoneDate(booking);
+  const [steps, setSteps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const bookingId = booking?._id;
 
-  const steps = [
-    {
-      label: ticketDate ? "Ticket Time" : "Booking Time",
-      date: ticketDate || booking.createdAt,
-      desc: ticketDate ? "Ticket was issued." : "Booking was created.",
-      icon: ticketDate ? <FiTag size={14} /> : <FiClock size={14} />,
-      active: true,
-    },
-    cancellationRequestedDate && {
-      label: "Cancellation Requested",
-      date: cancellationRequestedDate,
-      desc: "Cancellation request was raised.",
-      icon: <FiAlertCircle size={14} />,
-      active: true,
-    },
-    cancellationDoneDate && {
-      label: "Cancellation Done",
-      date: cancellationDoneDate,
-      desc: "Cancellation was completed.",
-      icon: <FiXCircle size={14} />,
-      active: true,
-    },
-  ].filter(Boolean);
-
-  if (!steps.length) {
-    steps.push(
-      {
-        label: "Booking Time",
-        date: booking.createdAt,
-        desc: "Booking was created.",
-        icon: <FiClock size={14} />,
-        active: true,
-      },
-    );
-  }
+  useEffect(() => {
+    if (!bookingId) { setLoading(false); return; }
+    setLoading(true);
+    api
+      .get(`/bookings/${bookingId}/lifecycle-timeline`)
+      .then((res) => {
+        const raw = res.data?.data || [];
+        setSteps(
+          raw.map((ev) => ({
+            label: ev.title,
+            date: ev.timestamp,
+            desc: ev.description,
+            icon: iconForEvent(ev.type),
+            active: true,
+          })),
+        );
+      })
+      .catch(() => setSteps([]))
+      .finally(() => setLoading(false));
+  }, [bookingId]);
 
   const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  if (loading) {
+    return (
+      <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mt-6">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-8 h-8 rounded-full bg-[#A07840]/10 flex items-center justify-center">
+            <FiRefreshCw size={14} className="text-[#A07840]" />
+          </div>
+          <div>
+            <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Booking Lifecycle</h3>
+            <p className="text-[10px] text-[#8B7355] font-bold uppercase tracking-widest mt-0.5">Loading timeline...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mt-6">
@@ -4085,4 +4049,17 @@ function BookingHistory({ booking }) {
       </div>
     </div>
   );
+}
+
+function iconForEvent(type) {
+  if (!type) return <FiClock size={14} />;
+  const t = type.toUpperCase();
+  if (t.includes("BOOKING_CREATED") || t.includes("REQUEST_CREATED")) return <FiClock size={14} />;
+  if (t.includes("APPROVED") || t.includes("EXECUTED") || t.includes("COMPLETED")) return <FiCheckCircle size={14} />;
+  if (t.includes("REJECTED") || t.includes("FAILED") || t.includes("CANCELLED")) return <FiXCircle size={14} />;
+  if (t.includes("TICKET") || t.includes("DOWNLOAD")) return <FiTag size={14} />;
+  if (t.includes("CANCELLATION") || t.includes("AMENDMENT")) return <FiAlertCircle size={14} />;
+  if (t.includes("REISSUE") || t.includes("ASSIGN") || t.includes("REASSIGN")) return <FiRefreshCw size={14} />;
+  if (t.includes("NOTIFIED") || t.includes("PASSENGER")) return <FiSend size={14} />;
+  return <FiClock size={14} />;
 }

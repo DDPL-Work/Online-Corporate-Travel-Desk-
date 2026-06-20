@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const BookingRequest = require("../../../../models/BookingRequest");
 const Corporate = require("../../../../models/Corporate");
+const User = require("../../../../models/User");
 const ApiError = require("../../../../utils/ApiError");
 const logger = require("../../../../utils/logger");
 const tboService = require("../../../../services/tektravels/flight.service");
@@ -503,6 +504,7 @@ class OfflineReissueWorkflowService {
     }
     if (query.bookingId) mongoQuery.bookingId = query.bookingId;
     if (query.corporateId) mongoQuery.corporateId = query.corporateId;
+    if (query.approvalStage) mongoQuery.approvalStage = query.approvalStage;
 
     const assigneeFilter = query.assignedOpsMember || query.assignedTo;
     if (assigneeFilter === "me" && actor?.id) {
@@ -641,12 +643,25 @@ class OfflineReissueWorkflowService {
       throw new ApiError(422, "Original airline PNR missing for reissue");
     }
 
+    // Resolve manager and travel admin for approval flow
+    let managerId = null;
+    let travelAdminId = null;
+    try {
+      if (booking.approverId) {
+        const mgrUser = await User.findById(booking.approverId).select("_id").lean();
+        if (mgrUser) managerId = mgrUser._id;
+      }
+      if (booking.corporateId) {
+        const taUser = await User.findOne({ corporateId: booking.corporateId, role: "travel-admin" }).select("_id").lean();
+        if (taUser) travelAdminId = taUser._id;
+      }
+    } catch (e) { /* silently fallback */ }
+
     const correlationId = payload.correlationId || crypto.randomUUID();
     const now = new Date();
     const session = await mongoose.startSession();
 
     let createdRequestId = null;
-    let assignedOpsMember = null;
 
     try {
       await session.withTransaction(async () => {
@@ -682,6 +697,23 @@ class OfflineReissueWorkflowService {
             createdBy: actor?._id?.toString?.() || actor?.id?.toString?.() || null,
             workflow: "OFFLINE_REISSUE",
           },
+          // 🔥 UNIFIED APPROVAL FIELDS
+          approvalStage: actor?.role === "travel-admin" ? "TRAVEL_ADMIN_APPROVER" : "MANAGER",
+          requestStatus: actor?.role === "travel-admin" ? "PENDING_ADMIN_APPROVAL" : "PENDING_MANAGER_APPROVAL",
+          managerId: actor?.role === "travel-admin" ? null : managerId,
+          travelAdminId,
+          approvalAudit: [
+            {
+              action: "REQUEST_CREATED",
+              user: actor._id || actor.id,
+              role: actor.role || "employee",
+              timestamp: new Date(),
+              remarks: actor?.role === "travel-admin"
+                ? "Offline reissue request created by Travel Admin"
+                : "Offline reissue request submitted",
+            },
+          ],
+
           status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
           assignmentStatus: "UNASSIGNED",
           autoAssignmentAttempted: false,
@@ -749,84 +781,38 @@ class OfflineReissueWorkflowService {
           },
         });
 
-        const assignmentResult = await reissueAssignmentService.assignOfflineReissue({
-          request,
-          session,
-          assignedBy: {
+        // Assignment is deferred — it happens in the approval controller
+        // after approvalStage reaches EXECUTED.
+        // Keep the request at PENDING_ASSIGNMENT until then.
+        this.appendTimeline(request, {
+          status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
+          eventType: OFFLINE_TIMELINE_EVENTS.ASSIGNMENT_PENDING,
+          title: "Awaiting OPS assignment",
+          description:
+            "Offline reissue request is pending approval. Ops assignment will occur after approval completes.",
+          actor: {
             id: null,
             name: "OPS Assignment Service",
             role: "SYSTEM",
           },
-          mode: "ROUND_ROBIN",
-          remarks: "Automatic offline reissue assignment",
-          notify: false,
-          persistRequest: false,
+          at: now,
+          metadata: {
+            autoAssignmentAttempted: false,
+          },
         });
 
-        assignedOpsMember = assignmentResult.assignedOpsMember;
-        if (assignedOpsMember) {
-          this.appendTimeline(request, {
-            status: OFFLINE_STATUSES.ASSIGNED,
-            eventType: OFFLINE_TIMELINE_EVENTS.AUTO_ASSIGNED,
-            title: "Auto assigned to OPS",
-            description: `Automatically assigned to ${assignedOpsMember.name}`,
-            actor: {
-              id: null,
-              name: "OPS Assignment Service",
-              role: "SYSTEM",
-            },
-            at: request.assignedAt,
-            metadata: {
-              assignedOpsMember: assignedOpsMember._id,
-              assignmentMethod: "ROUND_ROBIN",
-            },
-          });
-
-          this.appendAudit(request, {
-            action: "AUTO_ASSIGNED",
-            actor: {
-              id: null,
-              role: "SYSTEM",
-            },
-            message: `Auto assigned to ${assignedOpsMember.name}`,
-            at: request.assignedAt,
-            metadata: {
-              assignedOpsMember: assignedOpsMember._id,
-              assignmentMethod: "ROUND_ROBIN",
-            },
-          });
-        } else {
-          this.appendTimeline(request, {
-            status: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
-            eventType: OFFLINE_TIMELINE_EVENTS.ASSIGNMENT_PENDING,
-            title: "Awaiting OPS assignment",
-            description:
-              "No eligible OPS member was available during auto-assignment. The request remains active in the unassigned queue.",
-            actor: {
-              id: null,
-              name: "OPS Assignment Service",
-              role: "SYSTEM",
-            },
-            at: now,
-            metadata: {
-              assignmentFailureReason: request.assignmentFailureReason || "NO_ELIGIBLE_OPS",
-            },
-          });
-
-          this.appendAudit(request, {
-            action: "ASSIGNMENT_PENDING",
-            actor: {
-              id: null,
-              role: "SYSTEM",
-            },
-            message: "Offline reissue request is awaiting OPS assignment",
-            at: now,
-            metadata: {
-              assignmentFailureReason: request.assignmentFailureReason || "NO_ELIGIBLE_OPS",
-              autoAssignmentAttempted: true,
-            },
-          });
-        }
+        this.appendAudit(request, {
+          action: "ASSIGNMENT_PENDING",
+          actor: {
+            id: null,
+            role: "SYSTEM",
+          },
+          message: "Offline reissue request is awaiting approval before Ops assignment",
+          at: now,
+          metadata: {
+            autoAssignmentAttempted: false,
+          },
+        });
 
         this.refreshSlaFlags(request, now);
         await request.save({ session });
@@ -841,19 +827,6 @@ class OfflineReissueWorkflowService {
 
     const request = await this.loadRequestOrThrow(createdRequestId);
 
-    if (assignedOpsMember) {
-      await reissueAssignmentService.notifyAssignedOpsMember({
-        request,
-        assignedOpsMember,
-        assignedBy: {
-          id: null,
-          name: "OPS Assignment Service",
-          role: "SYSTEM",
-        },
-        mode: "ROUND_ROBIN",
-      });
-    }
-
     this.emitPassengerEvent(DOMAIN_EVENTS.OFFLINE_REISSUE_CREATED, request);
 
     logger.info("offline_reissue_created", {
@@ -861,7 +834,6 @@ class OfflineReissueWorkflowService {
       bookingId: booking._id?.toString(),
       employeeId: request.employeeId?._id?.toString?.() || request.employeeId?.toString?.(),
       originalPnr,
-      assignedOpsMember: assignedOpsMember?._id?.toString?.() || null,
       correlationId,
     });
 
@@ -884,6 +856,10 @@ class OfflineReissueWorkflowService {
     const mongoQuery = this.buildListQuery(query, actor);
     if (this.isOpsActor(actor)) {
       mongoQuery.assignedOpsMember = this.getActorObjectId(actor);
+      // Ops members should only see active pipeline statuses (not COMPLETED/FAILED/REJECTED/CANCELLED)
+      if (!mongoQuery.status) {
+        mongoQuery.status = { $nin: TERMINAL_OFFLINE_STATUSES };
+      }
     }
 
     const result = await offlineReissueRepository.list(mongoQuery, {
@@ -902,6 +878,13 @@ class OfflineReissueWorkflowService {
   async getById({ actor, requestId }) {
     const request = await this.loadRequestOrThrow(requestId);
     this.ensureAccess(actor, request);
+
+    // Issue 32: Ops members cannot view requests before EXECUTED,
+    // unless the request is assigned to them (round-robin assigns before approval completes)
+    if (actor?.role === "ops-member" && request.approvalStage !== "EXECUTED" && !this.isAssignedToActor(request, actor)) {
+      throw new ApiError(403, "Request not yet available — approval stage not completed");
+    }
+
     this.refreshSlaFlags(request);
     return request;
   }
@@ -1159,6 +1142,11 @@ class OfflineReissueWorkflowService {
   async generateTicket({ actor, requestId, payload = {} }) {
     let request = await this.loadRequestOrThrow(requestId);
     this.ensureAccess(actor, request);
+
+    // 🔒 EXECUTION GATING: Must be EXECUTED
+    if (request.approvalStage !== undefined && request.approvalStage !== "EXECUTED") {
+      throw new ApiError(400, "Awaiting approval before execution");
+    }
 
     const booking = await this.loadBookingOrThrow(request.bookingId);
     const selectedFlight = this.ensureSelectedFlightSnapshot(request);
@@ -1422,6 +1410,15 @@ class OfflineReissueWorkflowService {
       metadata: {
         generatedTicketUrl: generatedTicket.generatedTicketUrl,
       },
+    });
+
+    if (!request.approvalAudit) request.approvalAudit = [];
+    request.approvalAudit.push({
+      action: "EXECUTED",
+      user: actor?._id || actor?.id,
+      role: "system",
+      timestamp: new Date(),
+      remarks: "Offline reissue ticket generated successfully",
     });
 
     this.refreshSlaFlags(request, generatedTicket.generatedAt);

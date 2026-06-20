@@ -1,182 +1,52 @@
-// client\src\components\TravelAdminTabs\OfflineCancellationQueries.jsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCancellationQueries } from "../../Redux/Actions/amendmentThunks";
 import {
-  FiSearch,
-  FiFilter,
-  FiRefreshCw,
-  FiClock,
-  FiCheckCircle,
-  FiXCircle,
-  FiAlertCircle,
-  FiInbox,
-  FiCalendar,
-  FiUser,
-  FiTag,
-  FiHash,
-  FiX,
-  FiArrowRight,
-  FiActivity,
+  FiSearch, FiFilter, FiRefreshCw, FiClock, FiCheckCircle,
+  FiXCircle, FiAlertCircle, FiInbox, FiCalendar, FiUser,
+  FiTag, FiHash, FiX, FiArrowRight, FiActivity, FiEye,
 } from "react-icons/fi";
-import { StatCard, IdCell, Th, LabeledField } from "./Shared/CommonComponents";
+import { StatCard, IdCell, Th } from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
 import CancellationQueryDetailsPage from "./CancellationQueryDetailsPage";
 import { C } from "../Shared/color";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
 import { adminOfflineCancellationQueriesExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*                                  HELPERS                                   */
-/* ────────────────────────────────────────────────────────────────────────── */
-
 const StatusBadge = ({ status }) => {
   const map = {
     OPEN: {
-      label: "Open",
-      bg: "#EFF6FF", text: "#1E40AF", border: "#BFDBFE",
-      icon: <FiClock size={11} />,
+      label: "Pending Review",
+      tone: "bg-blue-50 text-blue-700 border-blue-200",
     },
     IN_PROGRESS: {
       label: "In Progress",
-      bg: "#FFFBEB", text: "#92400E", border: "#FDE68A",
-      icon: <FiRefreshCw size={11} className="animate-spin" />,
+      tone: "bg-amber-50 text-amber-700 border-amber-200",
     },
     RESOLVED: {
       label: "Resolved",
-      bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0",
-      icon: <FiCheckCircle size={11} />,
+      tone: "bg-emerald-50 text-emerald-700 border-emerald-200",
     },
     REJECTED: {
       label: "Rejected",
-      bg: "#FEF2F2", text: "#991B1B", border: "#FECACA",
-      icon: <FiXCircle size={11} />,
+      tone: "bg-rose-50 text-rose-700 border-rose-200",
     },
   };
-  const s = map[status?.toUpperCase()] || map.OPEN;
+  const s = map[status] || map.OPEN;
   return (
-    <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black border shadow-sm uppercase tracking-wider"
-      style={{ background: s.bg, color: s.text, borderColor: s.border }}
-    >
-      {s.icon}
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${s.tone}`}>
       {s.label}
     </span>
   );
 };
 
-const PriorityBadge = ({ priority }) => {
-  const map = {
-    HIGH: { bg: "#FEF2F2", text: "#991B1B" },
-    MEDIUM: { bg: "#FFFBEB", text: "#92400E" },
-    LOW: { bg: "#F8FAFC", text: "#64748B" },
-  };
-  const s = map[priority?.toUpperCase()] || map.LOW;
-  return (
-    <span
-      className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest"
-      style={{ background: s.bg, color: s.text }}
-    >
-      {priority || "MEDIUM"}
-    </span>
-  );
-};
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*                                CARD VIEW                                   */
-/* ────────────────────────────────────────────────────────────────────────── */
-const QueryCard = ({ query, onViewDetails }) => {
-  const requestedAt = query.requestedAt
-    ? new Date(query.requestedAt).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
-
-  return (
-    <div className="bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group" style={{ borderColor: C.border }}>
-      <div className="h-2 w-full" style={{ background: `linear-gradient(90deg, ${C.gold}, ${C.navy})` }} />
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Query Reference</span>
-              <span className="text-[11px] font-black px-2 py-0.5 rounded-md border" style={{ color: C.navy, background: C.offWhite, borderColor: C.border }}>
-                Q-{String(query.queryId || query._id).slice(-6).toUpperCase()}
-              </span>
-            </div>
-            <h3 className="text-lg font-black tracking-tight line-clamp-1" style={{ color: C.navy }}>
-              {query.bookingReference || "Corporate Amendment"}
-            </h3>
-          </div>
-          <StatusBadge status={query.status} />
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: `${C.navy}08`, color: C.navy }}>
-              <FiCalendar size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Request Date</p>
-              <p className="text-sm font-black" style={{ color: C.navy }}>{requestedAt}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: `${C.gold}10`, color: C.gold }}>
-              <FiUser size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Requester</p>
-              <p className="text-sm font-black truncate max-w-[200px]" style={{ color: C.navy }}>
-                {query.corporate?.employeeName || "Unknown Staff"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: `${C.navy}08`, color: C.navy }}>
-              <FiTag size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Urgency</p>
-              <PriorityBadge priority={query.priority} />
-            </div>
-          </div>
-        </div>
-
-        {query.remarks && (
-          <div className="mt-6 p-4 rounded-xl border border-dashed text-[11px] font-medium italic" style={{ background: C.offWhite, borderColor: C.border, color: C.muted }}>
-             "{query.remarks}"
-          </div>
-        )}
-
-        <button 
-          onClick={() => onViewDetails(query._id)}
-          className="w-full mt-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm border group-hover:shadow-md"
-          style={{ background: C.white, borderColor: C.border, color: C.navy }}
-        >
-          Process Query <FiArrowRight className="transition-transform group-hover:translate-x-1" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*                                MAIN COMPONENT                              */
-/* ────────────────────────────────────────────────────────────────────────── */
-
-const OfflineCancellationQueries = () => {
+export default function OfflineCancellationQueries() {
   const dispatch = useDispatch();
   const { queries, queriesLoading, queriesError } = useSelector((state) => state.amendment);
   const { user: currentUser } = useSelector((state) => state.auth);
-  
-  const userRole = currentUser?.role || "employee";
-  const [activeTab, setActiveTab] = useState("my");
+
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedQueryId, setSelectedQueryId] = useState(null);
 
   const { exportExcel, isExporting } = useExcelExporter();
@@ -195,28 +65,22 @@ const OfflineCancellationQueries = () => {
     };
   }, [queries]);
 
-  const filteredQueries = useMemo(() => {
-    let list = queries || [];
-    if (activeTab === "my") {
-      list = list.filter(q => 
-        q.user?.id === currentUser?._id || 
-        q.user?.id === currentUser?.id ||
-        q.corporate?.employeeId === currentUser?._id ||
-        q.corporate?.employeeId === currentUser?.id
-      );
+  const filtered = useMemo(() => {
+    let result = queries || [];
+    if (statusFilter !== "ALL") {
+      result = result.filter((q) => q.status === statusFilter);
     }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (item) =>
-          item.bookingReference?.toLowerCase().includes(q) ||
-          item.queryId?.toLowerCase().includes(q) ||
-          item.corporate?.employeeName?.toLowerCase().includes(q) ||
-          item.corporate?.employeeEmail?.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [queries, activeTab, search, currentUser]);
+    const t = search.trim().toLowerCase();
+    if (!t) return result;
+    return result.filter((r) => {
+      const ref = (r.bookingReference || "").toLowerCase();
+      const qid = (r.queryId || "").toLowerCase();
+      const name = (r.corporate?.employeeName || "").toLowerCase();
+      const email = (r.corporate?.employeeEmail || "").toLowerCase();
+      const reason = (r.reason || r.remarks || "").toLowerCase();
+      return [ref, qid, name, email, reason].some((v) => v.includes(t));
+    });
+  }, [queries, search, statusFilter]);
 
   if (selectedQueryId) {
     return (
@@ -228,196 +92,176 @@ const OfflineCancellationQueries = () => {
   }
 
   return (
-    <div className="min-h-screen font-sans pb-20 px-6 pt-8" style={{ background: C.offWhite }}>
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-2xl border shadow-sm" style={{ borderColor: C.border }}>
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg text-white" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.gold})` }}>
-              <FiInbox size={32} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-tight" style={{ color: C.navy }}>Cancellation Queries</h1>
-              <p className="text-xs mt-1 font-bold uppercase tracking-widest" style={{ color: C.muted }}>Manage Offline Amendments & Ticketing Inquiries</p>
-            </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#0A4D68]/10 text-[#0A4D68] flex items-center justify-center">
+            <FiInbox size={18} />
           </div>
-          <button
-            onClick={() => dispatch(fetchCancellationQueries())}
-            disabled={queriesLoading}
-            className="px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all shadow-sm"
-            style={{ background: C.white, borderColor: C.border, color: C.navy }}
-          >
-            <FiRefreshCw className={queriesLoading ? "animate-spin" : ""} />
-            {queriesLoading ? "Syncing..." : "Sync Records"}
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard label="Total Submissions" value={stats.total} Icon={FiInbox} iconBgCls="bg-[#000D26]10" iconColorCls="text-[#000D26]" borderCls="border-[#000D26]" />
-          <StatCard label="Pending Review" value={stats.open} Icon={FiClock} iconBgCls="bg-blue-50" iconColorCls="text-blue-600" borderCls="border-blue-500" />
-          <StatCard label="Under Process" value={stats.inProgress} Icon={FiRefreshCw} iconBgCls="bg-amber-50" iconColorCls="text-amber-600" borderCls="border-amber-500" />
-          <StatCard label="Closed Queries" value={stats.resolved} Icon={FiCheckCircle} iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" borderCls="border-emerald-500" />
-        </div>
-
-        {/* Filters and Navigation */}
-        <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-            <div className="md:col-span-5">
-              <div className="flex p-1 bg-slate-100 rounded-xl border" style={{ borderColor: C.border }}>
-                <button
-                  onClick={() => setActiveTab("my")}
-                  className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "my" ? "bg-white shadow-sm" : "text-slate-400"}`}
-                  style={{ color: activeTab === "my" ? C.navy : "" }}
-                >
-                  {userRole === "employee" ? "My Submissions" : "Assigned Leads"}
-                </button>
-                {(userRole === "manager" || userRole === "travel-admin") && (
-                  <button
-                    onClick={() => setActiveTab("company")}
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "company" ? "bg-white shadow-sm" : "text-slate-400"}`}
-                    style={{ color: activeTab === "company" ? C.navy : "" }}
-                  >
-                    {userRole === "manager" ? "Team Ledger" : "Corporate Wide"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="md:col-span-5">
-              <LabeledField label={<><FiSearch size={10} /> Reference Search</>}>
-                <div className="relative group">
-                  <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors" style={{ color: C.muted }} />
-                  <input
-                    type="text"
-                    placeholder="PNR, Ref or Query Identifier..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border rounded-xl text-sm font-bold outline-none transition-all shadow-sm focus:ring-2 focus:ring-[#B8860B]/20"
-                    style={{ background: C.offWhite, borderColor: C.border, color: C.navy }}
-                  />
-                </div>
-              </LabeledField>
-            </div>
-
-            <div className="md:col-span-2">
-              <button
-                onClick={() => { setSearch(""); setActiveTab("my"); }}
-                className="w-full py-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest"
-                style={{ background: C.white, borderColor: C.border, color: C.muted }}
-              >
-                <FiX /> Reset
-              </button>
-            </div>
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Cancellation Queries</h2>
+            <p className="text-xs text-slate-400">Offline amendment and ticketing inquiries</p>
           </div>
         </div>
-
-        {/* Content Area */}
-        {queriesLoading ? (
-          <div className="py-32 text-center bg-white rounded-3xl border shadow-sm" style={{ borderColor: C.border }}>
-            <FiRefreshCw className="animate-spin mx-auto mb-4" size={40} style={{ color: C.gold }} />
-            <p className="font-black uppercase tracking-widest" style={{ color: C.navy }}>Synchronizing Repository...</p>
-          </div>
-        ) : queriesError ? (
-          <div className="bg-white border rounded-3xl p-16 text-center shadow-sm" style={{ borderColor: C.border }}>
-            <FiAlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-            <h3 className="text-xl font-black mb-2" style={{ color: C.navy }}>Sync Protocol Interrupted</h3>
-            <p className="text-slate-400 mb-8 max-w-md mx-auto font-medium">{queriesError}</p>
-            <button onClick={() => dispatch(fetchCancellationQueries())} className="px-10 py-4 bg-navy rounded-2xl text-white font-black text-xs uppercase tracking-widest shadow-lg" style={{ background: C.navy }}>Retry Connection</button>
-          </div>
-        ) : filteredQueries.length === 0 ? (
-          <div className="bg-white border-2 border-dashed rounded-3xl p-24 text-center" style={{ borderColor: C.border }}>
-            <FiInbox size={64} className="mx-auto mb-4 opacity-10" style={{ color: C.navy }} />
-            <h3 className="text-xl font-black uppercase tracking-widest text-slate-300">No Queries in Pipeline</h3>
-          </div>
-        ) : activeTab === "my" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {filteredQueries.map((query) => (
-              <QueryCard key={query._id} query={query} onViewDetails={setSelectedQueryId} />
-            ))}
-          </div>
-        ) : (
-          <ResponsiveDataTable
-            title="Governance Ledger"
-            subtitle={`${filteredQueries.length} active queries tracked`}
-            tableMinWidth="1000px"
-            exportLabel="Export Excel"
-            exportLoading={isExporting}
-            exportDisabled={isExporting}
-            onExport={() => exportExcel({
-              pageHeader: "Governance Ledger",
-              statCards: [
-                { label: "Total Submissions", value: stats.total },
-                { label: "Pending Review", value: stats.open },
-                { label: "Under Process", value: stats.inProgress },
-                { label: "Closed Queries", value: stats.resolved }
-              ],
-              appliedFilters: [
-                { label: "Search", value: search || "None" },
-                { label: "Tab Filter", value: activeTab }
-              ],
-              data: filteredQueries,
-              columns: adminOfflineCancellationQueriesExportTemplate,
-              filenamePrefix: "offline_cancellation_queries"
-            })}
-          >
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr style={{ background: C.navy, color: C.white }}>
-                  <Th className="px-6 py-5">Query ID</Th>
-                  <Th className="px-6 py-5">Travel Asset</Th>
-                  <Th className="px-6 py-5">Personnel</Th>
-                  <Th className="px-6 py-5">Email Identifier</Th>
-                  <Th className="px-6 py-5">Submission Time</Th>
-                  <Th className="px-6 py-5 text-center">Protocol Status</Th>
-                  <Th className="px-6 py-5 text-center">Governance</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ borderColor: C.border }}>
-                {filteredQueries.map((query, i) => (
-                  <tr key={query._id} className="hover:bg-slate-50 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.offWhite }}>
-                    <td className="px-6 py-5">
-                      <code className="text-[10px] font-black px-2 py-1 rounded border" style={{ background: C.white, borderColor: C.border, color: C.muted }}>
-                        Q-{String(query.queryId || query._id).slice(-6).toUpperCase()}
-                      </code>
-                    </td>
-                    <td className="px-6 py-5">
-                      <p className="text-sm font-black" style={{ color: C.navy }}>{query.bookingReference}</p>
-                      <p className="text-[10px] font-bold text-gold uppercase tracking-tighter">{query.bookingSnapshot?.airline || "Offline Segment"}</p>
-                    </td>
-                    <td className="px-6 py-5">
-                      <p className="text-xs font-black" style={{ color: C.navy }}>{query.corporate?.employeeName}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">{query.reason || "AMENDMENT"}</p>
-                    </td>
-                    <td className="px-6 py-5">
-                       <span className="text-[11px] font-bold text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded">{query.corporate?.employeeEmail}</span>
-                    </td>
-                    <td className="px-6 py-5">
-                       <p className="text-xs font-bold" style={{ color: C.navy }}>{new Date(query.requestedAt).toLocaleDateString()}</p>
-                       <p className="text-[10px] text-slate-400 font-medium">{new Date(query.requestedAt).toLocaleTimeString()}</p>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <StatusBadge status={query.status} />
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <button 
-                        onClick={() => setSelectedQueryId(query._id)}
-                        className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md"
-                        style={{ background: `${C.navy}08`, color: C.navy }}
-                      >
-                        <FiArrowRight size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ResponsiveDataTable>
-        )}
+        <button
+          onClick={() => dispatch(fetchCancellationQueries())}
+          disabled={queriesLoading}
+          className="flex items-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+        >
+          <FiRefreshCw size={12} className={queriesLoading ? "animate-spin" : ""} />
+          Refresh
+        </button>
       </div>
+
+      {/* Stat pills */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Total", value: stats.total, color: "bg-[#0A4D68]/10 text-[#0A4D68]" },
+          { label: "Pending Review", value: stats.open, color: "bg-blue-50 text-blue-700" },
+          { label: "Under Process", value: stats.inProgress, color: "bg-amber-50 text-amber-700" },
+          { label: "Closed Queries", value: stats.resolved, color: "bg-emerald-50 text-emerald-700" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center gap-3">
+            <span className={`h-10 w-10 rounded-xl flex items-center justify-center text-lg font-black ${color}`}>{value}</span>
+            <span className="text-[13px] font-bold text-slate-600">{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Search + Filter */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by PNR, query ID, employee name, email, or reason…"
+          className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm outline-none focus:border-[#0A4D68] bg-white"
+        />
+        <div className="flex gap-2 flex-wrap">
+          {["ALL", "OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider border transition ${statusFilter === s ? "bg-[#0A4D68] text-white border-[#0A4D68]" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
+            >
+              {s === "ALL" ? "All" : s.replace("_", " ")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      {queriesLoading ? (
+        <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
+          <FiRefreshCw size={32} className="mx-auto text-[#0A4D68] animate-spin opacity-30" />
+          <p className="text-sm font-bold text-slate-400 mt-4">Loading...</p>
+        </div>
+      ) : queriesError ? (
+        <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
+          <FiAlertCircle size={40} className="mx-auto text-slate-200 mb-3" />
+          <p className="text-sm font-bold text-slate-400">{queriesError}</p>
+          <button onClick={() => dispatch(fetchCancellationQueries())} className="mt-4 px-5 py-2 bg-[#0A4D68] text-white rounded-xl text-xs font-bold">Retry</button>
+        </div>
+      ) : !filtered.length ? (
+        <div className="py-20 text-center bg-white rounded-2xl shadow-sm border border-slate-200">
+          <FiInbox size={40} className="mx-auto text-slate-200 mb-3" />
+          <p className="text-sm font-bold text-slate-400">No cancellation queries found</p>
+        </div>
+      ) : (
+        <ResponsiveDataTable
+          exportLabel="Export Excel"
+          exportLoading={isExporting}
+          exportDisabled={isExporting}
+          onExport={() => exportExcel({
+            pageHeader: "Cancellation Queries",
+            statCards: [
+              { label: "Total", value: stats.total },
+              { label: "Pending Review", value: stats.open },
+              { label: "Under Process", value: stats.inProgress },
+              { label: "Closed Queries", value: stats.resolved },
+            ],
+            appliedFilters: [
+              { label: "Search", value: search || "None" },
+              { label: "Status", value: statusFilter },
+            ],
+            data: filtered,
+            columns: adminOfflineCancellationQueriesExportTemplate,
+            filenamePrefix: "cancellation_queries",
+          })}
+          wrapperClass="!border-none !shadow-none"
+        >
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[1000px]">
+                <thead>
+                  <tr className="bg-[#dac448] text-slate-900 border-b border-slate-200">
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">Query ID</th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">Employee</th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">PNR / Ref</th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">Submission Time</th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">Reason</th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-widest">Status</th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((q, i) => {
+                    const queryIdDisplay = q.queryId || `Q-${String(q._id).slice(-6).toUpperCase()}`;
+                    const employeeName = q.corporate?.employeeName || q.user?.name || "Unknown";
+                    const employeeEmail = q.corporate?.employeeEmail || q.user?.email || "";
+                    const pnr = q.bookingReference || q.bookingSnapshot?.pnr || "—";
+                    const reason = q.reason || q.remarks || "";
+                    const requestedAt = q.requestedAt ? new Date(q.requestedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+                    const requestedTime = q.requestedAt ? new Date(q.requestedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
+                    return (
+                      <tr key={q._id} className={`hover:bg-sky-50/40 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
+                        <td className="px-4 py-4">
+                          <p className="font-mono text-[12px] font-bold text-slate-800">{queryIdDisplay}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0A4D68] to-[#088395] text-white flex items-center justify-center text-[11px] font-black shrink-0 shadow-sm">
+                              {employeeName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-[13px] text-slate-800 leading-tight">{employeeName}</p>
+                              {employeeEmail && <p className="text-[11px] text-slate-400">{employeeEmail}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="font-black text-sm text-slate-900 uppercase tracking-wide">{pnr}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="font-bold text-[13px] text-slate-800">{requestedAt}</p>
+                          {requestedTime && <p className="text-[11px] text-slate-400">{requestedTime}</p>}
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-[11px] text-slate-500 italic line-clamp-1 max-w-[200px]" title={reason}>
+                            &ldquo;{reason || "N/A"}&rdquo;
+                          </p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <StatusBadge status={q.status} />
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <button
+                            onClick={() => setSelectedQueryId(q._id)}
+                            className="p-2 text-slate-400 hover:text-[#0A4D68] hover:bg-[#0A4D68]/5 transition-all rounded-lg"
+                            title="View Details"
+                          >
+                            <FiEye size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ResponsiveDataTable>
+      )}
     </div>
   );
-};
-
-export default OfflineCancellationQueries;
+}

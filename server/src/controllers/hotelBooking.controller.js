@@ -324,6 +324,21 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
 
   const isAutoApproved = requestStatus === "approved";
 
+  // 🔥 Populate unified approval fields for auto-approved bookings
+  if (isAutoApproved) {
+    bookingRequest.approvalStage = "EXECUTED";
+    bookingRequest.approvalAudit = [
+      {
+        action: "AUTO_APPROVED",
+        user: user._id,
+        role: "system",
+        timestamp: new Date(),
+        remarks: "Auto-approved by SSR policy (no approval required)",
+      },
+    ];
+    await bookingRequest.save();
+  }
+
   // ── Notify ──
   const _hotelRequesterName = user.name?.firstName
     ? `${user.name.firstName} ${user.name.lastName || ""}`.trim()
@@ -840,6 +855,21 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   });
 
   const isAutoApproved = requestStatus === "approved";
+
+  // 🔥 Populate unified approval fields for auto-approved bookings
+  if (isAutoApproved) {
+    bookingRequest.approvalStage = "EXECUTED";
+    bookingRequest.approvalAudit = [
+      {
+        action: "AUTO_APPROVED",
+        user: user._id,
+        role: "system",
+        timestamp: new Date(),
+        remarks: "Auto-approved by SSR policy (no approval required)",
+      },
+    ];
+    await bookingRequest.save();
+  }
 
   // ── Notify Travel Admin + Manager of new hotel booking request ──
   const _hotelRequesterName = user.name?.firstName

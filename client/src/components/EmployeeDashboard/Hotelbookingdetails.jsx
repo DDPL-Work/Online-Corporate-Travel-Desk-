@@ -51,6 +51,7 @@ import {
   sendHotelAmendment,
   getHotelAmendmentStatus,
 } from "../../Redux/Actions/hotelAmendment.thunks";
+import { createCancellationQuery } from "../../Redux/Actions/amendmentThunks";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Design tokens Mapping (for reference during conversion)        */
@@ -1139,12 +1140,22 @@ function CancellationSection({
     if (!reason) return;
     setSubmitting(true);
     try {
-      const res = await dispatch(
-        sendHotelAmendment({
-          bookingId: booking?._id || booking?.bookingId,
-          remarks: `${reason} - ${remarks}`,
-        }),
-      );
+      const bookingReference = booking.bookingReference || booking.orderId || booking._id;
+      const payload = {
+        bookingId: booking?._id || booking?.bookingId,
+        bookingReference,
+        bookingType: "hotel",
+        remarks: `${reason} - ${remarks}`,
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+      };
+
+      const res = await dispatch(createCancellationQuery(payload));
       if (res.meta.requestStatus === "fulfilled") {
         setShowForm(false);
         setIsSubmitted(true);
@@ -1190,7 +1201,7 @@ function CancellationSection({
     booking.amendment?.changeRequestId ||
     "—";
 
-  let displayStatus = booking.amendment?.status || "Cancelled";
+  let displayStatus = booking.executionStatus === "cancelled" ? "CANCELLED" : booking.amendment?.status || "Cancelled";
   if (
     cancelStatusRaw.ChangeRequestStatus === 3 ||
     providerStatusObj?.ChangeRequestStatus === 3
@@ -1973,6 +1984,10 @@ function BookingHistory({ booking }) {
   const isCancelled = ["cancelled", "cancel_requested"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation;
   const isConfirmed = ["voucher_generated", "confirmed", "booked"].includes((booking.executionStatus || "").toLowerCase()) || (isCancelled && !!booking.bookingResult?.hotelBookingId);
 
+  const auditSteps = booking.cancellationQuery?.approvalAudit
+    ? [...booking.cancellationQuery.approvalAudit].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    : [];
+
   const steps = [
     {
       label: "Request Created",
@@ -1999,7 +2014,6 @@ function BookingHistory({ booking }) {
           const appEmail = booking.approvedBy?.email || booking.approverEmail;
           const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
 
-          // If explicitly auto-approved, or same user (self-approved), or no approver info exists
           if (
             booking.approverName === "Auto Approve" ||
             isSameUser ||
@@ -2018,10 +2032,14 @@ function BookingHistory({ booking }) {
 
           return `Approved by ${fullName}${email ? ` (${email})` : ""}`;
         }
+        if (booking.requestStatus === "PENDING_MANAGER_APPROVAL") return "Waiting for manager approval";
+        if (booking.requestStatus === "PENDING_TRAVEL_ADMIN_APPROVAL") return "Waiting for travel admin approval";
+        if (booking.requestStatus === "PENDING_ADMIN_APPROVAL") return "Waiting for admin approval";
+        if (booking.requestStatus === "transferred") return "Transferred to another approver";
         return "Waiting for manager approval";
       })(),
       icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected", "PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL"].includes(booking.requestStatus)),
     },
     {
       label: "Voucher Issued",
@@ -2036,8 +2054,16 @@ function BookingHistory({ booking }) {
       desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
       icon: <FiXCircle size={14} />,
       active: isCancelled,
-      isLast: true,
+      isLast: !auditSteps.length,
     },
+    ...(auditSteps.length > 0 ? auditSteps.map((entry, idx) => ({
+      label: entry.action,
+      date: entry.timestamp,
+      desc: `${entry.remarks || ""}${entry.role ? ` — by ${entry.role}` : ""}`,
+      icon: entry.action === "EXECUTED" ? <FiCheckCircle size={14} /> : <FiShield size={14} />,
+      active: true,
+      isLast: idx === auditSteps.length - 1,
+    })) : []),
   ];
 
   const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });

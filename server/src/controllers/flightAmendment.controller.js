@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const amendmentService = require("../services/tektravels/flightAmendment.service");
+const cancellationExecution = require("../services/cancellationExecution.service");
 const BookingRequest = require("../models/BookingRequest");
 
 /* ======================================================
@@ -79,7 +81,6 @@ const getTboBookingId = (booking) => getAllTboBookingIds(booking)[0] || null;
 ====================================================== */
 const tboService = require("../services/tektravels/flight.service");
 const CancellationQuery = require("../models/CancellationQuery");
-const roundRobinAssignmentService = require("../modules/ops/services/roundRobinAssignment.service");
 
 const fetchTicketIdsFromTbo = async (pnr) => {
   if (!pnr) return [];
@@ -205,127 +206,34 @@ exports.getCancellationCharges = async (req, res) => {
 ====================================================== */
 exports.fullCancellation = async (req, res) => {
   try {
-    const { bookingId, remarks } = req.body;
+    const { bookingId, remarks, cancellationQueryId } = req.body;
 
-    const booking = await BookingRequest.findById(bookingId);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-    const bookingIds = getAllTboBookingIds(booking);
-
-    if (!bookingIds.length) {
-      return res.status(400).json({
-        success: false,
-        message: "No valid TBO BookingIds found",
-      });
-    }
-
-    /* 🔥 CALL TBO FOR EACH BOOKING ID */
-    const responses = [];
-
-    for (const id of bookingIds) {
-      const result = await amendmentService.sendChangeRequest({
-        BookingId: id,
-        RequestType: 1,
-        CancellationType: 1,
-        Remarks: remarks || "Full cancellation",
-      });
-
-      const validation = validateTboResponse(result);
-
-      if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          message: `Booking ${id}: ${validation.message}`,
-          code: validation.code,
-          traceId: validation.traceId,
-        });
+    // 🔒 EXECUTION GATING: Must have EXECUTED CancellationQuery
+    if (cancellationQueryId) {
+      const cancellationQuery = await CancellationQuery.findById(cancellationQueryId);
+      if (cancellationQuery && cancellationQuery.approvalStage !== undefined && cancellationQuery.approvalStage !== "EXECUTED") {
+        return res.status(400).json({ success: false, message: "Awaiting approval before execution" });
       }
-
-      responses.push({
-        bookingId: id,
-        response: result,
-      });
+    } else {
+      // No cancellationQueryId provided — reject immediately to prevent unapproved execution
+      return res.status(400).json({ success: false, message: "Cancellation query ID required. Request must be approved first." });
     }
 
-
-    /* ✅ SUCCESS ONLY */
-    const changeRequestIds = responses
-      .flatMap((r) => {
-        const info = r.response?.Response?.TicketCRInfo;
-        if (Array.isArray(info)) return info.map((i) => i?.ChangeRequestId);
-        if (info) return [info?.ChangeRequestId];
-        return [r.response?.Response?.ChangeRequestId];
-      })
-      .filter(Boolean);
-
-    const STATUS_MAP = {
-      0: "cancel_requested",
-      1: "cancel_requested",
-      2: "cancel_requested",
-      3: "cancel_requested",
-      4: "cancelled",
-      5: "cancel_failed",
-      6: "cancelled",
-      7: "cancel_requested",
-      8: "cancel_requested",
-    };
-
-    /* 🔥 DETERMINE FINAL STATUS (MULTI BOOKING SAFE) */
-    let finalExecutionStatus = "cancel_requested";
-
-    const statuses = responses
-      .flatMap((r) => {
-        const info = r.response?.Response?.TicketCRInfo;
-        if (Array.isArray(info)) return info.map((i) => i?.ChangeRequestStatus);
-        if (info) return [info?.ChangeRequestStatus];
-        return [r.response?.Response?.ChangeRequestStatus];
-      })
-      .filter((s) => s !== undefined && s !== null);
-
-/* If ALL are completed → cancelled */
-if (statuses.length && statuses.every((s) => s === 4 || s === 6)) {
-  finalExecutionStatus = "cancelled";
-  var finalCancelledAt = new Date();
-}
-
-/* If ANY rejected → failed */
-else if (statuses.some((s) => s === 5)) {
-  finalExecutionStatus = "cancel_failed";
-}
-
-/* Else → still in progress */
-else {
-  finalExecutionStatus = "cancel_requested";
-}
-
-    await updateBooking(bookingId, {
-      executionStatus: finalExecutionStatus,
-      ...(finalExecutionStatus === "cancelled" && { cancelledAt: finalCancelledAt }),
-
-      amendment: {
-        type: "FULL_CANCEL",
-        changeRequestIds, // 🔥 ARRAY now
-        status: "requested",
-        response: responses,
-      },
-
-      amendmentHistory: {
-        type: "FULL_CANCEL",
-        changeRequestIds,
-        status: "requested",
-        response: responses,
-        createdAt: new Date(),
-      },
+    const result = await cancellationExecution.executeFullCancellation({
+      bookingId,
+      cancellationQueryId,
+      remarks,
+      userId: req.user?._id,
+      userName: req.user?.name,
     });
 
     return res.json({
       success: true,
-      isRoundTrip: bookingIds.length > 1,
-      data: responses,
+      ...result,
     });
   } catch (error) {
     console.error("Full Cancellation Error:", error.message);
-    return res.status(500).json({ message: "Cancellation failed" });
+    return res.status(500).json({ message: "Cancellation failed", error: error.message });
   }
 };
 
@@ -334,7 +242,16 @@ else {
 ====================================================== */
 exports.partialCancellation = async (req, res) => {
   try {
-    const { bookingId, passengerIds = [], segments, remarks } = req.body;
+    const { bookingId, passengerIds = [], segments, remarks, cancellationQueryId } = req.body;
+
+    // 🔒 EXECUTION GATING: Must have EXECUTED CancellationQuery
+    if (!cancellationQueryId) {
+      return res.status(400).json({ success: false, message: "Cancellation query ID required. Request must be approved first." });
+    }
+    const cancellationQuery = await CancellationQuery.findById(cancellationQueryId);
+    if (cancellationQuery && cancellationQuery.approvalStage !== undefined && cancellationQuery.approvalStage !== "EXECUTED") {
+      return res.status(400).json({ success: false, message: "Awaiting approval before execution" });
+    }
 
     /* Support both internal Mongo _id and direct TBO BookingId */
     let booking = null;
@@ -505,6 +422,21 @@ exports.partialCancellation = async (req, res) => {
         createdAt: new Date(),
       },
     });
+
+    // 🔥 Record EXECUTED audit on CancellationQuery if present
+    if (cancellationQueryId) {
+      await CancellationQuery.findByIdAndUpdate(cancellationQueryId, {
+        $push: {
+          approvalAudit: {
+            action: "EXECUTED",
+            user: req.user?._id,
+            role: "system",
+            timestamp: new Date(),
+            remarks: "Partial cancellation executed via TBO",
+          },
+        },
+      });
+    }
 
     return res.json(result);
   } catch (error) {
@@ -714,12 +646,16 @@ exports.createCancellationQuery = async (req, res) => {
       corporate,
       bookingSnapshot,
       passengers,
+      bookingType,
       user: requestUser,
+      isOnlineCancellation,
+      approvalType,
     } = req.body;
 
     console.log("[CancellationQuery] create payload identifiers", {
       receivedBookingId: bookingId,
       receivedBookingReference: bookingReference,
+      isOnline: isOnlineCancellation,
     });
 
     /* ─────────────────────────────
@@ -729,6 +665,70 @@ exports.createCancellationQuery = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "bookingId and bookingReference are required",
+      });
+    }
+
+    /* ─────────────────────────────────────────────
+       🔥 EXECUTION GUARD: booking already cancelled
+    ───────────────────────────────────────────── */
+    const existingBooking = await BookingRequest.findById(bookingId).select("executionStatus").lean();
+    if (existingBooking && existingBooking.executionStatus === "cancelled") {
+      return res.status(409).json({
+        success: false,
+        message: "This booking has already been cancelled.",
+      });
+    }
+
+    /* ───────────────────────────────────────────────────────
+       🔥 ONLINE CANCELLATION: Execute directly, NO CQ created
+       When charges API confirms online availability:
+       - ResponseStatus === 1
+       - ErrorCode absent or 0
+       - RefundAmount > 0 OR CancellationCharge >= 0
+    ─────────────────────────────────────────────────────── */
+    if (isOnlineCancellation === true || isOnlineCancellation === "true") {
+      console.log(`[CancellationQuery] Online cancellation for ${bookingId} — executing directly, no CQ`);
+
+      const result = await cancellationExecution.executeFullCancellation({
+        bookingId,
+        remarks: remarks || "Online cancellation",
+        userId: req.user?._id,
+        userName: req.user?.name,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Cancellation executed successfully",
+        data: {
+          ...result,
+          requestStatus: "approved",
+          approvalStage: "EXECUTED",
+          providerExecutionStatus: "COMPLETED",
+          isOnlineCancellation: true,
+        },
+      });
+    }
+
+    /* ─────────────────────────────
+       🔥 DUPLICATE PREVENTION: Check active request exists
+    ───────────────────────────── */
+    const CancellationQuery = require("../models/CancellationQuery");
+    const existingQuery = await CancellationQuery.findOne({
+      bookingId,
+      requestStatus: {
+        $in: [
+          "PENDING_MANAGER_APPROVAL",
+          "PENDING_TRAVEL_ADMIN_APPROVAL",
+          "PENDING_ADMIN_APPROVAL",
+        ],
+      },
+    });
+
+    if (existingQuery) {
+      return res.status(409).json({
+        success: false,
+        message: "A cancellation request is already pending for this booking.",
+        existingQueryId: existingQuery.queryId,
       });
     }
 
@@ -788,6 +788,82 @@ exports.createCancellationQuery = async (req, res) => {
       });
     }
 
+    /* ───────────────────────────────────────────────────────
+       🔥 RESOLVE APPROVERS FROM ORIGINAL BOOKING (Issue 29 fix)
+       Read stored unified approval fields from the booking.
+       Do NOT derive from employee profile or corporate defaults.
+    ─────────────────────────────────────────────────────── */
+    let managerId = null;
+    let travelAdminId = null;
+    let travadminApprover = null;
+
+    try {
+      if (bookingType === "hotel") {
+        const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+        const hotelDoc = await HotelBookingRequest.findById(bookingId)
+          .select("managerId travelAdminId travadminApprover approverId")
+          .lean();
+
+        if (hotelDoc) {
+          // Prefer unified approval fields (populated during hotel booking approval)
+          managerId = hotelDoc.managerId || null;
+          travelAdminId = hotelDoc.travelAdminId || null;
+          travadminApprover = hotelDoc.travadminApprover || null;
+
+          // Fallback: read approverId (legacy ObjectId ref)
+          if (!managerId && hotelDoc.approverId) {
+            managerId = hotelDoc.approverId;
+          }
+        }
+      } else {
+        const bookingDoc = await BookingRequest.findById(bookingId)
+          .select("managerId travelAdminId travadminApprover approverId")
+          .lean();
+
+        if (bookingDoc) {
+          // Prefer unified approval fields (populated during booking approval)
+          managerId = bookingDoc.managerId || null;
+          travelAdminId = bookingDoc.travelAdminId || null;
+          travadminApprover = bookingDoc.travadminApprover || null;
+
+          // Fallback: read approverId (legacy String)
+          if (!managerId && bookingDoc.approverId) {
+            // bookingDoc.approverId is stored as String — convert to ObjectId
+            try {
+              const mgoId = new mongoose.Types.ObjectId(bookingDoc.approverId);
+              managerId = mgoId;
+            } catch (_) {
+              // Not a valid ObjectId; skip
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[CancellationQuery] Failed to resolve booking approvers:", e.message);
+    }
+
+    /* ─────────────────────────────
+       🔥 DETECT INITIATOR ROLE & APPROVAL STAGE
+       Parallel flow: PENDING_PARALLEL_APPROVAL for simultaneous visibility
+    ───────────────────────────── */
+    const isTravelAdminInitiated = req.user?.role === "travel-admin";
+    const hasManagerAssigned = !isTravelAdminInitiated && !!managerId;
+    const hasTravelAdminAssigned = !!travelAdminId;
+
+    const initialStage = isTravelAdminInitiated
+      ? "TRAVEL_ADMIN_APPROVER"
+      : hasManagerAssigned && hasTravelAdminAssigned
+        ? "PENDING_PARALLEL_APPROVAL"
+        : hasManagerAssigned
+          ? "MANAGER"
+          : "TRAVEL_ADMIN";
+    const initialStatus = isTravelAdminInitiated
+      ? "PENDING_ADMIN_APPROVAL"
+      : hasManagerAssigned
+        ? "PENDING_MANAGER_APPROVAL"
+        : "PENDING_TRAVEL_ADMIN_APPROVAL";
+    const initiatorRole = isTravelAdminInitiated ? "travel-admin" : "employee";
+
     /* ─────────────────────────────
        🔥 GENERATE QUERY ID
     ───────────────────────────── */
@@ -798,11 +874,12 @@ exports.createCancellationQuery = async (req, res) => {
     ).padStart(5, "0")}`;
 
     /* ─────────────────────────────
-       🔥 CREATE QUERY
+       🔥 CREATE QUERY (NO PROVIDER EXECUTION)
     ───────────────────────────── */
     const query = await CancellationQuery.create({
       bookingId,
       bookingReference,
+      bookingType: bookingType || "flight",
       queryId,
       priority,
       remarks,
@@ -815,10 +892,33 @@ exports.createCancellationQuery = async (req, res) => {
 
       user: {
         id: req.user?._id || requestUser?.id,
-        name: req.user?.name || requestUser?.name,
+        name: typeof req.user?.name === "string"
+          ? req.user.name
+          : req.user?.name?.firstName
+            ? `${req.user.name.firstName} ${req.user.name.lastName || ""}`.trim()
+            : (requestUser?.name || "Employee"),
         email: req.user?.email || requestUser?.email,
         phone: req.user?.phone || requestUser?.phone,
       },
+
+      // 🔥 APPROVAL FIELDS
+      approvalStage: initialStage,
+      requestStatus: initialStatus,
+      managerId: isTravelAdminInitiated ? null : (managerId || null),
+      travelAdminId: travelAdminId || null,
+      travadminApprover: travadminApprover || undefined,
+      isOnlineCancellation: isOnlineCancellation === true || isOnlineCancellation === "true",
+      approvalType: approvalType === "ONLINE" ? "ONLINE" : "OFFLINE",
+      providerExecutionStatus: isOnlineCancellation === true || isOnlineCancellation === "true" ? "PENDING" : "PENDING",
+      approvalAudit: [
+        {
+          action: "REQUEST_CREATED",
+          user: req.user?._id || requestUser?.id,
+          role: initiatorRole,
+          timestamp: new Date(),
+          remarks: isTravelAdminInitiated ? "Cancellation query created by Travel Admin" : "Cancellation query created",
+        },
+      ],
 
       logs: [
         {
@@ -830,39 +930,11 @@ exports.createCancellationQuery = async (req, res) => {
     });
 
     /* ─────────────────────────────
-       ✅ SUCCESS RESPONSE
+        ✅ SUCCESS RESPONSE (NO OPS ASSIGNMENT — approvals first)
     ───────────────────────────── */
-    const assignmentResult = await roundRobinAssignmentService.autoAssignRequest({
-      request: query,
-      requestType: "cancellation",
-      assignedBy: req.user?._id || req.user?.id || null,
-      reason: "Automatic cancellation query assignment",
-    });
-
-    if (!assignmentResult) {
-      query.autoAssignmentAttempted = true;
-      query.assignmentFailureReason = "NO_ELIGIBLE_OPS";
-      query.logs.push({
-        action: "ASSIGNMENT_PENDING",
-        by: "SYSTEM",
-        message:
-          "No eligible OPS member with Manage Cancellations permission was available for auto-assignment",
-      });
-      await query.save();
-    } else {
-      query.logs.push({
-        action: "AUTO_ASSIGNED",
-        by: "SYSTEM",
-        message: `Cancellation query auto-assigned to ${assignmentResult.agent.name}`,
-      });
-      await query.save();
-    }
-
     return res.status(201).json({
       success: true,
-      message: assignmentResult
-        ? "Cancellation query created and auto-assigned successfully"
-        : "Cancellation query created and awaiting OPS assignment",
+      message: "Cancellation query created successfully. Awaiting approval chain completion.",
       data: query,
     });
   } catch (error) {

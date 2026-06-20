@@ -73,6 +73,51 @@ const flightReissueRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+    /* ================= UNIFIED APPROVAL FIELDS ================= */
+
+    approvalStage: {
+      type: String,
+      enum: ["MANAGER", "TRAVEL_ADMIN", "TRAVEL_ADMIN_APPROVER", "EXECUTED"],
+      index: true,
+    },
+
+    requestStatus: {
+      type: String,
+      enum: ["PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL", "approved", "rejected", "transferred"],
+      index: true,
+    },
+
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travelAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travadminApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
+
+    approvalAudit: [
+      {
+        action: { type: String, required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: String,
+        timestamp: { type: Date, default: Date.now },
+        remarks: String,
+      },
+    ],
+
     reissueType: {
       type: String,
       enum: ["FULL_JOURNEY", "PARTIAL_JOURNEY"],
@@ -98,6 +143,10 @@ const flightReissueRequestSchema = new mongoose.Schema(
       pnr: String,
       totalFare: Number,
       travelDate: Date,
+      returnDate: Date,
+      cabinClass: String,
+      baseFare: Number,
+      taxes: Number,
     },
 
     /* SELECTED SEGMENTS FOR REISSUE */
@@ -105,6 +154,37 @@ const flightReissueRequestSchema = new mongoose.Schema(
       type: [sectorSchema],
       default: [],
     },
+
+    /* ================= REISSUE ITINERARY COMPARISON ================= */
+    // Original full itinerary (enriched from booking at request time)
+    originalItinerary: {
+      travelDate: Date,
+      returnDate: Date,
+      flightNumber: String,
+      sectors: [sectorSchema],
+      fare: Number,
+      class: String,
+      airline: String,
+      pnr: String,
+    },
+
+    // New/requested itinerary
+    newItinerary: {
+      travelDate: Date,
+      returnDate: Date,
+      flightNumber: String,
+      sectors: [sectorSchema],
+      fare: Number,
+      class: String,
+      airline: String,
+    },
+
+    // Pricing comparison
+    fareDifference: { type: Number, default: 0 },
+    penalty: { type: Number, default: 0 },
+    supplierCharges: { type: Number, default: 0 },
+    additionalCollection: { type: Number, default: 0 },
+    refundAmount: { type: Number, default: 0 },
 
     /* PASSENGERS */
     passengers: {
@@ -179,6 +259,14 @@ const flightReissueRequestSchema = new mongoose.Schema(
     strict: true,
   }
 );
+
+/* ─────────────────────────────
+   COMPOUND INDEXES for badge/queue queries
+───────────────────────────── */
+flightReissueRequestSchema.index({ "corporate.companyId": 1, approvalStage: 1, managerId: 1 });
+flightReissueRequestSchema.index({ "corporate.companyId": 1, approvalStage: 1, travelAdminId: 1 });
+flightReissueRequestSchema.index({ "corporate.companyId": 1, approvalStage: 1, "travadminApprover.userId": 1 });
+flightReissueRequestSchema.index({ approvalStage: 1, requestStatus: 1 });
 
 /* ─────────────────────────────
    MODEL EXPORT

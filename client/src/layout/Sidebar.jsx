@@ -33,6 +33,7 @@ import { fetchCorporateAdmin } from "../Redux/Slice/corporateAdminSlice";
 import { logoutUser } from "../Redux/Slice/authSlice";
 import { C } from "../components/Shared/color";
 import api from "../API/axios";
+import useSidebarBadges from "../hooks/useSidebarBadges";
 
 export default function Sidebar({ isOpen, onClose }) {
   const dispatch = useDispatch();
@@ -69,6 +70,8 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const [hasPendingTransfers, setHasPendingTransfers] = useState(false);
 
+  const { badges, refresh: refreshBadges } = useSidebarBadges();
+
   useEffect(() => {
     if (token) {
       api.get("/approvals/second-approver/check")
@@ -78,6 +81,11 @@ export default function Sidebar({ isOpen, onClose }) {
         .catch(console.error);
     }
   }, [token, location.pathname]);
+
+  // Refetch badges on navigation (catches approve/reject/transfer actions)
+  useEffect(() => {
+    refreshBadges();
+  }, [location.pathname, refreshBadges]);
 
   const handleLogout = () => {
     dispatch(logoutUser());
@@ -275,6 +283,15 @@ export default function Sidebar({ isOpen, onClose }) {
       icon: <FaListAlt />,
     },
     { to: "/system-logs", label: "System Logs", icon: <FaFileAlt /> },
+    {
+      label: "Ops Management",
+      icon: <FaUsers />,
+      children: [
+        { to: "/ops-members", label: "OPS Members", icon: <FaUsers /> },
+        { to: "/ops-capacity", label: "Capacity Dashboard", icon: <FaClipboardList /> },
+        { to: "/ops-diagnostics", label: "Diagnostics", icon: <FaClipboardList /> },
+      ],
+    },
   ];
 
   const employeeSection = [
@@ -432,6 +449,26 @@ export default function Sidebar({ isOpen, onClose }) {
     finance_team: "Finance Team",
   };
 
+  /* ── Badge helpers ── */
+  function Badge({ count }) {
+    if (!count) return null;
+    return (
+      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-[#04112F] ml-auto">
+        {count > 99 ? "99+" : count}
+      </span>
+    );
+  }
+
+  const badgeConfig = {
+    "Pending Requests": badges.pendingRequests,
+    "Offline Cancellations": badges.offlineCancellations,
+    "Reissue Requests": badges.reissueRequests,
+    "Approved Requests": badges.approvedRequests,
+    "Pending Approvals": badges.pendingRequests,
+    "Cancelled Bookings": badges.offlineCancellations,
+    "My Reissued": badges.reissueRequests,
+  };
+
   return (
     <aside
       className={`fixed top-0 left-0 h-screen z-100 flex flex-col transition-all duration-300 shadow-2xl border-r
@@ -570,6 +607,7 @@ export default function Sidebar({ isOpen, onClose }) {
                           {c.icon}
                         </span>
                         <span>{c.label}</span>
+                        <Badge count={badgeConfig[c.label]} />
                       </NavLink>
                     ))}
                   </div>
@@ -597,6 +635,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   {m.icon}
                 </span>
                 <span>{m.label}</span>
+                <Badge count={badgeConfig[m.label]} />
               </NavLink>
             ),
           )

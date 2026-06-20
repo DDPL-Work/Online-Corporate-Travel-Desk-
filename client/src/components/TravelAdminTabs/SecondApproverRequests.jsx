@@ -42,6 +42,7 @@ import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
 import { adminSecondApproverFlightsExportTemplate, adminSecondApproverHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
+import CancellationReissueApprovalPanel from "../CancellationReissueApprovalPanel";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Shared Components for both sections                            */
@@ -642,15 +643,15 @@ export default function SecondApproverRequests() {
 
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Tab Switcher */}
-        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Queue", FaPlane], ["hotel", "Hotel Queue", FaHotel]].map(([k, lbl, Icon]) => (
-             <button 
-                key={k} 
-                onClick={() => setActiveTab(k)} 
-                className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-             >
-                <Icon size={14} /> {lbl}
-             </button>
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit flex-wrap">
+           {[["flight", "Flight Queue", FaPlane], ["hotel", "Hotel Queue", FaHotel], ["cancel-reissue", "Cancel / Reissue", FaExchangeAlt]].map(([k, lbl, Icon]) => (
+              <button 
+                 key={k} 
+                 onClick={() => setActiveTab(k)} 
+                 className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+              >
+                 <Icon size={14} /> {lbl}
+              </button>
            ))}
         </div>
 
@@ -662,6 +663,14 @@ export default function SecondApproverRequests() {
             employeeOptions={allCorporateEmployees}
             onSelect={setSelectedRequest}
           />
+        ) : activeTab === "cancel-reissue" ? (
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
+            <h3 className="text-base font-black text-slate-800 mb-4 flex items-center gap-2">
+              <FaExchangeAlt size={16} className="text-[#003399]" />
+              Cancellation & Reissue Approvals (Configured Approver)
+            </h3>
+            <CancellationReissueApprovalPanel role="configured-approver" />
+          </div>
         ) : (
           <PendingHotelSection 
             requests={requests.filter(r => r.type === "hotel")} 

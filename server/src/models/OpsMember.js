@@ -70,6 +70,16 @@ const OpsMemberSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    currentActiveReissues: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    currentActiveCancellations: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     lastAssignedAt: {
       type: Date,
       default: null,
@@ -81,12 +91,22 @@ const OpsMemberSchema = new mongoose.Schema(
     },
     availabilityStatus: {
       type: String,
-      enum: ["AVAILABLE", "BUSY", "BREAK", "OFFLINE"],
+      enum: ["AVAILABLE", "BUSY", "BREAK", "OFFLINE", "ON_LEAVE"],
       default: "AVAILABLE",
     },
     maxConcurrentAssignments: {
       type: Number,
       default: 10,
+    },
+    maxConcurrentReissues: {
+      type: Number,
+      default: 10,
+      min: 1,
+    },
+    maxConcurrentCancellations: {
+      type: Number,
+      default: 10,
+      min: 1,
     },
     autoAssignmentEnabled: {
       type: Boolean,

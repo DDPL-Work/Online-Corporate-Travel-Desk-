@@ -126,6 +126,7 @@ function toOfflineReissueDto(doc) {
     // ── Type discriminator for combined online+offline views ──
     _type: "OFFLINE",
     id: item._id,
+    _id: item._id,
     requestId: item.requestId,
     bookingId: item.bookingId,
     employeeId: populatedEmployee ? populatedEmployee._id : item.employeeId,

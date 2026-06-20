@@ -5,15 +5,19 @@ const router = express.Router();
 const opsController = require("../controllers/ops.controller");
 const { verifyToken, verifySuperAdmin } = require("../middleware/auth.middleware");
 
-// All routes here require Super Admin access
+// Authentication required for all routes
 router.use(verifyToken);
-router.use(verifySuperAdmin);
 
-router.post("/create", opsController.createOpsMember);
-router.get("/list", opsController.listOpsMembers);
-router.patch("/update/:id", opsController.updateOpsMember);
-router.patch("/status/:id", opsController.updateOpsStatus);
-router.delete("/delete/:id", opsController.deleteOpsMember);
-router.patch("/reset-password/:id", opsController.resetPassword);
+// Super Admin only routes
+router.post("/create", verifySuperAdmin, opsController.createOpsMember);
+router.get("/list", verifySuperAdmin, opsController.listOpsMembers);
+router.patch("/update/:id", verifySuperAdmin, opsController.updateOpsMember);
+router.patch("/status/:id", verifySuperAdmin, opsController.updateOpsStatus);
+router.delete("/delete/:id", verifySuperAdmin, opsController.deleteOpsMember);
+router.patch("/reset-password/:id", verifySuperAdmin, opsController.resetPassword);
+router.get("/diagnostics", verifySuperAdmin, opsController.getAssignmentDiagnostics);
+
+// Self-service route (Ops member updates own availability)
+router.patch("/availability", opsController.updateMyAvailability);
 
 module.exports = router;

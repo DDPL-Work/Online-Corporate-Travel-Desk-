@@ -1289,7 +1289,7 @@ function CancellationSection({
     booking.amendment?.changeRequestId ||
     "—";
 
-  let displayStatus = booking.amendment?.status || "Cancelled";
+  let displayStatus = booking.executionStatus === "cancelled" ? "CANCELLED" : booking.amendment?.status || "Cancelled";
   if (
     cancelStatusRaw.ChangeRequestStatus === 3 ||
     providerStatusObj?.ChangeRequestStatus === 3

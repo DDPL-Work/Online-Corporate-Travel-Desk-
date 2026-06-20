@@ -1,5 +1,6 @@
 const FlightReissueRequest = require("../models/FlightReissueRequest");
 const BookingRequest = require("../models/BookingRequest");
+const User = require("../models/User");
 const amendmentService = require("../services/tektravels/flightAmendment.service");
 
 /* ======================================================
@@ -24,7 +25,13 @@ exports.createReissueRequest = async (req, res) => {
       passengers,
       corporate,
       bookingSnapshot,
-      user
+      user,
+      newItinerary,
+      fareDifference,
+      penalty,
+      supplierCharges,
+      additionalCollection,
+      refundAmount,
     } = req.body;
 
     // 1. Validation
@@ -61,7 +68,41 @@ exports.createReissueRequest = async (req, res) => {
       });
     }
 
-    // 4. Create request
+    // 4. Resolve manager from booking's original approver (Issue 29: no reassignment)
+    const bookingRequest = await BookingRequest.findById(bookingId).populate("approverId");
+    const managerId = bookingRequest?.approverId || null;
+    const travelAdminId = req.user?.corporateId
+      ? await User.findOne({ corporateId: req.user.corporateId, role: "travel-admin" }).select("_id").lean()
+      : null;
+
+    // 5. Determine creation stage based on initiator role
+    const isTravelAdminInitiated = req.user?.role === "travel-admin";
+    const initialStage = isTravelAdminInitiated ? "TRAVEL_ADMIN_APPROVER" : "MANAGER";
+    const initialStatus = isTravelAdminInitiated ? "PENDING_ADMIN_APPROVAL" : "PENDING_MANAGER_APPROVAL";
+    const initiatorRole = isTravelAdminInitiated ? "travel-admin" : "employee";
+
+    // 6. Build itinerary comparison data
+    // ── Original Itinerary (from booking) ──
+    const oldSectors = (booking?.bookingSnapshot?.sectors || [])
+      .map(s => {
+        if (typeof s === 'string') {
+          const parts = s.split('-');
+          return { origin: parts[0], destination: parts[1] || '', airline: booking?.bookingSnapshot?.airline };
+        }
+        return s;
+      });
+    const originalItinerary = booking ? {
+      travelDate: booking?.bookingSnapshot?.travelDate || null,
+      returnDate: booking?.bookingSnapshot?.returnDate || null,
+      flightNumber: booking?.flightRequest?.segments?.[0]?.flightNumber || null,
+      sectors: oldSectors,
+      fare: booking?.pricingSnapshot?.totalAmount || null,
+      class: booking?.bookingSnapshot?.cabinClass || null,
+      airline: booking?.bookingSnapshot?.airline || null,
+      pnr: booking?.bookingResult?.pnr || booking?.bookingSnapshot?.pnr || null,
+    } : {};
+
+    // ── Create request with approval stage & itinerary comparison ──
     const reissueId = await generateReissueId();
     
     const request = await FlightReissueRequest.create({
@@ -75,6 +116,26 @@ exports.createReissueRequest = async (req, res) => {
       corporate: corporate || {},
       bookingSnapshot: bookingSnapshot || {},
       user: user || {},
+      // ✅ Itinerary comparison data (Issues 30-31)
+      originalItinerary,
+      newItinerary: newItinerary || {},
+      fareDifference: fareDifference || 0,
+      penalty: penalty || 0,
+      supplierCharges: supplierCharges || 0,
+      additionalCollection: additionalCollection || 0,
+      refundAmount: refundAmount || 0,
+      // 🔥 Approval fields
+      approvalStage: initialStage,
+      requestStatus: initialStatus,
+      managerId: isTravelAdminInitiated ? null : managerId,
+      travelAdminId: travelAdminId?._id || null,
+      approvalAudit: [{
+        action: "REQUEST_CREATED",
+        user: user?.id || req.user?._id,
+        role: initiatorRole,
+        timestamp: new Date(),
+        remarks: isTravelAdminInitiated ? "Reissue request created by Travel Admin" : "Reissue request submitted"
+      }],
       logs: [{
         action: "CREATED",
         by: user?.name || "User",
@@ -142,30 +203,87 @@ exports.getReissueRequests = async (req, res) => {
 
 /* ======================================================
    2️⃣.5️⃣ GET SINGLE REISSUE REQUEST BY ID
+   Enriched with full itinerary comparison (Issues 30-31)
 ====================================================== */
 exports.getReissueRequestById = async (req, res) => {
   try {
     const { requestId } = req.params;
     let request = null;
+    let modelType = "legacy";
 
     // 1. Try fetching from OfflineReissueRequest collection first
     try {
       const OfflineReissueRequest = require("../modules/servicing/reissue/schemas/OfflineReissueRequest.schema");
-      request = await OfflineReissueRequest.findById(requestId).populate("bookingId");
-    } catch (err) {
-      console.warn("OfflineReissueRequest lookup error/not loaded:", err.message);
+      request = await OfflineReissueRequest.findById(requestId).lean();
+      if (request) modelType = "offline_reissue";
+    } catch (err) { /* model not available */ }
+
+    // 2. Try online ReissueRequest
+    if (!request) {
+      try {
+        const ReissueRequest = require("../modules/servicing/reissue/schemas/ReissueRequest.schema");
+        request = await ReissueRequest.findById(requestId).lean();
+        if (request) modelType = "online_reissue";
+      } catch (err) { /* model not available */ }
     }
 
-    // 2. Fall back to FlightReissueRequest if not found
+    // 3. Fall back to FlightReissueRequest
     if (!request) {
-      request = await FlightReissueRequest.findById(requestId).populate("bookingId");
+      request = await FlightReissueRequest.findById(requestId).lean();
+      if (request) modelType = "legacy";
     }
 
     if (!request) {
       return res.status(404).json({ success: false, message: "Request not found" });
     }
 
-    return res.json({ success: true, data: request });
+    // ── Enrich with booking data for itinerary comparison ──
+    let enriched = { ...request, modelType };
+
+    try {
+      if (request.bookingId) {
+        const Booking = require("../models/BookingRequest");
+        const booking = await Booking.findById(request.bookingId).lean();
+        if (booking) {
+          // Populate bookingId so frontend can read travellers
+          enriched.bookingId = booking;
+
+          enriched.bookingData = {
+            pnr: booking?.bookingResult?.pnr || booking?.bookingSnapshot?.pnr,
+            airline: booking?.bookingSnapshot?.airline,
+            travelDate: booking?.bookingSnapshot?.travelDate,
+            returnDate: booking?.bookingSnapshot?.returnDate,
+            cabinClass: booking?.bookingSnapshot?.cabinClass,
+            totalFare: booking?.pricingSnapshot?.totalAmount,
+            bookingReference: booking?.bookingReference,
+            orderId: booking?.orderId,
+            sectors: booking?.bookingSnapshot?.sectors || [],
+            segments: booking?.flightRequest?.segments || [],
+          };
+
+          // Build original itinerary if not already present
+          if (!enriched.originalItinerary || !enriched.originalItinerary.travelDate) {
+            enriched.originalItinerary = {
+              travelDate: booking?.bookingSnapshot?.travelDate || null,
+              returnDate: booking?.bookingSnapshot?.returnDate || null,
+              flightNumber: booking?.flightRequest?.segments?.[0]?.flightNumber || null,
+              sectors: (booking?.bookingSnapshot?.sectors || []).map(s => {
+                if (typeof s === 'string') return { origin: s.split('-')[0], destination: s.split('-')[1] || '' };
+                return s;
+              }),
+              fare: booking?.pricingSnapshot?.totalAmount || null,
+              class: booking?.bookingSnapshot?.cabinClass || null,
+              airline: booking?.bookingSnapshot?.airline || null,
+              pnr: booking?.bookingResult?.pnr || booking?.bookingSnapshot?.pnr || null,
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not enrich reissue detail with booking data:", err.message);
+    }
+
+    return res.json({ success: true, data: enriched });
   } catch (error) {
     console.error("Get Reissue Request By Id Error:", error.message);
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -196,13 +314,32 @@ exports.updateReissueStatus = async (req, res) => {
       });
     }
 
+    // Update both legacy status and new approval flow status
     request.status = status;
+
+    if (status === "APPROVED") {
+      // Legacy approval
+      request.approvalStage = "EXECUTED";
+      request.requestStatus = "approved";
+    } else {
+      request.approvalStage = "TRAVEL_ADMIN";
+      request.requestStatus = "rejected";
+    }
+
     request.resolution = {
       actionBy,
       actionByName,
       actionAt: new Date(),
       message: message || `Request ${status.toLowerCase()} by admin`
     };
+
+    request.approvalAudit.push({
+      action: status === "APPROVED" ? "Travel Admin Approved" : "Travel Admin Rejected",
+      user: actionBy || req.user?._id,
+      role: "travel-admin",
+      timestamp: new Date(),
+      remarks: message || `Request ${status.toLowerCase()}`
+    });
 
     request.logs.push({
       action: status,
@@ -235,6 +372,11 @@ exports.executeReissue = async (req, res) => {
     const request = await FlightReissueRequest.findById(requestId);
     if (!request) {
       return res.status(404).json({ success: false, message: "Request not found" });
+    }
+
+    // 🔒 EXECUTION GATING: Must be EXECUTED
+    if (request.approvalStage !== undefined && request.approvalStage !== "EXECUTED") {
+      return res.status(400).json({ success: false, message: "Awaiting approval before execution" });
     }
 
     if (request.status !== "APPROVED") {
@@ -294,6 +436,14 @@ exports.executeReissue = async (req, res) => {
         request.resolution.changeRequestId = changeRequestId;
         request.resolution.executedBy = actionBy;
         request.resolution.executedAt = new Date();
+
+        request.approvalAudit.push({
+          action: "EXECUTED",
+          user: actionBy || req.user?._id,
+          role: "super-admin",
+          timestamp: new Date(),
+          remarks: "Reissue executed successfully via TBO"
+        });
 
         request.logs.push({
             action: "COMPLETED",

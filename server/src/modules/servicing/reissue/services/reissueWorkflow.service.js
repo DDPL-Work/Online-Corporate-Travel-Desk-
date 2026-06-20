@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const BookingRequest = require("../../../../models/BookingRequest");
 const Corporate = require("../../../../models/Corporate");
+const User = require("../../../../models/User");
 const OpsMember = require("../../../../models/OpsMember");
 const ApiError = require("../../../../utils/ApiError");
 const logger = require("../../../../utils/logger");
@@ -364,12 +365,35 @@ class ReissueWorkflowService {
         booking?.originalBookingSnapshot?.corporateFareContext ||
         null,
     };
+    // Resolve manager from booking's approver for approval flow
+    let managerId = null;
+    let travelAdminId = null;
+    try {
+      if (booking.approverId) {
+        const mgrUser = await User.findById(booking.approverId).select("_id").lean();
+        if (mgrUser) managerId = mgrUser._id;
+      }
+      if (booking.corporateId) {
+        const taUser = await User.findOne({ corporateId: booking.corporateId, role: "travel-admin" }).select("_id").lean();
+        if (taUser) travelAdminId = taUser._id;
+      }
+    } catch (e) { /* silently fallback */ }
+
+    const isTravelAdminInitiated = actor?.role === "travel-admin";
+    const initialStage = isTravelAdminInitiated ? "TRAVEL_ADMIN_APPROVER" : "MANAGER";
+    const initialStatus = isTravelAdminInitiated ? "PENDING_ADMIN_APPROVAL" : "PENDING_MANAGER_APPROVAL";
+
     const baseRequestPayload = {
       reissueId,
       bookingId: booking._id,
       originalBookingId: onlineReissueContext.providerBookingReference,
       originalPnr: onlineReissueContext.originalPnr,
       userId: booking.userId,
+      // 🔥 UNIFIED APPROVAL FIELDS
+      approvalStage: initialStage,
+      requestStatus: initialStatus,
+      managerId: isTravelAdminInitiated ? null : managerId,
+      travelAdminId,
       corporateId: booking.corporateId,
       companyId: booking.corporateId,
       supplier: eligibility.supplier,
@@ -813,6 +837,11 @@ class ReissueWorkflowService {
       throw new ApiError(409, "Reissue confirmation requires a reserved billing quote first");
     }
 
+    // 🔒 EXECUTION GATING: Must be EXECUTED
+    if (request.approvalStage !== undefined && request.approvalStage !== "EXECUTED") {
+      throw new ApiError(400, "Awaiting approval before execution");
+    }
+
     const lock = await reissueLockService.acquire(request.reissueId, 60000);
     if (!lock.acquired) {
       throw new ApiError(409, "This reissue is already being processed");
@@ -957,6 +986,15 @@ class ReissueWorkflowService {
           newPnr: result.newPnr || request.originalPnr,
           activeBookingId: activeBooking?._id?.toString?.() || null,
         },
+      });
+
+      if (!request.approvalAudit) request.approvalAudit = [];
+      request.approvalAudit.push({
+        action: "EXECUTED",
+        user: actor?._id || actor?.id,
+        role: "system",
+        timestamp: new Date(),
+        remarks: "Online reissue executed successfully",
       });
 
       request.isReissueLocked = false;

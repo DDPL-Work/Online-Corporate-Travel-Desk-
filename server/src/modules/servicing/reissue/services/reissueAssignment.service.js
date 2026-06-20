@@ -30,45 +30,37 @@ class ReissueAssignmentService {
   getEligibleOpsQuery() {
     return {
       isDeleted: false,
-      isAvailableForReissues: true,
+      permissions: "Manage Reissues",
       autoAssignmentEnabled: true,
+      availabilityStatus: "AVAILABLE",
       $expr: {
         $lt: [
-          { $ifNull: ["$currentWorkload", 0] },
-          { $ifNull: ["$maxConcurrentAssignments", DEFAULT_MAX_CONCURRENT_ASSIGNMENTS] },
+          { $ifNull: ["$currentActiveReissues", 0] },
+          { $ifNull: ["$maxConcurrentReissues", 10] },
         ],
       },
     };
   }
 
   async listEligibleOpsMembers({ session } = {}) {
-    const candidates = await OpsMember.find(this.getEligibleOpsQuery())
-      .sort({ currentWorkload: 1, lastAssignedAt: 1, _id: 1 })
+    const eligible = await OpsMember.find(this.getEligibleOpsQuery())
+      .sort({ lastAssignedAt: 1, name: 1 })
       .session(session || null);
 
-    return candidates.filter((member) =>
-      isEligibleForReissueAssignment(member, {
-        context: {
-          service: "reissueAssignmentService.listEligibleOpsMembers",
-        },
-      }),
-    );
+    logger.info("reissue_eligible_members", {
+      count: eligible.length,
+      members: eligible.map((m) => ({
+        name: m.name,
+        reissues: `${m.currentActiveReissues}/${m.maxConcurrentReissues}`,
+      })),
+    });
+
+    return eligible;
   }
 
   async findNextEligibleOpsMember({ session } = {}) {
-    const candidates = await OpsMember.find(this.getEligibleOpsQuery())
-      .sort({ currentWorkload: 1, lastAssignedAt: 1, _id: 1 })
-      .session(session || null);
-
-    return (
-      candidates.find((member) =>
-        isEligibleForReissueAssignment(member, {
-          context: {
-            service: "reissueAssignmentService.findNextEligibleOpsMember",
-          },
-        }),
-      ) || null
-    );
+    const eligible = await this.listEligibleOpsMembers({ session });
+    return eligible[0] || null;
   }
 
   async validateAssignableOpsMember(opsMemberId, { session } = {}) {
@@ -103,6 +95,7 @@ class ReissueAssignmentService {
     }
 
     opsMember.lastAssignedAt = assignedAt;
+    opsMember.currentActiveReissues = Math.max(0, Number(opsMember.currentActiveReissues || 0) + 1);
     opsMember.currentWorkload = Math.max(0, Number(opsMember.currentWorkload || 0) + 1);
     opsMember.currentActiveAssignments = Math.max(
       0,
@@ -124,6 +117,7 @@ class ReissueAssignmentService {
     const opsMember = await OpsMember.findById(normalizedId).session(session || null);
     if (!opsMember) return null;
 
+    opsMember.currentActiveReissues = Math.max(0, Number(opsMember.currentActiveReissues || 0) - 1);
     opsMember.currentWorkload = Math.max(0, Number(opsMember.currentWorkload || 0) - 1);
     opsMember.currentActiveAssignments = Math.max(
       0,
@@ -183,6 +177,15 @@ class ReissueAssignmentService {
   } = {}) {
     if (!request) {
       throw new ApiError(400, "Offline reissue request is required for assignment");
+    }
+
+    // 🔒 GUARD: Assignment is ONLY allowed after final approval (EXECUTED).
+    // This prevents premature assignment before the approval pipeline completes.
+    if (request.approvalStage !== "EXECUTED" && request.requestStatus !== "approved") {
+      throw new ApiError(
+        409,
+        "Offline reissue must reach EXECUTED approval stage before Ops assignment",
+      );
     }
 
     const now = new Date();
@@ -255,6 +258,14 @@ class ReissueAssignmentService {
     }
     await this.incrementOpsWorkload(nextOpsMember._id, { session, assignedAt: now });
 
+    request.assignmentAudit = request.assignmentAudit || [];
+    request.assignmentAudit.push({
+      action: "AUTO_ASSIGNED",
+      message: `Assigned to ${nextOpsMember.name} via ${mode} — Reissue Capacity: ${nextOpsMember.currentActiveReissues}/${nextOpsMember.maxConcurrentReissues}`,
+      assignedBy: assignedBy?.name || "SYSTEM",
+      at: now,
+    });
+
     if (persistRequest && typeof request.save === "function") {
       await request.save({ session });
     }
@@ -263,6 +274,7 @@ class ReissueAssignmentService {
       requestId: request.requestId || request._id?.toString?.(),
       assignedOpsId: nextOpsMember._id.toString(),
       assignedOpsName: nextOpsMember.name,
+      capacity: `${nextOpsMember.currentActiveReissues}/${nextOpsMember.maxConcurrentReissues}`,
       previousAssigneeId: previousAssigneeId ? String(previousAssigneeId) : null,
     });
 
@@ -313,10 +325,19 @@ class ReissueAssignmentService {
 
     await this.decrementOpsWorkload(request.assignedOpsMember, { session });
 
+    const opsMember = await OpsMember.findById(request.assignedOpsMember).session(session || null);
+
     request.metadata = {
       ...metadata,
       assignmentWorkloadReleasedAt: new Date(),
     };
+
+    request.assignmentAudit = request.assignmentAudit || [];
+    request.assignmentAudit.push({
+      action: "CAPACITY_RELEASED",
+      message: `Reissue capacity released for ${opsMember?.name || request.assignedOpsMember} — Reissues: ${opsMember?.currentActiveReissues ?? 0}/${opsMember?.maxConcurrentReissues ?? 10}`,
+      at: new Date(),
+    });
 
     if (typeof request.save === "function") {
       await request.save({ session });

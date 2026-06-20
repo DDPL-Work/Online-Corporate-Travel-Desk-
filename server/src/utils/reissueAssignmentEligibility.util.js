@@ -82,6 +82,20 @@ const evaluateReissueAssignmentEligibility = (member, options = {}) => {
     reasons.push("invalid_servicing_scope");
   }
 
+  if (member.availabilityStatus !== "AVAILABLE") {
+    reasons.push(`availability_${(member.availabilityStatus || "unknown").toLowerCase()}`);
+  }
+
+  if (!member.autoAssignmentEnabled) {
+    reasons.push("auto_assignment_disabled");
+  }
+
+  const currentReissues = member.currentActiveReissues ?? 0;
+  const maxReissues = member.maxConcurrentReissues ?? 10;
+  if (currentReissues >= maxReissues) {
+    reasons.push(`capacity_full_${currentReissues}_${maxReissues}`);
+  }
+
   const result = {
     eligible: reasons.length === 0,
     reasons,
@@ -100,6 +114,9 @@ const evaluateReissueAssignmentEligibility = (member, options = {}) => {
       status: member.status ?? null,
       isBlocked: member.isBlocked === true,
       permissions: normalizedPermissions,
+      availabilityStatus: member.availabilityStatus,
+      autoAssignmentEnabled: member.autoAssignmentEnabled,
+      capacity: `${currentReissues}/${maxReissues}`,
       servicingScope: member.servicingScope ?? null,
       normalizedServicingScope: normalizedScope || null,
       context: options.context || null,

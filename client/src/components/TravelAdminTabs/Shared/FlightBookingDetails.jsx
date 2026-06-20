@@ -1278,7 +1278,7 @@ function BookingHistory({ booking }) {
       date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
       desc: (() => {
         const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
-        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
+        const isApproved = booking.approvedAt || booking.requestStatus === "approved" || booking.requestStatus === "EXECUTED";
         
         if (isRejected) {
           return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
@@ -1292,10 +1292,14 @@ function BookingHistory({ booking }) {
           }
           return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
         }
+        if (booking.requestStatus === "PENDING_MANAGER_APPROVAL") return "Waiting for manager approval";
+        if (booking.requestStatus === "PENDING_TRAVEL_ADMIN_APPROVAL") return "Waiting for travel admin approval";
+        if (booking.requestStatus === "PENDING_ADMIN_APPROVAL") return "Waiting for admin approval";
+        if (booking.requestStatus === "transferred") return "Transferred to another approver";
         return "Waiting for manager approval";
       })(),
       icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
+      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected", "PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL"].includes(booking.requestStatus)),
     },
     {
       label: "Ticketing",
@@ -2096,7 +2100,7 @@ export default function FlightBookingDetails() {
                         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 border border-red-100">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                           <span className="text-[9px] font-bold uppercase text-red-600 tracking-wider">
-                            {booking.amendment?.status || "Cancelled"}
+                            {booking.executionStatus === "cancelled" ? "CANCELLED" : booking.amendment?.status || "Cancelled"}
                           </span>
                         </div>
                       </div>
@@ -2377,39 +2381,63 @@ function CancellationModal({ booking, onClose, onSuccess }) {
   };
 
   useEffect(() => {
-    const isCancelled = sessionStorage.getItem(
-      `cancelRequested_${booking._id}`,
-    );
-
-    if (isCancelled === "true" || !shouldFetchCharges) {
+    if (!shouldFetchCharges) {
       return;
     }
-
+    const existingRequest = sessionStorage.getItem(
+      `cancelRequested_${booking._id}`,
+    );
+    if (existingRequest === "true") {
+      setStep("charges");
+      return;
+    }
     (async () => {
       try {
         const res = await dispatch(fetchCancellationCharges(booking._id));
-
         if (!fetchCancellationCharges.fulfilled.match(res)) {
           throw new Error("Failed to fetch charges");
         }
-
         if (isCancellationChargesUnavailableResponse(res.payload)) {
           setChargesError(CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE);
           setCharges(null);
           setStep("charges");
           return;
         }
-
         setCharges(res.payload);
         setStep("charges");
       } catch (err) {
         console.warn("Charges API failed → allowing actions");
         setChargesError(err.message);
-        setCharges(null); 
-        setStep("charges"); 
+        setCharges(null);
+        setStep("charges");
       }
     })();
   }, [booking._id, dispatch, shouldFetchCharges]);
+
+  const querySuccess = useSelector((s) => s.amendment?.querySuccess);
+  const queryError = useSelector((s) => s.amendment?.queryError);
+  const queryDataState = useSelector((s) => s.amendment?.queryData);
+
+  useEffect(() => {
+    if (step !== "processing") return;
+    if (querySuccess && queryDataState) {
+      const successType = selectedJourney ? "partial" : "full";
+      setSuccessData({
+        type: successType,
+        status: queryDataState?.requestStatus || "pending",
+        route: selectedJourney,
+        queryData: queryDataState,
+      });
+      setStep("success");
+    } else if (queryError) {
+      const msg =
+        typeof queryError === "string"
+          ? queryError
+          : queryError?.message || "Cancellation request failed. Please try again.";
+      setChargesError(msg);
+      setStep("error");
+    }
+  }, [querySuccess, queryError, queryDataState, step, selectedJourney]);
 
   const isMulti = charges?.isRoundTrip;
   const chargeList = isMulti

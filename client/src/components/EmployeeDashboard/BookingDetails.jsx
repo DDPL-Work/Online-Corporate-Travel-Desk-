@@ -43,8 +43,6 @@ import {
 } from "../../Redux/Actions/booking.thunks";
 import {
   fetchCancellationCharges,
-  fullCancellation,
-  partialCancellation,
   fetchChangeStatus,
   createCancellationQuery,
 } from "../../Redux/Actions/amendmentThunks";
@@ -54,6 +52,7 @@ import {
 } from "../../Redux/Actions/reissueThunks";
 import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
 import { clearEligibility } from "../../Redux/Slice/reissueSlice";
+import api from "../../API/axios";
 import {
   formatDate,
   formatTime,
@@ -69,6 +68,7 @@ import {
   CANCELLATION_CHARGES_UNAVAILABLE_MESSAGE,
   CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE,
   isCancellationChargesUnavailableResponse,
+  isOnlineCancellationResponse,
   resolveCancellationBookingReference,
 } from "../../utils/cancellationQuery";
 
@@ -1224,6 +1224,10 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
   const [processingLabel, setProcessingLabel] = useState("Processing…");
   const [shouldFetchCharges, setShouldFetchCharges] = useState(true);
 
+  const querySuccess = useSelector((s) => s.amendment?.querySuccess);
+  const queryError = useSelector((s) => s.amendment?.queryError);
+  const queryDataState = useSelector((s) => s.amendment?.queryData);
+
   const [showQueryModal, setShowQueryModal] = useState(false);
   // const [showReissueModal, setShowReissueModal] = useState(false);
   const [queryPriority, setQueryPriority] = useState("MEDIUM");
@@ -1238,6 +1242,13 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
   const returnSegs = segments.filter((s) => journeyTypeOf(s) === "return");
   const hasReturn = returnSegs.length > 0;
 
+  const existingCancelQuery = booking?.cancellationQuery;
+  const hasActiveCancellationQuery =
+    existingCancelQuery &&
+    ["PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL"].includes(
+      existingCancelQuery.requestStatus
+    );
+
   const sectorLabel = (segList) => {
     if (!segList.length) return "N/A";
     const first = segList[0];
@@ -1247,12 +1258,20 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
 
   // Fetch charges on mount
   useEffect(() => {
-    const isCancelled = sessionStorage.getItem(
+    // 🚫 STOP API after cancellation OR manual block
+    if (!shouldFetchCharges) {
+      return;
+    }
+
+    const existingRequest = sessionStorage.getItem(
       `cancelRequested_${booking._id}`,
     );
 
-    // 🚫 STOP API after cancellation OR manual block
-    if (isCancelled === "true" || !shouldFetchCharges) {
+    // If sessionStorage shows a prior cancel request for this booking,
+    // don't block the UI — transition to "charges" so the user can see
+    // charges or raise a fresh query.
+    if (existingRequest === "true") {
+      setStep("charges");
       return;
     }
 
@@ -1282,6 +1301,30 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
       }
     })();
   }, [booking._id, dispatch, shouldFetchCharges]);
+
+  // Safety net — watch Redux querySuccess/queryError as additional
+  // exit conditions for the processing step.
+  useEffect(() => {
+    if (step !== "processing") return;
+
+    if (querySuccess && queryDataState) {
+      const successType = selectedJourney ? "partial" : "full";
+      setSuccessData({
+        type: successType,
+        status: queryDataState?.requestStatus || "pending",
+        route: selectedJourney,
+        queryData: queryDataState,
+      });
+      setStep("success");
+    } else if (queryError) {
+      const msg =
+        typeof queryError === "string"
+          ? queryError
+          : queryError?.message || "Cancellation request failed. Please try again.";
+      setChargesError(msg);
+      setStep("error");
+    }
+  }, [querySuccess, queryError, queryDataState, step, selectedJourney]);
 
   // Extract TicketCRInfo[0] from charges response
   const isMulti = charges?.isRoundTrip;
@@ -1320,44 +1363,68 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
     setStep("processing");
     setProcessingLabel("Submitting cancellation request…");
     try {
-      const res = await dispatch(
-        fullCancellation({
-          bookingId: booking._id,
-          remarks: remarksText || undefined,
-        }),
-      );
-      let changeRequestIds = [];
-      const responses = res.payload?.data || [];
-
-      if (responses.length > 0) {
-        changeRequestIds = responses
-          .map(
-            (item) =>
-              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-              item?.response?.Response?.ChangeRequestId,
-          )
-          .filter(Boolean);
-      } else {
-        // Fallback for direct response structure
-        const singleId =
-          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-          res.payload?.Response?.ChangeRequestId;
-        if (singleId) changeRequestIds = [singleId];
+      const bookingReference = resolveCancellationBookingReference(booking);
+      if (!bookingReference) {
+        throw new Error(CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE);
       }
 
-      if (!changeRequestIds.length) {
-        throw new Error("No ChangeRequestId returned");
-      }
+      const onlineAvailable = charges ? isOnlineCancellationResponse(charges) : false;
+
+      const payload = {
+        bookingId: booking._id,
+        bookingReference,
+        type: "full",
+        remarks: remarksText || "User requested full cancellation",
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+        isOnlineCancellation: onlineAvailable,
+        approvalType: onlineAvailable ? "ONLINE" : "OFFLINE",
+      };
+
+      const res = await dispatch(createCancellationQuery(payload));
+      if (res.error) throw new Error(res.payload || "Failed to create cancellation request");
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
 
-      toast.success("Cancellation request submitted successfully");
+      // Close modal
       onClose();
 
-      await dispatch(fetchMyBookingById(booking._id));
-      // Force page refresh or reload if needed by navigating or reloading
-      navigate("/my-cancelled-bookings");
+      // Reset all modal states
+      dispatch(resetAmendmentState());
+      setStep("loading");
+      setCharges(null);
+      setChargesError(null);
+      setSuccessData(null);
+      setRemarksText("");
+      setSelectedJourney(null);
+      setReissueDate("");
+      setReturnReissueDate("");
+      setProcessingLabel("Processing…");
+
+      // Show success feedback
+      if (onlineAvailable) {
+        Swal.fire({
+          icon: "success",
+          title: "Cancellation Executed",
+          text: "Your booking has been cancelled successfully.",
+          confirmButtonColor: "#003399",
+        });
+      } else {
+        Swal.fire({
+          icon: "success",
+          title: "Cancellation Request Submitted",
+          text: "Your cancellation request has been sent for approval.",
+          confirmButtonColor: "#003399",
+        });
+      }
+
+      dispatch(fetchMyBookingById(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Cancellation failed. Please try again.");
       setStep("error");
@@ -1381,24 +1448,56 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
     setStep("processing");
     setProcessingLabel("Submitting partial cancellation…");
     try {
-      const res = await dispatch(
-        partialCancellation({
-          bookingId: booking._id,
-          segments: sectors,
-          remarks: remarksText || "User requested partial cancellation",
-        }),
-      );
-      if (res.error)
-        throw new Error(res.payload || "Partial cancellation failed");
+      const bookingReference = resolveCancellationBookingReference(booking);
+      if (!bookingReference) {
+        throw new Error(CANCELLATION_REFERENCE_UNAVAILABLE_MESSAGE);
+      }
+
+      const payload = {
+        bookingId: booking._id,
+        bookingReference,
+        type: "partial",
+        segments: sectors,
+        remarks: remarksText || "User requested partial cancellation",
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+      };
+
+      const res = await dispatch(createCancellationQuery(payload));
+      if (res.error) throw new Error(res.payload || "Failed to create cancellation request");
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
 
-      toast.success("Partial cancellation request submitted successfully");
+      // Close modal
       onClose();
 
-      await dispatch(fetchMyBookingById(booking._id));
-      navigate("/my-cancelled-bookings");
+      // Reset all modal states
+      dispatch(resetAmendmentState());
+      setStep("loading");
+      setCharges(null);
+      setChargesError(null);
+      setSuccessData(null);
+      setRemarksText("");
+      setSelectedJourney(null);
+      setReissueDate("");
+      setReturnReissueDate("");
+      setProcessingLabel("Processing…");
+
+      // Show success feedback
+      Swal.fire({
+        icon: "success",
+        title: "Cancellation Request Submitted",
+        text: "Your cancellation request has been sent for approval.",
+        confirmButtonColor: "#003399",
+      });
+
+      dispatch(fetchMyBookingById(booking._id));
     } catch (err) {
       setChargesError(err?.message || "Partial cancellation failed.");
       setStep("error");
@@ -1562,7 +1661,22 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
         throw new Error(res.payload || "Failed to create query");
       }
 
-      toast.success("Cancellation query created successfully");
+      dispatch(resetAmendmentState());
+      setStep("loading");
+      setCharges(null);
+      setChargesError(null);
+      setSuccessData(null);
+      setRemarksText("");
+      setShowQueryModal(false);
+      setQueryPriority("MEDIUM");
+      setQueryRemarks("");
+
+      Swal.fire({
+        icon: "success",
+        title: "Cancellation Request Submitted",
+        text: "Your cancellation request has been sent for approval.",
+        confirmButtonColor: "#003399",
+      });
       onClose();
 
       await dispatch(fetchMyBookingById(booking._id));
@@ -1672,31 +1786,39 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
               </div>
               <div>
                 <p className="text-base font-black text-slate-800 mb-1">
-                  {successData.type === "full" && "Cancellation Successful"}
-                  {successData.type === "partial" &&
-                    "Partial Cancellation Submitted"}
-                  {successData.type === "reissue" &&
-                    "Reissue Request Submitted"}
+                  {successData.type === "full" && successData.status !== "completed" && "Cancellation Request Submitted"}
+                  {successData.type === "full" && successData.status === "completed" && "Cancellation Successful"}
+                  {successData.type === "partial" && successData.status !== "completed" && "Partial Cancellation Request Submitted"}
+                  {successData.type === "partial" && successData.status === "completed" && "Partial Cancellation Completed"}
+                  {successData.type === "reissue" && "Reissue Request Submitted"}
                   {successData.type === "query" && "Request Submitted"}
                 </p>
                 <p className="text-xs text-slate-400">
-                  {successData.type === "full" &&
-                  successData.status !== "completed"
-                    ? "Your request is being processed. You'll be notified shortly."
-                    : successData.type === "full"
-                      ? "Your ticket has been cancelled successfully."
-                      : successData.type === "partial"
-                        ? `Route ${successData.route} cancellation submitted.`
-                        : successData.type === "reissue"
-                          ? `Reissue for ${successData.newDate} submitted.`
-                          : successData.type === "query"
-                            ? "Your cancellation request has been raised successfully. Our support team will process it shortly."
-                            : ""}
+                  {successData.type === "full" && successData.status === "completed"
+                    ? "Your ticket has been cancelled successfully."
+                    : successData.type === "full" || successData.type === "partial"
+                      ? "Your cancellation request has been sent for approval."
+                      : successData.type === "reissue"
+                        ? `Reissue for ${successData.newDate} submitted.`
+                        : successData.type === "query"
+                          ? "Your cancellation request has been raised successfully. Our support team will process it shortly."
+                          : ""}
                 </p>
+{successData.status !== "completed" && (successData.type === "full" || successData.type === "partial") && (
+  <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg mt-2">
+    {successData.status === "PENDING_MANAGER_APPROVAL" && "Waiting for approval"}
+    {successData.status === "PENDING_TRAVEL_ADMIN_APPROVAL" && "Waiting for travel admin approval"}
+    {successData.status === "PENDING_ADMIN_APPROVAL" && "Waiting for admin approval"}
+    {successData.status === "approved" && "Approved — processing cancellation"}
+    {successData.status === "rejected" && "Cancellation request was rejected"}
+    {successData.status === "transferred" && "Transferred to another approver"}
+    {!["PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL", "approved", "rejected", "transferred"].includes(successData.status) && "Submitted for approval"}
+  </p>
+)}
               </div>
 
-              {/* Refund summary for full cancel */}
-              {successData.type === "full" && (
+              {/* Refund summary only after EXECUTED */}
+              {successData.type === "full" && successData.status === "completed" && (
                 <div className="w-full bg-slate-50 rounded-xl p-4 space-y-2 text-left">
                   {successData.cancellationCharge != null && (
                     <div className="flex justify-between text-sm">
@@ -1820,11 +1942,27 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
                 </div>
               )} */}
 
+              {/* ⚠️ Active cancellation query warning */}
+              {hasActiveCancellationQuery && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                  <FiAlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">A cancellation request is already awaiting approval.</p>
+                    <p className="text-xs text-amber-600 mt-1">Query ID: {existingCancelQuery.queryId || existingCancelQuery._id?.slice(-8)?.toUpperCase()}</p>
+                  </div>
+                </div>
+              )}
+
               {/* 3 action buttons */}
               <div className="grid grid-cols-1 gap-2 pt-1">
                 <button
                   onClick={() => setStep("full-confirm")}
-                  className="w-full py-3 bg-red-600 text-white font-bold text-sm rounded-xl hover:bg-red-700 transition flex items-center justify-center gap-2"
+                  disabled={hasActiveCancellationQuery}
+                  className={`w-full py-3 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 ${
+                    hasActiveCancellationQuery
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "bg-red-600 text-white hover:bg-red-700"
+                  }`}
                 >
                   <FiXCircle size={15} />
                   Full Cancellation
@@ -1833,7 +1971,12 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
                 {hasReturn && (
                   <button
                     onClick={() => setStep("partial-select")}
-                    className="w-full py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition flex items-center justify-center gap-2"
+                    disabled={hasActiveCancellationQuery}
+                    className={`w-full py-3 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 ${
+                      hasActiveCancellationQuery
+                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                        : "bg-amber-500 text-white hover:bg-amber-600"
+                    }`}
                   >
                     <FiAlertTriangle size={15} />
                     Partial Cancellation
@@ -1858,26 +2001,11 @@ function CancellationModal({ booking, onClose, onSuccess, isOnlineEligible = tru
                     Reissue Flight
                   </button>
                 ) : (
-                  <>
-                    {/* <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                      <FiAlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-500" />
-                      <p className="text-xs leading-relaxed text-amber-800">
-                        <span className="font-bold">Online reissue is not available</span> for this booking/fare.
-                        Our operations team will process your request manually.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setStep("reissue")}
-                      className="w-full py-3 bg-amber-500 text-white font-bold text-sm rounded-xl hover:bg-amber-600 transition flex items-center justify-center gap-2"
-                    >
-                      <FiSend size={15} />
-                      Raise Offline Reissue Request
-                    </button> */}
-                  </>
+                  <></>
                 )}
 
-                {/* ✅ NEW BUTTON (ONLY WHEN API FAILS) */}
-                {chargesUnavailable && (
+                {/* Raise Cancellation Request (ONLY WHEN CHARGES API FAILS AND NO ACTIVE QUERY) */}
+                {chargesUnavailable && !hasActiveCancellationQuery && (
                   <button
                     onClick={() => setShowQueryModal(true)}
                     className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2"
@@ -2288,11 +2416,18 @@ function CancelScreen({ booking, onClose }) {
       `cancelRequested_${booking._id}`,
     );
 
-    if (isCancelled === "true") return;
+    if (isCancelled === "true") {
+      setCharges(null);
+      return;
+    }
 
     const fetchCharges = async () => {
-      const res = await dispatch(fetchCancellationCharges(booking._id));
-      if (res.payload) setCharges(res.payload);
+      try {
+        const res = await dispatch(fetchCancellationCharges(booking._id));
+        if (res.payload) setCharges(res.payload);
+      } catch (_) {
+        setCharges(null);
+      }
     };
 
     fetchCharges();
@@ -2302,81 +2437,61 @@ function CancelScreen({ booking, onClose }) {
     if (!confirm) return;
     try {
       setLoading(true);
-      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
-      let changeRequestIds = [];
 
-      if (res.payload?.isRoundTrip) {
-        changeRequestIds = res.payload.data
-          ?.map(
-            (item) =>
-              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId,
-          )
-          .filter(Boolean);
-      } else {
-        const singleId =
-          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-          res.payload?.Response?.ChangeRequestId;
-
-        if (singleId) changeRequestIds = [singleId];
+      const bookingReference = resolveCancellationBookingReference(booking);
+      if (!bookingReference) {
+        Swal.fire({
+          icon: "error",
+          title: "Cannot Cancel",
+          text: "Booking reference not available.",
+        });
+        setLoading(false);
+        return;
       }
 
-      if (!changeRequestIds.length) {
-        throw new Error("No ChangeRequestId");
-      }
-      let status = "requested";
-      let attempts = 0;
-      while (
-        (status === "requested" || status === "in_progress") &&
-        attempts < 2
-      ) {
-        attempts++;
-        await new Promise((r) => setTimeout(r, 4000));
-        const statusResponses = await Promise.all(
-          changeRequestIds.map((id) =>
-            dispatch(
-              fetchChangeStatus({
-                changeRequestId: id,
-                bookingId: booking._id,
-              }),
-            ),
-          ),
-        );
-        let allCompleted = true;
+      const payload = {
+        bookingId: booking._id,
+        bookingReference,
+        type: "full",
+        remarks: "User requested cancellation",
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+      };
 
-        for (const resItem of statusResponses) {
-          const apiStatus =
-            resItem.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestStatus;
-
-          if (apiStatus !== 4) {
-            allCompleted = false;
-          }
-        }
-
-        status = allCompleted ? "completed" : "in_progress";
-      }
-      if (status === "failed")
-        throw new Error("Cancellation failed by airline/supplier");
+      const res = await dispatch(createCancellationQuery(payload));
+      if (res.error) throw new Error(res.payload || "Failed to create cancellation request");
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
 
-      if (status !== "completed") {
-        Swal.fire({
-          icon: "info",
-          title: "Cancellation in Progress",
-          text: "Your cancellation request is being processed. Please check status later.",
-        });
-        navigate("/my-cancelled-bookings");
-        onClose();
-        return;
+      Swal.fire({
+        icon: "success",
+        title: "Request Submitted",
+        text: "Your cancellation request has been submitted for approval. You'll be notified once processed.",
+      });
+
+      // Re-fetch booking in background — never let a failure here override
+      // the success state.
+      try {
+        await dispatch(fetchMyBookingById(booking._id));
+      } catch (_) {
+        // swallow — query was already created successfully
       }
-      await dispatch(fetchMyBookingById(booking._id));
       navigate("/my-cancelled-bookings");
       onClose();
     } catch (err) {
       console.error(err);
+      Swal.fire({
+        icon: "error",
+        title: "Cancellation Failed",
+        text: err?.message || "Something went wrong. Please try again.",
+      });
     } finally {
       setLoading(false);
-      dispatch(fetchMyBookingById(booking._id));
     }
   };
 
@@ -2515,32 +2630,58 @@ function PartialCancelModal({ booking, onClose }) {
     if (!sectors.length) return;
     try {
       setLoading(true);
-      const res = await dispatch(
-        partialCancellation({
-          bookingId: booking._id,
-          segments: sectors,
-          remarks,
-        }),
-      );
-      if (res.error)
-        throw new Error(res.payload || "Partial cancellation failed");
+
+      const bookingReference = resolveCancellationBookingReference(booking);
+      if (!bookingReference) {
+        Swal.fire({
+          icon: "error",
+          title: "Cannot Cancel",
+          text: "Booking reference not available.",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const payload = {
+        bookingId: booking._id,
+        bookingReference,
+        type: "partial",
+        segments: sectors,
+        remarks,
+        corporate: {
+          companyId: booking?.companyId,
+          companyName: booking?.companyName,
+          employeeId: booking?.employeeId,
+          employeeName: booking?.user?.name,
+          employeeEmail: booking?.user?.email,
+        },
+      };
+
+      const res = await dispatch(createCancellationQuery(payload));
+      if (res.error) throw new Error(res.payload || "Failed to create cancellation request");
+
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-      // 🔥 CLOSE MODAL IMMEDIATELY
       onClose();
-      await dispatch(fetchMyBookingById(booking._id));
+      // Re-fetch booking in background — never let a failure here override
+      // the success state.
+      try {
+        await dispatch(fetchMyBookingById(booking._id));
+      } catch (_) {
+        // swallow — query was already created successfully
+      }
       Swal.fire({
         icon: "success",
-        title: "Cancellation request submitted successfully",
-        timer: 2000,
+        title: "Request Submitted",
+        text: "Your partial cancellation request has been submitted for approval. You'll be notified once processed.",
+        timer: 3000,
         showConfirmButton: false,
       });
       navigate("/my-cancelled-bookings");
-      onClose();
     } catch (err) {
       Swal.fire({
         icon: "error",
-        title: "Failed to submit cancellation",
-        text: err.message,
+        title: "Cancellation Failed",
+        text: err?.message || "Something went wrong. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -2662,9 +2803,34 @@ export default function BookingDetails() {
 
   const cancelRequested =
     sessionStorage.getItem(`cancelRequested_${booking?._id}`) === "true";
+  const cancellationQuery = booking?.cancellationQuery;
   const isCancelled =
     ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase()) ||
-    (isEmployee && cancelRequested);
+    (isEmployee && cancelRequested) ||
+    (cancellationQuery?.approvalStage === "EXECUTED" && cancellationQuery?.requestStatus === "approved");
+
+// Derive display status from cancellation query
+// Mapping: PENDING_APPROVAL → CANCELLED → REJECTED → PROCESSING → COMPLETED
+const derivedStatus = cancellationQuery
+    ? cancellationQuery.requestStatus === "approved" && cancellationQuery.approvalStage === "EXECUTED"
+        ? cancellationQuery.providerExecutionStatus === "COMPLETED"
+            ? "Completed"
+            : cancellationQuery.providerExecutionStatus === "OPS_ASSIGNED"
+                ? "Processing"
+                : "Completed"
+        : cancellationQuery.requestStatus === "rejected" || cancellationQuery.approvalStage === "REJECTED"
+            ? "Rejected"
+            : cancellationQuery.requestStatus === "transferred"
+                ? "Transferred"
+                : cancellationQuery.approvalStage === "PENDING_PARALLEL_APPROVAL" ||
+                  cancellationQuery.requestStatus === "PENDING_MANAGER_APPROVAL" ||
+                  cancellationQuery.requestStatus === "PENDING_TRAVEL_ADMIN_APPROVAL" ||
+                  cancellationQuery.requestStatus === "PENDING_ADMIN_APPROVAL"
+                    ? "Pending approval"
+                    : booking.executionStatus === "ticketed"
+                        ? "Confirmed"
+                        : booking.executionStatus || "Pending"
+    : null;
 
   useEffect(() => {
     if (id) dispatch(fetchMyBookingById(id));
@@ -2753,6 +2919,7 @@ export default function BookingDetails() {
   }
 
   const paymentSuccessful = booking.payment?.status === "completed";
+  const displayStatus = derivedStatus || (isCancelled ? "cancelled" : booking.executionStatus);
   const executionStatus = isCancelled ? "cancelled" : booking.executionStatus;
   const departureTime = allSegments?.[0]?.departureDateTime;
   const isTravelPassed = departureTime && new Date() > new Date(departureTime);
@@ -2810,7 +2977,7 @@ export default function BookingDetails() {
               <span className="text-xs text-gray-500 font-mono">
                 <span className="font-medium text-md text-green-500">Order ID:</span> {booking.orderId || booking.bookingReference}
               </span>
-              <StatusPill status={executionStatus} />
+              <StatusPill status={displayStatus} />
             </div>
 
             {paymentSuccessful && !isCancelled && (
@@ -3404,7 +3571,7 @@ export default function BookingDetails() {
                         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 border border-red-100">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                           <span className="text-[9px] font-bold uppercase text-red-600 tracking-wider">
-                            {booking.amendment?.status || "Cancelled"}
+                            {booking.executionStatus === "cancelled" ? "CANCELLED" : booking.amendment?.status || "Cancelled"}
                           </span>
                         </div>
                       </div>
@@ -3549,73 +3716,65 @@ export default function BookingDetails() {
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/*  Booking History / Timeline                                     */
+/*  Booking History / Timeline (unified API)                       */
 /* ─────────────────────────────────────────────────────────────── */
-const getTicketDate = (b) => {
-  if (b.ticketedAt) return b.ticketedAt;
-  const onwardIssueDate = b.bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
-  if (onwardIssueDate) return onwardIssueDate;
-  const providerIssueDate = b.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger?.[0]?.Ticket?.IssueDate;
-  if (providerIssueDate) return providerIssueDate;
-  if (b.executionStatus === "ticketed") return b.updatedAt;
-  return null;
-};
+function iconForEvent(type) {
+  if (!type) return <FiClock size={14} />;
+  const t = type.toUpperCase();
+  if (t.includes("BOOKING_CREATED") || t.includes("REQUEST_CREATED")) return <FiClock size={14} />;
+  if (t.includes("APPROVED") || t.includes("EXECUTED") || t.includes("COMPLETED")) return <FiCheckCircle size={14} />;
+  if (t.includes("REJECTED") || t.includes("FAILED") || t.includes("CANCELLED")) return <FiXCircle size={14} />;
+  if (t.includes("TICKET") || t.includes("DOWNLOAD")) return <FiTag size={14} />;
+  if (t.includes("CANCELLATION") || t.includes("AMENDMENT")) return <FiAlertCircle size={14} />;
+  if (t.includes("REISSUE") || t.includes("ASSIGN") || t.includes("REASSIGN")) return <FiRefreshCw size={14} />;
+  if (t.includes("NOTIFIED") || t.includes("PASSENGER")) return <FiSend size={14} />;
+  return <FiClock size={14} />;
+}
 
 function BookingHistory({ booking }) {
-  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
-  const isTicketed = booking.executionStatus === "ticketed" || (isCancelled && !!booking.bookingResult?.pnr);
+  const [steps, setSteps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const bookingId = booking?._id;
 
-  const steps = [
-    {
-      label: "Request Created",
-      date: booking.createdAt,
-      desc: `Requested by ${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""} (${booking.userId?.email || "N/A"})`,
-      icon: <FiClock size={14} />,
-      active: true,
-    },
-    {
-      label: "Approval Status",
-      date: booking.approvedAt || booking.rejectedAt || (["approved", "rejected"].includes(booking.requestStatus) ? booking.updatedAt : null),
-      desc: (() => {
-        const isRejected = booking.rejectedAt || booking.requestStatus === "rejected";
-        const isApproved = booking.approvedAt || booking.requestStatus === "approved";
-        
-        if (isRejected) {
-          return `Rejected by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
-        }
-        if (isApproved) {
-          const reqEmail = booking.userId?.email || booking.requesterDetails?.email;
-          const appEmail = booking.approvedBy?.email || booking.approverEmail;
-          const isSameUser = reqEmail && appEmail && reqEmail === appEmail;
-          if (booking.approverName === "Auto Approve" || isSameUser) {
-             return "Auto Approved by System (Travel Policy)";
-          }
-          return `Approved by ${booking.approvedBy?.name?.firstName || booking.approverName || ""} ${booking.approvedBy?.name?.lastName || ""} (${booking.approvedBy?.email || booking.approverEmail || "N/A"})`;
-        }
-        return "Waiting for manager approval";
-      })(),
-      icon: <FiShield size={14} />,
-      active: !!(booking.approvedAt || booking.rejectedAt || ["approved", "rejected"].includes(booking.requestStatus)),
-    },
-    {
-      label: "Ticketing",
-      date: getTicketDate(booking),
-      desc: isTicketed ? "E-ticket generated and sent to employee" : "Final ticketing pending",
-      icon: <FiTag size={14} />,
-      active: isTicketed,
-    },
-    {
-      label: "Cancellation",
-      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
-      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
-      icon: <FiXCircle size={14} />,
-      active: isCancelled,
-      isLast: true,
-    },
-  ];
+  useEffect(() => {
+    if (!bookingId) { setLoading(false); return; }
+    setLoading(true);
+    api
+      .get(`/bookings/${bookingId}/lifecycle-timeline`)
+      .then((res) => {
+        const raw = res.data?.data || [];
+        setSteps(
+          raw.map((ev) => ({
+            label: ev.title,
+            date: ev.timestamp,
+            desc: ev.description,
+            icon: iconForEvent(ev.type),
+            active: true,
+          })),
+        );
+      })
+      .catch(() => setSteps([]))
+      .finally(() => setLoading(false));
+  }, [bookingId]);
 
   const formatDateStr = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const formatTimeStr = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  if (loading) {
+    return (
+      <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mt-6">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-8 h-8 rounded-full bg-[#A07840]/10 flex items-center justify-center">
+            <FiRefreshCw size={14} className="text-[#A07840]" />
+          </div>
+          <div>
+            <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Booking Lifecycle</h3>
+            <p className="text-[10px] text-[#8B7355] font-bold uppercase tracking-widest mt-0.5">Loading timeline...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#F5F0E8] rounded-2xl border border-[#E8E0D0] p-6 mt-6">

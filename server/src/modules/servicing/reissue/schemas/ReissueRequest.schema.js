@@ -323,6 +323,51 @@ const reissueRequestSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+
+    /* ================= UNIFIED APPROVAL FIELDS ================= */
+
+    approvalStage: {
+      type: String,
+      enum: ["MANAGER", "TRAVEL_ADMIN", "TRAVEL_ADMIN_APPROVER", "EXECUTED"],
+      index: true,
+    },
+
+    requestStatus: {
+      type: String,
+      enum: ["PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL", "approved", "rejected", "transferred"],
+      index: true,
+    },
+
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travelAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travadminApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
+
+    approvalAudit: [
+      {
+        action: { type: String, required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: String,
+        timestamp: { type: Date, default: Date.now },
+        remarks: String,
+      },
+    ],
     timeline: {
       type: [timelineSchema],
       default: [],

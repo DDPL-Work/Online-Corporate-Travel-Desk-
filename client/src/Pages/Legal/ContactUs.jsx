@@ -60,6 +60,9 @@ const ContactUs = () => {
             {/* Delhi Head Office */}
             <div className="absolute left-[90px] top-[50px] w-[258px] flex flex-col justify-start items-start gap-[26px]">
               <div className="self-stretch flex flex-col justify-center text-[#DCB149] text-[20px] font-bold font-['DM_Sans'] uppercase leading-5 tracking-[3.60px]">
+                Traveamer Array Pvt Limited
+              </div>
+              <div className="self-stretch flex flex-col justify-center text-[#DCB149] text-[20px] font-bold font-['DM_Sans'] uppercase leading-5 tracking-[3.60px]">
                 delhi head office
               </div>
               <div className="self-stretch flex flex-col justify-center text-[#0B111F] text-[16px] font-normal uppercase leading-[26px] tracking-[3.60px]">

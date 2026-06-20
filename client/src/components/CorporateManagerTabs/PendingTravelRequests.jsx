@@ -12,7 +12,7 @@ import {
   FiSearch,
   FiArrowRight,
 } from "react-icons/fi";
-import { FaHotel, FaPlane, FaRupeeSign } from "react-icons/fa";
+import { FaHotel, FaPlane, FaRupeeSign, FaExchangeAlt } from "react-icons/fa";
 import {
   approveApproval,
   rejectApproval,
@@ -44,6 +44,7 @@ import { C } from "../Shared/color";
 import { airlineLogo } from "../../utils/formatter";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
 import { pendingFlightsExportTemplate, pendingHotelsExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
+import CancellationReissueApprovalPanel from "../CancellationReissueApprovalPanel";
 
 const RouteCell = ({ routes, airline }) => {
   if (!routes || routes.length === 0) return <span className="text-slate-400">No Route</span>;
@@ -602,8 +603,8 @@ export default function PendingTravelRequestsForManager() {
           </div>
         )}
 
-        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-           {[["flight", "Flight Requests", FaPlane], ["hotel", "Hotel Requests", FaHotel]].map(([k, lbl, Icon]) => (
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit flex-wrap">
+           {[["flight", "Flight Requests", FaPlane], ["hotel", "Hotel Requests", FaHotel], ["cancel-reissue", "Cancel / Reissue", FaExchangeAlt]].map(([k, lbl, Icon]) => (
              <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                 <Icon size={14} /> {lbl}
              </button>
@@ -612,6 +613,14 @@ export default function PendingTravelRequestsForManager() {
 
         {activeTab === "flight" ? (
           <FlightSection data={pendingFlightRequests} loading={loadingPendingFlightRequests} onRefresh={handleRefresh} handleAction={handleAction} isVerified={isVerified} onSelect={setSelectedRequest} />
+        ) : activeTab === "cancel-reissue" ? (
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
+            <h3 className="text-base font-black text-slate-800 mb-4 flex items-center gap-2">
+              <FaExchangeAlt size={16} className="text-[#003399]" />
+              Cancellation & Reissue Approvals
+            </h3>
+            <CancellationReissueApprovalPanel role="manager" />
+          </div>
         ) : (
           <HotelSection data={pendingHotelRequests} loading={loadingPendingRequests} onRefresh={handleRefresh} handleAction={handleAction} isVerified={isVerified} onSelect={setSelectedRequest} />
         )}

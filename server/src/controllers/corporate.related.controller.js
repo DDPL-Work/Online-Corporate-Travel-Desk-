@@ -1445,7 +1445,9 @@ exports.fetchCancellationQueries = async (req, res) => {
         { corporateId },
       ];
     } else if (userRole === "super-admin" || userRole === "ops-member") {
-      // Super Admin sees everything or filtered by query params
+      // Issue 32: Ops only sees queries AFTER EXECUTED that require offline processing
+      query.approvalStage = "EXECUTED";
+      query.providerExecutionStatus = { $in: ["OPS_ASSIGNED", "FAILED"] };
       if (req.query.corporateId) {
         query["corporate.companyId"] = req.query.corporateId;
       }
@@ -1453,6 +1455,20 @@ exports.fetchCancellationQueries = async (req, res) => {
       // Unauthorized or unknown role
       return res.status(403).json({ success: false, message: "Unauthorized role for this action" });
     }
+
+    /* ─────────────────────────────
+       🔥 EXCLUDE COMPLETED ONLINE CANCELLATIONS
+       Online cancellations are executed directly (no CQ created).
+       For any historical online CQ records that may exist,
+       hide them from all cancellation-query views.
+    ───────────────────────────── */
+    query.$and = query.$and || [];
+    query.$and.push({
+      $or: [
+        { isOnlineCancellation: { $ne: true } },
+        { providerExecutionStatus: { $ne: "COMPLETED" } },
+      ],
+    });
 
     if (status) query.status = status;
 
@@ -1489,7 +1505,17 @@ exports.fetchCancellationQueries = async (req, res) => {
     /* ─────────────────────────────
        🔥 NORMALIZE DATA
     ───────────────────────────── */
-    const enrichedData = queries.map((q) => {
+    // Filter out queries whose booking is already cancelled (safety net)
+    let activeQueries = queries;
+    if (userRole === "super-admin" || userRole === "ops-member") {
+      activeQueries = queries.filter((q) => {
+        const b = bookingMap[q.bookingId?.toString()];
+        if (!b) return true;
+        return b.executionStatus !== "cancelled";
+      });
+    }
+
+    const enrichedData = activeQueries.map((q) => {
       const b = bookingMap[q.bookingId?.toString()] || {};
 
       const itinerary =
@@ -1581,14 +1607,14 @@ exports.fetchCancellationQueries = async (req, res) => {
     });
 
     /* ─────────────────────────────
-       ✅ RESPONSE
+        ✅ RESPONSE
     ───────────────────────────── */
     return res.status(200).json({
       success: true,
       message: "Cancellation queries fetched successfully",
       data: enrichedData,
       pagination: {
-        total,
+        total: enrichedData.length,
         // page: Number(page),
         // limit: Number(limit),
         // totalPages: Math.ceil(total / limit),
@@ -1624,8 +1650,34 @@ exports.fetchCancellationQueryById = async (req, res) => {
       return res.status(403).json({ success: false, message: "Unauthorized access to this query" });
     }
 
-    if (userRole === "travel-admin" && query.corporate?.companyId?.toString() !== corporateId) {
-      return res.status(403).json({ success: false, message: "Unauthorized access to this company's query" });
+    if (userRole === "manager" && query.managerId?.toString() !== userId) {
+      return res.status(403).json({ success: false, message: "You are not the assigned manager for this request" });
+    }
+
+    if (userRole === "travel-admin") {
+      const queryCorporateId = query.corporate?.companyId?.toString() || query.corporateId?.toString();
+      if (queryCorporateId !== corporateId) {
+        return res.status(403).json({ success: false, message: "Unauthorized access to this company's query" });
+      }
+    }
+
+    // Issue 32: Ops visibility — only see EXECUTED queries needing offline processing
+    if (userRole === "ops-member" || userRole === "super-admin") {
+      if (query.approvalStage !== "EXECUTED") {
+        return res.status(403).json({ success: false, message: "Query not yet available — approval stage not completed" });
+      }
+      if (!["OPS_ASSIGNED", "FAILED"].includes(query.providerExecutionStatus)) {
+        return res.status(403).json({ success: false, message: "Query already processed via provider — not available for Ops" });
+      }
+    }
+
+    // If query is in TRAVEL_ADMIN_APPROVER stage, enforce travadminApprover ownership
+    if (
+      query.approvalStage === "TRAVEL_ADMIN_APPROVER" &&
+      query.travadminApprover?.userId?.toString() &&
+      query.travadminApprover?.userId?.toString() !== userId
+    ) {
+      return res.status(403).json({ success: false, message: "This request has been transferred to another configured approver" });
     }
 
     let bookingData = null;
@@ -1727,10 +1779,21 @@ exports.updateCancellationQueryStatus = async (req, res) => {
         ...(query.resolution?.toObject?.() || query.resolution || {}),
         resolvedAt: new Date(),
       };
+      // Issue 32: Ops resolution completes the provider execution
+      if (query.providerExecutionStatus === "OPS_ASSIGNED") {
+        query.providerExecutionStatus = "COMPLETED";
+        if (query.assignedTo) {
+          try {
+            await roundRobinAssignmentService.decrementAgentCounters(query.assignedTo, "cancellation");
+          } catch (decrementError) {
+            console.error("Failed to decrement OPS agent counters:", decrementError.message);
+          }
+        }
+      }
     }
 
     /* ─────────────────────────────
-       🧾 LOG ENTRY
+        🧾 LOG ENTRY
     ───────────────────────────── */
     query.logs.push({
       action: "STATUS_UPDATED",
@@ -1758,6 +1821,47 @@ exports.updateCancellationQueryStatus = async (req, res) => {
       success: false,
       message: "Failed to update status",
       error: error.message,
+    });
+  }
+};
+
+// @desc    Reassign cancellation query to another Ops member
+// @route   PATCH /api/v1/corporate-related/cancellation-queries/:id/reassign
+// @access  Super Admin / Ops Admin
+exports.reassignCancellationQuery = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { opsMemberId, message } = req.body;
+
+    if (!opsMemberId) {
+      return res.status(400).json({ success: false, message: "opsMemberId is required for reassignment" });
+    }
+
+    const CancellationQuery = require("../models/CancellationQuery");
+    const query = await CancellationQuery.findById(id);
+    if (!query) {
+      return res.status(404).json({ success: false, message: "Cancellation query not found" });
+    }
+
+    const roundRobinAssignmentService = require("../modules/ops/services/roundRobinAssignment.service");
+    const result = await roundRobinAssignmentService.reassignRequest({
+      request: query,
+      newAgentId: opsMemberId,
+      requestType: "cancellation",
+      assignedBy: req.user._id,
+      reason: message || "Manual reassignment",
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.request,
+      message: "Cancellation query reassigned successfully",
+    });
+  } catch (error) {
+    console.error("reassignCancellationQuery Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to reassign cancellation query",
     });
   }
 };

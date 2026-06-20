@@ -86,7 +86,17 @@ export default function WalletRechargeLogs() {
       corporateName: log.corporateId?.corporateName || "—",
       corporateId: log.corporateId?._id || "—",
       amount: log.amount,
-      method: "Razorpay",
+      method: log.gateway === "phonepe"
+        ? "PhonePe"
+        : log.gateway === "razorpay"
+          ? "Razorpay"
+          : log.orderId?.startsWith("PHONEPE_")
+            ? "PhonePe"
+            : log.orderId?.startsWith("RAZORPAY_")
+              ? "Razorpay"
+              : log.gateway
+                ? log.gateway.charAt(0).toUpperCase() + log.gateway.slice(1)
+                : "Unknown",
       orderId: log.orderId || "—",
       paymentId: log.paymentId || "—",
       status:

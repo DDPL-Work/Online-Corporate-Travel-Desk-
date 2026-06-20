@@ -1,6 +1,8 @@
 const OPS_MEMBER_ACCESS_ROLES = Object.freeze(["ops-member"]);
 const OPS_MEMBER_SERVICING_SCOPES = Object.freeze(["Flights", "Hotels", "Both"]);
 
+const OPS_AVAILABILITY_STATUSES = Object.freeze(["AVAILABLE", "BUSY", "BREAK", "OFFLINE", "ON_LEAVE"]);
+
 const DEFAULT_OPS_ROLE = "ops-member";
 const DEFAULT_OPS_DEPARTMENT = "Operations";
 const DEFAULT_OPS_SERVICING_SCOPE = "Both";
@@ -109,6 +111,7 @@ module.exports = {
   LEGACY_OPS_ROLE_DETAILS,
   OPS_MEMBER_ACCESS_ROLES,
   OPS_MEMBER_SERVICING_SCOPES,
+  OPS_AVAILABILITY_STATUSES,
   getLegacyRoleDetails,
   isServicingScope,
   normalizeOpsMemberInput,

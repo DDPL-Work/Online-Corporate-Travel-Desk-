@@ -47,4 +47,9 @@ router.get("/get-project-flight-expenses/:projectId", bookingsController.getProj
 
 router.post("/:id/cancel", bookingsController.cancelBooking);
 
+router.get(
+  "/:id/lifecycle-timeline",
+  bookingsController.getBookingLifecycleTimeline,
+);
+
 module.exports = router;

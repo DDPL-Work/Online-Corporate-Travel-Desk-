@@ -23,6 +23,10 @@ import CorporateWallet from "../components/TravelAdminTabs/CorporateWalletStatus
 import BrandingSettings from "../components/TravelAdminTabs/BrandingSettings";
 import ReissueRequests from "../components/TravelAdminTabs/ReissueRequests";
 import OfflineCancellationQueries from "../components/TravelAdminTabs/OfflineCancellationQueries";
+import OpsMemberList from "../components/SuperAdminTabs/OpsMemberList";
+import OpsMemberForm from "../components/SuperAdminTabs/OpsMemberForm";
+import OpsCapacityDashboard from "../components/SuperAdminTabs/OpsCapacityDashboard";
+import AssignmentDiagnostics from "../components/SuperAdminTabs/AssignmentDiagnostics";
 
 // Employee
 import MyBookings from "../components/EmployeeDashboard/MyBookings";
@@ -129,6 +133,24 @@ export const appRouter = createBrowserRouter([
       //   path: "/unauthorized",
       //   element: <Unauthorized />,
       // },
+
+      // SUPER-ADMIN PROTECTED ROUTES
+      {
+        element: <ProtectedRoute allowedRoles={["super-admin"]} />,
+        children: [
+          {
+            path: "/",
+            element: <Layout />,
+            children: [
+              { path: "/ops-members", element: <OpsMemberList /> },
+              { path: "/ops-members/create", element: <OpsMemberForm /> },
+              { path: "/ops-members/edit/:id", element: <OpsMemberForm /> },
+              { path: "/ops-capacity", element: <OpsCapacityDashboard /> },
+              { path: "/ops-diagnostics", element: <AssignmentDiagnostics /> },
+            ],
+          },
+        ],
+      },
 
       // TRAVEL-ADMIN PROTECTED ROUTES
       {

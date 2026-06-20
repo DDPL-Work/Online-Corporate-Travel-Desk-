@@ -49,6 +49,16 @@ export const statusStyles = {
   approved: { background: `${C.emerald}10`, color: C.emerald, boxShadow: `0 0 0 1px ${C.emerald}30` },
   rejected: { background: "#FEF2F2", color: "#DC2626", boxShadow: "0 0 0 1px #FEE2E2" },
   Cancelled: { background: "#FEF2F2", color: "#DC2626", boxShadow: "0 0 0 1px #FEE2E2" },
+  PENDING_MANAGER_APPROVAL: { background: `${C.amber}10`, color: C.amber, boxShadow: `0 0 0 1px ${C.amber}30` },
+  PENDING_TRAVEL_ADMIN_APPROVAL: { background: `${C.amber}10`, color: C.amber, boxShadow: `0 0 0 1px ${C.amber}30` },
+  PENDING_ADMIN_APPROVAL: { background: `${C.amber}10`, color: C.amber, boxShadow: `0 0 0 1px ${C.amber}30` },
+  PENDING_PARALLEL_APPROVAL: { background: `${C.amber}10`, color: C.amber, boxShadow: `0 0 0 1px ${C.amber}30` },
+  MANAGER_APPROVED: { background: `${C.emerald}10`, color: C.emerald, boxShadow: `0 0 0 1px ${C.emerald}30` },
+  transferred: { background: "#EFF6FF", color: "#2563EB", boxShadow: "0 0 0 1px #DBEAFE" },
+  EXECUTED: { background: `${C.emerald}10`, color: C.emerald, boxShadow: `0 0 0 1px ${C.emerald}30` },
+  manager_approved: { background: `${C.emerald}10`, color: C.emerald, boxShadow: `0 0 0 1px ${C.emerald}30` },
+  pending_second_approval: { background: "#FEF3C7", color: "#D97706", boxShadow: "0 0 0 1px #FDE68A" },
+  Processing: { background: "#EFF6FF", color: "#2563EB", boxShadow: "0 0 0 1px #DBEAFE" },
 };
 export const dotStyles = {
   Confirmed: { background: C.emerald },
@@ -58,6 +68,16 @@ export const dotStyles = {
   approved: { background: C.emerald },
   rejected: { background: "#EF4444" },
   Cancelled: { background: "#EF4444" },
+  PENDING_MANAGER_APPROVAL: { background: C.amber },
+  PENDING_TRAVEL_ADMIN_APPROVAL: { background: C.amber },
+  PENDING_ADMIN_APPROVAL: { background: C.amber },
+  PENDING_PARALLEL_APPROVAL: { background: C.amber },
+  MANAGER_APPROVED: { background: C.emerald },
+  transferred: { background: "#2563EB" },
+  EXECUTED: { background: C.emerald },
+  manager_approved: { background: C.emerald },
+  pending_second_approval: { background: "#D97706" },
+  Processing: { background: "#2563EB" },
 };
 
 export const StatCard = ({
@@ -97,6 +117,19 @@ export const beautifyStatus = (s) => {
   if (!s || typeof s !== "string") return "—";
   if (s.toLowerCase() === "failed") return "Not Booked";
   if (s.toLowerCase() === "booking_initiated") return "Booking Initiated";
+
+  // Handle new unified approval statuses
+  if (s === "PENDING_MANAGER_APPROVAL") return "Waiting for Approval";
+  if (s === "PENDING_TRAVEL_ADMIN_APPROVAL") return "Waiting for Travel Admin Approval";
+  if (s === "PENDING_ADMIN_APPROVAL") return "Waiting for Admin Approval";
+  if (s === "PENDING_PARALLEL_APPROVAL") return "Pending Approval";
+  if (s === "MANAGER_APPROVED") return "Manager Approved";
+  if (s === "EXECUTED") return "Approved / Processing";
+  if (s === "REJECTED") return "Rejected";
+  if (s === "transferred") return "Transferred";
+  if (s === "PENDING") return "Pending";
+  if (s === "Processing") return "Processing";
+
   return s
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())

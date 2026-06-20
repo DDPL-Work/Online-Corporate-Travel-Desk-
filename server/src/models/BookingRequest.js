@@ -40,10 +40,50 @@ const bookingRequestSchema = new mongoose.Schema(
 
     requestStatus: {
       type: String,
-      enum: ["draft", "pending_approval", "pending_second_approval", "manager_approved", "approved", "rejected", "expired"],
+      enum: ["draft", "pending_approval", "pending_second_approval", "manager_approved", "approved", "rejected", "expired",
+        "PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL"],
       default: "draft",
       index: true,
     },
+
+    /* ================= UNIFIED APPROVAL STAGE ================= */
+
+    approvalStage: {
+      type: String,
+      enum: ["MANAGER", "TRAVEL_ADMIN", "TRAVEL_ADMIN_APPROVER", "EXECUTED"],
+      index: true,
+    },
+
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travelAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travadminApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
+
+    approvalAudit: [
+      {
+        action: { type: String, required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: String,
+        timestamp: { type: Date, default: Date.now },
+        remarks: String,
+      },
+    ],
 
     /* ================= APPROVER DETAILS ================= */
 
@@ -456,6 +496,9 @@ const ALLOWED_STATUS_TRANSITIONS = {
   approved: [],
   rejected: [],
   expired: [],
+  PENDING_MANAGER_APPROVAL: ["PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL", "rejected"],
+  PENDING_TRAVEL_ADMIN_APPROVAL: ["approved", "rejected", "PENDING_ADMIN_APPROVAL"],
+  PENDING_ADMIN_APPROVAL: ["approved", "rejected"],
 };
 
 bookingRequestSchema.pre("save", function () {

@@ -41,12 +41,21 @@ router.get(
 );
 
 /* ==========================================
-   PLATFORM SUPER ADMIN DASHBOARD
+    PLATFORM SUPER ADMIN DASHBOARD
 ========================================== */
 router.get(
   "/super-admin",
   authorizeRoles("super-admin", "ops-member"),
   dashboardController.getSuperAdminDashboard,
+);
+
+/* ==========================================
+    SIDEBAR BADGES (role-aware counts)
+========================================== */
+router.get(
+  "/sidebar-badges",
+  authorizeRoles("employee", "manager", "travel-admin", "configured-approver", "super-admin", "ops-member"),
+  dashboardController.getSidebarBadges,
 );
 
 module.exports = router;

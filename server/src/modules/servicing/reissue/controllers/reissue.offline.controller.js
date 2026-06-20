@@ -77,6 +77,12 @@ exports.listAdmin = asyncHandler(async (req, res) => {
     query.assignedOpsMember = new mongoose.Types.ObjectId(req.user.id);
   }
 
+  // Only restrict to EXECUTED when ops member is browsing ALL requests
+  // (not filtered to their own assigned queue)
+  if (req.user?.role === "ops-member" && !query.assignedOpsMember) {
+    query.approvalStage = "EXECUTED";
+  }
+
   const result = await offlineReissueWorkflowService.listAdmin({
     actor: req.user,
     query,
