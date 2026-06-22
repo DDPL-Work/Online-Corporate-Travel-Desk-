@@ -440,7 +440,6 @@ const MapSection = ({ mapString }) => {
    Main HotelInfo
 ───────────────────────────────────────── */
 const HotelInfo = ({ description = "", checkIn, checkOut, checkInDate, checkOutDate, contact = {}, map }) => {
-// >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90
   const [showAll, setShowAll] = useState(false);
 
   const sections = useMemo(() => parseDescription(description), [description]);
@@ -478,6 +477,11 @@ const HotelInfo = ({ description = "", checkIn, checkOut, checkInDate, checkOutD
           )}
         </div>
 
+        {/* ── Contact Info ── */}
+        {(contact?.phone || contact?.email || contact?.website || contact?.fax) && (
+          <ContactCard contact={contact} />
+        )}
+
         {/* {map && <MapSection mapString={map} />} */}
 
         {/* ── Section Cards ── */}
@@ -490,7 +494,6 @@ const HotelInfo = ({ description = "", checkIn, checkOut, checkInDate, checkOutD
             />
           ))}
         </div>
-{/* >>>>>>> 6c93c2a6864064eee402edb2e2c40c889dc71d90 */}
 
         {/* ── Show more / less ── */}
         {sections.length > 3 && (

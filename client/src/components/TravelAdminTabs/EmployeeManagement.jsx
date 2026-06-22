@@ -320,7 +320,7 @@ export default function EmployeeManagement() {
       {/* Navy Header Section */}
       <div className="w-full bg-linear-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button 
                   onClick={() => navigate(-1)} 
@@ -341,13 +341,13 @@ export default function EmployeeManagement() {
              
              <div className="h-12 w-px bg-white/10 mx-2 hidden md:block" />
 
-             <div className="flex items-center gap-5">
-               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
-                 <FiUsers size={28} />
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <FiUsers size={24} className="md:w-7 md:h-7" />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Employee Directory</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Employee Directory</h1>
+                 <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">
                    Manage employees, roles, and access
                  </p>
                </div>
@@ -361,18 +361,18 @@ export default function EmployeeManagement() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         
         {/* Top-Level Tab Switcher */}
-        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit max-w-full overflow-x-auto">
           <button
             onClick={() => setActiveTab("employees")}
-            className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === "employees" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+            className={`px-6 md:px-8 py-3.5 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeTab === "employees" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
           >
-            <FiUsers size={14} /> Employees
+            <FiUsers className="w-3 h-3 md:w-3.5 md:h-3.5" /> Employees
           </button>
           <button
             onClick={() => setActiveTab("expenses")}
-            className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === "expenses" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+            className={`px-6 md:px-8 py-3.5 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeTab === "expenses" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
           >
-            <MdBadge size={14} /> Expenses
+            <MdBadge className="w-3 h-3 md:w-3.5 md:h-3.5" /> Expenses
           </button>
         </div>
 

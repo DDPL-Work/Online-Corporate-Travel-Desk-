@@ -323,8 +323,8 @@ function HotelSection({ data, loading, onRefresh, handleAction, isVerified, onSe
       status: b.requestStatus || "pending_approval", 
       amount, 
       bookedDate: b.createdAt,
-      hotelName: b.hotelRequest?.selectedHotel?.hotelName || "N/A",
-      city: b.hotelRequest?.selectedHotel?.city || "N/A",
+      hotelName: b.tboHotelDetails?.hotelName || b.hotelRequest?.selectedHotel?.hotelName || b.bookingSnapshot?.hotelName || "N/A",
+      city: b.tboHotelDetails?.cityName || b.tboHotelDetails?.city || b.hotelRequest?.selectedHotel?.city || b.bookingSnapshot?.city || "N/A",
       isTravelPassed,
       checkIn: b.hotelRequest?.checkInDate
     };
@@ -564,7 +564,7 @@ export default function PendingTravelRequestsForManager() {
     <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => navigate(-1)} className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 transition-all border border-white/10 backdrop-blur-md shadow-xl">
                  <FiArrowRight className="rotate-180" size={22} />
@@ -576,13 +576,13 @@ export default function PendingTravelRequestsForManager() {
                </button>
              </div>
              <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
-             <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
-                 <FiClock size={32} />
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl flex shrink-0 items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+                 <FiClock size={28} className="md:w-8 md:h-8" />
                </div>
                <div>
-                 <h1 className="text-4xl font-black tracking-tight leading-none">Team Pending Requests</h1>
-                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">View all the pending requests (Hotel & Flight) which were done by your team</p>
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Team Pending Requests</h1>
+                 <p className="text-[10px] md:text-[11px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] md:tracking-[3px] opacity-60">View all the pending requests (Hotel & Flight) which were done by your team</p>
                </div>
              </div>
           </div>
@@ -602,10 +602,10 @@ export default function PendingTravelRequestsForManager() {
           </div>
         )}
 
-        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit max-w-full overflow-x-auto">
            {[["flight", "Flight Requests", FaPlane], ["hotel", "Hotel Requests", FaHotel]].map(([k, lbl, Icon]) => (
-             <button key={k} onClick={() => setActiveTab(k)} className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
-                <Icon size={14} /> {lbl}
+             <button key={k} onClick={() => setActiveTab(k)} className={`px-6 md:px-8 py-3.5 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+                <Icon className="w-3 h-3 md:w-3.5 md:h-3.5" /> {lbl}
              </button>
            ))}
         </div>

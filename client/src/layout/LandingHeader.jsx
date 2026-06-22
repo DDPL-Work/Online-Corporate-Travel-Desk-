@@ -20,6 +20,7 @@ import NotificationBell from "../components/common/NotificationBell";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logoutUser } from "../Redux/Slice/authSlice";
+import { getPublicBrandingBySlug } from "../Redux/Actions/landingPageThunks";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { FaBars, FaHotel, FaPlane } from "react-icons/fa";
@@ -166,6 +167,12 @@ export default function LandingHeader() {
     window.addEventListener("scroll", fn);
     return () => window.removeEventListener("scroll", fn);
   }, []);
+
+  useEffect(() => {
+    if (!publicBranding && activeSlug) {
+      dispatch(getPublicBrandingBySlug(activeSlug));
+    }
+  }, [publicBranding, activeSlug, dispatch]);
 
   const handleLogout = () => {
     dispatch(logoutUser());

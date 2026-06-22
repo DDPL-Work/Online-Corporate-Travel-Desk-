@@ -56,9 +56,12 @@ const ContactUs = () => {
         <div className="relative z-10 mx-auto w-full max-w-[1440px] px-6 lg:px-0">
           
           {/* Desktop Card (>= 1024px) - Exact Figma Dimensions */}
-          <div className="hidden lg:block absolute left-[168px] top-[128px] w-[1104px] h-[301px] bg-white shadow-[0px_4px_18.1px_rgba(5,29,140,0.30)] overflow-hidden rounded-[16px] pointer-events-auto">
+          <div className="hidden lg:block absolute left-[168px] top-[50px] w-[1104px] h-[301px] bg-white shadow-[0px_4px_18.1px_rgba(5,29,140,0.30)] overflow-hidden rounded-[16px] pointer-events-auto">
             {/* Delhi Head Office */}
             <div className="absolute left-[90px] top-[50px] w-[258px] flex flex-col justify-start items-start gap-[26px]">
+              <div className="self-stretch flex flex-col justify-center text-[#DCB549] text-[15px] font-bold font-['DM_Sans'] uppercase leading-5 tracking-[3.60px]">
+                Traveamer Array Pvt Limited
+              </div>
               <div className="self-stretch flex flex-col justify-center text-[#DCB149] text-[20px] font-bold font-['DM_Sans'] uppercase leading-5 tracking-[3.60px]">
                 delhi head office
               </div>

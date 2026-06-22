@@ -265,7 +265,7 @@ export default function CorporateWallet() {
     >
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate(-1)}
@@ -286,15 +286,15 @@ export default function CorporateWallet() {
 
             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
-                <FiCreditCard size={28} />
+            <div className="flex items-center md:items-center gap-4 md:gap-5">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <FiCreditCard size={24} className="md:w-7 md:h-7" />
               </div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight leading-none">
+                <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">
                   Corporate Wallet
                 </h1>
-                <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">
                   Manage corporate funds and capital
                 </p>
               </div>
@@ -304,29 +304,51 @@ export default function CorporateWallet() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowRecharge(true)}
-              className="px-8 py-3.5 rounded-xl font-black text-[11px] bg-gold text-navy hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2.5 uppercase tracking-widest bg-[#C9A240]"
+              className="px-6 md:px-8 py-3.5 rounded-xl font-black text-[10px] md:text-[11px] bg-gold text-navy hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2.5 uppercase tracking-widest bg-[#C9A240] whitespace-nowrap"
             >
-              <FiPlusCircle size={16} /> Recharge Wallet
+              <FiPlusCircle size={16} className="w-3.5 h-3.5 md:w-4 md:h-4" /> Recharge Wallet
             </button>
           </div>
         </div>
       </div>
 
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
-        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
-          {[
-            ["booking", "Bookings", FiArrowUpRight],
-            ["recharge", "Recharges", FiArrowDownLeft],
-            ["serviceCharge", "Service Charges", FiHash],
-          ].map(([k, lbl, Icon]) => (
-            <button
-              key={k}
-              onClick={() => setActiveTab(k)}
-              className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-            >
-              <Icon size={14} /> {lbl}
-            </button>
-          ))}
+        <div className="w-full md:w-auto">
+          {/* Mobile Dropdown */}
+          <div className="block md:hidden">
+            <CustomDropdown
+              value={
+                activeTab === "booking"
+                  ? "Bookings"
+                  : activeTab === "recharge"
+                  ? "Recharges"
+                  : "Service Charges"
+              }
+              onChange={(val) => setActiveTab(val)}
+              options={[
+                { label: "Bookings", value: "booking" },
+                { label: "Recharges", value: "recharge" },
+                { label: "Service Charges", value: "serviceCharge" },
+              ]}
+            />
+          </div>
+
+          {/* Desktop Tabs */}
+          <div className="hidden md:flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+            {[
+              ["booking", "Bookings", FiArrowUpRight],
+              ["recharge", "Recharges", FiArrowDownLeft],
+              ["serviceCharge", "Service Charges", FiHash],
+            ].map(([k, lbl, Icon]) => (
+              <button
+                key={k}
+                onClick={() => setActiveTab(k)}
+                className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+              >
+                <Icon className="w-3.5 h-3.5" /> {lbl}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -440,231 +462,279 @@ export default function CorporateWallet() {
         </div>
 
         <div className="bg-white rounded-3xl overflow-hidden">
-          <div className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-black" style={{ color: C.navy }}>
-                {activeTab === "booking" && "Booking Transactions"}
-                {activeTab === "recharge" && "Recharge Transactions"}
-                {activeTab === "serviceCharge" && "Service Charges Applied"}
-              </h2>
-              <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
-                {filteredTransactions.length} records found
+          {loading ? (
+            <div className="py-20 flex flex-col items-center justify-center">
+              <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                Loading Transactions...
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => exportExcel({
-                  pageHeader: activeTab === "booking" ? "Asset Consumption Ledger" : "Wallet Recharge Ledger",
+          ) : (
+            <ResponsiveDataTable
+              title={
+                activeTab === "booking"
+                  ? "Booking Transactions"
+                  : activeTab === "recharge"
+                  ? "Recharge Transactions"
+                  : "Service Charges Applied"
+              }
+              subtitle={`${filteredTransactions.length} records found`}
+              exportLabel="Export Excel"
+              exportLoading={isExporting}
+              exportDisabled={isExporting}
+              onExport={() =>
+                exportExcel({
+                  pageHeader:
+                    activeTab === "booking"
+                      ? "Asset Consumption Ledger"
+                      : "Wallet Recharge Ledger",
                   statCards: [
-                    { label: "Available Asset", value: loading ? "..." : `${currency || "₹"} ${(balance || 0).toLocaleString()}` },
-                    { label: "Total Capital In", value: `₹${totalCredit.toLocaleString()}` },
-                    ...(activeTab !== "recharge" ? [{ label: "Total Capital Out", value: `₹${totalDebit.toLocaleString()}` }] : []),
-                    { label: "Ledger Entries", value: filteredTransactions.length }
+                    {
+                      label: "Available Asset",
+                      value: loading
+                        ? "..."
+                        : `${currency || "₹"} ${(balance || 0).toLocaleString()}`,
+                    },
+                    {
+                      label: "Total Capital In",
+                      value: `₹${totalCredit.toLocaleString()}`,
+                    },
+                    ...(activeTab !== "recharge"
+                      ? [
+                          {
+                            label: "Total Capital Out",
+                            value: `₹${totalDebit.toLocaleString()}`,
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Ledger Entries",
+                      value: filteredTransactions.length,
+                    },
                   ],
                   appliedFilters: [
                     { label: "Universal Search", value: searchTerm || "None" },
-                    { label: "Ledger Period", value: `${startDate || "Any"} to ${endDate || "Any"}` },
-                    { label: "Execution Status", value: statusFilter }
+                    {
+                      label: "Ledger Period",
+                      value: `${startDate || "Any"} to ${endDate || "Any"}`,
+                    },
+                    { label: "Execution Status", value: statusFilter },
                   ],
                   data: filteredTransactions,
                   columns: [
-                    { header: "Date", value: (tx) => new Date(tx.createdAt).toLocaleDateString("en-IN") },
-                    { header: "Description", value: (tx) => tx.description || "—" },
-                    { header: "Reference", value: (tx) => tx.bookingId?.orderId || tx.orderId || tx.reference || (typeof tx.bookingId === 'string' ? tx.bookingId : null) || tx._id || "—" },
-                    ...(activeTab === "recharge" ? [{ header: "Payment ID", value: (tx) => tx.paymentGateway?.paymentId || "—" }] : []),
+                    {
+                      header: "Date",
+                      value: (tx) =>
+                        new Date(tx.createdAt).toLocaleDateString("en-IN"),
+                    },
+                    {
+                      header: "Description",
+                      value: (tx) => tx.description || "—",
+                    },
+                    {
+                      header: "Reference",
+                      value: (tx) =>
+                        tx.bookingId?.orderId ||
+                        tx.orderId ||
+                        tx.reference ||
+                        (typeof tx.bookingId === "string" ? tx.bookingId : null) ||
+                        tx._id ||
+                        "—",
+                    },
+                    ...(activeTab === "recharge"
+                      ? [
+                          {
+                            header: "Payment ID",
+                            value: (tx) => tx.paymentGateway?.paymentId || "—",
+                          },
+                        ]
+                      : []),
                     { header: "Type", value: (tx) => tx.type || "—" },
-                    { header: "Amount", value: (tx) => {
+                    {
+                      header: "Amount",
+                      value: (tx) => {
                         const amt = tx.amount || 0;
-                        return `${tx.type === "credit" ? "+" : "-"} ₹${amt.toLocaleString()}`;
-                    } },
-                    { header: "Status", value: (tx) => getTransactionStatus(tx) }
+                        return `${
+                          tx.type === "credit" ? "+" : "-"
+                        } ₹${amt.toLocaleString()}`;
+                      },
+                    },
+                    {
+                      header: "Status",
+                      value: (tx) => getTransactionStatus(tx),
+                    },
                   ],
-                  filenamePrefix: "wallet_ledger"
-                })}
-                disabled={isExporting}
-                className="inline-flex shrink-0 items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-wait"
-                style={{ background: C.navy, color: C.white }}
-              >
-                {isExporting ? (
-                   <span className="w-3.5 h-3.5 border-2 border-[currentColor] border-t-transparent rounded-full animate-spin"></span>
-                ) : (
-                   <FiDownload size={13} />
-                )}
-                <span>{isExporting ? "Exporting..." : "Export Excel"}</span>
-              </button>
+                  filenamePrefix: "wallet_ledger",
+                })
+              }
+              wrapperClass="!border-none !shadow-none"
+              pagination={
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredTransactions.length}
+                  pageSize={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                />
+              }
+            >
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+                    <Th className="!px-6 !py-5">Date</Th>
+                    <Th className="!px-6 !py-5">Description</Th>
+                    <Th className="!px-6 !py-5">Reference</Th>
+                    {activeTab !== "recharge" && (
+                      <Th className="!px-6 !py-5">Category</Th>
+                    )}
+                    <Th className="!px-6 !py-5">Type</Th>
+                    <Th className="!px-6 !py-5">Amount</Th>
+                    <Th className="!px-6 !py-5">Status</Th>
+                    <Th className="!px-6 !py-5 text-right">Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedTransactions.length > 0 ? (
+                    paginatedTransactions.map((tx, idx) => {
+                      const processorName = tx.processedBy?.name
+                        ? `${tx.processedBy.name.firstName || ""} ${
+                            tx.processedBy.name.lastName || ""
+                          }`.trim()
+                        : "System Protocol";
+                      const gatewayInfo =
+                        tx.paymentGateway?.name || tx.type === "debit"
+                          ? "Corporate Asset"
+                          : "Direct Recharge";
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleScroll("left")}
-                  className="p-2.5 rounded-xl border bg-white hover:bg-slate-50 text-slate-400 hover:text-navy transition-all active:scale-90"
-                  style={{ borderColor: C.border }}
-                  title="Scroll Left"
-                >
-                  <FiChevronLeft size={16} />
-                </button>
-                <button
-                  onClick={() => handleScroll("right")}
-                  className="p-2.5 rounded-xl border bg-white hover:bg-slate-50 text-slate-400 hover:text-navy transition-all active:scale-90"
-                  style={{ borderColor: C.border }}
-                  title="Scroll Right"
-                >
-                  <FiChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <ResponsiveDataTable
-            showToolbar={false}
-            wrapperClass="!border-none !shadow-none"
-          >
-            <div className="overflow-x-auto" ref={ledgerScrollRef}>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
-                  <Th className="!px-6 !py-5">Date</Th>
-                  <Th className="!px-6 !py-5">Description</Th>
-                  <Th className="!px-6 !py-5">Reference</Th>
-                  {activeTab !== "recharge" && <Th className="!px-6 !py-5">Category</Th>}
-                  <Th className="!px-6 !py-5">Type</Th>
-                  <Th className="!px-6 !py-5">Amount</Th>
-                  <Th className="!px-6 !py-5">Status</Th>
-                  <Th className="!px-6 !py-5 text-right">Actions</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedTransactions.map((tx, idx) => {
-                  const processorName = tx.processedBy?.name
-                    ? `${tx.processedBy.name.firstName || ""} ${tx.processedBy.name.lastName || ""}`.trim()
-                    : "System Protocol";
-                  const gatewayInfo =
-                    tx.paymentGateway?.name || tx.type === "debit"
-                      ? "Corporate Asset"
-                      : "Direct Recharge";
-
-                  return (
-                    <tr
-                      key={tx._id}
-                      className="hover:bg-slate-50 transition-colors"
-                      style={{
-                        background: idx % 2 === 0 ? C.white : "#FAF6EB",
-                      }}
-                    >
-                      <td className="px-6 py-5">
-                        <p
-                          className="text-xs font-black"
-                          style={{ color: C.navy }}
-                        >
-                          {new Date(tx.createdAt).toLocaleDateString("en-IN")}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">
-                          {new Date(tx.createdAt).toLocaleTimeString("en-IN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </td>
-                      <td className="px-6 py-5">
-                        <p
-                          className="text-xs font-black"
-                          style={{ color: C.navy }}
-                        >
-                          {tx.description || "Travel Booking"}
-                        </p>
-                      </td>
-                      <td className="px-6 py-5">
-                        <code
-                          className="text-[10px] font-black px-2 py-1 rounded border uppercase block w-fit mb-1"
+                      return (
+                        <tr
+                          key={tx._id}
+                          className="hover:bg-slate-50 transition-colors"
                           style={{
-                            background: C.white,
-                            borderColor: C.border,
-                            color: C.muted,
+                            background: idx % 2 === 0 ? C.white : "#FAF6EB",
                           }}
                         >
-                          {tx.bookingId?.orderId || tx.orderId || tx.reference || (typeof tx.bookingId === 'string' ? tx.bookingId : null) || tx._id}
-                        </code>
-                      </td>
-                      {activeTab !== "recharge" && (
-                        <td className="px-6 py-5">
-                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase text-navy border border-slate-200/60 shadow-sm block w-fit mb-1">
-                            {tx.bookingModel === "HotelBookingRequest"
-                              ? "Hotel"
-                              : tx.bookingModel === "BookingRequest" 
-                              ? "Flight" 
-                              : tx.type === "credit" ? "Recharge" : "Other"}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-6 py-5">
-                        <span
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm"
-                          style={{
-                            backgroundColor:
-                              tx.type === "credit" || tx.type === "refund"
-                                ? "#ECFDF5"
-                                : "#FEF2F2",
-                            color:
-                              tx.type === "credit" || tx.type === "refund"
-                                ? "#065F46"
-                                : "#991B1B",
-                            borderColor:
-                              tx.type === "credit" || tx.type === "refund"
-                                ? "#A7F3D0"
-                                : "#FECACA",
-                          }}
-                        >
-                          {tx.type === "credit" || tx.type === "refund" ? (
-                            <FiArrowDownLeft />
-                          ) : (
-                            <FiArrowUpRight />
-                          )}{" "}
-                          {tx.type === "service_fee_deduction" ? "Service Fee" : tx.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5 font-black text-xs text-left">
-                        <span
-                          style={{
-                            color:
-                              tx.type === "credit" || tx.type === "refund"
-                                ? "#10B981"
-                                : "#EF4444",
-                          }}
-                        >
-                          {tx.type === "credit" || tx.type === "refund"
-                            ? "+"
-                            : "-"}{" "}
-                          ₹{(tx.amount || 0).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5">
-                        <StatusBadge status={getTransactionStatus(tx)} />
-                      </td>
-                      <td className="px-6 py-5 text-right">
-                        <button
-                          onClick={() => handleOpenDetails(tx)}
-                          className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-[#003399] transition-all border border-slate-100 hover:border-[#003399]/20"
-                          title="View Details"
-                        >
-                          <FiEye size={16} />
-                        </button>
+                          <td className="px-6 py-5">
+                            <p
+                              className="text-xs font-black"
+                              style={{ color: C.navy }}
+                            >
+                              {new Date(tx.createdAt).toLocaleDateString("en-IN")}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">
+                              {new Date(tx.createdAt).toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </td>
+                          <td className="px-6 py-5">
+                            <p
+                              className="text-xs font-black"
+                              style={{ color: C.navy }}
+                            >
+                              {tx.description || "Travel Booking"}
+                            </p>
+                          </td>
+                          <td className="px-6 py-5">
+                            <code
+                              className="text-[10px] font-black px-2 py-1 rounded border uppercase block w-fit mb-1"
+                              style={{
+                                background: C.white,
+                                borderColor: C.border,
+                                color: C.muted,
+                              }}
+                            >
+                              {tx.bookingId?.orderId ||
+                                tx.orderId ||
+                                tx.reference ||
+                                (typeof tx.bookingId === "string"
+                                  ? tx.bookingId
+                                  : null) ||
+                                tx._id}
+                            </code>
+                          </td>
+                          {activeTab !== "recharge" && (
+                            <td className="px-6 py-5">
+                              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase text-navy border border-slate-200/60 shadow-sm block w-fit mb-1">
+                                {tx.bookingModel === "HotelBookingRequest"
+                                  ? "Hotel"
+                                  : tx.bookingModel === "BookingRequest"
+                                  ? "Flight"
+                                  : tx.type === "credit"
+                                  ? "Recharge"
+                                  : "Other"}
+                              </span>
+                            </td>
+                          )}
+                          <td className="px-6 py-5">
+                            <span
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm"
+                              style={{
+                                backgroundColor:
+                                  tx.type === "credit" || tx.type === "refund"
+                                    ? "#ECFDF5"
+                                    : "#FEF2F2",
+                                color:
+                                  tx.type === "credit" || tx.type === "refund"
+                                    ? "#065F46"
+                                    : "#991B1B",
+                                borderColor:
+                                  tx.type === "credit" || tx.type === "refund"
+                                    ? "#A7F3D0"
+                                    : "#FECACA",
+                              }}
+                            >
+                              {tx.type === "credit" || tx.type === "refund" ? (
+                                <FiArrowDownLeft />
+                              ) : (
+                                <FiArrowUpRight />
+                              )}{" "}
+                              {tx.type === "service_fee_deduction"
+                                ? "Service Fee"
+                                : tx.type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 font-black text-xs text-left">
+                            <span
+                              style={{
+                                color:
+                                  tx.type === "credit" || tx.type === "refund"
+                                    ? "#10B981"
+                                    : "#EF4444",
+                              }}
+                            >
+                              {tx.type === "credit" || tx.type === "refund"
+                                ? "+"
+                                : "-"}{" "}
+                              ₹{(tx.amount || 0).toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5">
+                            <StatusBadge status={getTransactionStatus(tx)} />
+                          </td>
+                          <td className="px-6 py-5 text-right">
+                            <button
+                              onClick={() => handleOpenDetails(tx)}
+                              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-[#003399] transition-all border border-slate-100 hover:border-[#003399]/20"
+                              title="View Details"
+                            >
+                              <FiEye size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-slate-400 font-bold uppercase tracking-widest text-[11px]">
+                        No Transactions Found
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          </ResponsiveDataTable>
-
-          <div className="p-6 border-t" style={{ borderColor: C.border }}>
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredTransactions.length}
-              pageSize={itemsPerPage}
-              onPageChange={setCurrentPage}
-            />
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </ResponsiveDataTable>
+          )}
         </div>
       </div>
 

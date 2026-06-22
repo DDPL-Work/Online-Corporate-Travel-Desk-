@@ -136,7 +136,7 @@ export default function BrandingSettings() {
       {/* ── Page Header ── */}
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => window.history.back()} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
                <button onClick={handleRefresh} disabled={isLoading} className={`p-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}>
@@ -144,11 +144,11 @@ export default function BrandingSettings() {
                </button>
              </div>
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
-             <div className="flex items-center gap-5">
-               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiLayout size={28} /></div>
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FiLayout size={24} className="md:w-7 md:h-7" /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Branding & Identity</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">Set up your portal's look and feel</p>
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Branding & Identity</h1>
+                 <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">Set up your portal's look and feel</p>
                </div>
              </div>
           </div>

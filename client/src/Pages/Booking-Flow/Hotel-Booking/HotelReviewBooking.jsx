@@ -1796,38 +1796,13 @@ const HotelReviewBooking = () => {
           safeHotel?.HotelCode ||
           safeHotel?.hotelCode ||
           bookingRequest?.hotelRequest?.selectedHotel?.hotelCode,
-        hotelName:
-          safeHotel?.HotelName ||
-          safeHotel?.hotelName ||
-          bookingRequest?.bookingSnapshot?.hotelName ||
-          "Unknown Hotel",
-        address:
-          safeHotel?.Address ||
-          safeHotel?.address ||
-          bookingRequest?.hotelRequest?.selectedHotel?.address,
-        city:
-          safeHotel?.CityName ||
-          safeHotel?.cityName ||
-          safeHotel?.city ||
-          bookingRequest?.hotelRequest?.selectedHotel?.city ||
-          bookingRequest?.hotelRequest?.city,
-        country:
-          safeHotel?.CountryName ||
-          safeHotel?.countryName ||
-          safeHotel?.country ||
-          bookingRequest?.hotelRequest?.selectedHotel?.country ||
-          bookingRequest?.hotelRequest?.country,
-        starRating: safeHotel?.StarRating || safeHotel?.starRating || 0,
-        images:
-          safeHotel?.Images ||
-          safeHotel?.images ||
-          bookingRequest?.hotelRequest?.selectedHotel?.images ||
-          [],
-        amenities: safeHotel?.Amenities || safeHotel?.amenities || [],
-        latitude: safeHotel?.Latitude || safeHotel?.latitude,
-        longitude: safeHotel?.Longitude || safeHotel?.longitude,
-        rawHotelData: safeHotel,
-        selectedRoom: (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0],
+        // images: [], // Removed to save payload size and DB space
+        // rawHotelData: null, // Removed to save payload size and DB space
+        // selectedRoom: {
+        //   bookingCode: (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]?.BookingCode || (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]?.RoomTypeCode,
+        //   roomIndex: (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]?.RoomIndex,
+        // },
+        bookingCode: (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]?.BookingCode || (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]?.RoomTypeCode,
         traceId: preBookData?.TraceId || searchParams?.traceId || searchParams?.TraceId,
         preBookResponse: preBookData,
         roomIndex: selectedRoom?.RoomIndex,
@@ -1840,44 +1815,7 @@ const HotelReviewBooking = () => {
             noOfChild: r.Children || r.children || 0,
             childAge: r.childrenAges || r.ChildrenAges || r.ChildAge || r.childAges || [],
           })) || roomGuests,
-        rooms: (() => {
-          const baseRooms =
-            preBookRooms.length > 0 ? preBookRooms : selectedRoom;
-          const noOfRoomsReq = searchParams?.rooms?.length || 1;
-
-          // If we have fewer room detail objects than requested rooms,
-          // expand the list by duplicating and distributing the price.
-          const expandedRooms =
-            baseRooms.length < noOfRoomsReq && baseRooms.length > 0
-              ? Array.from({ length: noOfRoomsReq }, (_, i) => ({
-                  ...baseRooms[0],
-                  // Distribute total price across rooms
-                  TotalFare:
-                    (baseRooms[0].TotalFare || baseRooms[0].NetAmount || 0) /
-                    noOfRoomsReq,
-                  TotalTax:
-                    (baseRooms[0].TotalTax || baseRooms[0].NetTax || 0) /
-                    noOfRoomsReq,
-                  NetAmount: (baseRooms[0].NetAmount || 0) / noOfRoomsReq,
-                  NetTax: (baseRooms[0].NetTax || 0) / noOfRoomsReq,
-                  RoomIndex: i + 1,
-                }))
-              : baseRooms;
-
-          return expandedRooms.map((room) => ({
-            bookingCode:
-              room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
-            price: room.Price,
-            totalFare: room.TotalFare || room.NetAmount,
-            totalTax: room.TotalTax || room.NetTax,
-            roomIndex: room.RoomIndex,
-            name: Array.isArray(room.Name)
-              ? room.Name[0] || room.Name
-              : room.Name,
-            mealType: room.MealType,
-            isRefundable: room.IsRefundable,
-          }));
-        })(),
+        // rooms: [], // Removed to save payload size and DB space
         PaxRooms: buildPaxRooms(searchParams.rooms),
         NoOfRooms: searchParams.rooms.length,
       },

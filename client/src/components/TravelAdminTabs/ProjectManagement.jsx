@@ -187,7 +187,7 @@ export default function ProjectManagement() {
       {/* Navy Header Section */}
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => navigate(-1)} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10">
                  <FiArrow className="rotate-180" size={20} />
@@ -199,21 +199,21 @@ export default function ProjectManagement() {
              
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
-             <div className="flex items-center gap-5">
-               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
-                 <MdOutlineFolder size={28} />
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <MdOutlineFolder size={24} className="md:w-7 md:h-7" />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Projects</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Projects</h1>
+                 <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">
                    Manage projects for {corporate?.corporateName || "Corporate"}
                  </p>
                </div>
              </div>
           </div>
 
-          <button onClick={() => navigate("/projects-table")} className="group bg-[#C9A240] hover:bg-white text-[#000D26] px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3 active:scale-[0.98]">
-             View Projects <HiArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          <button onClick={() => navigate("/projects-table")} className="w-full md:w-auto justify-center group bg-[#C9A240] hover:bg-white text-[#000D26] px-6 md:px-8 py-3.5 md:py-4 rounded-2xl font-black text-[10px] md:text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3 active:scale-[0.98]">
+             View Projects <HiArrowRight size={16} className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const BookingRequest = require("../models/BookingRequest");
 const HotelBooking = require("../models/hotelBookingRequest.model");
+const TBOHotelDetails = require("../models/TBOHotelDetails");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const ManagerRequest = require("../models/ManagerRequest");
@@ -9,6 +10,7 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
+const hotelService = require("../services/tektravels/hotel.service");
 const { notify } = require("../notifications/orchestrator");
 const EVENTS = require("../events/eventConstants");
 
@@ -174,6 +176,45 @@ exports.getHotelBookingByIdAdmin = async (req, res) => {
         success: false,
         message: "Hotel booking not found",
       });
+    }
+    const rawResponse = booking.bookingResult?.providerResponse || {};
+    const bookResult = rawResponse.BookResult || rawResponse;
+
+    const bookingIdTBO = booking.providerBookingId || booking.bookingResult?.providerBookingId || bookResult?.BookingId || bookResult?.BookingDetail?.BookingId;
+    const confirmationNo = booking.bookingResult?.confirmationNumber || bookResult?.ConfirmationNo;
+    const traceId = booking.providerTraceId || bookResult?.TraceId;
+    const leadPassenger = booking.travellers?.find((t) => t.isLeadPassenger) || booking.travellers?.[0];
+
+    if (bookingIdTBO || confirmationNo || traceId) {
+       try {
+         const bookedHotelDetails = await hotelService.getBookingDetails({
+               bookingId: bookingIdTBO,
+               confirmationNo,
+               traceId,
+               firstName: leadPassenger?.firstName,
+               lastName: leadPassenger?.lastName,
+         });
+         booking.bookedHotelDetails = bookedHotelDetails;
+       } catch(err) {
+         console.error("Error fetching TBO booked details:", err.message);
+       }
+    }
+    
+    // Fetch hotel images & full details from TBOHotelDetails DB
+    try {
+      const hotelCode = booking.hotelRequest?.selectedHotel?.hotelCode;
+      if (hotelCode) {
+        const tboDetails = await TBOHotelDetails.findOne({ hotelCode }).lean();
+        if (tboDetails) {
+          booking.tboHotelDetails = tboDetails;
+          
+          if (!booking.hotelRequest.selectedHotel.images || booking.hotelRequest.selectedHotel.images.length === 0) {
+            booking.hotelRequest.selectedHotel.images = tboDetails.images?.length ? tboDetails.images : (tboDetails.image ? [tboDetails.image] : []);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching TBO hotel details from DB:", err.message);
     }
 
     return res.status(200).json({

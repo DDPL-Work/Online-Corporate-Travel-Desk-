@@ -14,9 +14,11 @@ const searchQueue = new Queue(SEARCH_QUEUE_NAME, {
     },
     removeOnComplete: {
       age: 900, // keep completed jobs for 15 minutes
+      count: 500, // or maximum 500 completed jobs
     },
     removeOnFail: {
       age: 86400, // keep failed jobs for 24 hours
+      count: 1000, // or maximum 1000 failed jobs
     },
   },
 });

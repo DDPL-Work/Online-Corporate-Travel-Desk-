@@ -13,6 +13,9 @@ import Amenities from "./components/Amenities";
 import RoomTypesList from "./components/RoomTypesList";
 import Attractions from "./components/Attractions";
 import HotelDetailsSkeleton from "./components/HotelDetailsSkeleton";
+import HotelDetailsModal from "./components/HotelDetailsModal";
+import RoomDetailsModal from "./components/RoomDetailsModal";
+import MapModal from "./components/MapModal";
 import {
   FiPhone,
   FiMail,
@@ -27,7 +30,7 @@ import {
   FiAlertCircle,
   FiList,
 } from "react-icons/fi";
-import { MdCheckCircle } from "react-icons/md";
+import { MdCheckCircle, MdInfo } from "react-icons/md";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import { FaPlane } from "react-icons/fa";
@@ -53,6 +56,7 @@ const HotelDetailsPage = () => {
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [selectedRooms, setSelectedRooms] = useState({});
   const [roomDetailsModalOpen, setRoomDetailsModalOpen] = useState(false);
+  const [hotelDetailsModalOpen, setHotelDetailsModalOpen] = useState(false);
   const [selectedRoomForDetails, setSelectedRoomForDetails] = useState(null);
   const [preBookData, setPreBookData] = useState(null);
   const [loadingPreBook, setLoadingPreBook] = useState(false);
@@ -71,7 +75,7 @@ const HotelDetailsPage = () => {
   const requiredRooms = searchPayload?.PaxRooms?.length || 1;
 
   const hotelFromSearch = useMemo(
-    () => (hotels?.find((h) => h.HotelCode === hotelCode)) || localState?.hotelFromSearch,
+    () => hotels?.find((h) => h.HotelCode === hotelCode || h.hotelCode === hotelCode) || localState?.hotelFromSearch,
     [hotels, hotelCode, localState?.hotelFromSearch],
   );
 
@@ -80,15 +84,27 @@ const HotelDetailsPage = () => {
     dispatch(fetchHotelDetails({ hotelCode }));
   }, [hotelCode, hotelFromSearch, dispatch]);
 
-  const hotelFromDetails = hotelDetailsById?.[hotelCode]?.HotelDetails?.[0];
+  // Accommodate both old TBO format (HotelDetails array) and new flat DB format
+  const hotelFromDetails = hotelDetailsById?.[hotelCode]?.HotelDetails?.[0] || hotelDetailsById?.[hotelCode];
   const roomsFromRedux = hotelDetailsById?.[hotelCode]?.Rooms || [];
   const selectedRoomEntries = Object.values(selectedRooms);
   const hasSelectedRooms = selectedRoomEntries.length > 0;
 
-  const extractAttractions = (html) => {
-    if (!html) return [];
+  const extractAttractions = (data) => {
+    if (!data) return [];
+
+    // Check if it's a JSON string like "{\"1) \":\"Shillong (SHL)\", ...}"
+    if (typeof data === "string" && data.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(data);
+        return Object.values(parsed);
+      } catch (e) {
+        console.error("Failed to parse attractions JSON", e);
+      }
+    }
+
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
+    const doc = parser.parseFromString(data, "text/html");
     let attractions = [];
     Array.from(doc.querySelectorAll("p")).forEach((p) => {
       const strong = p.querySelector("strong");
@@ -128,21 +144,25 @@ const HotelDetailsPage = () => {
       countryName: hotelFromDetails?.CountryName || "",
       map: hotelFromDetails?.Map || "",
       rating: hotelFromDetails?.HotelRating || hotelFromSearch?.StarRating || 0,
-      description: hotelFromDetails?.Description || "No description available",
-      checkIn: hotelFromDetails?.CheckInTime || "2:00 PM",
-      checkOut: hotelFromDetails?.CheckOutTime || "12:00 PM",
+      description: hotelFromDetails?.description || hotelFromDetails?.Description || "No description available",
+      checkIn: hotelFromDetails?.checkInTime || hotelFromDetails?.CheckInTime || "2:00 PM",
+      checkOut: hotelFromDetails?.checkOutTime || hotelFromDetails?.CheckOutTime || "12:00 PM",
       images: hotelFromDetails?.Images?.length
         ? hotelFromDetails.Images
-        : hotelFromSearch?.Images || [],
+        : hotelFromDetails?.images?.length
+          ? hotelFromDetails.images
+          : hotelFromSearch?.Images || [],
       facilities:
-        hotelFromDetails?.HotelFacilities || hotelFromSearch?.Amenities || [],
+        hotelFromDetails?.hotelFacilities || hotelFromDetails?.HotelFacilities || hotelFromSearch?.Amenities || [],
       hotelFees: hotelDetailsById?.[hotelCode]?.hotelFees || hotelFromDetails?.hotelFees || hotelFromDetails?.HotelFees || { optional: [], mandatory: [] },
-      attractions: extractAttractions(hotelFromDetails?.Description || ""),
+      attractions: hotelFromDetails?.attractions || hotelFromDetails?.Attractions 
+        ? extractAttractions(hotelFromDetails.attractions || hotelFromDetails.Attractions) 
+        : extractAttractions(hotelFromDetails?.Description || hotelFromDetails?.description || ""),
       contact: {
-        phone: hotelFromDetails?.PhoneNumber || "",
-        email: hotelFromDetails?.Email || "",
-        website: hotelFromDetails?.HotelWebsiteUrl || "",
-        fax: hotelFromDetails?.FaxNumber || "",
+        phone: hotelFromDetails?.phoneNumber || hotelFromDetails?.PhoneNumber || "",
+        email: hotelFromDetails?.email || hotelFromDetails?.Email || "",
+        website: hotelFromDetails?.hotelWebsiteUrl || hotelFromDetails?.HotelWebsiteUrl || "",
+        fax: hotelFromDetails?.faxNumber || hotelFromDetails?.FaxNumber || "",
       },
 
       rooms: (roomsFromRedux.length > 0
@@ -364,6 +384,10 @@ const HotelDetailsPage = () => {
             countryName={mergedHotel.countryName}
             rating={mergedHotel.rating}
             reviewCount={0}
+            checkInDate={searchPayload?.CheckIn}
+            checkOutDate={searchPayload?.CheckOut}
+            checkInTime={mergedHotel.checkIn}
+            checkOutTime={mergedHotel.checkOut}
           />
         </div>
       </div>
@@ -376,8 +400,7 @@ const HotelDetailsPage = () => {
         <div className="mb-6">
           <HotelImageGallery images={mergedHotel.images} />
         </div>
-
-        <div className="my-10">
+         <div className="my-10">
           {/* Rooms — full span under left column */}
           <RoomTypesList
             rooms={mergedHotel.rooms}
@@ -386,140 +409,89 @@ const HotelDetailsPage = () => {
             requiredRooms={requiredRooms}
             onSeeDetails={handleSeeRoomDetails}
           />
-
-          {/* <div className="mb-4 text-sm font-semibold text-[#000D26]">
-            {hasSelectedRooms ? (
-              <span className="flex items-center gap-2">
-                <MdCheckCircle className="text-emerald-500" /> All{" "}
-                {requiredRooms} rooms selected
-              </span>
-            ) : (
-              <span>Select this room type for all {requiredRooms} rooms</span>
-            )}
-          </div> */}
         </div>
 
-        {/* Two-column layout: main (left) + sticky sidebar (right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ── Left: main detail column ── */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* About / Description */}
-            <HotelInfo
-              description={mergedHotel.description}
-              checkIn={mergedHotel.checkIn}
-              checkOut={mergedHotel.checkOut}
-              checkInDate={searchPayload?.CheckIn}
-              checkOutDate={searchPayload?.CheckOut}
-              contact={mergedHotel.contact}
-              map={mergedHotel.map}
-            />
-
-            {/* Hotel Fees & Taxes */}
-            {((mergedHotel.hotelFees?.mandatory?.length > 0) || (mergedHotel.hotelFees?.optional?.length > 0)) && (
-              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden p-8 space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#C9A84C]/10 flex items-center justify-center text-[#C9A84C] shadow-sm">
-                    <FiInfo size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm leading-none">Hotel Fees & Taxes</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Additional charges collected by the property</p>
-                  </div>
-                </div>
-
-                <div className={`grid grid-cols-1 ${mergedHotel.hotelFees?.mandatory?.length > 0 && mergedHotel.hotelFees?.optional?.length > 0 ? "md:grid-cols-2" : ""} gap-6`}>
-                  {/* Mandatory Fees */}
-                  {mergedHotel.hotelFees?.mandatory?.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-rose-600">
-                        <FiAlertCircle size={16} />
-                        <h4 className="text-xs font-black uppercase tracking-widest">Mandatory Fees</h4>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3">
-                        {mergedHotel.hotelFees.mandatory.map((fee, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-4 bg-rose-50/30 rounded-xl border border-rose-100/50">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold text-slate-800">{fee.FeesType}</span>
-                              <span className="text-[10px] text-slate-500">{fee.ChargeType}</span>
-                            </div>
-                            <span className="text-sm font-black text-rose-600">
-                              {fee.Currency} {fee.FeesValue}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Optional Fees */}
-                  {mergedHotel.hotelFees?.optional?.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-[#C9A84C]">
-                        <FiInfo size={16} />
-                        <h4 className="text-xs font-black uppercase tracking-widest">Optional Fees</h4>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3">
-                        {mergedHotel.hotelFees.optional.map((fee, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold text-slate-800">{fee.FeesType}</span>
-                              <span className="text-[10px] text-slate-500">{fee.ChargeType}</span>
-                            </div>
-                            <span className="text-sm font-black text-[#C9A84C]">
-                              {fee.Currency} {fee.FeesValue}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Amenities */}
-            <Amenities amenities={mergedHotel.facilities} />
-
-            {/* Nearby attractions */}
-            {mergedHotel.attractions?.length > 0 && (
-              <Attractions attractions={mergedHotel.attractions} />
-            )}
+        {/* ── Bento Grid: Summary, Map, CTA ── */}
+        <div className="flex flex-col gap-6 mb-10">
+          {/* Row 1: Button Card (Full Width) */}
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 w-full">
+             <div>
+                <h2 className="font-black text-[#0A203E] text-2xl">Hotel Details & Information</h2>
+                <p className="text-sm text-slate-500 mt-2 max-w-lg leading-relaxed">
+                  View complete hotel description, comprehensive list of amenities, contact information, check-in/out times, and nearby attractions.
+                </p>
+             </div>
+             <button 
+                onClick={() => setHotelDetailsModalOpen(true)}
+                className="shrink-0 bg-[#C9A84C] text-[#0A203E] px-6 py-3.5 rounded-xl text-sm font-black tracking-widest uppercase shadow-lg shadow-[#C9A84C]/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 border-none cursor-pointer"
+             >
+                <MdInfo size={18} />
+                View All Details
+             </button>
           </div>
 
-          {/* ── Right: sticky summary sidebar ── */}
-          <div className="lg:col-span-1">
-            {/* ── Booking Summary Section Removed ── */}
-
-            {/* Map card */}
-            {/* {mergedHotel.map && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <iframe
-                    title="Hotel Map"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(mergedHotel.map)}&output=embed`}
-                    className="w-full h-48 border-0"
-                    loading="lazy"
-                    allowFullScreen
-                  />
-                  <div className="px-4 py-2.5 text-xs text-slate-400 flex items-center gap-1.5">
-                    <FiGlobe size={11} />
-                    {mergedHotel.address}
+          {/* Row 2: Map Card (2/3) + Flight Promo (1/3) OR Hotel Fee (1/3) + Map (1/3) + Flight Promo (1/3) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {mergedHotel?.hotelFees?.optional?.length > 0 || mergedHotel?.hotelFees?.mandatory?.length > 0 ? (
+              <div className="lg:col-span-1 h-full">
+                <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-6 md:p-8 flex flex-col h-full min-h-[250px] max-h-[400px]">
+                  <h4 className="font-black text-[#0A203E] text-lg mb-4 flex items-center gap-2">
+                    <FiAlertCircle className="text-[#C9A84C]" size={20} />
+                    Hotel Fees
+                  </h4>
+                  <div className="flex-1 overflow-y-auto pr-2" style={{ scrollbarWidth: "thin" }}>
+                    {mergedHotel.hotelFees.mandatory?.length > 0 && (
+                      <div className="mb-4">
+                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mandatory Fees</h5>
+                        <ul className="space-y-3">
+                          {mergedHotel.hotelFees.mandatory.map((fee, idx) => (
+                            <li key={idx} className="flex justify-between items-start gap-2">
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-700 truncate">{fee.FeesType}</span>
+                                <span className="text-[10px] text-slate-500 capitalize line-clamp-1 leading-tight">{fee.ChargeType}</span>
+                              </div>
+                              <span className="text-sm font-black text-[#0A203E] shrink-0">
+                                {fee.Currency} {fee.FeesValue}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {mergedHotel.hotelFees.optional?.length > 0 && (
+                      <div>
+                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Optional Fees</h5>
+                        <ul className="space-y-3">
+                          {mergedHotel.hotelFees.optional.map((fee, idx) => (
+                            <li key={idx} className="flex justify-between items-start gap-2">
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-700 truncate">{fee.FeesType}</span>
+                                <span className="text-[10px] text-slate-500 capitalize line-clamp-1 leading-tight">{fee.ChargeType}</span>
+                              </div>
+                              <span className="text-sm font-black text-[#0A203E] shrink-0">
+                                {fee.Currency} {fee.FeesValue}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )} */}
+              </div>
+            ) : null}
 
-            {/* Map card */}
-            {mergedHotel?.latitude != null &&
-              mergedHotel?.longitude != null && (
+            <div className={(mergedHotel?.hotelFees?.optional?.length > 0 || mergedHotel?.hotelFees?.mandatory?.length > 0) ? "lg:col-span-1 flex flex-col h-full" : "lg:col-span-2 flex flex-col h-full"}>
+              {mergedHotel?.latitude != null && mergedHotel?.longitude != null ? (
                 <div
-                  className="z-0 rounded-2xl border border-slate-200 shadow-sm overflow-hidden  cursor-pointer group"
+                  className="z-0 rounded-2xl border border-slate-200 shadow-sm overflow-hidden cursor-pointer group flex-1 flex flex-col"
                   onClick={() => setMapModalOpen(true)}
                 >
-                  {/* Thumbnail map — non-interactive overlay to capture click */}
-                  <div className="relative z-0 h-48">
+                  <div className="relative z-0 flex-1 min-h-[200px]">
                     <MapContainer
                       center={[mergedHotel.latitude, mergedHotel.longitude]}
                       zoom={15}
-                      className="w-full h-full"
+                      className="w-full h-full absolute inset-0"
                       scrollWheelZoom={false}
                       zoomControl={false}
                       dragging={false}
@@ -527,61 +499,55 @@ const HotelDetailsPage = () => {
                       attributionControl={false}
                     >
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      <Marker
-                        position={[mergedHotel.latitude, mergedHotel.longitude]}
-                      >
+                      <Marker position={[mergedHotel.latitude, mergedHotel.longitude]}>
                         <Popup>{mergedHotel.name}</Popup>
                       </Marker>
                     </MapContainer>
-
-                    {/* Click overlay with expand hint */}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 backdrop-blur-sm text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow flex items-center gap-1.5">
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                        >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
                         </svg>
                         Click to expand
                       </span>
                     </div>
                   </div>
-
-                  <div className="px-4 py-2.5 text-xs text-slate-400 flex items-center gap-1.5">
-                    <FiGlobe size={11} />
+                  <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 font-medium flex items-center gap-2">
+                    <FiGlobe size={14} className="text-slate-400" />
                     {mergedHotel.address}
                   </div>
                 </div>
+              ) : (
+                <div className="bg-slate-100 rounded-2xl flex-1 flex items-center justify-center text-slate-400 font-medium text-sm">
+                  Map data unavailable
+                </div>
               )}
+            </div>
 
-            {/* Flight Search Promo Banner */}
-            <div className="bg-[#C9A84C] rounded-2xl p-6 shadow-xl shadow-[#C9A84C]/20 flex flex-col items-center text-center mt-6">
-              <div className="w-12 h-12 bg-[#04112F] rounded-full flex items-center justify-center mb-4">
-                <FaPlane className="text-[#C9A84C] text-xl" />
+            <div className="lg:col-span-1 h-full">
+              <div className="bg-[#C9A84C] rounded-2xl p-6 md:p-8 shadow-xl shadow-[#C9A84C]/20 flex flex-col items-center text-center justify-center h-full">
+                <div className="w-14 h-14 bg-[#04112F] rounded-full flex items-center justify-center mb-5 shadow-lg">
+                  <FaPlane className="text-[#C9A84C] text-xl" />
+                </div>
+                <h4 className="text-white font-black text-xl mb-3 leading-tight">
+                  Need a flight to this hotel?
+                </h4>
+                <p className="text-white/90 text-sm mb-6 leading-relaxed max-w-[250px]">
+                  Book your flight easily alongside your hotel stay. Enter your
+                  dates and we'll find the best fares for you.
+                </p>
+                <button
+                  onClick={() => navigate("/travel", { state: { activeTab: "flight" } })}
+                  className="w-full py-4 bg-[#04112F] text-white rounded-xl text-xs font-black tracking-widest uppercase hover:bg-[#0A203E] active:scale-95 transition-all shadow-md mt-auto"
+                >
+                  Search Flights Now
+                </button>
               </div>
-              <h4 className="text-white font-black text-lg mb-2">
-                Need a flight to this hotel?
-              </h4>
-              <p className="text-white text-xs mb-5 leading-relaxed">
-                Book your flight easily alongside your hotel stay. Enter your
-                dates and we'll find the best fares for you.
-              </p>
-              <button
-                onClick={() =>
-                  navigate("/travel", { state: { activeTab: "flight" } })
-                }
-                className="w-full flex items-center justify-center gap-2 bg-[#04112F] hover:bg-[#04112F] text-[#C9A84C] px-4 py-3.5 rounded-xl font-black text-sm uppercase tracking-widest transition shadow-lg shadow-[#C9A84C]/20 active:scale-[0.98] border-none cursor-pointer"
-              >
-                Search Flights Now
-              </button>
             </div>
           </div>
-
+        </div>
+        {/* Two-column layout: main (left) + sticky sidebar (right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
            {/* Sticky Bottom Bar for Selected Room */}
           {hasSelectedRooms &&
             typeof document !== "undefined" &&
@@ -647,8 +613,6 @@ const HotelDetailsPage = () => {
             </div>,
             document.body,
           )}
-
-
           <MapModal
             open={mapModalOpen}
             onClose={() => setMapModalOpen(false)}
@@ -657,7 +621,6 @@ const HotelDetailsPage = () => {
             name={mergedHotel?.name}
             address={mergedHotel?.address}
           />
-
           <RoomDetailsModal
             open={roomDetailsModalOpen}
             onClose={() => setRoomDetailsModalOpen(false)}
@@ -665,381 +628,18 @@ const HotelDetailsPage = () => {
             preBookData={preBookData}
             loading={loadingPreBook}
           />
+          <HotelDetailsModal
+            open={hotelDetailsModalOpen}
+            onClose={() => setHotelDetailsModalOpen(false)}
+            hotel={mergedHotel}
+            searchPayload={searchPayload}
+          />
         </div>
       </div>
     </div>
   );
 };
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Room Details Modal                                             */
-/* ─────────────────────────────────────────────────────────────── */
-function RoomDetailsModal({ open, onClose, room, preBookData, loading }) {
-  useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
 
-  if (!open) return null;
-
-  const roomInfo = preBookData?.HotelResult?.[0]?.Rooms?.[0] || room;
-  const rateConditions = preBookData?.HotelResult?.[0]?.RateConditions || [];
-  const promotions = roomInfo?.RoomPromotion || [];
-  const supplements = roomInfo?.Supplements || [];
-  const cancelPolicies = roomInfo?.CancelPolicies || [];
-  const inclusions = (roomInfo?.Inclusion || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative z-10 w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <div>
-            <h3 className="text-lg font-black text-[#0A203E]">Room Details</h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-              {room?.RoomTypeName || room?.Name?.[0] || "Standard Room"}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer border-none"
-          >
-            <FiX size={18} className="text-slate-600" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
-          {loading ? (
-            <div className="py-20 flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-4 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full animate-spin" />
-              <p className="text-sm font-bold text-slate-500 animate-pulse">
-                Fetching live room data...
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Promotions */}
-              {promotions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-[#C9A84C]">
-                    <FiGift size={16} />
-                    <h4 className="text-xs font-black uppercase tracking-widest">
-                      Special Promotions
-                    </h4>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {promotions.map((promo, i) => (
-                      <span
-                        key={i}
-                        className="text-[11px] font-bold text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/20 px-3 py-1.5 rounded-xl"
-                      >
-                        {promo}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Inclusions */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-emerald-600">
-                  <FiCheckCircle size={16} />
-                  <h4 className="text-xs font-black uppercase tracking-widest">
-                    What's Included
-                  </h4>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {inclusions.length > 0 ? (
-                    inclusions.map((inc, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-2 text-[12px] text-slate-600 font-medium"
-                      >
-                        <MdCheckCircle className="text-emerald-500 shrink-0" />
-                        <span>{inc}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">
-                      No specific inclusions listed.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Supplements */}
-              {supplements.some((s) => s?.length > 0) && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <FiInfo size={16} />
-                    <h4 className="text-xs font-black uppercase tracking-widest">
-                      Mandatory Supplements & Taxes
-                    </h4>
-                  </div>
-                  <div className="space-y-3">
-                    {supplements.map(
-                      (roomSup, roomIdx) =>
-                        roomSup?.length > 0 && (
-                          <div key={roomIdx} className="space-y-2">
-                            {supplements.length > 1 && (
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                                Room {roomIdx + 1}
-                              </p>
-                            )}
-                            <div className="grid grid-cols-1 gap-2">
-                              {roomSup.map((sup, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100"
-                                >
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-slate-800 capitalize">
-                                      {sup.Description?.replace(/_/g, " ")}
-                                    </span>
-                                    <span className="text-[10px] text-slate-500">
-                                      {sup.Type?.replace(
-                                        /([A-Z])/g,
-                                        " $1",
-                                      ).trim()}
-                                    </span>
-                                  </div>
-                                  <span className="text-sm font-black text-[#C9A84C]">
-                                    {sup.Price === 0
-                                      ? "Included"
-                                      : `${sup.Currency} ${sup.Price}`}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ),
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Cancellation Policy */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-red-500">
-                  <FiShield size={16} />
-                  <h4 className="text-xs font-black uppercase tracking-widest">
-                    Cancellation Policy
-                  </h4>
-                </div>
-                <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                  <CancelPolicyTable policies={cancelPolicies} />
-                </div>
-              </div>
-
-              {/* Rate Conditions / Rules */}
-              {rateConditions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-[#0A203E]">
-                    <FiList size={16} />
-                    <h4 className="text-xs font-black uppercase tracking-widest">
-                      Important Rules & Conditions
-                    </h4>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
-                    {rateConditions.map((cond, i) => {
-                      const cleanCond = cond
-                        .replace(/&amp;lt;/g, "<")
-                        .replace(/&amp;gt;/g, ">")
-                        .replace(/&lt;/g, "<")
-                        .replace(/&gt;/g, ">")
-                        .replace(/<[^>]+>/g, " ")
-                        .trim();
-                      if (!cleanCond) return null;
-                      return (
-                        <div key={i} className="flex items-start gap-2.5">
-                          <FiAlertCircle
-                            size={14}
-                            className="text-[#C9A84C] mt-0.5 shrink-0"
-                          />
-                          <p className="text-[12px] text-slate-600 leading-relaxed">
-                            {cleanCond}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 bg-[#0A203E] text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-[#1E293B] transition active:scale-95 cursor-pointer border-none"
-          >
-            Close Details
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-function CancelPolicyTable({ policies = [] }) {
-  if (!policies.length)
-    return (
-      <div className="p-4 text-center text-xs text-slate-400 italic">
-        Policy information unavailable.
-      </div>
-    );
-
-  return (
-    <table className="w-full text-[11px]">
-      <thead>
-        <tr className="bg-slate-50 border-b border-slate-100">
-          <th className="text-left px-4 py-3 font-black text-slate-400 uppercase tracking-tighter">
-            From Date
-          </th>
-          <th className="text-right px-4 py-3 font-black text-slate-400 uppercase tracking-tighter">
-            Charge
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {policies.map((p, i) => (
-          <tr key={i} className="border-b border-slate-50 last:border-0">
-            <td className="px-4 py-3 font-bold text-slate-700">
-              {p.FromDate || "—"}
-            </td>
-            <td className="px-4 py-3 text-right">
-              <span
-                className={`font-black ${p.CancellationCharge === 0 ? "text-emerald-600" : "text-red-600"}`}
-              >
-                {p.CancellationCharge === 0
-                  ? "FREE"
-                  : p.ChargeType === "Fixed" || p.ChargeType === 1
-                    ? `₹${Number(p.CancellationCharge).toLocaleString()}`
-                    : `${p.CancellationCharge}%`}
-              </span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-// ── Sidebar contact row ───────────────────────────────────
-function ContactRow({ icon: Icon, value, href, external }) {
-  return (
-    <a
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noreferrer" : undefined}
-      className="flex items-center gap-2 text-xs text-slate-600 hover:text-[#C9A84C] transition truncate"
-    >
-      <Icon size={12} className="text-slate-400 shrink-0" />
-      <span className="truncate">{value}</span>
-    </a>
-  );
-}
-
-function MapModal({ open, onClose, lat, lng, name, address }) {
-  useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  if (!open) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      onClick={onClose}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-      {/* Modal */}
-      <div
-        className="relative z-10 w-[95vw] max-w-4xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-white"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
-          <div>
-            <p className="text-sm font-bold text-slate-800">{name}</p>
-            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-sm">
-              {address}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer border-none"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M1 1l12 12M13 1L1 13"
-                stroke="#64748b"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Full map */}
-        <div className="h-[70vh]">
-          <MapContainer
-            center={[lat, lng]}
-            zoom={15}
-            className="w-full h-full"
-            scrollWheelZoom={true}
-          >
-            <TileLayer
-              // attribution="&copy; OpenStreetMap contributors"
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <Marker position={[lat, lng]}>
-              <Popup>{name}</Popup>
-            </Marker>
-          </MapContainer>
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-xs text-slate-400 flex items-center gap-1.5">
-            <FiGlobe size={11} /> {address}
-          </p>
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=15`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-semibold text-[#C9A84C] hover:underline"
-          >
-            Open in OpenStreetMap →
-          </a>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
 
 export default HotelDetailsPage;

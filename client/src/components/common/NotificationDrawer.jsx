@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { IoClose, IoNotificationsOutline, IoTrashOutline } from "react-icons/io5";
 import { formatDistanceToNow } from "date-fns";
 
@@ -36,8 +37,8 @@ export default function NotificationDrawer({
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-[70]">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999]">
       <button
         type="button"
         aria-label="Close notifications"
@@ -145,6 +146,7 @@ export default function NotificationDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }

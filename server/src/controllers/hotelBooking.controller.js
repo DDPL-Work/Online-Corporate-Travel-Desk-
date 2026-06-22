@@ -17,6 +17,7 @@ const EmployeeSsrPolicy = require("../models/EmployeeSsrPolicy.model");
 const logger = require("../utils/logger");
 const MarkupAccountingService = require("../modules/markup/services/markupAccounting.service");
 const serviceFeeService = require("../services/serviceFee.service");
+const TBOHotelDetails = require("../models/TBOHotelDetails");
 
 // @desc    PreBook Hotel (TBO)
 // @route   POST /api/v1/hotel-bookings/prebook
@@ -244,54 +245,21 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     paxRooms,
     selectedHotel: {
       hotelCode: hotelRequest.hotelCode,
-      hotelName:
-        hotelRequest.hotelName?.trim() ||
-        hotelRequest.rawHotelData?.HotelName ||
-        "Unknown Hotel",
-      address: hotelRequest.address || hotelRequest.rawHotelData?.Address,
-      city: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
-      country: hotelRequest.country || "",
-      starRating: hotelRequest.starRating || 0,
-      description: hotelRequest.description || "",
-      images: hotelRequest.images?.length
-        ? hotelRequest.images
-        : hotelRequest.rawHotelData?.Images || [],
-      amenities: hotelRequest.amenities || [],
-      latitude: hotelRequest.latitude || "",
-      longitude: hotelRequest.longitude || "",
-      rawHotelData: hotelRequest.rawHotelData || null,
     },
-    allRooms: hotelRequest.rooms || [],
-    selectedRoom: {
-      roomIndex: hotelRequest.roomIndex,
-      name: hotelRequest.selectedRoom?.Name || [],
-      bookingCode: hotelRequest.selectedRoom?.BookingCode,
-      inclusion: hotelRequest.selectedRoom?.Inclusion,
-      mealType: hotelRequest.selectedRoom?.MealType,
-      isRefundable: hotelRequest.selectedRoom?.IsRefundable,
-      withTransfers: hotelRequest.selectedRoom?.WithTransfers,
-      beddingGroup: hotelRequest.selectedRoom?.BeddingGroup,
-      totalFare:
-        hotelRequest.selectedRoom?.Price?.TotalFare ||
-        hotelRequest.selectedRoom?.TotalFare,
-      totalTax:
-        hotelRequest.selectedRoom?.Price?.Tax ||
-        hotelRequest.selectedRoom?.TotalTax,
-      dayRates: hotelRequest.selectedRoom?.DayRates,
-      cancelPolicies: hotelRequest.selectedRoom?.CancelPolicies,
-      promotions: hotelRequest.selectedRoom?.RoomPromotion || [],
-      currency: hotelRequest.currency || "INR",
-      rawRoomData: hotelRequest.selectedRoom || null,
-    },
+    allRooms: [], // Removed to save DB space
+    // selectedRoom: {
+      // roomIndex: hotelRequest.roomIndex,
+      // bookingCode: hotelRequest.selectedRoom?.bookingCode || hotelRequest.selectedRoom?.BookingCode,
+    // },
     providerBookingId: hotelRequest.bookingCode || null,
     preBookResponse: hotelRequest.preBookResponse || null,
     ...(hotelRequest.IsCorporate && { IsCorporate: true }),
   };
 
   const bookingSnapshot = {
-    hotelName: transformedHotelRequest.selectedHotel.hotelName,
-    city: transformedHotelRequest.selectedHotel.city,
-    country: transformedHotelRequest.selectedHotel.country,
+    hotelName: req.body.bookingSnapshot?.hotelName || hotelRequest.hotelName?.trim() || hotelRequest.rawHotelData?.HotelName || "Unknown Hotel",
+    city: req.body.bookingSnapshot?.city || hotelRequest.city || hotelRequest.rawHotelData?.CityName,
+    country: req.body.bookingSnapshot?.country || hotelRequest.country || "",
     checkInDate: transformedHotelRequest.checkInDate,
     checkOutDate: transformedHotelRequest.checkOutDate,
     roomCount: transformedHotelRequest.noOfRooms,
@@ -299,7 +267,8 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     amount: pricingSnapshot?.totalAmount || 0,
     currency: pricingSnapshot?.currency || "INR",
     hotelImage:
-      transformedHotelRequest.selectedHotel?.images?.[0] ||
+      req.body.bookingSnapshot?.hotelImage ||
+      hotelRequest.images?.[0] ||
       hotelRequest.rawHotelData?.Images?.[0] ||
       "",
   };
@@ -406,7 +375,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
       if (!snapshot && actualRawRoom?.markupAmount > 0) {
         snapshot = {
           supplierFare: actualRawRoom?.supplierFare || 0,
-          finalFare: actualRawRoom?.TotalFare || actualRawRoom?.totalFare || transformedHotelRequest.selectedRoom.totalFare || 0,
+          finalFare: actualRawRoom?.TotalFare || actualRawRoom?.totalFare || transformedHotelRequest?.selectedRoom?.totalFare || 0,
           markupAmount: actualRawRoom.markupAmount,
           markupBreakdown: actualRawRoom.markupBreakdown || []
         };
@@ -464,7 +433,7 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
       bookingRequest.executionStatus = "booking_initiated";
       await bookingRequest.save();
 
-      const bookingCodes = [transformedHotelRequest.selectedRoom.bookingCode];
+      const bookingCodes = transformedHotelRequest.providerBookingId ? [transformedHotelRequest.providerBookingId] : [];
       const leadTraveller = transformedTravellers.find(
         (t) => t.isLeadPassenger,
       );
@@ -792,63 +761,14 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
 
     selectedHotel: {
       hotelCode: hotelRequest.hotelCode,
-      hotelName:
-        hotelRequest.hotelName?.trim() ||
-        hotelRequest.rawHotelData?.HotelName ||
-        "Unknown Hotel",
-      address: hotelRequest.address || hotelRequest.rawHotelData?.Address,
-      city: hotelRequest.city || hotelRequest.rawHotelData?.CityName,
-      country: hotelRequest.country || "",
-      starRating: hotelRequest.starRating || 0,
-      description: hotelRequest.description || "",
-      images: hotelRequest.images?.length
-        ? hotelRequest.images
-        : hotelRequest.rawHotelData?.Images || [],
-      amenities: hotelRequest.amenities || [],
-      latitude: hotelRequest.latitude || "",
-      longitude: hotelRequest.longitude || "",
-
-      // 🔥 FULL RAW HOTEL OBJECT (IMPORTANT)
-      rawHotelData: hotelRequest.rawHotelData || null,
     },
 
-    allRooms: hotelRequest.rooms || [],
+    // allRooms: [], // Removed to save DB space
 
-    selectedRoom: {
-      roomIndex: hotelRequest.roomIndex,
-
-      name: hotelRequest.selectedRoom?.Name || [],
-      bookingCode: hotelRequest.selectedRoom?.BookingCode,
-
-      inclusion: hotelRequest.selectedRoom?.Inclusion,
-      mealType: hotelRequest.selectedRoom?.MealType,
-
-      isRefundable: hotelRequest.selectedRoom?.IsRefundable,
-      withTransfers: hotelRequest.selectedRoom?.WithTransfers,
-
-      beddingGroup: hotelRequest.selectedRoom?.BeddingGroup,
-
-      // 🔥 pricing
-      totalFare:
-        hotelRequest.selectedRoom?.Price?.TotalFare ||
-        hotelRequest.selectedRoom?.TotalFare,
-
-      totalTax:
-        hotelRequest.selectedRoom?.Price?.Tax ||
-        hotelRequest.selectedRoom?.TotalTax,
-      dayRates: hotelRequest.selectedRoom?.DayRates,
-
-      // 🔥 cancellation
-      cancelPolicies: hotelRequest.selectedRoom?.CancelPolicies,
-
-      // 🔥 promotions
-      promotions: hotelRequest.selectedRoom?.RoomPromotion || [],
-
-      currency: hotelRequest.currency || "INR",
-
-      // 🔥 FULL RAW ROOM OBJECT
-      rawRoomData: hotelRequest.selectedRoom || null,
-    },
+    // selectedRoom: {
+    //   roomIndex: hotelRequest.roomIndex,
+    //   bookingCode: hotelRequest.selectedRoom?.bookingCode || hotelRequest.selectedRoom?.BookingCode,
+    // },
     providerBookingId: hotelRequest.bookingCode || null,
     preBookResponse: hotelRequest.preBookResponse || null,
   };
@@ -856,19 +776,20 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
   /* ================= SNAPSHOT ================= */
 
   const bookingSnapshot = {
-    hotelName: transformedHotelRequest.selectedHotel.hotelName,
-    city: transformedHotelRequest.selectedHotel.city,
-    country: transformedHotelRequest.selectedHotel.country,
+    hotelName: req.body.bookingSnapshot?.hotelName || hotelRequest.hotelName?.trim() || hotelRequest.rawHotelData?.HotelName || "Unknown Hotel",
+    city: req.body.bookingSnapshot?.city || hotelRequest.city || hotelRequest.rawHotelData?.CityName,
+    country: req.body.bookingSnapshot?.country || hotelRequest.country || "",
     checkInDate: transformedHotelRequest.checkInDate,
     checkOutDate: transformedHotelRequest.checkOutDate,
     roomCount: transformedHotelRequest.noOfRooms,
     nights: transformedHotelRequest.noOfNights,
     amount: pricingSnapshot?.totalAmount || 0,
     currency: pricingSnapshot?.currency || "INR",
-    hotelImage:
-      transformedHotelRequest.selectedHotel?.images?.[0] ||
-      hotelRequest.rawHotelData?.Images?.[0] ||
-      "",
+    // hotelImage:
+    //   req.body.bookingSnapshot?.hotelImage ||
+    //   hotelRequest.images?.[0] ||
+    //   hotelRequest.rawHotelData?.Images?.[0] ||
+    //   "",
   };
 
   /* ================= SAVE ================= */
@@ -1048,8 +969,7 @@ exports.getMyHotelRequests = asyncHandler(async (req, res) => {
     requestStatus: { $in: ["pending_approval", "pending_second_approval", "manager_approved", "approved"] },
     executionStatus: { $ne: "voucher_generated" }, // not completed yet
   })
-    .populate("approvedBy", "name email role")
-    .populate("rejectedBy", "name email role")
+    .select("orderId requestStatus pricingSnapshot.totalAmount hotelRequest.checkInDate hotelRequest.selectedHotel.hotelCode hotelRequest.hotelCode bookingSnapshot")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -1072,6 +992,25 @@ exports.getMyHotelRequestById = asyncHandler(async (req, res) => {
     .populate("approvedBy", "name email role")
     .populate("rejectedBy", "name email role")
     .lean();
+
+  if (booking) {
+    const hotelCode = booking.hotelRequest?.selectedHotel?.hotelCode || booking.hotelRequest?.hotelCode;
+    if (hotelCode) {
+      // Fetch full hotel details from TBOHotelDetails
+      const details = await TBOHotelDetails.findOne({ hotelCode }).lean();
+      if (details) {
+        // Attach the full details to the booking object
+        booking.hotelDetails = details;
+
+        // Also ensure bookingSnapshot is hydrated
+        if (!booking.bookingSnapshot) booking.bookingSnapshot = {};
+        booking.bookingSnapshot.hotelName = details.hotelName || booking.bookingSnapshot.hotelName;
+        booking.bookingSnapshot.city = details.cityName || booking.bookingSnapshot.city;
+        booking.bookingSnapshot.country = details.countryName || booking.bookingSnapshot.country;
+        booking.bookingSnapshot.hotelImage = details.image || details.images?.[0] || booking.bookingSnapshot.hotelImage;
+      }
+    }
+  }
 
   if (!booking) {
     throw new ApiError(404, "Hotel booking request not found");
@@ -1098,9 +1037,26 @@ exports.getMyRejectedHotelRequests = asyncHandler(async (req, res) => {
     userId: req.user._id,
     requestStatus: "rejected",
   })
-    .populate("rejectedBy", "name email")
+    .select("orderId requestStatus rejectedAt rejectionReason hotelRequest.selectedHotel.hotelCode hotelRequest.hotelCode bookingSnapshot")
     .sort({ rejectedAt: -1 })
     .lean();
+
+  for (let req of requests) {
+    const hotelCode = req.hotelRequest?.selectedHotel?.hotelCode || req.hotelRequest?.hotelCode;
+    if (hotelCode) {
+      // Only fetch exactly what is needed for the snapshot
+      const details = await TBOHotelDetails.findOne({ hotelCode })
+        .select("hotelName cityName countryName image images")
+        .lean();
+      if (details) {
+        if (!req.bookingSnapshot) req.bookingSnapshot = {};
+        req.bookingSnapshot.hotelName = details.hotelName || req.bookingSnapshot.hotelName;
+        req.bookingSnapshot.city = details.cityName || req.bookingSnapshot.city;
+        req.bookingSnapshot.country = details.countryName || req.bookingSnapshot.country;
+        req.bookingSnapshot.hotelImage = details.image || details.images?.[0] || req.bookingSnapshot.hotelImage;
+      }
+    }
+  }
 
   return res.status(200).json({
     success: true,
@@ -1169,9 +1125,15 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
     const selectedRooms = booking.hotelRequest?.allRooms || [];
 
     // derive booking codes and room count safely
-    const bookingCodes = selectedRooms
+    let bookingCodes = selectedRooms
       .map((r) => r.bookingCode)
       .filter(Boolean);
+
+    if (!bookingCodes.length && booking.hotelRequest?.preBookResponse?.HotelResult?.[0]?.Rooms) {
+      bookingCodes = booking.hotelRequest.preBookResponse.HotelResult[0].Rooms
+        .map(r => r.BookingCode)
+        .filter(Boolean);
+    }
 
     if (!bookingCodes.length) {
       throw new ApiError(400, "BookingCode missing");
@@ -1799,7 +1761,7 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
         ...tboRoom,
 
         // ✅ FIX ROOM NAME FROM DB
-        RoomTypeName: dbRoom?.Name?.[0]?.split(",")[0] || tboRoom.RoomTypeName,
+        RoomTypeName: dbRoom?.Name?.[0] || tboRoom.RoomTypeName,
 
         // ✅ FIX MEAL
         Inclusion: dbRoom?.Inclusion || tboRoom.Inclusion,
@@ -1810,6 +1772,26 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     });
   } else {
     rooms = tboRooms.length > 0 ? tboRooms : dbRooms;
+  }
+
+  /* ================= FETCH TBOHotelDetails FROM DB ================= */
+
+  const possibleCodes = [
+    result?.TBOHotelCode,
+    result?.HotelCode,
+    booking.hotelRequest?.selectedHotel?.hotelCode,
+    booking.hotelRequest?.hotelCode,
+  ].filter(Boolean);
+
+  let tboHotelDetails = null;
+
+  for (const hCode of possibleCodes) {
+    try {
+      tboHotelDetails = await TBOHotelDetails.findOne({ hotelCode: hCode }).lean();
+      if (tboHotelDetails) break;
+    } catch (err) {
+      console.error(`DB TBOHotelDetails FETCH FAILED for code ${hCode}:`, err.message);
+    }
   }
 
   /* ================= IMAGES ================= */
@@ -1830,80 +1812,44 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
     images = [booking.bookingSnapshot.hotelImage];
   }
 
-  // 🔥 Fallback 3: LAST RESORT - FETCH STATIC DETAILS FROM TBO
-  if (images.length === 0) {
-    const possibleCodes = [
-      result?.TBOHotelCode,
-      result?.HotelCode,
-      booking.hotelRequest?.selectedHotel?.hotelCode,
-      booking.hotelRequest?.hotelCode,
-    ].filter(Boolean);
+  // 🔥 Fallback 3: LAST RESORT - FETCH FROM TBOHotelDetails DB
+  if (images.length === 0 && tboHotelDetails) {
+    const foundImages = tboHotelDetails.images?.length 
+      ? tboHotelDetails.images 
+      : (tboHotelDetails.image ? [tboHotelDetails.image] : []);
 
-    for (const hCode of possibleCodes) {
+    if (foundImages.length > 0) {
+      images = foundImages;
+      // 🔥 Save back to DB for future hits
       try {
-        const staticDetails = await hotelService.getStaticHotelDetails(hCode);
-        const hotelInfo =
-          staticDetails?.HotelDetails?.[0] ||
-          staticDetails?.[0] ||
-          staticDetails;
-        const foundImages =
-          hotelInfo?.Images ||
-          hotelInfo?.HotelImages ||
-          hotelInfo?.images ||
-          [];
-
-        if (foundImages && foundImages.length > 0) {
-          images = foundImages;
-          // 🔥 Save back to DB for future hits
-          try {
-            await HotelBookingRequest.findByIdAndUpdate(booking._id, {
-              $set: {
-                "hotelRequest.selectedHotel.images": foundImages,
-                "bookingSnapshot.hotelImage": foundImages[0],
-              },
-            });
-          } catch (dbErr) {
-            console.error(
-              "FAILED TO SAVE RECOVERED IMAGES TO DB:",
-              dbErr.message,
-            );
-          }
-          break; // Success!
-        }
-      } catch (err) {
+        await HotelBookingRequest.findByIdAndUpdate(booking._id, {
+          $set: {
+            "hotelRequest.selectedHotel.images": foundImages,
+            "bookingSnapshot.hotelImage": foundImages[0],
+          },
+        });
+      } catch (dbErr) {
         console.error(
-          `STATIC IMAGE FETCH FAILED for code ${hCode}:`,
-          err.message,
+          "FAILED TO SAVE RECOVERED IMAGES TO DB:",
+          dbErr.message,
         );
       }
     }
   }
 
   const heroImage = images[0] || null;
-
   /* ================= GUESTS ================= */
-
   const guests =
     rooms.flatMap((room) => room?.HotelPassenger || []) || travellers || [];
-
   /* ================= PRICING ================= */
-
   const totalFare = result?.InvoiceAmount || pricingSnapshot?.totalAmount || 0;
-
   const currency = result?.Currency || pricingSnapshot?.currency || "INR";
-
   /* ================= DATES ================= */
-
   const checkIn = result?.CheckInDate || bookingSnapshot?.checkInDate;
-
   const checkOut = result?.CheckOutDate || bookingSnapshot?.checkOutDate;
-
   /* ================= HOTEL INFO ================= */
-
   const hotelName = result?.HotelName || bookingSnapshot?.hotelName;
-
   const city = result?.City || bookingSnapshot?.city;
-
   const status = result?.HotelBookingStatus || executionStatus;
 
   /* ================= FINAL RESPONSE ================= */
@@ -1928,7 +1874,6 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       approverRole,
       requesterDetails,
       gstDetails,
-
       // 📌 DB (stable)
       executionStatus,
       requestStatus,
@@ -1939,14 +1884,13 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       voucheredAt,
       createdAt,
       updatedAt,
-
       // ✅ NEW (CRITICAL FIX)
       rooms,
-
+      // ✅ TBO HOTEL DETAILS (DB)
+      tboHotelDetails,
       // ✅ MEDIA
       images,
       heroImage,
-
       // ✅ TBO (live)
       confirmationNo: result?.ConfirmationNo || confirmationNo,
       hotelName,
@@ -1954,17 +1898,13 @@ exports.getBookedHotelDetails = asyncHandler(async (req, res) => {
       checkIn,
       checkOut,
       status,
-
       // ✅ merged
       guests,
       totalFare,
       currency,
-
       // ✅ raw (optional)
       raw: result || null,
-
       amendment,
-
       // ✅ audit fields
       createdAt: booking.createdAt,
       approvedAt: booking.approvedAt,
