@@ -6,16 +6,17 @@ const deduplicateHotels = (hotels = []) => {
   const seenKeys = new Set();
   const uniqueHotels = [];
 
-  hotels.forEach((hotel) => {
+  for (let i = 0; i < hotels.length; i++) {
+    const hotel = hotels[i];
     const hotelCodeKey = hotel?.HotelCode ? String(hotel.HotelCode).trim() : "";
     const compositeKey = `${String(hotel?.HotelName || "").trim().toLowerCase()}|${String(hotel?.CityName || hotel?.City || "").trim().toLowerCase()}|${String(hotel?.Address || "").trim().toLowerCase()}`;
     const key = hotelCodeKey || compositeKey || `row-${uniqueHotels.length}`;
 
-    if (seenKeys.has(key)) return;
-
-    seenKeys.add(key);
-    uniqueHotels.push(hotel);
-  });
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueHotels.push(hotel);
+    }
+  }
 
   return uniqueHotels;
 };
@@ -39,6 +40,8 @@ async function aggregateFinalResults(searchId, cityRecord) {
   // Stream parse to avoid blocking if possible, or just parse incrementally
   for (const chunkStr of chunkDataStrings) {
     try {
+      // Yield to the event loop between chunks to allow BullMQ heartbeats
+      await new Promise(resolve => setImmediate(resolve));
       const parsed = JSON.parse(chunkStr);
       if (Array.isArray(parsed)) {
         allHotels.push(...parsed);
