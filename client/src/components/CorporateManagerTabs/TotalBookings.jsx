@@ -496,7 +496,7 @@ export default function TotalBookings() {
       {/* Navy Header Section - Aligned with CancelledBookings */}
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-10 pb-24 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button 
                   onClick={() => navigate(-1)} 
@@ -517,13 +517,13 @@ export default function TotalBookings() {
              
              <div className="h-16 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
-             <div className="flex items-center gap-5">
-               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
-                 <FiList size={32} />
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl flex shrink-0 items-center justify-center shadow-2xl text-white border border-white/20 bg-white/10 backdrop-blur-md" >
+                 <FiList size={28} className="md:w-8 md:h-8" />
                </div>
                <div>
-                 <h1 className="text-4xl font-black tracking-tight leading-none">Team Bookings</h1>
-                 <p className="text-[11px] mt-3 font-bold uppercase tracking-[3px] opacity-60">
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Team Bookings</h1>
+                 <p className="text-[10px] md:text-[11px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] md:tracking-[3px] opacity-60">
                    View all the bookings (Hotel & Flight) which were done by your team
                  </p>
                </div>
@@ -534,14 +534,14 @@ export default function TotalBookings() {
 
       <div className="w-full px-4 md:px-10 -mt-12 space-y-10">
         {/* Tab Switcher - Premium Glassmorphism */}
-        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit max-w-full overflow-x-auto">
            {[["flight", "Flights", FaPlane], ["hotel", "Hotels", FaHotel]].map(([k, lbl, Icon]) => (
              <button 
                 key={k} 
                 onClick={() => setActiveTab(k)} 
-                className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+                className={`px-6 md:px-8 py-3.5 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeTab === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
              >
-                <Icon size={14} /> {lbl}
+                <Icon className="w-3 h-3 md:w-3.5 md:h-3.5" /> {lbl}
              </button>
            ))}
         </div>

@@ -30,15 +30,10 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
   const [form, setForm] = useState({
     email: "",
     corporateName: "",
-    // classification: "prepaid",
     defaultApprover: "travel-admin",
-    // walletBalance: 0,
     primaryName: "",
     primaryEmail: "",
     primaryMobile: "",
-    // secondaryName: "",
-    // secondaryEmail: "",
-    // secondaryMobile: "",
     billingName: "",
     billingEmail: "",
     billingMobile: "",
@@ -50,10 +45,6 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     ssoType: "google",
     ssoDomain: "",
     samlMetadata: "",
-    // billingCycle: "30days",
-    // customBillingDays: "",
-    // creditLimit: 0,
-    // currentOutstanding: 0,
     creditTermsNotes: "",
     gstin: "",
     gstLegalName: "",
@@ -63,6 +54,7 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     gstContactNumber: "",
     gstContactSource: "manual", // linked source: manual, primary, billing
     corporateType: "pvt-ltd",
+    panNumber: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -127,6 +119,9 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
         : "Enter valid domain (example.com)",
 
     pincode: (v) => (/^[1-9][0-9]{5}$/.test(v) ? "" : "Invalid pincode"),
+
+    panNumber: (v) =>
+      /^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(v) ? "" : "Invalid PAN format",
   };
 
   const validateStep = () => {
@@ -196,8 +191,15 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
           newErrors.gstCertificate = "GST certificate required";
         }
 
+        if (!panFile && !panUrl) {
+          newErrors.panCard = "PAN Card document required";
+        }
+
         newErrors.gstin =
           validators.required(form.gstin) || validators.gstin(form.gstin);
+
+        newErrors.panNumber =
+          validators.required(form.panNumber) || validators.panNumber(form.panNumber);
 
         newErrors.gstLegalName = validators.required(form.gstLegalName);
         break;
@@ -359,11 +361,12 @@ export default function AuthModal({ onClose, initialStep = 0 }) {
     }
 
     if (panMode === "file" && panFile) {
-      fd.append("panCard", panFile);
+      fd.append("corporatePanCard", panFile);
     }
     if (panMode === "url" && panUrl) {
-      fd.append("panCard[url]", panUrl);
+      fd.append("corporatePanCard[url]", panUrl);
     }
+    fd.append("corporatePanCard[number]", form.panNumber ? form.panNumber.toUpperCase() : "");
 
     try {
       await dispatch(onboardCorporate(fd)).unwrap();

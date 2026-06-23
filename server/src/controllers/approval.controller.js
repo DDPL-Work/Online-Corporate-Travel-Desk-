@@ -36,16 +36,6 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     requestStatus: { $in: statuses },
   };
 
-  // const requests = await BookingRequest.find(query)
-  //   .populate("userId", "name email")
-  //   .populate("approvedBy", "name email")
-  //   .populate("rejectedBy", "name email")
-  //   .sort({ createdAt: -1 })
-  //   .skip(skip)
-  //   .limit(Number(limit));
-
-  // const total = await BookingRequest.countDocuments(query);
-
   // 🔹 Fetch flight requests
   const flightRequests = await BookingRequest.find(query)
     .populate("userId", "name email")
@@ -60,7 +50,6 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     .populate("rejectedBy", "name email")
     .populate("approverId", "name email role");
 
-  // 🔥 Add type (VERY IMPORTANT)
   const taggedFlights = flightRequests.map((r) => {
     const obj = r.toObject();
     return {
@@ -70,14 +59,24 @@ exports.getAllApprovals = asyncHandler(async (req, res) => {
     };
   });
 
-  const taggedHotels = hotelRequests.map((r) => {
+  const TBOHotelDetails = require("../models/TBOHotelDetails");
+
+  const taggedHotels = await Promise.all(hotelRequests.map(async (r) => {
     const obj = r.toObject();
+    
+    let tboHotelDetails = null;
+    const hotelCode = obj.hotelRequest?.selectedHotel?.hotelCode;
+    if (hotelCode) {
+      tboHotelDetails = await TBOHotelDetails.findOne({ hotelCode }).lean();
+    }
+
     return {
       ...obj,
       orderId: obj.orderId || "N/A",
       bookingType: "hotel",
+      tboHotelDetails
     };
-  });
+  }));
 
   // 🔹 Merge + sort
   const allRequests = [...taggedFlights, ...taggedHotels].sort(

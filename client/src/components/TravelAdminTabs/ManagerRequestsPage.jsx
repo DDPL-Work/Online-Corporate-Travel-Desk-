@@ -179,7 +179,7 @@ const ManagerRequestsPage = () => {
       {/* Navy Header Section - Matched with TotalBookings */}
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button 
                   onClick={() => navigate(-1)} 
@@ -200,13 +200,13 @@ const ManagerRequestsPage = () => {
              
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
 
-             <div className="flex items-center gap-5">
-               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
-                 <MdVerifiedUser size={28} />
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <MdVerifiedUser size={24} className="md:w-7 md:h-7" />
                </div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Manager Approvals</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Manager Approvals</h1>
+                 <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">
                    Review requests from employees to become managers
                  </p>
                </div>

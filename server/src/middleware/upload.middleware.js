@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
 
     if (
       file.fieldname === "gstCertificate" ||
-      file.fieldname === "panCard" ||
+      file.fieldname === "corporatePanCard" ||
       file.fieldname === "travelDocument" // ✅ ADD THIS
     ) {
       folder = "documents";
@@ -104,7 +104,7 @@ const processImage = async (req, res, next) => {
 // Middleware to handle multiple file uploads
 const uploadMultiple = upload.fields([
   { name: "gstCertificate", maxCount: 1 },
-  { name: "panCard", maxCount: 1 },
+  { name: "corporatePanCard", maxCount: 1 },
   { name: "profilePicture", maxCount: 1 },
   { name: "travelDocument", maxCount: 1 },
   { name: "companyLogo", maxCount: 1 },

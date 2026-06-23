@@ -166,6 +166,7 @@ const HotelBookNow = () => {
   const { loading: actionLoading } = useSelector(
     (state) => state.hotelBookings,
   );
+  const { user } = useSelector((state) => state.auth);
 
   const [bookingRequest, setBookingRequest] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -211,7 +212,12 @@ const HotelBookNow = () => {
     ? hotelReq.allRooms
     : [];
 
+  const hotelDetails = bookingRequest?.hotelDetails || {};
+  
   const hotelImages =
+    (hotelDetails?.images?.length > 0
+      ? hotelDetails.images
+      : null) ||
     (hotelReq?.selectedHotel?.images?.length > 0
       ? hotelReq.selectedHotel.images
       : null) ||
@@ -229,29 +235,40 @@ const HotelBookNow = () => {
   }, [hotelImages.length]);
 
   const hotel = {
-    name: selectedHotel.hotelName || "Hotel",
-    rating: selectedHotel.starRating || 0,
-    address: selectedHotel.address || "",
-    city: selectedHotel.city || "",
-    image: hotelImages[imgIdx] || "/placeholder-hotel.jpg",
+    name: hotelDetails?.hotelName || selectedHotel?.hotelName || snapshot?.hotelName || "Hotel",
+    rating: hotelDetails?.hotelRating || selectedHotel?.starRating || 0,
+    address: hotelDetails?.address || selectedHotel?.address || "",
+    city: hotelDetails?.cityName || selectedHotel?.city || snapshot?.city || "",
+    image: hotelImages[imgIdx] || hotelDetails?.image || "/placeholder-hotel.jpg",
+    phone: hotelDetails?.phoneNumber || "",
+    email: hotelDetails?.email || "",
+    website: hotelDetails?.hotelWebsiteUrl || "",
   };
 
   const checkIn = hotelReq.checkInDate || snapshot.checkInDate;
   const checkOut = hotelReq.checkOutDate || snapshot.checkOutDate;
   const nights = nightsCount(checkIn, checkOut);
-  const roomCount = selectedRooms.length;
+  
   const totalAdults =
     hotelReq.roomGuests?.reduce((sum, r) => sum + (r.noOfAdults || 0), 0) ||
     travelers.length;
 
-  const totalFare = selectedRooms.reduce(
-    (sum, r) => sum + (r.totalFare || r.price?.totalFare || 0),
+  // Detail Rooms
+  const detailRooms =
+    hotelReq.preBookResponse?.HotelResult?.[0]?.Rooms ||
+    (hotelReq.selectedRoom?.rawRoomData
+      ? [hotelReq.selectedRoom.rawRoomData]
+      : selectedRooms);
+
+  const roomCount = hotelReq?.noOfRooms || snapshot?.roomCount || detailRooms.length || 1;
+
+  const totalFare = bookingRequest?.pricingSnapshot?.totalAmount || snapshot?.amount || 0;
+  
+  const tax = detailRooms.reduce(
+    (sum, r) => sum + (r.TotalTax || r.NetTax || r.totalTax || r.price?.tax || 0),
     0,
   );
-  const tax = selectedRooms.reduce(
-    (sum, r) => sum + (r.totalTax || r.price?.tax || 0),
-    0,
-  );
+  
   const baseFare = totalFare - tax;
 
   const isApproved = bookingRequest?.requestStatus === "approved";
@@ -269,6 +286,7 @@ const HotelBookNow = () => {
 
   // Policies extraction
   const cancellationPolicies =
+    hotelReq.preBookResponse?.HotelResult?.[0]?.Rooms?.[0]?.CancelPolicies ||
     hotelReq.selectedRoom?.cancelPolicies ||
     hotelReq.selectedRoom?.rawRoomData?.CancelPolicies ||
     [];
@@ -277,12 +295,7 @@ const HotelBookNow = () => {
     hotelReq.selectedRoom?.rawRoomData?.RateConditions ||
     [];
 
-  // Detail Rooms
-  const detailRooms =
-    hotelReq.preBookResponse?.HotelResult?.[0]?.Rooms ||
-    (hotelReq.selectedRoom?.rawRoomData
-      ? [hotelReq.selectedRoom.rawRoomData]
-      : selectedRooms);
+  // Detail Rooms already extracted above
 
   const handleBookHotel = async () => {
     setShowConfirmModal(false);
@@ -565,6 +578,28 @@ const HotelBookNow = () => {
                             {hotel.address}
                           </p>
                         )}
+                        {(hotel.phone || hotel.email || hotel.website) && (
+                          <div className="mt-4 flex flex-col gap-1.5 text-[12px] text-[#7A7068]">
+                            {hotel.phone && (
+                              <span className="flex items-center gap-2">
+                                <FiPhone size={12} className="text-[#B5862A]" /> {hotel.phone}
+                              </span>
+                            )}
+                            {hotel.email && (
+                              <span className="flex items-center gap-2">
+                                <FiMail size={12} className="text-[#B5862A]" /> {hotel.email}
+                              </span>
+                            )}
+                            {hotel.website && (
+                              <span className="flex items-center gap-2">
+                                <FiInfo size={12} className="text-[#B5862A]" />{" "}
+                                <a href={hotel.website.startsWith('http') ? hotel.website : `https://${hotel.website}`} target="_blank" rel="noopener noreferrer" className="hover:text-[#B5862A] transition-colors hover:underline">
+                                  {hotel.website}
+                                </a>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <hr className="border-t border-[#EAE4D9] my-5" />
                       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-6">
@@ -630,17 +665,19 @@ const HotelBookNow = () => {
                 </div>
 
                 {/* Simplified Payment Summary (Right Side) */}
-                <div className="w-full lg:w-[320px] shrink-0 bg-[#FAF8F4] border border-[#EAE4D9] p-8 flex flex-col justify-center items-start h-full min-h-[160px]">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#A89F94] mb-3">
-                    Total Payment
+                {user?.role === "travel-admin" && (
+                  <div className="w-full lg:w-[320px] shrink-0 bg-[#FAF8F4] border border-[#EAE4D9] p-8 flex flex-col justify-center items-start h-full min-h-[160px]">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#A89F94] mb-3">
+                      Total Payment
+                    </div>
+                    <div className="text-[36px] font-black text-[#1A1714] font-['Cormorant_Garamond'] leading-none mb-3">
+                      ₹{totalFare.toLocaleString("en-IN")}
+                    </div>
+                    <div className="text-[13px] text-[#7A7068] leading-relaxed border-t border-[#EAE4D9] pt-4 mt-auto w-full">
+                      Includes all taxes and service fees.
+                    </div>
                   </div>
-                  <div className="text-[36px] font-black text-[#1A1714] font-['Cormorant_Garamond'] leading-none mb-3">
-                    ₹{totalFare.toLocaleString("en-IN")}
-                  </div>
-                  <div className="text-[13px] text-[#7A7068] leading-relaxed border-t border-[#EAE4D9] pt-4 mt-auto w-full">
-                    Includes all taxes and service fees.
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}

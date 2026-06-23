@@ -5,12 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   MdArrowBack,
-  MdHotel,
-  MdCheckCircle,
-  MdInfo,
   MdVerifiedUser,
-  MdLocationOn,
-  MdKingBed,
 } from "react-icons/md";
 import {
   FiUser,
@@ -20,26 +15,10 @@ import {
   FiShield,
   FiMapPin,
   FiGlobe,
-  FiCoffee,
-  FiImage,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCheckCircle,
-  FiXCircle,
-  FiStar,
-  FiTag,
-  FiClock,
   FiInfo,
   FiBookOpen,
-  FiX,
-  FiChevronDown,
-  FiChevronUp,
-  FiGift,
   FiShield as FiShieldIcon,
-  FiList,
-  FiAlertCircle,
 } from "react-icons/fi";
-import { FaUserPlus, FaHotel, FaPlane } from "react-icons/fa";
 import LandingHeader from "../../../layout/LandingHeader";
 import {
   createHotelBookingRequest,
@@ -48,7 +27,6 @@ import {
   preBookHotel,
   instantHotelBooking,
 } from "../../../Redux/Actions/hotelBooking.thunks";
-import { approveApproval } from "../../../Redux/Actions/approval.thunks";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import Swal from "sweetalert2";
 import PhoneInput from "react-phone-input-2";
@@ -65,914 +43,19 @@ import {
   isHotelPreBookSessionExpired,
 } from "./hotelPreBookSession";
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Utility: calculateNights                                       */
-/* ─────────────────────────────────────────────────────────────── */
-const calculateNights = (checkIn, checkOut) => {
-  if (!checkIn || !checkOut) return 1;
-  const inDate = new Date(checkIn);
-  const outDate = new Date(checkOut);
-  const diffTime = outDate - inDate;
-  const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return nights > 0 ? nights : 1;
-};
+import {
+  calculateNights,
+  Required,
+  Divider,
+  SectionHeading,
+  HotelHeroBanner,
+  SelectedRoomDetailsCard,
+  InfoCell,
+} from "./components/ReviewPageComps";
+import { GuestDetailsForm } from "./components/GuestDetailsForm";
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Utility: subtractOneSecond                                     */
-/* ─────────────────────────────────────────────────────────────── */
-const subtractOneSecond = (dateStr) => {
-  try {
-    if (!dateStr || typeof dateStr !== "string") return "";
-    // format is DD-MM-YYYY HH:mm:ss
-    const parts = dateStr.split(" ");
-    if (parts.length < 2) return dateStr;
-    const [datePart, timePart] = parts;
-    const [d, m, y] = datePart.split("-").map(Number);
-    const [hh, mm, ss] = timePart.split(":").map(Number);
-    const date = new Date(y, m - 1, d, hh, mm, ss);
-    date.setSeconds(date.getSeconds() - 1);
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  } catch (e) {
-    return dateStr;
-  }
-};
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Utility: sanitize HTML entities + tags from API strings       */
-/* ─────────────────────────────────────────────────────────────── */
-function sanitizeHtml(str = "") {
-  return str
-    .replace(/&amp;lt;/g, "<")
-    .replace(/&amp;gt;/g, ">")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
 
-/* ─────────────────────────────────────────────────────────────── */
-/*  Shared tiny helpers                                            */
-/* ─────────────────────────────────────────────────────────────── */
-const Required = () => <span className="text-red-400">*</span>;
-const Divider = () => <hr className="border-slate-100" />;
-const SectionHeading = ({ icon, title, badge }) => (
-  <div className="flex items-center gap-2 mb-3">
-    <span className="text-[#C9A84C]">{icon}</span>
-    <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
-      {title}
-    </p>
-    {badge && (
-      <span className="text-[9px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/30 px-2 py-0.5 rounded-full">
-        {badge}
-      </span>
-    )}
-  </div>
-);
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Room Image Gallery                                             */
-/* ─────────────────────────────────────────────────────────────── */
-function RoomImageGallery({ images = [] }) {
-  const [active, setActive] = useState(0);
-  const [expanded, setExpanded] = useState(false);
-
-  if (!images.length) return null;
-
-  const prev = () => setActive((i) => (i - 1 + images.length) % images.length);
-  const next = () => setActive((i) => (i + 1) % images.length);
-
-  return (
-    <div className="mb-5">
-      <div className="relative rounded-xl overflow-hidden bg-white h-52 sm:h-64 group">
-        <img src={images[active]}
-          alt={`Room image ${active + 1}`}
-          className="w-full h-full object-cover transition-all duration-500"
-          loading="lazy" decoding="async"
-          onError={(e) => {
-            e.target.style.display = "none";
-          }}
-        />
-        <div className="absolute bottom-3 right-3 bg-black/50 text-white text-[11px] font-bold px-2.5 py-1 rounded-full">
-          {active + 1} / {images.length}
-        </div>
-        {images.length > 1 && (
-          <>
-            <button
-              onClick={prev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border-none cursor-pointer"
-            >
-              <FiChevronLeft size={16} />
-            </button>
-            <button
-              onClick={next}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border-none cursor-pointer"
-            >
-              <FiChevronRight size={16} />
-            </button>
-          </>
-        )}
-      </div>
-      {images.length > 1 && (
-        <div className="flex gap-2 mt-2 overflow-x-auto pb-1 scrollbar-hide">
-          {(expanded ? images : images.slice(0, 8)).map((img, i) => (
-            <button
-              key={i}
-              onClick={() => setActive(i)}
-              className={`shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                active === i
-                  ? "border-[#C9A84C] scale-105"
-                  : "border-transparent hover:border-slate-300"
-              }`}
-            >
-              <img src={img}
-                alt={`thumb ${i}`}
-                className="w-full h-full object-cover"
-                loading="lazy" decoding="async"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                }}
-              />
-            </button>
-          ))}
-          {!expanded && images.length > 8 && (
-            <button
-              onClick={() => setExpanded(true)}
-              className="shrink-0 w-14 h-10 rounded-lg bg-white border-2 border-transparent hover:border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600 cursor-pointer border-none"
-            >
-              +{images.length - 8}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Cancellation Policy Table                                      */
-/* ─────────────────────────────────────────────────────────────── */
-function CancelPolicyTable({ policies = [] }) {
-  if (!policies.length) return null;
-
-  const typeLabel = (type) => {
-    if (type === "Fixed" || type === 1) return "Fixed (₹)";
-    if (type === "Percentage" || type === 2) return "Percentage (%)";
-    return String(type);
-  };
-
-  const formatCharge = (charge, type) => {
-    if (charge === 0)
-      return <span className="text-emerald-600 font-bold">Free</span>;
-    if (type === "Percentage" || type === 2)
-      return <span className="text-red-600 font-bold">{charge}%</span>;
-    return (
-      <span className="text-red-600 font-bold">
-        ₹{Number(charge).toLocaleString("en-IN")}
-      </span>
-    );
-  };
-
-  return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-white border-b border-slate-200">
-            <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-              Cancellation Period (From - To)
-            </th>
-            <th className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-              Charge Type
-            </th>
-            <th className="text-right px-3 py-2.5 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-              Cancellation Charge
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {policies.map((p, i) => (
-            <tr
-              key={i}
-              className="border-b border-slate-100 last:border-0 hover:bg-white transition"
-            >
-              <td className="px-3 py-2.5 text-xs text-slate-800 font-medium">
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase w-8">
-                      From:
-                    </span>
-                    <span>{p.FromDate || "—"}</span>
-                  </div>
-                  {policies[i + 1] && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase w-8">
-                        To:
-                      </span>
-                      <span className="text-slate-500">
-                        {subtractOneSecond(policies[i + 1].FromDate)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </td>
-              <td className="px-3 py-2.5">
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.CancellationCharge === 0 ? "bg-emerald-500/10 text-emerald-700" : "bg-red-500/10 text-red-700"}`}
-                >
-                  {typeLabel(p.ChargeType)}
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-right text-sm">
-                {formatCharge(p.CancellationCharge, p.ChargeType)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  NEW ▶ Room Promotions Panel                                    */
-/* ─────────────────────────────────────────────────────────────── */
-function RoomPromotions({ promotions = [] }) {
-  const cleaned = promotions.map(sanitizeHtml).filter(Boolean);
-  if (!cleaned.length) return null;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {cleaned.map((promo, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-2 px-3 py-2 bg-[#C9A84C]/10 border border-[#C9A84C]/30 rounded-xl shadow-sm animate-fade-in"
-        >
-          <div className="w-5 h-5 rounded-full bg-[#C9A84C] flex items-center justify-center shadow-lg shadow-[#C9A84C]/30">
-            <FiGift size={10} className="text-white" />
-          </div>
-          <span className="text-[12px] font-bold text-[#C9A84C]">{promo}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  NEW ▶ Inclusions Badges                                        */
-/* ─────────────────────────────────────────────────────────────── */
-function InclusionBadges({ inclusion }) {
-  if (!inclusion) return null;
-  const items = Array.isArray(inclusion)
-    ? inclusion
-    : inclusion
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-  if (!items.length) return null;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item, i) => (
-        <span
-          key={i}
-          className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full font-medium"
-        >
-          <MdCheckCircle size={11} /> {item}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  NEW ▶ Amenities Grid                                           */
-/* ─────────────────────────────────────────────────────────────── */
-function AmenitiesGrid({ amenities = [] }) {
-  const [showAll, setShowAll] = useState(false);
-  if (!amenities.length) return null;
-
-  const visible = showAll ? amenities : amenities.slice(0, 12);
-
-  return (
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
-        <FiStar size={11} className="text-[#C9A84C]" /> Room Amenities
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {visible.map((item, i) => (
-          <span
-            key={i}
-            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full"
-          >
-            <MdCheckCircle size={11} className="text-[#C9A84C] shrink-0" />
-            {item}
-          </span>
-        ))}
-        {!showAll && amenities.length > 12 && (
-          <button
-            onClick={() => setShowAll(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/20 px-2.5 py-1 rounded-full hover:bg-[#C9A84C]/15 transition cursor-pointer"
-          >
-            +{amenities.length - 12} more
-          </button>
-        )}
-        {showAll && amenities.length > 12 && (
-          <button
-            onClick={() => setShowAll(false)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full hover:bg-white/10 transition cursor-pointer"
-          >
-            Show less
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  NEW ▶ Rate Conditions Panel                                    */
-/* ─────────────────────────────────────────────────────────────── */
-function RateConditions({ conditions = [] }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const cleaned = conditions.map(sanitizeHtml).filter(Boolean);
-  if (!cleaned.length) return null;
-
-  // Always show check-in/out/age conditions; collapse the rest
-  const keyConditions = cleaned.filter((c) =>
-    /check.?in|check.?out|minimum|age/i.test(c),
-  );
-  const otherConditions = cleaned.filter(
-    (c) => !/check.?in|check.?out|minimum|age/i.test(c),
-  );
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/50 overflow-hidden">
-      {keyConditions.length > 0 && (
-        <div className="px-4 pt-3 pb-2 space-y-1.5">
-          {keyConditions.map((cond, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <p className="text-[12px] text-[#C9A84C] font-medium leading-snug">
-                {cond}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {otherConditions.length > 0 && (
-        <>
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 cursor-pointer border-none bg-transparent text-left border-t border-[#1E293B]"
-          >
-            <div className="flex items-center gap-2">
-              <FiList size={12} className="text-[#C9A84C]" />
-              <span className="text-[11px] font-bold text-[#C9A84C]">
-                {expanded ? "Hide" : "View"} {otherConditions.length} more
-                condition{otherConditions.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-            {expanded ? (
-              <FiChevronUp size={13} className="text-[#C9A84C]" />
-            ) : (
-              <FiChevronDown size={13} className="text-[#C9A84C]" />
-            )}
-          </button>
-          {expanded && (
-            <div className="px-4 pb-4 space-y-2 border-t border-[#1E293B]">
-              {otherConditions.map((cond, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <FiAlertCircle
-                    size={12}
-                    className="text-[#C9A84C] mt-0.5 shrink-0"
-                  />
-                  <p className="text-[12px] text-slate-700 leading-relaxed">
-                    {cond}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Full-Width Hotel Hero Banner                                   */
-/* ─────────────────────────────────────────────────────────────── */
-function HotelHeroBanner({
-  displayHotel,
-  displaySearchParams,
-  displayRoom,
-  selectedRoom,
-  totalAdults,
-  totalChildren,
-}) {
-  const nights = calculateNights(
-    displaySearchParams?.checkIn,
-    displaySearchParams?.checkOut,
-  );
-
-  return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-md shadow-black/20 overflow-hidden mb-6">
-      {/* Hero image strip */}
-      <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-white/10">
-        <img src={displayHotel?.images?.[0] || "/placeholder-hotel.jpg"}
-          alt={displayHotel?.name}
-          className="w-full h-full object-cover" loading="lazy" decoding="async" />
-        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
-
-        {displayHotel?.rating > 0 && (
-          <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 backdrop-blur-sm border border-slate-300 px-3 py-1.5 rounded-full">
-            {Array.from({ length: displayHotel.rating }).map((_, i) => (
-              <svg
-                key={i}
-                className="w-3 h-3 text-[#C9A84C]"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            ))}
-            <span className="text-[11px] font-bold text-white ml-0.5">
-              {displayHotel.rating}-Star
-            </span>
-          </div>
-        )}
-
-        <div className="absolute bottom-0 left-0 right-0 px-6 py-4">
-          <h2 className="text-xl sm:text-2xl font-extrabold text-white leading-tight mb-1 drop-shadow">
-            {displayHotel?.name}
-          </h2>
-          <div className="flex items-center gap-1.5 text-sm text-white/90">
-            <MdLocationOn size={15} className="text-white/70 shrink-0" />
-            <span className="leading-snug">{displayHotel?.address}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Check-in / out / room strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100 border-t border-slate-100">
-        <div className="px-5 py-4 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-            Check-in
-          </p>
-          <p className="text-sm font-bold text-[#0A203E]">
-            {displaySearchParams?.checkIn
-              ? new Date(displaySearchParams.checkIn).toLocaleDateString(
-                  "en-GB",
-                  { day: "2-digit", month: "short", year: "numeric" },
-                )
-              : "—"}
-          </p>
-          <p className="text-[11px] text-slate-500">
-            {displaySearchParams?.checkIn
-              ? new Date(displaySearchParams.checkIn).toLocaleDateString(
-                  "en-GB",
-                  { weekday: "long" },
-                )
-              : ""}
-          </p>
-        </div>
-
-        <div className="px-5 py-4 flex flex-col items-center justify-center gap-0.5 bg-[#C9A84C]/5">
-          <div className="w-8 h-8 rounded-full bg-[#C9A84C]/10 flex items-center justify-center mb-1">
-            <FiClock size={14} className="text-[#C9A84C]" />
-          </div>
-          <span className="text-lg font-black text-[#C9A84C]">{nights}</span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Night{nights !== 1 ? "s" : ""}
-          </span>
-        </div>
-
-        <div className="px-5 py-4 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-            Check-out
-          </p>
-          <p className="text-sm font-bold text-[#0A203E]">
-            {displaySearchParams?.checkOut
-              ? new Date(displaySearchParams.checkOut).toLocaleDateString(
-                  "en-GB",
-                  { day: "2-digit", month: "short", year: "numeric" },
-                )
-              : "—"}
-          </p>
-          <p className="text-[11px] text-slate-500">
-            {displaySearchParams?.checkOut
-              ? new Date(displaySearchParams.checkOut).toLocaleDateString(
-                  "en-GB",
-                  { weekday: "long" },
-                )
-              : ""}
-          </p>
-        </div>
-
-        <div className="px-5 py-4 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">
-            Room & Guests
-          </p>
-          <p className="text-sm font-bold text-[#0A203E]">
-            {displaySearchParams?.rooms?.length || 1} Room · {totalAdults} Adult
-            {totalAdults !== 1 ? "s" : ""}
-            {totalChildren > 0 &&
-              ` · ${totalChildren} Child${totalChildren !== 1 ? "ren" : ""}`}
-          </p>
-          {/* <p className="text-[11px] text-slate-500 truncate">
-            {Array.isArray(selectedRoom)
-              ? [...new Set(selectedRoom.map((r) => r.RoomTypeName || r.Name?.[0] || r.name))].join(", ")
-              : "—"}
-          </p> */}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Selected Room Details Card — FULLY UPDATED with PreBook data  */
-/* ─────────────────────────────────────────────────────────────── */
-function SelectedRoomDetailsCard({
-  selectedRoom,
-  displayRoom,
-  displaySearchParams,
-  rateConditions = [],
-}) {
-  const room = selectedRoom || displayRoom || {};
-
-  const images = room?.images || room?.rawRoomData?.images || [];
-  const roomNameDisplay =
-    room?.RoomTypeName ||
-    (Array.isArray(room?.Name)
-      ? [...new Set(room.Name)].join(", ")
-      : room?.Name) ||
-    (Array.isArray(room?.name)
-      ? [...new Set(room.name)].join(", ")
-      : room?.name) ||
-    "Room";
-
-  const totalFare = room?.TotalFare || room?.NetAmount || 0;
-  const totalTax = room?.TotalTax || room?.NetTax || 0;
-  const baseFare = totalFare - totalTax;
-
-  const cancelPolicies =
-    room?.CancelPolicies || displayRoom?.CancelPolicies || [];
-  const freePolicy = cancelPolicies.find((p) => p.CancellationCharge === 0);
-  const paidPolicy = cancelPolicies.find((p) => p.CancellationCharge > 0);
-
-  const freeCancelFrom = freePolicy?.FromDate;
-  const freeCancelTo = paidPolicy
-    ? subtractOneSecond(paidPolicy.FromDate)
-    : room?.LastCancellationDeadline;
-
-  const paidCancelFrom = paidPolicy?.FromDate;
-  const lastCancelDeadline = room?.LastCancellationDeadline;
-
-  const mealType =
-    room?.MealType || room?.mealType || displayRoom?.MealType || null;
-  const isRefundable =
-    room?.IsRefundable ??
-    room?.isRefundable ??
-    displayRoom?.IsRefundable ??
-    false;
-  const inclusion = room?.Inclusion || displayRoom?.Inclusion || null;
-  const amenities = room?.Amenities || displayRoom?.Amenities || [];
-  const promotions = room?.RoomPromotion || room?.roomPromotion || [];
-  const dayRates = room?.DayRates || displayRoom?.DayRates || [];
-  const nights = calculateNights(
-    displaySearchParams?.checkIn,
-    displaySearchParams?.checkOut,
-  );
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden mb-6">
-      {/* Header */}
-      <div className="bg-linear-to-r from-[#C9A84C] to-[#C9A84C] px-6 py-4 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-          <MdKingBed size={16} className="text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-bold text-[#0A203E]">
-            Selected Room Details
-          </h3>
-          <p className="text-[11px] text-[#0A203E]/70 font-medium">
-            Full breakdown of your chosen room
-          </p>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-6">
-        {/* ── Top section: Image, Title, Badges ── */}
-        <div>
-          {images.length > 0 && <RoomImageGallery images={images} />}
-          <h4 className="text-base font-extrabold text-[#0A203E] leading-snug mb-1">
-          {displaySearchParams?.rooms?.length} <span className="text-[#C9A84C]">X</span> {roomNameDisplay}
-          </h4>
-
-          {room?.BeddingGroup && (
-             <div className="flex items-start gap-1.5 text-[12px] text-slate-500 mb-3">
-               <MdKingBed className="text-slate-400 mt-0.5 shrink-0" size={14} />
-               <span className="leading-snug">{room.BeddingGroup}</span>
-             </div>
-          )}
-
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {/* Meal type */}
-            {mealType ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-100 px-2.5 py-1 rounded-full">
-                <FiCoffee size={11} />
-                {mealType.replace(/_/g, " ")}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
-                <FiCoffee size={11} /> Meal info unavailable
-              </span>
-            )}
-
-            {/* Refundable */}
-            <span
-              className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
-                isRefundable
-                  ? "text-teal-700 bg-teal-50 border-teal-100"
-                  : "text-red-600 bg-red-500/10 border-red-100"
-              }`}
-            >
-              {isRefundable ? (
-                <>
-                  <FiCheckCircle size={11} /> Refundable
-                </>
-              ) : (
-                <>
-                  <FiXCircle size={11} /> Non-Refundable
-                </>
-              )}
-            </span>
-
-            {/* Nights */}
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full">
-              🌙 {nights} Night{nights !== 1 ? "s" : ""}
-            </span>
-          </div>
-        </div>
-
-        {/* ── Two-column Details ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          {/* LEFT: Inclusions + Promotions + Fare breakdown */}
-          <div className="flex flex-col gap-5">
-            {/* Inclusions */}
-            <div className="mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                Inclusions{" "}( <span className="text-[#C9A84C]"> {displaySearchParams?.rooms?.length} X rooms </span>)
-              </p>
-              {inclusion ? (
-                <InclusionBadges inclusion={inclusion} />
-              ) : (
-                <span className="text-[11px] text-slate-500 italic">
-                  No inclusions listed
-                </span>
-              )}
-            </div>
-
-            {/* Room Promotions */}
-            {promotions.length > 0 ? (
-              <RoomPromotions promotions={promotions} />
-            ) : (
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 flex items-center gap-2">
-                <FiGift size={13} className="text-[#C9A84C]" />
-                <span className="text-[11px] text-slate-500">
-                  No promotions available for this room
-                </span>
-              </div>
-            )}
-
-            {/* Supplements */}
-            <div className="mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                Supplements
-              </p>
-              {room?.Supplements?.some((s) => s?.length > 0) ? (
-                <div className="flex flex-col gap-4">
-                  {room.Supplements.map(
-                    (roomSup, roomIdx) =>
-                      roomSup?.length > 0 && (
-                        <div key={roomIdx} className="space-y-2">
-                          {room.Supplements.length > 1 && (
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                              Room {roomIdx + 1}
-                            </p>
-                          )}
-                          <div className="flex flex-col gap-2">
-                            {roomSup.map((sup, idx) => (
-                              <div
-                                key={idx}
-                                className="rounded-xl border border-slate-200 bg-white p-3 flex justify-between items-center shadow-sm hover:border-[#C9A84C]/50 transition-all"
-                              >
-                                <div className="flex flex-col">
-                                  <span className="text-xs font-bold text-slate-800 capitalize">
-                                    {sup.Description?.replace(/_/g, " ")}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500">
-                                    {sup.Type?.replace(/([A-Z])/g, " $1").trim()}
-                                  </span>
-                                </div>
-                                <div className="text-right flex flex-col">
-                                  <span className="text-sm font-black text-[#C9A84C]">
-                                    {sup.Price === 0
-                                      ? "Included"
-                                      : `${sup.Currency} ${sup.Price}`}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ),
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 flex items-center gap-2">
-                  <FiInfo size={13} className="text-[#C9A84C]" />
-                  <span className="text-[11px] text-slate-500">
-                    No supplements are available for this room
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Fare Breakdown */}
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">
-                Fare Breakdown
-              </p>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="divide-y divide-slate-100">
-                  {/* Per-night rates from DayRates */}
-                  {/* {dayRates?.[0]?.length > 0 && (
-                    <div className="px-4 py-2 bg-white/60">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                        Per-Night Rates
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {dayRates[0].map((d, i) => (
-                          <span
-                            key={i}
-                            className="text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-full"
-                          >
-                            Night {i + 1}: ₹
-                            {Number(d.BasePrice).toLocaleString("en-IN")}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )} */}
-                  <div className="flex justify-between px-4 py-2.5">
-                    <span className="text-[13px] text-slate-600">
-                      Base Fare
-                    </span>
-                    <span className="text-[13px] font-semibold text-slate-800">
-                      ₹{Number(baseFare).toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                  <div className="flex justify-between px-4 py-2.5">
-                    <span className="text-[13px] text-slate-600">
-                      Taxes & Fees
-                    </span>
-                    <span className="text-[13px] font-semibold text-slate-800">
-                      ₹{Number(totalTax).toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                  <div className="flex justify-between px-4 py-3 bg-linear-to-r from-cyan-50 to-teal-50">
-                    <span className="text-[14px] font-bold text-teal-700">
-                      Total
-                    </span>
-                    <span className="text-[18px] font-black text-[#C9A84C]">
-                      ₹{Number(totalFare).toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT: Cancellation policy */}
-          <div className="flex flex-col gap-5">
-            {/* Cancellation Policy */}
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                Cancellation Policy
-              </p>
-              {cancelPolicies.length > 0 ? (
-                <>
-                  {freeCancelFrom && (
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-100 rounded-xl px-3 py-2.5 mb-2">
-                      <FiCheckCircle
-                        size={14}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <p className="text-[12px] text-emerald-700 font-semibold leading-relaxed">
-                        Free cancellation from <strong>{freeCancelFrom}</strong>
-                        {freeCancelTo && (
-                          <>
-                            {" "}
-                            to <strong>{freeCancelTo}</strong>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  {paidCancelFrom && (
-                    <div className="flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/20 rounded-xl px-3 py-2.5 mb-2">
-                      <MdInfo size={14} className="text-[#C9A84C] shrink-0" />
-                      <p className="text-[12px] text-[#C9A84C] font-semibold">
-                        Charges apply from <strong>{paidCancelFrom}</strong>
-                      </p>
-                    </div>
-                  )}
-                  {/* {lastCancelDeadline && (
-                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-100 rounded-xl px-3 py-2.5 mb-2">
-                      <FiClock size={14} className="text-red-500 shrink-0" />
-                      <p className="text-[12px] text-red-700 font-semibold">
-                        Last cancellation deadline:{" "}
-                        <strong>{lastCancelDeadline}</strong>
-                      </p>
-                    </div>
-                  )} */}
-                  <CancelPolicyTable policies={cancelPolicies} />
-                </>
-              ) : (
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5">
-                  <FiShieldIcon size={13} className="text-slate-500 shrink-0" />
-                  <p className="text-[12px] text-slate-600">
-                    Cancellation policy not available
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Divider ── */}
-        <hr className="border-slate-100" />
-
-        {/* ── Amenities (full width) ── */}
-        {amenities.length > 0 ? (
-          <AmenitiesGrid amenities={amenities} />
-        ) : (
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-              Room Amenities
-            </p>
-            <span className="text-[11px] text-slate-500 italic">
-              No amenities listed for this room
-            </span>
-          </div>
-        )}
-
-        {/* ── Rate Conditions (full width, from HotelResult level) ── */}
-        {rateConditions.length > 0 && (
-          <>
-            <hr className="border-slate-100" />
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-1.5">
-                <FiInfo size={11} className="text-[#C9A84C]" /> Rate Conditions
-                & Check-in Info
-              </p>
-              <RateConditions conditions={rateConditions} />
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  InfoCell (used in BookNow approved-guest view)                 */
-/* ─────────────────────────────────────────────────────────────── */
-function InfoCell({ icon: Icon, label, value }) {
-  return (
-    <div className="px-4 py-3 flex flex-col gap-0.5 bg-white">
-      <div className="flex items-center gap-2.5 mb-0.5">
-        <Icon size={15} className="text-slate-500" />
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
-          {label}
-        </span>
-      </div>
-      <span className="text-sm font-medium text-slate-800 truncate">
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Main Component                                                 */
-/* ─────────────────────────────────────────────────────────────── */
 const HotelReviewBooking = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -990,8 +73,14 @@ const HotelReviewBooking = () => {
     (state) => state.hotelBookings,
   );
   const { hotels: searchedHotels } = useSelector((state) => state.hotel);
-  const { selectedRequest, loading, error, preBookData, preBookLoading } =
-    useSelector((state) => state.hotelBookings);
+  const {
+    selectedRequest,
+    loading,
+    error,
+    preBookData,
+    preBookLoading,
+    preBookError,
+  } = useSelector((state) => state.hotelBookings);
 
   const [formErrors, setFormErrors] = useState({});
 
@@ -1041,7 +130,12 @@ const HotelReviewBooking = () => {
   }, [dispatch, id]);
 
   useEffect(() => {
-    if (user?.role === "employee" || user?.role === "manager" || user?.role === "travel-admin" || user?.role === "finance_team") {
+    if (
+      user?.role === "employee" ||
+      user?.role === "manager" ||
+      user?.role === "travel-admin" ||
+      user?.role === "finance_team"
+    ) {
       dispatch(fetchMySSRPolicy());
       dispatch(fetchMyProfile());
     }
@@ -1081,13 +175,18 @@ const HotelReviewBooking = () => {
   useEffect(() => {
     if (!isBookNowMode && travelers.length === 0 && user) {
       const generatedTravelers = [];
-      const roomsFromSearch = searchParams?.rooms || searchParams?.PaxRooms || [];
+      const roomsFromSearch =
+        searchParams?.rooms || searchParams?.PaxRooms || [];
 
       roomsFromSearch.forEach((room, roomIdx) => {
         const adults = room.Adults || room.adults || 0;
         const children = room.Children || room.children || 0;
         const childAges =
-          room.childrenAges || room.ChildrenAges || room.ChildAge || room.childAges || [];
+          room.childrenAges ||
+          room.ChildrenAges ||
+          room.ChildAge ||
+          room.childAges ||
+          [];
 
         for (let a = 0; a < adults; a++) {
           const isLead = generatedTravelers.length === 0;
@@ -1104,8 +203,7 @@ const HotelReviewBooking = () => {
                 fName = myProfile.name.firstName || "";
                 lName = myProfile.name.lastName || "";
               } else {
-                const rawName =
-                  myProfile.name || myProfile.displayName || "";
+                const rawName = myProfile.name || myProfile.displayName || "";
                 const names = (typeof rawName === "string" ? rawName : "")
                   .trim()
                   .split(/\s+/);
@@ -1122,7 +220,8 @@ const HotelReviewBooking = () => {
                 sourceProfile.mobile ||
                 sourceProfile.phoneWithCode ||
                 "";
-              const rawDob = sourceProfile.dob || sourceProfile.dateOfBirth || "";
+              const rawDob =
+                sourceProfile.dob || sourceProfile.dateOfBirth || "";
               dob = rawDob ? rawDob.split("T")[0] : "";
               if (dob) {
                 const today = new Date();
@@ -1171,7 +270,7 @@ const HotelReviewBooking = () => {
             leadPassenger: false,
             email: "",
             phoneWithCode: "",
-            countryCode: searchParams?.guestNationality, 
+            countryCode: searchParams?.guestNationality,
             nationality: searchParams?.guestNationality,
             panCard: "",
             roomIndex: roomIdx,
@@ -1192,8 +291,7 @@ const HotelReviewBooking = () => {
             fName = myProfile.name.firstName || "";
             lName = myProfile.name.lastName || "";
           } else {
-            const rawName =
-              myProfile.name || myProfile.displayName || "";
+            const rawName = myProfile.name || myProfile.displayName || "";
             const names = (typeof rawName === "string" ? rawName : "")
               .trim()
               .split(/\s+/);
@@ -1238,7 +336,7 @@ const HotelReviewBooking = () => {
           email: email,
           phoneWithCode: phone,
           countryCode: searchParams?.guestNationality,
-          nationality: searchParams?.guestNationality ,
+          nationality: searchParams?.guestNationality,
           panCard: "",
         });
       }
@@ -1272,13 +370,20 @@ const HotelReviewBooking = () => {
               pLName = myProfile.name.lastName || "";
             } else {
               const rawName = myProfile.name || myProfile.displayName || "";
-              const names = (typeof rawName === "string" ? rawName : "").trim().split(/\s+/);
+              const names = (typeof rawName === "string" ? rawName : "")
+                .trim()
+                .split(/\s+/);
               pFName = names[0] || "";
               pLName = names.slice(1).join(" ") || "";
             }
 
             if (pFName || pLName) {
-              if (!lead.firstName || lead.firstName !== pFName || !lead.lastName || lead.lastName !== pLName) {
+              if (
+                !lead.firstName ||
+                lead.firstName !== pFName ||
+                !lead.lastName ||
+                lead.lastName !== pLName
+              ) {
                 lead.firstName = pFName;
                 lead.lastName = pLName;
                 updated = true;
@@ -1288,7 +393,10 @@ const HotelReviewBooking = () => {
 
           if (!lead.phoneWithCode) {
             lead.phoneWithCode =
-              myProfile.phone || myProfile.mobile || myProfile.phoneWithCode || "";
+              myProfile.phone ||
+              myProfile.mobile ||
+              myProfile.phoneWithCode ||
+              "";
             updated = true;
           }
           if (!lead.dob) {
@@ -1318,6 +426,27 @@ const HotelReviewBooking = () => {
     }
   }, [myProfile, isBookNowMode]);
 
+  // ── Autofill Corporate PAN Card when Corporate Booking is selected ──
+  useEffect(() => {
+    if (isCorporateBooking && myProfile?.corporate?.corporatePanCard?.number) {
+      const corporatePan = myProfile.corporate.corporatePanCard.number;
+      setTravelers((prev) =>
+        prev.map((t) => ({ ...t, panCard: corporatePan })),
+      );
+    } else if (
+      !isCorporateBooking &&
+      myProfile?.corporate?.corporatePanCard?.number
+    ) {
+      const corporatePan = myProfile.corporate.corporatePanCard.number;
+      setTravelers((prev) =>
+        prev.map((t) => ({
+          ...t,
+          panCard: t.panCard === corporatePan ? "" : t.panCard,
+        })),
+      );
+    }
+  }, [isCorporateBooking, myProfile]);
+
   // ── Guest management ──
   const handleAddGuest = (paxType = 1) => {
     const limit = totalGuestsFromSearch || totalAdultsFromSearch;
@@ -1342,8 +471,8 @@ const HotelReviewBooking = () => {
         leadPassenger: false,
         email: "",
         phoneWithCode: "",
-        countryCode: searchParams?.guestNationality ,
-        nationality: searchParams?.guestNationality ,
+        countryCode: searchParams?.guestNationality,
+        nationality: searchParams?.guestNationality,
         PassportNo: "",
         PassportIssueDate: "",
         PassportExpDate: "",
@@ -1386,13 +515,19 @@ const HotelReviewBooking = () => {
 
   const displayHotel = isBookNowMode
     ? {
-        name: bookingRequest?.bookingSnapshot?.hotelName || bookingRequest?.hotelRequest?.selectedHotel?.hotelName,
+        name:
+          bookingRequest?.bookingSnapshot?.hotelName ||
+          bookingRequest?.hotelRequest?.selectedHotel?.hotelName,
         rating: 4,
         address:
           bookingRequest?.hotelRequest?.selectedHotel?.address ||
           bookingRequest?.bookingSnapshot?.city,
-        city: bookingRequest?.bookingSnapshot?.city || bookingRequest?.hotelRequest?.selectedHotel?.city,
-        country: bookingRequest?.bookingSnapshot?.country || bookingRequest?.hotelRequest?.selectedHotel?.country,
+        city:
+          bookingRequest?.bookingSnapshot?.city ||
+          bookingRequest?.hotelRequest?.selectedHotel?.city,
+        country:
+          bookingRequest?.bookingSnapshot?.country ||
+          bookingRequest?.hotelRequest?.selectedHotel?.country,
         images: [
           bookingRequest?.bookingSnapshot?.hotelImage ||
             "/placeholder-hotel.jpg",
@@ -1417,10 +552,14 @@ const HotelReviewBooking = () => {
     "";
 
   // ── PreBook data ──
-  const preBookRooms = preBookData?.HotelResult?.[0]?.Rooms || [];
+  const activePreBookData = preBookData || preBookError?.data;
+  const preBookRooms = activePreBookData?.HotelResult?.[0]?.Rooms || [];
   const preBookRateConditions =
-    preBookData?.HotelResult?.[0]?.RateConditions || []; // ← NEW
-  const validation = preBookData?.ValidationInfo || {};
+    activePreBookData?.HotelResult?.[0]?.RateConditions || []; // ← NEW
+  const validation =
+    activePreBookData?.HotelResult?.[0]?.ValidationInfo ||
+    activePreBookData?.ValidationInfo ||
+    {};
 
   const requiredFlags = {
     isPANRequired: validation?.PanMandatory,
@@ -1438,9 +577,9 @@ const HotelReviewBooking = () => {
     return found?.isoCode || "";
   };
 
-  const hotelCountryCode = 
+  const hotelCountryCode =
     preBookData?.HotelResult?.[0]?.CountryCode ||
-    displayHotel?.CountryCode || 
+    displayHotel?.CountryCode ||
     displayHotel?.countryCode ||
     getCountryCode(hotelCountry);
 
@@ -1497,18 +636,23 @@ const HotelReviewBooking = () => {
     ? {
         checkIn: bookingRequest?.bookingSnapshot?.checkInDate,
         checkOut: bookingRequest?.bookingSnapshot?.checkOutDate,
-        rooms: bookingRequest?.hotelRequest?.rooms || bookingRequest?.hotelRequest?.PaxRooms || [],
+        rooms:
+          bookingRequest?.hotelRequest?.rooms ||
+          bookingRequest?.hotelRequest?.PaxRooms ||
+          [],
       }
     : searchParams;
 
-  const totalAdults = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
-    (sum, r) => sum + (r.Adults || r.adults || 0),
-    0,
-  );
-  const totalChildren = (displaySearchParams?.rooms || displaySearchParams?.PaxRooms || []).reduce(
-    (sum, r) => sum + (r.Children || r.children || 0),
-    0,
-  );
+  const totalAdults = (
+    displaySearchParams?.rooms ||
+    displaySearchParams?.PaxRooms ||
+    []
+  ).reduce((sum, r) => sum + (r.Adults || r.adults || 0), 0);
+  const totalChildren = (
+    displaySearchParams?.rooms ||
+    displaySearchParams?.PaxRooms ||
+    []
+  ).reduce((sum, r) => sum + (r.Children || r.children || 0), 0);
   const countries = Country.getAllCountries();
   const selectedRooms = rooms || [];
 
@@ -1527,24 +671,31 @@ const HotelReviewBooking = () => {
       : selectedRooms.reduce(
           (sum, r) =>
             sum + (r.TotalFare || r.NetAmount || r.Price?.TotalFare || 0),
-          0
+          0,
         );
 
   const isAutoApprove = myPolicy?.approvalRequired === false;
-  
+
   let applicableLimit = 0;
   let isUnlimitedLimit = true;
   if (myPolicy?.hotelLimits?.length) {
-    const loc = hotelCountryCode?.toUpperCase() === "IN" ? "Domestic" : "International";
-    const starNum = Number(displayHotel?.rating) || 3; 
-    const limitObj = myPolicy.hotelLimits.find(l => l.location === loc && l.starRating === starNum);
+    const loc =
+      hotelCountryCode?.toUpperCase() === "IN" ? "Domestic" : "International";
+    const starNum = Number(displayHotel?.rating) || 3;
+    const limitObj = myPolicy.hotelLimits.find(
+      (l) => l.location === loc && l.starRating === starNum,
+    );
     if (limitObj) {
       applicableLimit = limitObj.limit;
       isUnlimitedLimit = limitObj.isUnlimited !== false;
     }
   }
 
-  const isOverLimit = isAutoApprove && !isUnlimitedLimit && applicableLimit > 0 && totalFare > applicableLimit;
+  const isOverLimit =
+    isAutoApprove &&
+    !isUnlimitedLimit &&
+    applicableLimit > 0 &&
+    totalFare > applicableLimit;
   const approvalRequired = !isTravelAdmin && (!isAutoApprove || isOverLimit);
 
   let tax =
@@ -1649,7 +800,8 @@ const HotelReviewBooking = () => {
           } else {
             let calcAge = today.getFullYear() - birth.getFullYear();
             const m = today.getMonth() - birth.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) calcAge--;
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate()))
+              calcAge--;
             if (t.originalAge && String(calcAge) !== String(t.originalAge)) {
               tErrors.dob = `Age from DOB (${calcAge} yrs) does not match searched age (${t.originalAge} yrs). Please enter a valid Date of Birth.`;
             }
@@ -1777,7 +929,11 @@ const HotelReviewBooking = () => {
         Adults: Number(room.Adults || room.adults || 0),
         Children: Number(room.Children || room.children || 0),
         ChildrenAges:
-          room.childrenAges || room.ChildrenAges || room.childAges || room.ChildAge || [],
+          room.childrenAges ||
+          room.ChildrenAges ||
+          room.childAges ||
+          room.ChildAge ||
+          [],
       }));
 
     const payload = {
@@ -1796,88 +952,31 @@ const HotelReviewBooking = () => {
           safeHotel?.HotelCode ||
           safeHotel?.hotelCode ||
           bookingRequest?.hotelRequest?.selectedHotel?.hotelCode,
-        hotelName:
-          safeHotel?.HotelName ||
-          safeHotel?.hotelName ||
-          bookingRequest?.bookingSnapshot?.hotelName ||
-          "Unknown Hotel",
-        address:
-          safeHotel?.Address ||
-          safeHotel?.address ||
-          bookingRequest?.hotelRequest?.selectedHotel?.address,
-        city:
-          safeHotel?.CityName ||
-          safeHotel?.cityName ||
-          safeHotel?.city ||
-          bookingRequest?.hotelRequest?.selectedHotel?.city ||
-          bookingRequest?.hotelRequest?.city,
-        country:
-          safeHotel?.CountryName ||
-          safeHotel?.countryName ||
-          safeHotel?.country ||
-          bookingRequest?.hotelRequest?.selectedHotel?.country ||
-          bookingRequest?.hotelRequest?.country,
-        starRating: safeHotel?.StarRating || safeHotel?.starRating || 0,
-        images:
-          safeHotel?.Images ||
-          safeHotel?.images ||
-          bookingRequest?.hotelRequest?.selectedHotel?.images ||
-          [],
-        amenities: safeHotel?.Amenities || safeHotel?.amenities || [],
-        latitude: safeHotel?.Latitude || safeHotel?.latitude,
-        longitude: safeHotel?.Longitude || safeHotel?.longitude,
-        rawHotelData: safeHotel,
-        selectedRoom: (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0],
-        traceId: preBookData?.TraceId || searchParams?.traceId || searchParams?.TraceId,
+        bookingCode:
+          (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]
+            ?.BookingCode ||
+          (preBookRooms.length > 0 ? preBookRooms : selectedRoom)[0]
+            ?.RoomTypeCode,
+        traceId:
+          preBookData?.TraceId ||
+          searchParams?.traceId ||
+          searchParams?.TraceId,
         preBookResponse: preBookData,
         roomIndex: selectedRoom?.RoomIndex,
         checkIn: search?.checkIn,
         checkOut: search?.checkOut,
-        guestNationality: searchParams?.guestNationality ,
+        guestNationality: searchParams?.guestNationality,
         roomGuests:
           displaySearchParams?.rooms?.map((r) => ({
             noOfAdults: r.Adults || r.adults || 0,
             noOfChild: r.Children || r.children || 0,
-            childAge: r.childrenAges || r.ChildrenAges || r.ChildAge || r.childAges || [],
+            childAge:
+              r.childrenAges ||
+              r.ChildrenAges ||
+              r.ChildAge ||
+              r.childAges ||
+              [],
           })) || roomGuests,
-        rooms: (() => {
-          const baseRooms =
-            preBookRooms.length > 0 ? preBookRooms : selectedRoom;
-          const noOfRoomsReq = searchParams?.rooms?.length || 1;
-
-          // If we have fewer room detail objects than requested rooms,
-          // expand the list by duplicating and distributing the price.
-          const expandedRooms =
-            baseRooms.length < noOfRoomsReq && baseRooms.length > 0
-              ? Array.from({ length: noOfRoomsReq }, (_, i) => ({
-                  ...baseRooms[0],
-                  // Distribute total price across rooms
-                  TotalFare:
-                    (baseRooms[0].TotalFare || baseRooms[0].NetAmount || 0) /
-                    noOfRoomsReq,
-                  TotalTax:
-                    (baseRooms[0].TotalTax || baseRooms[0].NetTax || 0) /
-                    noOfRoomsReq,
-                  NetAmount: (baseRooms[0].NetAmount || 0) / noOfRoomsReq,
-                  NetTax: (baseRooms[0].NetTax || 0) / noOfRoomsReq,
-                  RoomIndex: i + 1,
-                }))
-              : baseRooms;
-
-          return expandedRooms.map((room) => ({
-            bookingCode:
-              room.BookingCode || room.RoomTypeCode || room.RatePlanCode,
-            price: room.Price,
-            totalFare: room.TotalFare || room.NetAmount,
-            totalTax: room.TotalTax || room.NetTax,
-            roomIndex: room.RoomIndex,
-            name: Array.isArray(room.Name)
-              ? room.Name[0] || room.Name
-              : room.Name,
-            mealType: room.MealType,
-            isRefundable: room.IsRefundable,
-          }));
-        })(),
         PaxRooms: buildPaxRooms(searchParams.rooms),
         NoOfRooms: searchParams.rooms.length,
       },
@@ -1890,7 +989,7 @@ const HotelReviewBooking = () => {
         age: t.age,
         email: t.email,
         phoneWithCode: t.phoneWithCode,
-        nationality: t.nationality ,
+        nationality: t.nationality,
         isLeadPassenger: t.leadPassenger,
         panCard: t.panCard || "",
         PassportExpDate: t.PassportExpDate || "",
@@ -1909,25 +1008,48 @@ const HotelReviewBooking = () => {
         totalAmount: totalFare,
         currency: displayRoom?.Currency || "INR",
       },
-        bookingSnapshot: {
-          hotelName: displayHotel?.name || displayHotel?.HotelName,
-          hotelImage: displayHotel?.images?.[0] || "/placeholder-hotel.jpg",
-          city: displayHotel?.city || displayHotel?.cityName || displaySearchParams?.city,
-          country: displayHotel?.country || displayHotel?.countryName || hotelCountry,
-          checkInDate: displaySearchParams?.checkIn,
-          checkOutDate: displaySearchParams?.checkOut,
-          roomCount: displaySearchParams?.rooms?.length || 1,
-          nights: calculateNights(
-            displaySearchParams?.checkIn,
-            displaySearchParams?.checkOut,
-          ),
-          amount: totalFare,
-          currency: displayRoom?.Currency || "INR",
-        },
+      bookingSnapshot: {
+        hotelName: displayHotel?.name || displayHotel?.HotelName,
+        hotelImage: displayHotel?.images?.[0] || "/placeholder-hotel.jpg",
+        city:
+          displayHotel?.city ||
+          displayHotel?.cityName ||
+          displaySearchParams?.city,
+        country:
+          displayHotel?.country || displayHotel?.countryName || hotelCountry,
+        checkInDate: displaySearchParams?.checkIn,
+        checkOutDate: displaySearchParams?.checkOut,
+        roomCount: displaySearchParams?.rooms?.length || 1,
+        nights: calculateNights(
+          displaySearchParams?.checkIn,
+          displaySearchParams?.checkOut,
+        ),
+        amount: totalFare,
+        currency: displayRoom?.Currency || "INR",
+      },
     };
 
     try {
-      const isApproverTravelAdmin = projectApproverData.approver?.role === "travel-admin";
+      // --- Handle Manual Project Creation ---
+      if (projectApproverData.project && !projectApproverData.project._id) {
+        try {
+          const projectRes = await api.post("/corporate-projects/create", {
+            projectCodeId: projectApproverData.project.id,
+            projectName: projectApproverData.project.name,
+            clientName: projectApproverData.project.client,
+          });
+          // Update the local project data with the created _id so further processes use it if needed
+          if (projectRes.data?.data?._id) {
+             projectApproverData.project._id = projectRes.data.data._id;
+          }
+        } catch (projErr) {
+           console.error("Failed to save manual project:", projErr);
+        }
+      }
+
+      // --- Handle Manager Request Creation / Selection ---
+      const isApproverTravelAdmin =
+        projectApproverData.approver?.role === "travel-admin";
       if (approvalRequired && !isTravelAdmin && !isApproverTravelAdmin) {
         if (projectApproverData.approver && projectApproverData.project) {
           await dispatch(
@@ -1961,7 +1083,9 @@ const HotelReviewBooking = () => {
         return;
       }
 
-      const result = await dispatch(createHotelBookingRequest(payload)).unwrap();
+      const result = await dispatch(
+        createHotelBookingRequest(payload),
+      ).unwrap();
 
       ToastWithTimer({
         type: "success",
@@ -1969,10 +1093,54 @@ const HotelReviewBooking = () => {
       });
       navigate("/my-pending-approvals");
     } catch (err) {
+      let rawErr = err;
+      if (err && typeof err === "object") {
+        rawErr = err.error || err.message || err.data?.message || err;
+      }
+      
+      const errorMsg =
+        typeof rawErr === "string" ? rawErr : "Failed to submit request";
+
+      const isSupplierError = 
+        errorMsg.toLowerCase().includes("price has changed") ||
+        errorMsg.toLowerCase().includes("tolerance") ||
+        errorMsg.toLowerCase().includes("supplier response") ||
+        errorMsg.toLowerCase().includes("interaction failed");
+
+      if (isSupplierError) {
+        // Price has changed, tolerance exceeded, or generic supplier failure
+        return Swal.fire({
+          icon: "warning",
+          title: "Availability or Price Changed",
+          text: "The price or availability for this hotel has changed since you searched. Please search again to get the latest options.",
+          confirmButtonText: "Search Again",
+          showCancelButton: true,
+          cancelButtonText: "Cancel",
+          confirmButtonColor: "#C9A84C",
+        }).then((res) => {
+          if (res.isConfirmed) {
+            navigate("/travel", {
+              state: {
+                activeTab: "hotel",
+                prefillHotelSearch: {
+                  city: displayHotel?.city || displaySearchParams?.city,
+                  checkIn: displaySearchParams?.checkIn,
+                  checkOut: displaySearchParams?.checkOut,
+                  rooms: displaySearchParams?.rooms,
+                  nationality: displaySearchParams?.nationality,
+                  roomConfigs: displaySearchParams?.roomConfigs,
+                  guestNationality: displaySearchParams?.guestNationality,
+                },
+              },
+            });
+          }
+        });
+      }
+
       Swal.fire({
         icon: "error",
         title: "Booking Failed",
-        text: typeof err === "string" ? err : err?.message || "Failed to submit request",
+        text: errorMsg,
         confirmButtonColor: "#C9A84C",
       });
     }
@@ -2037,7 +1205,7 @@ const HotelReviewBooking = () => {
 
   if (loading && !hotel && !isBookNowMode) return <div>Loading...</div>;
   // Removed global error return to prevent blank page on API error
-  
+
   /* ──────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -2047,21 +1215,19 @@ const HotelReviewBooking = () => {
       <div className="bg-[#0A203E] border-b border-slate-200 sticky top-[64px] z-40">
         <div className="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-[#C9A84C] tracking-tight">
-          Review your Booking
-        </h1>
+            Review your Booking
+          </h1>
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 text-sm text-slate-100 hover:text-[#C9A84C] transition font-medium"
           >
             <MdArrowBack size={18} />
             Back to Details
-          </button>          
+          </button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        
-
         {/* ── FULL-WIDTH HOTEL HERO ── */}
         <HotelHeroBanner
           displayHotel={displayHotel}
@@ -2074,749 +1240,54 @@ const HotelReviewBooking = () => {
 
         {/* ── FULL-WIDTH ROOM DETAILS (with all PreBook fields) ── */}
         {(preBookRooms.length ? preBookRooms : selectedRoom).map(
-          (room, index) => (
-            <SelectedRoomDetailsCard
-              key={index}
-              selectedRoom={room}
-              displayRoom={room}
-              displaySearchParams={displaySearchParams}
-              rateConditions={index === 0 ? preBookRateConditions : []}
-            />
-          ),
+          (room, index) => {
+            const baseRoom = selectedRoom[index] || {};
+            // Merge properties from baseRoom into room to prevent losing amenities/images
+            const mergedRoom = {
+              ...baseRoom,
+              ...room,
+              CancelPolicies: room?.CancelPolicies?.length
+                ? room.CancelPolicies
+                : baseRoom.CancelPolicies,
+              Amenities: room?.Amenities?.length
+                ? room.Amenities
+                : baseRoom.Amenities,
+            };
+            return (
+              <SelectedRoomDetailsCard
+                key={index}
+                selectedRoom={baseRoom}
+                displayRoom={mergedRoom}
+                displaySearchParams={displaySearchParams}
+                rateConditions={index === 0 ? preBookRateConditions : []}
+              />
+            );
+          },
         )}
 
         {/* ── BOTTOM: Guest details (left 2/3) + Price summary (right 1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ── LEFT: Guest Details ── */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* BookNow mode: read-only approved guests */}
-            {isBookNowMode ? (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
-                <div className="bg-linear-to-r from-green-600 to-emerald-500 px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                      <MdVerifiedUser size={16} className="text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white">
-                        Guest Details — Verified
-                      </h3>
-                      <p className="text-[11px] text-green-100">
-                        Approved{" "}
-                        {approvedBy
-                          ? `by ${approvedBy?.name || "Manager"}`
-                          : ""}{" "}
-                        · Ready to book
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white px-3 py-1 rounded-full border border-slate-300">
-                    {travelers.length} Guest{travelers.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-
-                <div className="p-6 space-y-4">
-                  {travelers.map((t, index) => (
-                    <div
-                      key={t.id || t._id || index}
-                      className="rounded-xl border border-slate-100 overflow-hidden"
-                    >
-                      <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-100">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#C9A84C]/10 flex items-center justify-center text-[10px] font-bold text-[#C9A84C]">
-                            {(t.firstName?.[0] || "G").toUpperCase()}
-                            {(t.lastName?.[0] || "").toUpperCase()}
-                          </div>
-                          <span className="text-xs font-semibold text-slate-700">
-                            {t.title} {t.firstName} {t.middleName || ""}{" "}
-                            {t.lastName}
-                          </span>
-                          {t.leadPassenger && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full">
-                              Primary
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-500">
-                          Guest {index + 1}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-0 divide-x divide-y divide-slate-100">
-                        <InfoCell icon={FiMail} label="Email" value={t.email} />
-                        <InfoCell
-                          icon={FiPhone}
-                          label="Phone"
-                          value={t.phoneWithCode ? `+${t.phoneWithCode}` : "—"}
-                        />
-                        <InfoCell
-                          icon={FiGlobe}
-                          label="Nationality"
-                          value={
-                            countries.find((c) => c.isoCode === t.nationality)
-                              ?.name ||
-                            t.nationality ||
-                            "—"
-                          }
-                        />
-                        <InfoCell
-                          icon={FiCalendar}
-                          label="Date of Birth"
-                          value={
-                            t.dob
-                              ? new Date(t.dob).toLocaleDateString("en-IN", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : "—"
-                          }
-                        />
-                        <InfoCell
-                          icon={FiUser}
-                          label="Age"
-                          value={t.age ? `${t.age} yrs` : "—"}
-                        />
-                        <InfoCell
-                          icon={FiMapPin}
-                          label="Country"
-                          value={t.countryCode || "—"}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* Non-BookNow mode: editable guest form */
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
-                      <FiUser size={15} />
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800">
-                        Guest Details
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                          Search Criteria:
-                        </p>
-                        <span className="text-[10px] font-bold text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full border border-[#C9A84C]/20">
-                          {totalAdultsFromSearch} Adult
-                          {totalAdultsFromSearch !== 1 ? "s" : ""}
-                        </span>
-                        {totalChildrenFromSearch > 0 && (
-                          <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-100">
-                            {totalChildrenFromSearch} Child
-                            {totalChildrenFromSearch !== 1 ? "ren" : ""}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-5">
-                  {travelers.map((t, index) => (
-                    <div
-                      key={t.id || t._id || index}
-                      className="rounded-2xl border border-slate-200 shadow-md shadow-black/20 relative"
-                      style={{ zIndex: travelers.length - index + 10 }}
-                    >
-                      {/* Card Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200 rounded-t-2xl">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
-                            {index + 1}
-                          </div>
-                          <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                            <FiUser size={13} className="text-[#C9A84C]" />
-                            {t.paxType === 2 ? "Child" : "Adult"} {index + 1}
-                          </span>
-                          {t.leadPassenger && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2.5 py-0.5 rounded-full border border-[#C9A84C]/20">
-                              Primary Guest
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="p-5 space-y-6 bg-white rounded-b-2xl">
-                        {/* Full Name */}
-                        <div>
-                          <SectionHeading
-                            icon={<FiUser size={12} />}
-                            title={`${t.paxType === 2 ? "Child" : "Adult"} Details`}
-                          />
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">Title</label>
-                              <select
-                                value={t.title}
-                                disabled={isBookNowMode}
-                                onChange={(e) =>
-                                  updateTraveler(t.id, "title", e.target.value)
-                                }
-                                className="field-input"
-                              >
-                                <option>Mr.</option>
-                                <option>Mrs.</option>
-                                <option>Miss.</option>
-                              </select>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                First Name <Required />
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Rahul"
-                                value={t.firstName}
-                                disabled={isBookNowMode}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(
-                                    /[^A-Za-z]/g,
-                                    "",
-                                  );
-                                  updateTraveler(t.id, "firstName", val);
-                                }}
-                                className={`field-input ${formErrors[t.id]?.firstName ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                              />
-                              {formErrors[t.id]?.firstName && (
-                                <p className="text-[10px] text-red-500 mt-1">
-                                  {formErrors[t.id].firstName}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Middle Name{" "}
-                                <span className="text-slate-500 font-normal normal-case">
-                                  (optional)
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Kumar"
-                                value={t.middleName || ""}
-                                disabled={isBookNowMode}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(
-                                    /[^A-Za-z]/g,
-                                    "",
-                                  );
-                                  updateTraveler(t.id, "middleName", val);
-                                }}
-                                className="field-input"
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Last Name <Required />
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Singh"
-                                value={t.lastName}
-                                disabled={isBookNowMode}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(
-                                    /[^A-Za-z]/g,
-                                    "",
-                                  );
-                                  updateTraveler(t.id, "lastName", val);
-                                }}
-                                className={`field-input ${formErrors[t.id]?.lastName ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                              />
-                              {formErrors[t.id]?.lastName && (
-                                <p className="text-[10px] text-red-500 mt-1">
-                                  {formErrors[t.id].lastName}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <Divider />
-
-                        {/* Contact Details (adults only) */}
-                        {t.paxType !== 2 && (
-                          <div>
-                            <SectionHeading
-                              icon={<FiMail size={12} />}
-                              title="Contact Details"
-                            />
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div className="flex flex-col gap-1">
-                                <label className="field-label">
-                                  Email Address <Required />
-                                </label>
-                                <div className="relative">
-                                  <FiMail
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
-                                    size={14}
-                                  />
-                                  <input
-                                    type="email"
-                                    placeholder="e.g. rahul@email.com"
-                                    value={t.email}
-                                    disabled={isBookNowMode}
-                                    onChange={(e) =>
-                                      updateTraveler(
-                                        t.id,
-                                        "email",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className={`field-input pl-9 ${formErrors[t.id]?.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                                  />
-                                  {formErrors[t.id]?.email && (
-                                    <p className="text-[10px] text-red-500 mt-1">
-                                      {formErrors[t.id].email}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="field-label">
-                                  Phone Number {t.leadPassenger && <Required />}
-                                </label>
-                                <PhoneInput
-                                  country={"in"}
-                                  value={t.phoneWithCode}
-                                  disabled={isBookNowMode}
-                                  onChange={(value, data) => {
-                                    updateTraveler(
-                                      t.id,
-                                      "phoneWithCode",
-                                      value,
-                                    );
-                                    updateTraveler(
-                                      t.id,
-                                      "countryCode",
-                                      data?.countryCode?.toUpperCase(),
-                                    );
-                                  }}
-                                  inputClass={`!h-10 !w-full !text-sm !bg-white !border !rounded-lg !text-slate-800 focus:!border-[#C9A84C] focus:!ring-2 focus:!ring-[#C9A84C]/10 ${formErrors[t.id]?.phoneWithCode ? "!border-red-500 !ring-1 !ring-red-500" : "!border-slate-200"}`}
-                                  buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
-                                  containerClass="w-full"
-                                  enableSearch
-                                />
-                                {formErrors[t.id]?.phoneWithCode && (
-                                  <p className="text-[10px] text-red-500 mt-1">
-                                    {formErrors[t.id].phoneWithCode}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <Divider />
-
-                        {/* Personal Details */}
-                        <div>
-                          <SectionHeading
-                            icon={<FiInfo size={12} />}
-                            title="Personal Details"
-                          />
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Nationality <Required />
-                              </label>
-                              <select
-                                value={t.nationality }
-                                disabled
-                                onChange={(e) =>
-                                  updateTraveler(
-                                    t.id,
-                                    "nationality",
-                                    e.target.value,
-                                  )
-                                }
-                                className="field-input cursor-not-allowed bg-slate-50"
-                              >
-                                <option value="">Select country</option>
-                                {countries.map((c) => (
-                                  <option key={c.isoCode} value={c.isoCode}>
-                                    {c.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Date of Birth{t.paxType === 2 && <span className="text-red-500 ml-0.5">*</span>}
-                              </label>
-                              {isBookNowMode ? (
-                                <input
-                                  type="date"
-                                  value={t.dob || ""}
-                                  disabled={true}
-                                  className="field-input"
-                                />
-                              ) : (
-                                <div className={formErrors[t.id]?.dob ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
-                                  <CustomDatePicker
-                                    value={t.dob || ""}
-                                    maxDate={new Date().toISOString().split("T")[0]}
-                                    minDate={(() => {
-                                      if (t.paxType === 2 && t.originalAge) {
-                                        const minYear = new Date().getFullYear() - Number(t.originalAge) - 1;
-                                        return `${minYear}-01-01`;
-                                      }
-                                      return undefined;
-                                    })()}
-                                    onChange={(val) => {
-                                      if (!val) {
-                                        updateTraveler(t.id, "dob", "");
-                                        updateTraveler(t.id, "age", "");
-                                        return;
-                                      }
-                                      const dob = val;
-                                      const today = new Date();
-                                      const birth = new Date(dob);
-                                      let age = today.getFullYear() - birth.getFullYear();
-                                      const m = today.getMonth() - birth.getMonth();
-                                      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-                                      updateTraveler(t.id, "dob", dob);
-                                      updateTraveler(t.id, "age", age);
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              {formErrors[t.id]?.dob && (
-                                <p className="text-[10px] text-red-500 mt-1">
-                                  {formErrors[t.id].dob}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="field-label">
-                                Age{" "}
-                                <span className="text-slate-500 font-normal normal-case">
-                                  (auto-calculated)
-                                </span>
-                              </label>
-
-                              <input
-                                type="number"
-                                value={t.age || ""}
-                                readOnly
-                                placeholder="—"
-                                className={`field-input bg-white text-slate-500 cursor-not-allowed ${formErrors[t.id]?.age ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                              />
-                              {formErrors[t.id]?.age && (
-                                <p className="text-[10px] text-red-500 mt-1">
-                                  {formErrors[t.id].age}
-                                </p>
-                              )}
-                            </div>
-                            {requiredFlags.isPANRequired && (
-                              <div className="flex flex-col gap-1">
-                                <label className="field-label">
-                                  PAN Card{" "}
-                                  {t.paxType === 1 && Number(t.age) > 18 && (
-                                    <Required />
-                                  )}
-                                  {(t.paxType === 2 ||
-                                    (t.age && Number(t.age) <= 18)) && (
-                                    <span className="text-slate-500 font-normal normal-case">
-                                      (Not required)
-                                    </span>
-                                  )}
-                                </label>
-                                <input
-                                  type="text"
-                                  value={t.panCard || ""}
-                                  disabled={
-                                    isBookNowMode ||
-                                    t.paxType === 2 ||
-                                    (t.age && Number(t.age) <= 18)
-                                  }
-                                  onChange={(e) => {
-                                    const val = e.target.value.toUpperCase();
-                                    setTravelers((prev) =>
-                                      prev.map((tr) => {
-                                        if (tr.id === t.id) {
-                                          return { ...tr, panCard: val };
-                                        }
-                                        if (t.leadPassenger && applyLeadPan && tr.paxType === 1 && !tr.leadPassenger) {
-                                          return { ...tr, panCard: val };
-                                        }
-                                        return tr;
-                                      })
-                                    );
-                                  }}
-                                  placeholder="ABCDE1234F"
-                                  maxLength={10}
-                                  className={`field-input font-mono tracking-widest ${formErrors[t.id]?.panCard ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                                />
-                                {formErrors[t.id]?.panCard && (
-                                  <p className="text-[10px] text-red-500 mt-1">
-                                    {formErrors[t.id].panCard}
-                                  </p>
-                                )}
-                                <p className="text-[10px] text-yellow-700 font-semibold">
-                                  {isCorporateBooking ? "Enter Valid Corporate PAN." : "Required only for adults older than 18."}
-                                </p>
-                                {t.leadPassenger && travelers.some(tr => tr.paxType === 1 && !tr.leadPassenger) && (
-                                  <div className="mt-2 flex items-center gap-2">
-                                    <input 
-                                      type="checkbox" 
-                                      id="applyLeadPan"
-                                      checked={applyLeadPan}
-                                      onChange={(e) => {
-                                        const checked = e.target.checked;
-                                        setApplyLeadPan(checked);
-                                        if (checked && t.panCard) {
-                                          setTravelers(prev => prev.map(tr => 
-                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: t.panCard } : tr
-                                          ));
-                                        } else if (!checked) {
-                                          setTravelers(prev => prev.map(tr => 
-                                            (tr.paxType === 1 && !tr.leadPassenger) ? { ...tr, panCard: "" } : tr
-                                          ));
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-[#C9A84C] focus:ring-[#C9A84C] cursor-pointer"
-                                    />
-                                    <label htmlFor="applyLeadPan" className="text-xs text-slate-600 font-medium cursor-pointer">
-                                      Apply this PAN card to all other adults
-                                    </label>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Passport (International only) */}
-                        {isInternationalBooking &&
-                          requiredFlags.isPassportRequired && (
-                            <>
-                              <Divider />
-                              <div>
-                                <SectionHeading
-                                  icon={<FiBookOpen size={12} />}
-                                  title="Passport Details"
-                                  badge="International"
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                  <div className="flex flex-col gap-1">
-                                    <label className="field-label">
-                                      Passport Number <Required />
-                                    </label>
-                                    <input
-                                      type="text"
-                                      placeholder="e.g. A1234567"
-                                      value={t.PassportNo || ""}
-                                      onChange={(e) =>
-                                        updateTraveler(
-                                          t.id,
-                                          "PassportNo",
-                                          e.target.value,
-                                        )
-                                      }
-                                      className={`field-input font-mono tracking-widest ${formErrors[t.id]?.PassportNo ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                                    />
-                                    {formErrors[t.id]?.PassportNo && (
-                                      <p className="text-[10px] text-red-500 mt-1">
-                                        {formErrors[t.id].PassportNo}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="field-label">
-                                      Issue Date <Required />
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={t.PassportIssueDate || ""}
-                                      onChange={(e) =>
-                                        updateTraveler(
-                                          t.id,
-                                          "PassportIssueDate",
-                                          e.target.value,
-                                        )
-                                      }
-                                      className={`field-input ${formErrors[t.id]?.PassportIssueDate ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                                    />
-                                    {formErrors[t.id]?.PassportIssueDate && (
-                                      <p className="text-[10px] text-red-500 mt-1">
-                                        {formErrors[t.id].PassportIssueDate}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="field-label">
-                                      Expiry Date <Required />
-                                    </label>
-                                    <input
-                                      type="date"
-                                      value={t.PassportExpDate || ""}
-                                      onChange={(e) =>
-                                        updateTraveler(
-                                          t.id,
-                                          "PassportExpDate",
-                                          e.target.value,
-                                        )
-                                      }
-                                      className={`field-input ${formErrors[t.id]?.PassportExpDate ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                                    />
-                                    {formErrors[t.id]?.PassportExpDate && (
-                                      <p className="text-[10px] text-red-500 mt-1">
-                                        {formErrors[t.id].PassportExpDate}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          )}
-                      </div>
-                    </div>
-                  ))}
-
-                  <style>{`
-                    .field-label {
-                      font-size: 11px; font-weight: 600; color: #64748b;
-                      text-transform: uppercase; letter-spacing: 0.05em;
-                    }
-                    .field-input {
-                      height: 40px; width: 100%; padding: 0 12px;
-                      font-size: 14px; color: #334155; background: white;
-                      border: 1px solid #e2e8f0; border-radius: 8px;
-                      outline: none; transition: border-color 0.15s, box-shadow 0.15s;
-                    }
-                    .field-input:focus {
-                      border-color: #C9A84C;
-                      box-shadow: 0 0 0 3px rgba(10,77,104,0.08);
-                    }
-                    .field-input:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
-                    .field-input::placeholder { color: #cbd5e1; }
-                  `}</style>
-                </div>
-
-                {/* Make Corporate Booking Checkbox */}
-                {!isBookNowMode && validation?.CorporateBookingAllowed && validation?.CrpPANMandatory && (
-                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between rounded-b-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="corporateBooking"
-                          type="checkbox"
-                          checked={isCorporateBooking}
-                          onChange={(e) => setIsCorporateBooking(e.target.checked)}
-                          className="w-4 h-4 text-[#C9A84C] bg-white border-slate-300 rounded focus:ring-[#C9A84C] focus:ring-2 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label htmlFor="corporateBooking" className="text-sm font-semibold text-slate-800 cursor-pointer">
-                          Make Corporate Booking
-                        </label>
-                        <p className="text-[11px] text-slate-500">
-                          Check this box if this is a corporate booking requiring special handling.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Purpose of Travel */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
-              <div className="flex items-center gap-2.5 mb-4">
-                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
-                  <FiShield size={15} />
-                </span>
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Purpose of Travel
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Required for corporate approval
-                  </p>
-                </div>
-              </div>
-              <textarea
-                onChange={(e) => setPurposeOfTravel(e.target.value)}
-                placeholder="Describe the reason for this booking…"
-                value={purposeOfTravel}
-                className={`w-full bg-white border ${formErrors.purposeOfTravel ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"} rounded-xl px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 focus:bg-white min-h-[100px] transition resize-none`}
-              />
-              {formErrors.purposeOfTravel && (
-                <p className="text-[11px] text-red-500 mt-2 font-medium">
-                  {formErrors.purposeOfTravel}
-                </p>
-              )}
-            </div>
-
-            {/* GST Details */}
-            {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/20 text-green-600">
-                    <FiTag size={15} />
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-800">
-                      GST Details
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Fetched automatically from your corporate profile
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-1 rounded uppercase tracking-wider">
-                  Profile Locked
-                </span>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {[
-                  {
-                    label: "GSTIN",
-                    key: "gstin",
-                    placeholder: "GSTIN",
-                  },
-                  {
-                    label: "Legal Name",
-                    key: "legalName",
-                    placeholder: "Company legal name",
-                  },
-                  {
-                    label: "GST Email",
-                    key: "gstEmail",
-                    placeholder: "GST Email",
-                  },
-                  {
-                    label: "Billing Address",
-                    key: "address",
-                    placeholder: "Street, City, State, PIN",
-                  },
-                ].map(({ label, key, placeholder }) => (
-                  <div key={key} className={key === 'address' ? 'lg:col-span-3' : ''}>
-                    <label className="block text-sm font-bold text-slate-800 mb-2">
-                      {label}
-                    </label>
-                    <input
-                      type="text"
-                      value={gstDetails[key] || ""}
-                      readOnly
-                      placeholder={placeholder}
-                      className="w-full px-4 py-2.5 border border-slate-100 rounded-lg text-sm bg-white text-slate-600 cursor-not-allowed font-medium"
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className="mt-4 text-[11px] text-slate-500 italic">
-                * Note: To update GST details, please contact your travel administrator.
-              </p>
-            </div> */}
-          </div>
+            <GuestDetailsForm 
+              isBookNowMode={isBookNowMode}
+              approvedBy={approvedBy}
+              travelers={travelers}
+              updateTraveler={updateTraveler}
+              countries={countries}
+              totalAdultsFromSearch={totalAdultsFromSearch}
+              totalChildrenFromSearch={totalChildrenFromSearch}
+              formErrors={formErrors}
+              requiredFlags={requiredFlags}
+              isCorporateBooking={isCorporateBooking}
+              setIsCorporateBooking={setIsCorporateBooking}
+              applyLeadPan={applyLeadPan}
+              setApplyLeadPan={setApplyLeadPan}
+              setTravelers={setTravelers}
+              isInternationalBooking={isInternationalBooking}
+              validation={validation}
+              purposeOfTravel={purposeOfTravel}
+              setPurposeOfTravel={setPurposeOfTravel}
+            />
 
           {/* ── RIGHT: Price Summary ── */}
           <div className="lg:col-span-1">
@@ -2860,20 +1331,6 @@ const HotelReviewBooking = () => {
               </div>
 
               <div className="space-y-3">
-                {/* {!isBookNowMode && (
-                  <p className="text-[11px] text-slate-500 text-center leading-relaxed px-2">
-                    By proceeding, I agree to{" "}
-                    <span className="text-[#C9A84C] cursor-pointer hover:underline">
-                      User Agreement
-                    </span>{" "}
-                    &amp;{" "}
-                    <span className="text-[#C9A84C] cursor-pointer hover:underline">
-                      Cancellation Policy
-                    </span>
-                    .
-                  </p>
-                )} */}
-
                 <button
                   onClick={handleAction}
                   disabled={actionLoading}

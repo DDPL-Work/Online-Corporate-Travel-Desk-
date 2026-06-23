@@ -36,6 +36,7 @@ import {
   FiHash,
   FiEye,
   FiUsers,
+  FiMenu,
 } from "react-icons/fi";
 import { fetchMyBookingById } from "../../Redux/Actions/booking.thunks";
 import { downloadTicketPdf } from "../../Redux/Actions/booking.thunks";
@@ -1537,6 +1538,7 @@ export default function BookingDetails() {
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [showReissueModal, setShowReissueModal] = useState(false);
   const [activeTab, setActiveTab] = useState("flight_details");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ── Reissue eligibility ──
   const { eligibility, eligibilityLoading, bookingOfflineRequest } =
@@ -1706,7 +1708,7 @@ export default function BookingDetails() {
       `}</style>
 
       {/* ── Sticky nav ── */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] flex flex-col pt-4 px-8 gap-4">
+      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] flex flex-col pt-4 px-4 sm:px-8 gap-4">
         {/* Top Row */}
         <div className="flex items-center gap-4 w-full">
           <button
@@ -1721,9 +1723,9 @@ export default function BookingDetails() {
             Flight Booking Details
           </h1>
 
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-2 sm:gap-4">
             {(booking.orderId || booking.bookingReference) && (
-              <span className="text-[11px] text-[#A89F94]">
+              <span className="hidden sm:inline text-[11px] text-[#A89F94]">
                 Order ID:{" "}
                 <strong className="text-[#1A1714] font-['DM_Mono']">
                   {booking.orderId || booking.bookingReference}
@@ -1735,7 +1737,7 @@ export default function BookingDetails() {
               executionStatus === "booked") &&
               !isCancelled && (
                 <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
+                  <span className="hidden sm:flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
                     <MdVerifiedUser size={11} /> Ticket Issued
                   </span>
                   <button
@@ -1744,51 +1746,87 @@ export default function BookingDetails() {
                     }
                     className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
                   >
-                    <FiDownload size={11} /> Download Ticket
+                    <FiDownload size={11} /> <span className="hidden sm:inline">Download Ticket</span>
                   </button>
                 </div>
               )}
           </div>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="flex items-center gap-6 overflow-x-auto w-full">
-          {[
-            { id: "flight_details", label: "Flight Details" },
-            { id: "project", label: "Project Details" },
-            { id: "charges_rules", label: "Charges and rules" },
-            { id: "passengers", label: "Passengers" },
-            ...(upsellList && upsellList.length > 0
-              ? [{ id: "upsell_options", label: "Upsell Options" }]
-              : []),
-            {
-              id: "amendment",
-              label: isCancelled
-                ? "Cancellation Details"
-                : isAmendmentPending
-                  ? "Cancellation Request"
-                  : bookingAmendmentStatus &&
-                      bookingAmendmentStatus !== "not_requested"
-                    ? "Amendment Status"
-                    : "Cancellation",
-            },
-            { id: "history", label: "Booking Life Cycle" },
-          ].map((tab) => (
+        {/* Tabs Navigation (Desktop & Mobile) */}
+        <div className="relative">
+          {/* Mobile Dropdown Button */}
+          <div className="md:hidden pb-4">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
-                activeTab === tab.id
-                  ? "text-[#1A1714]"
-                  : "text-[#A89F94] hover:text-[#7A7068]"
-              }`}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="w-full flex items-center justify-between bg-[#FAF8F4] border border-[#EAE4D9] px-4 py-3 text-[13px] font-bold text-[#1A1714]"
             >
-              {tab.label}
-              {activeTab === tab.id && (
-                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
-              )}
+              <span className="flex items-center gap-2">
+                <FiMenu className="text-[#B5862A]" size={16} />
+                {activeTab === "flight_details" && "Flight Details"}
+                {activeTab === "project" && "Project Details"}
+                {activeTab === "charges_rules" && "Charges and rules"}
+                {activeTab === "passengers" && "Passengers"}
+                {activeTab === "upsell_options" && "Upsell Options"}
+                {activeTab === "amendment" && (isCancelled ? "Cancellation Details" : isAmendmentPending ? "Cancellation Request" : bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested" ? "Amendment Status" : "Cancellation")}
+                {activeTab === "history" && "Booking Life Cycle"}
+              </span>
+              <FiChevronDown
+                size={16}
+                className={`text-[#B5862A] transition-transform duration-300 ${mobileMenuOpen ? 'rotate-180' : ''}`}
+              />
             </button>
-          ))}
+          </div>
+
+          {/* Desktop Tabs / Mobile Dropdown Content */}
+          <div className={`
+            md:flex items-center gap-6 overflow-x-auto w-full
+            ${mobileMenuOpen ? 'flex flex-col absolute top-full left-0 right-0 bg-white border border-[#EAE4D9] shadow-lg z-50 p-2' : 'hidden'}
+          `}>
+            {[
+              { id: "flight_details", label: "Flight Details" },
+              { id: "project", label: "Project Details" },
+              { id: "charges_rules", label: "Charges and rules" },
+              { id: "passengers", label: "Passengers" },
+              ...(upsellList && upsellList.length > 0
+                ? [{ id: "upsell_options", label: "Upsell Options" }]
+                : []),
+              {
+                id: "amendment",
+                label: isCancelled
+                  ? "Cancellation Details"
+                  : isAmendmentPending
+                    ? "Cancellation Request"
+                    : bookingAmendmentStatus &&
+                        bookingAmendmentStatus !== "not_requested"
+                      ? "Amendment Status"
+                      : "Cancellation",
+              },
+              { id: "history", label: "Booking Life Cycle" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setMobileMenuOpen(false);
+                }}
+                className={`
+                  text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative
+                  ${mobileMenuOpen ? 'w-full text-left px-4 py-3 border-b border-[#EAE4D9] last:border-0' : 'pb-3'}
+                  ${
+                    activeTab === tab.id
+                      ? "text-[#1A1714] bg-[#FAF8F4] md:bg-transparent"
+                      : "text-[#A89F94] hover:text-[#7A7068]"
+                  }
+                `}
+              >
+                {tab.label}
+                {activeTab === tab.id && !mobileMenuOpen && (
+                  <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 

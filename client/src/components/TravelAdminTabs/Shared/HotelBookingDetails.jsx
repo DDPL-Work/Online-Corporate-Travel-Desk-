@@ -33,6 +33,8 @@ import {
   FiHash,
   FiFileText,
   FiTag,
+  FiMenu,
+  FiChevronDown,
 } from "react-icons/fi";
 import {
   MdHotel,
@@ -237,7 +239,8 @@ function fmtTime(d) {
 }
 function nightsCount(ci, co) {
   if (!ci || !co) return 1;
-  return Math.ceil((new Date(co) - new Date(ci)) / (1000 * 60 * 60 * 24));
+  const n = Math.ceil((new Date(co) - new Date(ci)) / (1000 * 60 * 60 * 24));
+  return n > 0 ? n : 1;
 }
 
 /* ─────────────────────────────────────────────────────────────── */
@@ -331,27 +334,68 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
   const selectedRoom = hotelReq?.selectedRoom || {};
   const selectedHotel = hotelReq?.selectedHotel || {};
 
+  const tboHotelDetails = booking?.tboHotelDetails || {};
+
   const hotelName =
-    detail?.HotelName ||
+    booking?.hotelName ||
     snapshot?.hotelName ||
+    detail?.HotelName ||
+    tboHotelDetails?.hotelName ||
     selectedHotel?.hotelName ||
     "Hotel";
-  const city = detail?.City || selectedHotel?.city || "";
-  const address = detail?.AddressLine1 || selectedHotel?.address || "";
-  const starRating = detail?.StarRating || selectedHotel?.starRating || 0;
-  const checkIn = detail?.CheckInDate || hotelReq?.checkInDate;
-  const checkOut = detail?.CheckOutDate || hotelReq?.checkOutDate;
-  const nights = nightsCount(checkIn, checkOut);
+  const city = booking?.city || detail?.City || tboHotelDetails?.cityName || selectedHotel?.city || "";
+  const address = detail?.AddressLine1 || tboHotelDetails?.address || selectedHotel?.address || "";
+  const starRating = detail?.StarRating || tboHotelDetails?.hotelRating || selectedHotel?.starRating || 0;
+  const checkIn =
+    booking?.checkIn ||
+    snapshot?.checkInDate ||
+    detail?.CheckInDate ||
+    hotelReq?.checkInDate;
+  const checkOut =
+    booking?.checkOut ||
+    snapshot?.checkOutDate ||
+    detail?.CheckOutDate ||
+    hotelReq?.checkOutDate;
+  const nights = snapshot?.nights || nightsCount(checkIn, checkOut);
+
+  const rateConditions =
+    hotelReq?.preBookResponse?.HotelResult?.[0]?.RateConditions ||
+    booking?.raw?.Rooms?.[0]?.RateConditions ||
+    booking?.raw?.HotelResult?.[0]?.RateConditions ||
+    booking?.raw?.RateConditions ||
+    [];
+  let extractedCheckInTime = "14:00 (Estimated)";
+  let extractedCheckOutTime = "11:00 (Estimated)";
+  rateConditions.forEach((c) => {
+    if (!c) return;
+    const text = c.replace(/&lt;[^>]*&gt;/g, ""); // Strip raw HTML just in case
+    const lower = text.toLowerCase();
+
+    if (lower.includes("checkin time") || lower.includes("check-in time")) {
+      if (!lower.includes("-end")) {
+        const val =
+          text.split(/time.*?:/i)[1]?.trim() ||
+          text.substring(text.indexOf(":") + 1).trim();
+        if (val) extractedCheckInTime = val;
+      }
+    }
+    if (lower.includes("checkout time") || lower.includes("check-out time")) {
+      const val =
+        text.split(/time.*?:/i)[1]?.trim() ||
+        text.substring(text.indexOf(":") + 1).trim();
+      if (val) extractedCheckOutTime = val;
+    }
+  });
+
   // Room name: allRooms[].name[] is an array of strings in the new API
-  const roomType =
-    hotelReq.allRooms?.[0]?.name?.[0] ||
-    hotelReq.selectedRoom?.rawRoomData?.[0]?.Name?.[0] ||
-    rooms[0]?.RoomTypeName ||
-    "Standard Room";
+  const roomType = rooms[0]?.RoomTypeName || "Standard Room";
 
   let images =
     booking?.images ||
     selectedHotel?.images ||
+    booking?.hotelDetails?.Images ||
+    booking?.raw?.HotelDetails?.Images ||
+    booking?.raw?.Images ||
     hotelReq?.selectedRoom?.rawRoomData?.[0]?.images ||
     [];
   if (snapshot?.hotelImage && !images.includes(snapshot.hotelImage)) {
@@ -375,14 +419,14 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
 
   const issuedDate = booking?.approvedAt || booking?.createdAt;
 
+  const numImages = images.length;
   useEffect(() => {
-    if (!images.length) return;
-    const interval = setInterval(
-      () => setActiveIndex((p) => (p + 1) % images.length),
-      2000,
-    );
+    if (!numImages) return;
+    const interval = setInterval(() => {
+      setActiveIndex((p) => (p + 1) % numImages);
+    }, 2500);
     return () => clearInterval(interval);
-  }, [images]);
+  }, [numImages]);
 
   return (
     <div className="bg-white border border-[#EAE4D9]">
@@ -405,9 +449,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
       </div>
 
       {/* Body: image + details */}
-      <div className="grid grid-cols-[minmax(0,380px)_1fr] gap-0">
+      <div className="flex flex-col md:grid md:grid-cols-[minmax(0,340px)_1fr] gap-0">
         {/* Image */}
-        <div className="relative min-h-[320px] overflow-hidden bg-[#E8E0D0]">
+        <div className="relative overflow-hidden bg-[#E8E0D0] aspect-[16/9] md:aspect-auto md:min-h-[320px]">
           {images.length > 0 ? (
             <img
               src={images[activeIndex]}
@@ -417,25 +461,27 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               decoding="async"
             />
           ) : (
-            <div className="w-full h-full min-h-[320px] flex items-center justify-center bg-[#E8E0D0]">
+            <div className="absolute inset-0 flex items-center justify-center bg-[#E8E0D0]">
               <MdHotel size={48} className="text-[#EAE4D9]" />
             </div>
           )}
         </div>
 
         {/* Right content */}
-        <div className="p-8 md:p-9">
+        <div className="p-5 sm:p-7 md:p-8 lg:p-9">
           {/* Hotel name + stars + city */}
           <div className="mb-6">
-            <h1 className="font-['Cormorant_Garamond'] text-[36px] font-bold leading-[1.1] text-[#1A1714] mb-2">
-              {isCancelled
-                ? "Your trip was cancelled."
-                : location.state?.isPastTrip || source === "past"
-                  ? "Your trip is completed."
-                  : hotelName}
-            </h1>
+            <div className="flex items-center gap-4 flex-wrap mb-2">
+              <h1 className="font-['Cormorant_Garamond'] text-[26px] sm:text-[32px] md:text-[36px] font-bold leading-[1.1] text-[#1A1714]">
+                {isCancelled
+                  ? "Your trip was cancelled."
+                  : location.state?.isPastTrip || source === "past"
+                    ? "Your trip is completed."
+                    : hotelName}
+              </h1>
+              <Stars count={starRating} />
+            </div>
             <div className="flex items-center gap-3 flex-wrap mb-[6px]">
-              {starRating > 0 && <Stars count={starRating} />}
               {city && (
                 <span className="flex items-center gap-1 text-[12px] text-[#7A7068]">
                   <MdLocationOn size={13} className="text-[#B5862A]" />
@@ -465,12 +511,12 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
           <hr className="border-t border-[#EAE4D9] my-5" />
 
           {/* Check-in / out */}
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-6">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 mb-6">
             <div>
               <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
                 Check-in
               </div>
-              <div className="font-['Cormorant_Garamond'] text-[32px] font-bold leading-none mb-[2px]">
+              <div className="font-['Cormorant_Garamond'] text-[24px] sm:text-[32px] font-bold leading-none mb-[2px]">
                 {checkIn
                   ? new Date(checkIn).getDate().toString().padStart(2, "0")
                   : "—"}
@@ -478,9 +524,8 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               <div className="text-[13px] text-[#7A7068] font-medium">
                 {fmtDate(checkIn, { month: "short", year: "numeric" })}
               </div>
-              <div className="text-[11px] text-[#A89F94]">
-                {fmtDay(checkIn)} ·{" "}
-                {fmtTime(checkIn) !== "—" ? fmtTime(checkIn) : "14:00"}
+              <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                {fmtDay(checkIn)} <br /> Check-in Time: {extractedCheckInTime}
               </div>
             </div>
 
@@ -500,7 +545,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
                   Selected Room Type
                 </div>
                 <div className="text-[10px] font-bold text-[#1A1714] max-w-[120px] mx-auto uppercase tracking-wide">
-                  {hotelReq?.noOfRooms || 1} x {roomType}
+                  {roomType}
                 </div>
               </div>
             </div>
@@ -509,7 +554,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">
                 Check-out
               </div>
-              <div className="font-['Cormorant_Garamond'] text-[32px] font-bold leading-none mb-[2px]">
+              <div className="font-['Cormorant_Garamond'] text-[24px] sm:text-[32px] font-bold leading-none mb-[2px]">
                 {checkOut
                   ? new Date(checkOut).getDate().toString().padStart(2, "0")
                   : "—"}
@@ -517,8 +562,9 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
               <div className="text-[13px] text-[#7A7068] font-medium">
                 {fmtDate(checkOut, { month: "short", year: "numeric" })}
               </div>
-              <div className="text-[11px] text-[#A89F94]">
-                {fmtDay(checkOut)} · 11:00
+              <div className="text-[12px] text-[#8B7355] mt-1 font-medium">
+                {fmtDay(checkOut)} <br /> Check-out Time:{" "}
+                {extractedCheckOutTime}
               </div>
             </div>
           </div>
@@ -2259,6 +2305,7 @@ export default function HotelBookingDetails() {
   const isTravelAdmin = user?.role === "travel-admin";
 
   const [activeTab, setActiveTab] = useState("hotel_details");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Detect source: cancelled table or total bookings table
   const searchParams = new URLSearchParams(location.search);
@@ -2352,33 +2399,45 @@ export default function HotelBookingDetails() {
     ? rawData[0] || {}
     : rawData || allRooms[0] || {};
 
+  const tboBookedRooms = booking.bookedHotelDetails?.GetBookingDetailResult?.Rooms || booking.bookedHotelDetails?.Rooms;
+  const preBookRoomsArray = hotelReq?.preBookResponse?.HotelResult?.[0]?.Rooms;
+
   const rooms =
-    Array.isArray(booking?.rooms) && booking.rooms.length > 0
-      ? booking.rooms
-      : Array.isArray(rawData)
-        ? rawData
-        : rawData
-          ? [rawData]
-          : allRooms;
+    Array.isArray(tboBookedRooms) && tboBookedRooms.length > 0
+      ? tboBookedRooms
+      : Array.isArray(preBookRoomsArray) && preBookRoomsArray.length > 0
+        ? preBookRoomsArray
+        : Array.isArray(booking?.rooms) && booking.rooms.length > 0
+          ? booking.rooms
+          : Array.isArray(rawData)
+            ? rawData
+            : rawData
+              ? [rawData]
+              : allRooms;
+
+  // Use the first resolved room for fallback policies
+  const primaryRoom = rooms[0] || selectedRoomRaw;
 
   const cancelPolicies =
+    primaryRoom?.CancelPolicies ||
+    primaryRoom?.CancelPolicy ||
     hotelReq.selectedRoom?.cancelPolicies ||
-    selectedRoomRaw?.CancelPolicies ||
     [];
-  const amenities = selectedRoomRaw?.Amenities || [];
+
+  const amenities = primaryRoom?.Amenities || primaryRoom?.amenities || [];
 
   const travellers = booking?.travellers || [];
   const bookingDetail = null; // no raw TBO detail in this API
-  const detailRoom = selectedRoomRaw;
+  const detailRoom = primaryRoom;
   const preBookResult = hotelReq?.preBookResponse?.HotelResult?.[0] || {};
   const rateConditions =
+    primaryRoom?.RateConditions ||
     hotelReq.selectedRoom?.RateConditions ||
-    selectedRoomRaw?.RateConditions ||
     preBookResult?.RateConditions ||
     [];
   const rawSupplements =
+    primaryRoom?.Supplements ||
     hotelReq.selectedRoom?.Supplements ||
-    selectedRoomRaw?.Supplements ||
     preBookResult?.Rooms?.[0]?.Supplements ||
     [];
   const supplements = Array.isArray(rawSupplements[0])
@@ -2420,52 +2479,80 @@ export default function HotelBookingDetails() {
       `}</style>
 
       {/* ── Sticky nav ── */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] flex flex-col pt-4 px-8 gap-4">
+      <header className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9] flex flex-col">
         {/* Top Row */}
-        <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center gap-2 sm:gap-4 w-full px-4 sm:px-6 lg:px-8 pt-3 pb-2 sm:pt-4">
           <button
             onClick={() => {
               if (backPath === -1) navigate(-1);
               else navigate(backPath, { state: location.state });
             }}
-            className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity"
+            className="flex items-center gap-[6px] bg-none border-none cursor-pointer text-[12px] font-semibold text-[#B5862A] font-['DM_Sans'] tracking-[0.05em] uppercase hover:opacity-80 transition-opacity shrink-0"
           >
             <FiArrowLeft size={14} />
-            {backLabel || "Back"}
+            <span className="hidden sm:inline">{backLabel || "Back"}</span>
           </button>
-          <span className="w-[1px] h-4 bg-[#EAE4D9]" />
-          <h1 className="text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em]">
+          <span className="w-[1px] h-4 bg-[#EAE4D9] hidden sm:block" />
+          <h1 className="text-[12px] sm:text-[13px] font-semibold text-[#1A1714] font-['DM_Sans'] tracking-[0.04em] truncate">
             Hotel Booking Details
           </h1>
 
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-2 sm:gap-4">
+            {/* Status pills — hidden on xs, visible sm+ */}
+            {executionStatus && (
+              <div className="hidden sm:flex items-center gap-2">
+                <StatusPill status={executionStatus} />
+                {bookingAmendmentStatus &&
+                  bookingAmendmentStatus !== "not_requested" &&
+                  bookingAmendmentStatus !== "completed" && (
+                    <StatusPill
+                      status={`amendment_${bookingAmendmentStatus}`}
+                    />
+                  )}
+              </div>
+            )}
+            {/* Order ID — hidden on mobile */}
             {(booking.orderId || booking.bookingReference) && (
-              <span className="text-[11px] text-[#A89F94]">
+              <span className="hidden md:inline text-[11px] text-[#A89F94]">
                 Order ID:{" "}
                 <strong className="text-[#1A1714] font-['DM_Mono']">
                   {booking.orderId || booking.bookingReference}
                 </strong>
               </span>
             )}
+            {/* Download voucher — icon-only on mobile */}
             {isConfirmed && !isCancelled && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
+                <span className="hidden sm:flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
                   <MdVerifiedUser size={11} /> Voucher Issued
                 </span>
                 <button
                   onClick={() => dispatch(generateHotelVoucher(booking._id))}
-                  className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
+                  className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[10px] sm:px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
                 >
-                  <FiDownload size={11} /> Download Voucher
+                  <FiDownload size={11} />
+                  <span className="hidden sm:inline">Download Voucher</span>
                 </button>
               </div>
             )}
+            {/* Hamburger — visible only on small screens */}
+            <button
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              className="lg:hidden flex items-center gap-1 border border-[#EAE4D9] px-2 py-1 text-[#7A7068] hover:border-[#B5862A] hover:text-[#B5862A] transition-colors shrink-0"
+              aria-label="Toggle navigation"
+            >
+              {mobileMenuOpen ? <FiX size={16} /> : <FiMenu size={16} />}
+              <FiChevronDown
+                size={12}
+                className={`transition-transform duration-200 ${mobileMenuOpen ? "rotate-180" : ""}`}
+              />
+            </button>
           </div>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="flex items-center gap-6 overflow-x-auto w-full">
-          {[
+        {/* ── Desktop Tab Bar (lg+) ── */}
+        {(() => {
+          const tabs = [
             { id: "hotel_details", label: "Hotel Details" },
             { id: "room_details", label: "Room Details" },
             { id: "project", label: "Project Details" },
@@ -2473,23 +2560,77 @@ export default function HotelBookingDetails() {
             { id: "guest", label: "Guest" },
             { id: "amendment", label: "Amendment" },
             { id: "history", label: "Booking Life Cycle" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
-                activeTab === tab.id
-                  ? "text-[#1A1714]"
-                  : "text-[#A89F94] hover:text-[#7A7068]"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
+          ];
+          return (
+            <>
+              {/* Desktop horizontal tab bar */}
+              <div className="hidden lg:flex items-center gap-6 overflow-x-auto w-full px-8">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`pb-3 text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative ${
+                      activeTab === tab.id
+                        ? "text-[#1A1714]"
+                        : "text-[#A89F94] hover:text-[#7A7068]"
+                    }`}
+                  >
+                    {tab.label}
+                    {activeTab === tab.id && (
+                      <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#B5862A]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Mobile dropdown menu */}
+              {mobileMenuOpen && (
+                <div className="lg:hidden border-t border-[#EAE4D9] bg-white shadow-lg">
+                  {/* Status pills row on mobile */}
+                  {executionStatus && (
+                    <div className="flex items-center gap-2 flex-wrap px-4 pt-3 pb-2 border-b border-[#EAE4D9]">
+                      <StatusPill status={executionStatus} />
+                      {bookingAmendmentStatus &&
+                        bookingAmendmentStatus !== "not_requested" &&
+                        bookingAmendmentStatus !== "completed" && (
+                          <StatusPill
+                            status={`amendment_${bookingAmendmentStatus}`}
+                          />
+                        )}
+                      {(booking.orderId || booking.bookingReference) && (
+                        <span className="text-[11px] text-[#A89F94] ml-auto">
+                          <strong className="text-[#1A1714] font-['DM_Mono']">
+                            #{booking.orderId || booking.bookingReference}
+                          </strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {/* Tab list */}
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-5 py-[13px] text-[13px] font-semibold tracking-wide border-b border-[#EAE4D9] transition-colors flex items-center justify-between ${
+                        activeTab === tab.id
+                          ? "text-[#B5862A] bg-[#FFFBF0]"
+                          : "text-[#7A7068] hover:bg-[#FAF8F4] hover:text-[#1A1714]"
+                      }`}
+                    >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#B5862A] shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               )}
-            </button>
-          ))}
-        </div>
+            </>
+          );
+        })()}
       </header>
 
       {/* ── Main ── */}

@@ -128,6 +128,67 @@ exports.uploadProjectsExcel = async (req, res) => {
 
 /**
  * ============================================================
+ * 📝 CREATE SINGLE PROJECT (SSO / CORPORATE SCOPED ONLY)
+ * ============================================================
+ */
+exports.createProject = async (req, res) => {
+  try {
+    if (!req.user || !req.user.corporateId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Corporate context missing",
+      });
+    }
+
+    const { projectCodeId, projectName, clientName } = req.body;
+    const corporateId = new mongoose.Types.ObjectId(req.user.corporateId);
+
+    if (!projectCodeId || !projectName || !clientName) {
+      return res.status(400).json({
+        success: false,
+        message: "projectCodeId, projectName, and clientName are required",
+      });
+    }
+
+    const code = String(projectCodeId).trim().toUpperCase();
+
+    // Check if project code already exists for this corporate
+    const existingProject = await Project.findOne({
+      corporateId,
+      projectCodeId: code,
+    });
+
+    if (existingProject) {
+      return res.status(400).json({
+        success: false,
+        message: "A project with this code already exists",
+      });
+    }
+
+    const newProject = await Project.create({
+      corporateId,
+      projectName,
+      projectCodeId: code,
+      clientName,
+      createdBy: req.user._id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Project created successfully",
+      data: newProject,
+    });
+  } catch (error) {
+    console.error("CREATE PROJECT ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create project",
+    });
+  }
+};
+
+/**
+ * ============================================================
  * 🔐 FETCH PROJECTS (SSO / CORPORATE SCOPED ONLY)
  * ============================================================
  */

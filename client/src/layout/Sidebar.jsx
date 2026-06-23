@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -423,9 +424,17 @@ export default function Sidebar({ isOpen, onClose }) {
     finance_team: "Finance Team",
   };
 
-  return (
+  return createPortal(
+    <div className={`fixed inset-0 z-[99999] transition-opacity duration-300 ${isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"}`}>
+      {/* Backdrop */}
+      <button
+        type="button"
+        aria-label="Close sidebar"
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px] w-full h-full border-none cursor-default"
+        onClick={onClose}
+      />
     <aside
-      className={`fixed top-0 left-0 h-screen z-100 flex flex-col transition-all duration-300 shadow-2xl border-r
+      className={`absolute top-0 left-0 h-screen flex flex-col transition-transform duration-300 shadow-2xl border-r
         ${isOpen ? "w-64 translate-x-0" : "w-64 -translate-x-full"}`}
       style={{
         background: C.navyDeep,
@@ -626,5 +635,7 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
       </div>
     </aside>
+    </div>,
+    document.body
   );
 }

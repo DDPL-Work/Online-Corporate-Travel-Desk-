@@ -31,7 +31,11 @@ import {
   MdOutlinePendingActions,
   MdCancelScheduleSend,
 } from "react-icons/md";
-import { canAccessMenuItem, DASHBOARD_ROLES, OPS_PERMISSIONS } from "../constants/rbac";
+import {
+  canAccessMenuItem,
+  DASHBOARD_ROLES,
+  OPS_PERMISSIONS,
+} from "../constants/rbac";
 import { logoutUser } from "../Redux/Slice/authSlice";
 
 export const C = {
@@ -203,12 +207,24 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
         },
       ],
     },
+
+    {
+      label: "Leads & Inquiries",
+      icon: <FaUsers />,
+      subItems: [
+        {
+          to: "/contact-leads",
+          label: "Contact Leads",
+          icon: <FaListAlt />,
+        },
+      ],
+    },
   ];
 
   // Automatically open parent menu if a child is active
   useEffect(() => {
     const activeParent = superAdminMenu.find((item) =>
-      item.subItems?.some((sub) => location.pathname === sub.to)
+      item.subItems?.some((sub) => location.pathname === sub.to),
     );
 
     if (activeParent) {
@@ -281,9 +297,10 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
               <button
                 onClick={() => toggleGroup(m.label)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200
-                  ${openGroups[m.label]
-                    ? "text-white"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  ${
+                    openGroups[m.label]
+                      ? "text-white"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
                   }`}
                 style={{
                   background: openGroups[m.label]
@@ -320,9 +337,10 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
                       onClick={onClose}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-medium transition-all duration-200
-                        ${isActive
-                          ? "text-white"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white"
+                        ${
+                          isActive
+                            ? "text-white"
+                            : "text-slate-400 hover:bg-white/5 hover:text-white"
                         }`
                       }
                       style={({ isActive }) => ({
@@ -346,9 +364,10 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200
-                ${isActive
-                  ? "text-white"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white"
+                ${
+                  isActive
+                    ? "text-white"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
                 }`
               }
               style={({ isActive }) => ({
@@ -377,13 +396,15 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           >
             {typeof user?.name === "string" && user.name.length > 0
               ? user.name.charAt(0).toUpperCase()
-              : (user?.name?.firstName?.charAt(0).toUpperCase() || "S")}
+              : user?.name?.firstName?.charAt(0).toUpperCase() || "S"}
           </div>
           <div className="flex flex-col min-w-0">
             <p className="text-sm font-bold text-white truncate leading-tight">
               {typeof user?.name === "string"
                 ? user.name
-                : (user?.name?.firstName ? `${user.name.firstName} ${user.name.lastName || ""}` : "Super Admin")}
+                : user?.name?.firstName
+                  ? `${user.name.firstName} ${user.name.lastName || ""}`
+                  : "Super Admin"}
             </p>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1 truncate">
               {roleLabels[role] || "System Admin"}

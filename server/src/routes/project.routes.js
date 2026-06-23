@@ -5,6 +5,7 @@ const {
   uploadProjectsExcel,
   getProjectsByCorporate,
   deleteProject,
+  createProject,
 } = require("../controllers/project.controller");
 
 const {
@@ -24,6 +25,12 @@ router.post(
   upload.single("file"),
   authorizeRoles("travel-admin"),
   uploadProjectsExcel
+);
+
+router.post(
+  "/create",
+  authorizeRoles("travel-admin", "employee", "manager", "finance_team"),
+  createProject
 );
 
 router.get(

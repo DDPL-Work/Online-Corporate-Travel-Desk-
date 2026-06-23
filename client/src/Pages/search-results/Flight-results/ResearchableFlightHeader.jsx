@@ -206,7 +206,7 @@ const buildPayload = (draft, original) => {
 };
 
 /* ─── Airport Autocomplete ───────────────────────────────────────────────────── */
-function AirportAutocomplete({ value, onChange, placeholder, icon, onOpen }) {
+function AirportAutocomplete({ value, onChange, placeholder, icon, onOpen, alignRight }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState([]);
   const [open, setOpen] = useState(false);
@@ -279,14 +279,14 @@ function AirportAutocomplete({ value, onChange, placeholder, icon, onOpen }) {
           }}
           placeholder={placeholder}
           autoComplete="off"
-          className="w-full border-none outline-none bg-transparent text-[14px] font-extrabold text-gray-900 font-inter placeholder:text-gray-400 placeholder:font-semibold"
+          className="w-full border-none outline-none bg-transparent text-[13px] sm:text-[14px] font-extrabold text-gray-900 font-inter placeholder:text-gray-400 placeholder:font-semibold"
         />
       </div>
 
       {open && hits.length > 0 && (
         <div
           ref={dropRef}
-          className="absolute top-[calc(100%+8px)] -left-2 w-[300px] z-[200] bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[280px] overflow-y-auto"
+          className={`absolute top-[calc(100%+8px)] ${alignRight ? "right-0 sm:-left-2" : "-left-2"} w-[min(300px,90vw)] z-[200] bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[280px] overflow-y-auto`}
         >
           <div className="px-3.5 py-1.5 bg-gray-50 border-b border-gray-100 text-[9px] font-bold tracking-widest text-gray-400 uppercase sticky top-0">
             Airports
@@ -336,7 +336,7 @@ function PaxCabin({ passengers, cabin, onChange, isOpen, onToggle }) {
         onClick={onToggle}
         className="flex items-center gap-1.5 h-full w-full"
       >
-        <span className="text-[14px] font-extrabold text-gray-900 whitespace-nowrap">
+        <span className="text-[13px] sm:text-[14px] font-extrabold text-gray-900 whitespace-nowrap">
           {total} Adult{total !== 1 ? "s" : ""}, {cabinLabel(cabin).slice(0, 8)}
         </span>
         <BsChevronDown className="text-gray-500 text-[10px] ml-auto" />
@@ -360,9 +360,6 @@ function PaxCabin({ passengers, cabin, onChange, isOpen, onToggle }) {
           }}
           modalPosition={{
             top: "calc(100% + 12px)",
-            left: "auto",
-            right: 0,
-            width: 640,
             zIndex: 1000,
           }}
           initialData={{
@@ -387,14 +384,14 @@ function TripTypeDropdown({ value, onChange, journeyLabel, isOpen, onToggle }) {
   return (
     <div
       ref={ref}
-      className="relative flex flex-col shrink-0 min-w-[120px] px-3.5 py-2 border border-[#C9A84C]/30 bg-[#C9A84C]/5 rounded-[8px] shadow-sm cursor-pointer"
+      className="w-full sm:w-auto relative flex flex-col shrink-0 min-w-[100px] sm:min-w-[120px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 border border-[#C9A84C]/30 bg-[#C9A84C]/5 rounded-[8px] shadow-sm cursor-pointer"
       onClick={onToggle}
     >
-      <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
+      <div className="text-[9px] sm:text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
         Trip Type
       </div>
       <div className="flex items-center gap-1.5">
-        <div className="text-[14px] font-extrabold text-gray-900">
+        <div className="text-[13px] sm:text-[14px] font-extrabold text-gray-900">
           {labels[value] || journeyLabel}
         </div>
         <BsChevronDown className="text-gray-500 text-[10px] ml-auto" />
@@ -489,7 +486,7 @@ export default function ResearchableFlightHeader({
 
   /* ── ONE-WAY / ROUND-TRIP row ── */
   const renderMainRow = () => (
-    <div className="flex items-stretch gap-2 py-3 w-full animate-fadeIn transition-colors duration-200 flex-wrap">
+    <div className="flex items-stretch gap-2 py-2.5 sm:py-3 w-full animate-fadeIn transition-colors duration-200 flex-wrap">
       {/* TRIP TYPE */}
       <TripTypeDropdown
         value={jt}
@@ -505,8 +502,8 @@ export default function ResearchableFlightHeader({
       />
 
       {/* FROM */}
-      <div className="flex flex-col flex-[1.4] min-w-0 px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm border-slate-200 bg-slate-50">
-        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
+      <div className="flex flex-col flex-1 sm:flex-[1.4] min-w-[140px] sm:min-w-0 px-2.5 sm:px-3.5 py-1.5 sm:py-2 border rounded-[8px] transition-colors shadow-sm border-slate-200 bg-slate-50">
+        <div className="text-[9px] sm:text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
           From
         </div>
         <AirportAutocomplete
@@ -518,7 +515,7 @@ export default function ResearchableFlightHeader({
       </div>
 
       {/* SWAP ICON */}
-      <div className="flex items-center justify-center shrink-0 w-6">
+      <div className="flex items-center justify-center shrink-0 w-5 sm:w-6">
         <FaExchangeAlt
           onClick={() =>
             setDraft((d) => ({
@@ -527,13 +524,13 @@ export default function ResearchableFlightHeader({
               destination: d.origin,
             }))
           }
-          className="text-[15px] transition-colors text-[#C9A84C] hover:text-[#b08f3a] cursor-pointer"
+          className="text-[13px] sm:text-[15px] transition-colors text-[#C9A84C] hover:text-[#b08f3a] cursor-pointer"
         />
       </div>
 
       {/* TO */}
-      <div className="flex flex-col flex-[1.4] min-w-0 px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm border-slate-200 bg-slate-50">
-        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
+      <div className="flex flex-col flex-1 sm:flex-[1.4] min-w-[140px] sm:min-w-0 px-2.5 sm:px-3.5 py-1.5 sm:py-2 border rounded-[8px] transition-colors shadow-sm border-slate-200 bg-slate-50">
+        <div className="text-[9px] sm:text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
           To
         </div>
         <AirportAutocomplete
@@ -541,26 +538,27 @@ export default function ResearchableFlightHeader({
           onChange={(a) => setDraft((d) => ({ ...d, destination: a.code }))}
           placeholder="City or airport"
           onOpen={() => setOpenDropdown(null)}
+          alignRight={true}
         />
       </div>
 
       <div
-        className="relative flex flex-col shrink-0 min-w-[135px] px-3.5 py-2 border rounded-[8px] transition-colors shadow-sm border-slate-200 bg-slate-50 cursor-pointer"
+        className="w-[calc(50%-4px)] sm:w-auto relative flex flex-col shrink-0 min-w-[115px] sm:min-w-[135px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 border rounded-[8px] transition-colors shadow-sm border-slate-200 bg-slate-50 cursor-pointer"
         onClick={() => setOpenDropdown(openDropdown === "dep" ? null : "dep")}
       >
-        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
+        <div className="text-[9px] sm:text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
           Depart
         </div>
         <div className="flex items-center gap-2">
-          <BsCalendar4 className="text-[#C9A84C] text-xs" />
-          <div className="text-[14px] font-extrabold text-gray-900">
+          <BsCalendar4 className="text-[#C9A84C] text-xs shrink-0" />
+          <div className="text-[12px] sm:text-[14px] font-extrabold text-gray-900 whitespace-nowrap">
             {fmtDate(draft.departureDate)}
           </div>
         </div>
 
         {openDropdown === "dep" && (
           <div
-            className="absolute top-[calc(100%+8px)] right-0 z-[300]"
+            className="absolute top-[calc(100%+8px)] left-0 sm:left-auto sm:right-0 z-[300] max-w-[92vw] sm:max-w-none"
             onClick={(e) => e.stopPropagation()}
           >
             <CustomCalendar
@@ -577,29 +575,30 @@ export default function ResearchableFlightHeader({
 
       {/* RETURN */}
       <div
-        className="relative flex flex-col shrink-0 min-w-[135px] px-3.5 py-2 border border-slate-200 bg-slate-50 rounded-[8px] shadow-sm cursor-pointer"
+        className="w-[calc(50%-4px)] sm:w-auto relative flex flex-col shrink-0 min-w-[115px] sm:min-w-[135px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 border border-slate-200 bg-slate-50 rounded-[8px] shadow-sm cursor-pointer"
         onClick={() =>
           jt === 2 && setOpenDropdown(openDropdown === "ret" ? null : "ret")
         }
       >
-        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
+        <div className="text-[9px] sm:text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
           Return
         </div>
         <div className="flex items-center gap-2">
           <BsCalendar4
             className={
-              jt === 2 ? "text-[#C9A84C] text-xs" : "text-gray-400 text-xs"
+              (jt === 2 ? "text-[#C9A84C]" : "text-gray-400") +
+              " text-xs shrink-0"
             }
           />
           <div
-            className={`text-[14px] font-extrabold ${jt === 1 ? "text-gray-400" : "text-gray-900"}`}
+            className={`text-[12px] sm:text-[14px] font-extrabold whitespace-nowrap ${jt === 1 ? "text-gray-400" : "text-gray-900"}`}
           >
             {jt === 1 ? "Select Return" : fmtDate(draft.returnDate)}
           </div>
         </div>
         {openDropdown === "ret" && jt === 2 && (
           <div
-            className="absolute top-[calc(100%+8px)] right-0 z-[300]"
+            className="absolute top-[calc(100%+8px)] right-0 z-[300] max-w-[92vw] sm:max-w-none"
             onClick={(e) => e.stopPropagation()}
           >
             <CustomCalendar
@@ -616,8 +615,8 @@ export default function ResearchableFlightHeader({
       </div>
 
       {/* PASSENGERS & CLASS */}
-      <div className="flex flex-col shrink-0 min-w-[160px] px-3.5 py-2 border border-slate-200 bg-slate-50 rounded-[8px] shadow-sm">
-        <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
+      <div className="w-full sm:w-auto flex flex-col shrink-0 min-w-[140px] sm:min-w-[160px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 border border-slate-200 bg-slate-50 rounded-[8px] shadow-sm">
+        <div className="text-[9px] sm:text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
           Passengers & Class
         </div>
         <PaxCabin
@@ -635,11 +634,11 @@ export default function ResearchableFlightHeader({
       </div>
 
       {/* CTA */}
-      <div className="flex items-center ml-auto pl-2">
+      <div className="flex items-center w-full sm:w-auto sm:ml-auto sm:pl-2">
         <button
           onClick={handleSearch}
           disabled={loading}
-          className={`flex items-center justify-center gap-1.5 px-8 h-[44px] rounded-[8px] border-none text-[#0A203E] text-[14px] font-extrabold uppercase transition-all shadow-md
+          className={`flex w-full sm:w-auto items-center justify-center gap-1.5 px-8 h-[40px] sm:h-[44px] rounded-[8px] border-none text-[#0A203E] text-[13px] sm:text-[14px] font-extrabold uppercase transition-all shadow-md
             ${loading ? "bg-slate-200 cursor-not-allowed" : "bg-[#C9A84C] hover:brightness-110 cursor-pointer active:scale-95"}
           `}
         >
@@ -651,7 +650,7 @@ export default function ResearchableFlightHeader({
 
   /* ── MULTI-CITY row ── */
   const renderMultiCity = () => (
-    <div className="p-4 px-5 transition-colors duration-200 flex flex-col gap-3 bg-slate-50">
+    <div className="p-3 sm:p-4 px-3 sm:px-5 transition-colors duration-200 flex flex-col gap-3 bg-slate-50">
       <div className="flex w-full items-center">
         <TripTypeDropdown
           value={jt}
@@ -666,55 +665,58 @@ export default function ResearchableFlightHeader({
           return (
             <div
               key={idx}
-              className={`flex items-center gap-0 p-3 ${isNotLast ? "border-b border-gray-100" : ""}`}
+              className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-0 p-3 ${isNotLast ? "border-b border-gray-100" : ""}`}
             >
-              <div className="text-[10px] font-extrabold text-[#C9A84C] uppercase tracking-[0.08em] mr-3 w-7 shrink-0">
+              <div className="text-[10px] font-extrabold text-[#C9A84C] uppercase tracking-[0.08em] sm:mr-3 w-7 shrink-0">
                 #{idx + 1}
               </div>
 
-              {/* From */}
-              <div className="flex-1 min-w-0 pr-3.5">
-                <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">
-                  From
+              <div className="flex items-stretch gap-0 flex-1 min-w-0">
+                {/* From */}
+                <div className="flex-1 min-w-0 pr-2 sm:pr-3.5">
+                  <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">
+                    From
+                  </div>
+                  <AirportAutocomplete
+                    value={seg.origin}
+                    onChange={(a) => {
+                      const s = [...draft.segments];
+                      s[idx] = { ...s[idx], origin: a.code };
+                      setDraft((d) => ({ ...d, segments: s }));
+                    }}
+                    placeholder="City"
+                    icon={<MdFlightTakeoff />}
+                    onOpen={() => setOpenDropdown(null)}
+                  />
                 </div>
-                <AirportAutocomplete
-                  value={seg.origin}
-                  onChange={(a) => {
-                    const s = [...draft.segments];
-                    s[idx] = { ...s[idx], origin: a.code };
-                    setDraft((d) => ({ ...d, segments: s }));
-                  }}
-                  placeholder="City"
-                  icon={<MdFlightTakeoff />}
-                  onOpen={() => setOpenDropdown(null)}
-                />
+
+                <div className="w-px h-8 bg-gray-100 mx-1 shrink-0" />
+
+                {/* To */}
+                <div className="flex-1 min-w-0 px-2 sm:px-3.5">
+                  <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">
+                    To
+                  </div>
+                  <AirportAutocomplete
+                    value={seg.destination}
+                    onChange={(a) => {
+                      const s = [...draft.segments];
+                      s[idx] = { ...s[idx], destination: a.code };
+                      setDraft((d) => ({ ...d, segments: s }));
+                    }}
+                    placeholder="City"
+                    icon={<MdFlightLand />}
+                    onOpen={() => setOpenDropdown(null)}
+                    alignRight={true}
+                  />
+                </div>
               </div>
 
-              <div className="w-px h-8 bg-gray-100 mx-1" />
-
-              {/* To */}
-              <div className="flex-1 min-w-0 px-3.5">
-                <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-[3px]">
-                  To
-                </div>
-                <AirportAutocomplete
-                  value={seg.destination}
-                  onChange={(a) => {
-                    const s = [...draft.segments];
-                    s[idx] = { ...s[idx], destination: a.code };
-                    setDraft((d) => ({ ...d, segments: s }));
-                  }}
-                  placeholder="City"
-                  icon={<MdFlightLand />}
-                  onOpen={() => setOpenDropdown(null)}
-                />
-              </div>
-
-              <div className="w-px h-8 bg-gray-100 mx-1" />
+              <div className="hidden sm:block w-px h-8 bg-gray-100 mx-1 shrink-0" />
 
               {/* Date */}
               <div
-                className="relative shrink-0 px-3.5 cursor-pointer"
+                className="relative shrink-0 sm:px-3.5 cursor-pointer"
                 onClick={() =>
                   setOpenDropdown(
                     openDropdown === `mc-${idx}` ? null : `mc-${idx}`,
@@ -725,14 +727,14 @@ export default function ResearchableFlightHeader({
                   Date
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <BsCalendar4 className="text-[#C9A84C] text-[13px]" />
-                  <div className="text-[14px] font-bold text-gray-900">
+                  <BsCalendar4 className="text-[#C9A84C] text-[13px] shrink-0" />
+                  <div className="text-[13px] sm:text-[14px] font-bold text-gray-900 whitespace-nowrap">
                     {fmtDate(seg.departureDate)}
                   </div>
                 </div>
                 {openDropdown === `mc-${idx}` && (
                   <div
-                    className="absolute top-[calc(100%+8px)] right-0 z-[300]"
+                    className="absolute top-[calc(100%+8px)] right-0 z-[300] max-w-[92vw] sm:max-w-none"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <CustomCalendar
@@ -759,8 +761,8 @@ export default function ResearchableFlightHeader({
       </div>
 
       {/* Pax + CTA for Multi-City */}
-      <div className="flex items-center justify-between pt-2">
-        <div className="flex flex-col px-3.5 py-1.5 border border-slate-200 bg-slate-50 rounded-[8px] min-w-[180px]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 pt-2">
+        <div className="flex flex-col px-3.5 py-1.5 border border-slate-200 bg-slate-50 rounded-[8px] sm:min-w-[180px]">
           <div className="text-[10px] font-bold tracking-wider text-gray-500 uppercase mb-[2px]">
             Passengers & Class
           </div>
@@ -780,7 +782,7 @@ export default function ResearchableFlightHeader({
         <button
           onClick={handleSearch}
           disabled={loading}
-          className={`flex items-center justify-center gap-1.5 px-10 h-[44px] rounded-[8px] border-none text-[#0A203E] text-[14px] font-extrabold uppercase transition-all shadow-md
+          className={`flex w-full sm:w-auto items-center justify-center gap-1.5 px-10 h-[42px] sm:h-[44px] rounded-[8px] border-none text-[#0A203E] text-[13px] sm:text-[14px] font-extrabold uppercase transition-all shadow-md
             ${loading ? "bg-slate-200 cursor-not-allowed" : "bg-[#C9A84C] hover:brightness-110 cursor-pointer active:scale-95"}
           `}
         >
@@ -792,46 +794,50 @@ export default function ResearchableFlightHeader({
 
   /* ══ RENDER ══ */
   return (
-    <div className="sticky top-0 z-40 font-inter">
+    <div className="sm:sticky sm:top-0 z-[100] font-inter">
       <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
 
       {/* ── Dark brand top strip ── */}
-      <div className="bg-gradient-to-r from-[#0A203E] to-[#1a3a5a] py-[7px] px-10 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-[#0A203E] to-[#1a3a5a] py-[7px] px-3 sm:px-6 lg:px-10 flex items-center justify-between gap-2">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 bg-transparent border-none text-white/65 cursor-pointer text-[12px] font-semibold p-0 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 bg-transparent border-none text-white/65 cursor-pointer text-[11px] sm:text-[12px] font-semibold p-0 hover:text-white transition-colors shrink-0"
         >
-          <MdArrowBack className="text-[16px]" /> Back to search
+          <MdArrowBack className="text-[16px]" />{" "}
+          <span className="hidden xs:inline">Back to search</span>
+          <span className="xs:hidden">Back</span>
         </button>
-        <div className="flex items-center gap-3.5 text-[12px] text-white/50">
-          <span className="font-medium">{flightsCount} flights found</span>
-          <span className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-full px-2.5 py-0.5 text-[#C9A84C] font-bold text-[11px] tracking-[0.04em]">
+        <div className="flex items-center gap-2 sm:gap-3.5 text-[11px] sm:text-[12px] text-white/50 min-w-0">
+          <span className="font-medium hidden sm:inline whitespace-nowrap">
+            {flightsCount} flights found
+          </span>
+          <span className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-full px-2 sm:px-2.5 py-0.5 text-[#C9A84C] font-bold text-[10px] sm:text-[11px] tracking-[0.04em] whitespace-nowrap shrink-0">
             {journeyLabel}
           </span>
         </div>
       </div>
 
       {/* ── White search bar ── */}
-      <div className="bg-white border-b border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] relative z-10 w-full">
-        <div className="px-6 lg:px-10 max-w-full">
+      <div className="bg-white border-b border-gray-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] relative z-[200] w-full">
+        <div className="px-3 sm:px-6 lg:px-10 max-w-full">
           {(jt === 1 || jt === 2) && renderMainRow()}
           {jt === 3 && renderMultiCity()}
         </div>
       </div>
 
       {/* ── Sort + count bar ── */}
-      <div className="bg-slate-50 border-b border-gray-200 py-[7px] px-10 flex items-center justify-between">
-        <div className="flex gap-1.5">
+      <div className="bg-slate-50 border-b border-gray-200 py-[7px] px-3 sm:px-6 lg:px-10 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
           {SORT_TABS.map((tab) => {
             const active = sortKey === tab;
             return (
               <button
                 key={tab}
                 onClick={() => setSortKey(tab)}
-                className={`px-4 py-1.5 rounded-full text-[12px] font-bold cursor-pointer transition-all duration-150 font-inter 
+                className={`px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-[12px] font-bold cursor-pointer transition-all duration-150 font-inter whitespace-nowrap shrink-0
                   ${
                     active
                       ? "border-[1.5px] border-[#0A203E] bg-[#0A203E] text-white shadow-lg"
@@ -844,8 +850,8 @@ export default function ResearchableFlightHeader({
             );
           })}
         </div>
-        <div className="text-[13px] text-gray-500 font-medium">
-          <span className="font-extrabold text-[16px] text-gray-900 mr-1">
+        <div className="text-[12px] sm:text-[13px] text-gray-500 font-medium whitespace-nowrap shrink-0">
+          <span className="font-extrabold text-[14px] sm:text-[16px] text-gray-900 mr-1">
             {flightsCount}
           </span>
           flights found

@@ -33,6 +33,7 @@ import {
   FiPhone,
   FiInfo,
   FiHash,
+  FiMenu,
 } from "react-icons/fi";
 import { MdVerifiedUser } from "react-icons/md";
 import { getFlightBookingByIdAdmin } from "../../../Redux/Actions/travelAdmin.thunks";
@@ -1414,6 +1415,7 @@ export default function FlightBookingDetails() {
   }, [booking?._id, booking?.executionStatus, dispatch]);
 
   const [activeTab, setActiveTab] = useState("flight_details");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (loading || !booking) {
     return (
@@ -1495,9 +1497,9 @@ export default function FlightBookingDetails() {
   return (
     <div className="min-h-screen bg-[#FAF8F4] font-['DM_Sans']">
       {/* Sticky header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-[#EAE4D9]">
+      <div className="sticky top-0 z-40 bg-white border-b border-[#EAE4D9]">
         {/* Top bar: back + order ID + status */}
-        <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <button
             onClick={() => {
               if (backPath === -1) navigate(-1);
@@ -1505,51 +1507,86 @@ export default function FlightBookingDetails() {
             }}
             className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-[0.12em] uppercase text-[#7A7068] hover:text-[#1A1714] transition-colors"
           >
-            <FiArrowLeft size={14} /> {backLabel}
+            <FiArrowLeft size={14} /> <span className="hidden sm:inline">{backLabel}</span><span className="sm:hidden">Back</span>
           </button>
-          <div className="flex items-center gap-4">
-            <span className="text-[11px] text-[#A89F94]">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <span className="hidden sm:inline text-[11px] text-[#A89F94]">
               Order ID:{" "}
               <strong className="text-[#1A1714] font-['DM_Mono']">{booking.orderId}</strong>
             </span>
             {(executionStatus === "ticketed" || executionStatus === "confirmed" || executionStatus === "booked") && !isCancelled && (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
+                <span className="hidden sm:flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
                   <MdVerifiedUser size={11} /> Ticket Issued
                 </span>
-                            <button
-                              onClick={() => dispatch(downloadTicketPdf({ bookingId: booking._id }))}
-                              className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
-                            >
-                              <FiDownload size={11} /> Download Ticket
-                            </button>
-                          </div>
-                        )}
+                <button
+                  onClick={() => dispatch(downloadTicketPdf({ bookingId: booking._id }))}
+                  className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
+                >
+                  <FiDownload size={11} /> <span className="hidden sm:inline">Download Ticket</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="max-w-[1440px] mx-auto px-6 flex items-end gap-0 border-t border-[#EAE4D9] overflow-x-auto">
-          {[
-            { id: "flight_details", label: "Flight Details" },
-            { id: "project_details", label: "Project Details" },
-            { id: "cancellation", label: "Fare Rules & Policies" },
-            { id: "passengers", label: "Passengers" },
-            { id: "amendment", label: "Cancellation" },
-            { id: "history", label: "Booking Life Cycle" },
-          ].map((tab) => (
+        {/* Tabs Navigation (Desktop & Mobile) */}
+        <div className="max-w-[1440px] mx-auto relative border-t border-[#EAE4D9]">
+          {/* Mobile Dropdown Button */}
+          <div className="md:hidden">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 px-4 py-3 text-[11px] font-semibold tracking-[0.12em] uppercase transition-colors whitespace-nowrap relative border-b-2 ${
-                activeTab === tab.id
-                  ? "text-[#1A1714] border-[#B5862A]"
-                  : "text-[#A89F94] border-transparent hover:text-[#7A7068]"
-              }`}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="w-full flex items-center justify-between bg-[#FAF8F4] border-b border-[#EAE4D9] px-4 py-3 text-[13px] font-bold text-[#1A1714]"
             >
-              {tab.label}
+              <span className="flex items-center gap-2">
+                <FiMenu className="text-[#B5862A]" size={16} />
+                {activeTab === "flight_details" && "Flight Details"}
+                {activeTab === "project_details" && "Project Details"}
+                {activeTab === "cancellation" && "Fare Rules & Policies"}
+                {activeTab === "passengers" && "Passengers"}
+                {activeTab === "amendment" && "Cancellation"}
+                {activeTab === "history" && "Booking Life Cycle"}
+              </span>
+              <FiChevronDown
+                size={16}
+                className={`text-[#B5862A] transition-transform duration-300 ${mobileMenuOpen ? 'rotate-180' : ''}`}
+              />
             </button>
-          ))}
+          </div>
+
+          {/* Desktop Tabs / Mobile Dropdown Content */}
+          <div className={`
+            md:flex items-end gap-0 overflow-x-auto w-full px-4 sm:px-6
+            ${mobileMenuOpen ? 'flex flex-col absolute top-full left-0 right-0 bg-white border-b border-[#EAE4D9] shadow-lg z-50 p-2' : 'hidden'}
+          `}>
+            {[
+              { id: "flight_details", label: "Flight Details" },
+              { id: "project_details", label: "Project Details" },
+              { id: "cancellation", label: "Fare Rules & Policies" },
+              { id: "passengers", label: "Passengers" },
+              { id: "amendment", label: "Cancellation" },
+              { id: "history", label: "Booking Life Cycle" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setMobileMenuOpen(false);
+                }}
+                className={`
+                  shrink-0 text-[11px] font-semibold tracking-[0.12em] uppercase transition-colors whitespace-nowrap relative
+                  ${mobileMenuOpen ? 'w-full text-left px-4 py-3 border-b border-[#EAE4D9] last:border-0' : 'px-4 py-3 border-b-2'}
+                  ${
+                    activeTab === tab.id
+                      ? "text-[#1A1714] bg-[#FAF8F4] md:bg-transparent md:border-[#B5862A]"
+                      : "text-[#A89F94] border-transparent hover:text-[#7A7068]"
+                  }
+                `}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

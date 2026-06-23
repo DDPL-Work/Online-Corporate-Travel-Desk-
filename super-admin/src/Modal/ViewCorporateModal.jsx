@@ -368,7 +368,11 @@ export default function ViewCorporateModal({ corporate, onClose }) {
                   />
                 </Section>
 
-                <Section title="Uploaded Documents" color="gold">
+                <Section title="PAN Details" color="gold">
+                  <Item label="PAN Number" value={corporate.corporatePanCard?.number} span={2} />
+                </Section>
+
+                <Section title="Uploaded Documents" color="navy">
                   <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {corporate.gstCertificate?.url ? (
                       <DocCard
@@ -382,11 +386,11 @@ export default function ViewCorporateModal({ corporate, onClose }) {
                       </div>
                     )}
 
-                    {corporate.panCard?.url ? (
+                    {corporate.corporatePanCard?.url ? (
                       <DocCard
                         label="PAN Card"
-                        url={corporate.panCard.url}
-                        verified={corporate.panCard.verified}
+                        url={corporate.corporatePanCard.url}
+                        verified={corporate.corporatePanCard.verified}
                       />
                     ) : (
                       <div className="p-4 rounded-xl border border-dashed border-[#d97706]/30 text-center text-[#d97706]/60 text-xs font-bold uppercase tracking-widest bg-[#d97706]/5">

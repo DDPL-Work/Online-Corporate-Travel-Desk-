@@ -49,10 +49,10 @@ export default function CompanyLandingPage() {
 
       {/* ── HERO SECTION ── */}
       <section className="relative w-full bg-[linear-gradient(348deg,#003399_0%,#000D26_100%)] overflow-hidden pt-[122px] pb-[112px]">
-        <div className="max-w-[1280px] mx-auto px-6 flex flex-col lg:flex-row justify-between items-start gap-16">
+        <div className="max-w-[1280px] mx-auto px-6 flex flex-col lg:flex-row justify-between items-center lg:items-start gap-12 lg:gap-10 xl:gap-16">
           
           {/* Top text block */}
-          <div className="flex flex-col justify-start items-start gap-[23px] w-full lg:max-w-[584px] z-10">
+          <div className="flex flex-col justify-start items-center md:items-start text-center md:text-left gap-[23px] w-full lg:max-w-[400px] xl:max-w-[584px] z-10">
             {/* Version badge */}
             <div className="inline-flex justify-start items-center bg-white rounded-full px-3 py-1.5 outline outline-1 outline-black/10 gap-2">
               <div className="rounded-full w-1.5 h-1.5 bg-[#00BC7D]" />
@@ -62,7 +62,7 @@ export default function CompanyLandingPage() {
             </div>
 
             {/* Headline */}
-            <div className="flex flex-col justify-start items-start font-['DM_Sans'] text-6xl font-bold leading-[63px]">
+            <div className="flex flex-col justify-start items-center md:items-start font-['DM_Sans'] text-4xl md:text-5xl xl:text-6xl font-bold leading-tight xl:leading-[63px]">
               <span className="text-white">Welcome to the</span>
               <span className="text-[#C9A240]">
                 {branding?.branding?.landingPageTitle || branding?.corporateName || "Company Name"}
@@ -71,14 +71,14 @@ export default function CompanyLandingPage() {
             </div>
 
             {/* Subtitle */}
-            <div className="flex flex-col justify-start items-start max-w-[576px]">
-              <p className="text-white text-lg font-normal leading-[29.25px]">
-                Book, manage, and track your business travel with integrated approval<br className="hidden sm:block" />workflows and project-linked expenses.
+            <div className="flex flex-col justify-start items-center md:items-start max-w-[576px]">
+              <p className="text-white text-base md:text-lg font-normal leading-[29.25px]">
+                Book, manage, and track your business travel with integrated approval<br className="hidden sm:block lg:hidden xl:block" />workflows and project-linked expenses.
               </p>
             </div>
 
             {/* Trust badges */}
-            <div className="inline-flex flex-wrap justify-start items-center pt-6 gap-8">
+            <div className="inline-flex flex-wrap justify-center md:justify-start items-center pt-6 gap-6 md:gap-8">
               {[
                 { icon: <FiLock size={16} className="text-white" />, label: "SOC 2 Type II" },
                 { icon: <FiShield size={16} className="text-white" />, label: "AES-256 Encrypted" },
@@ -95,9 +95,9 @@ export default function CompanyLandingPage() {
           </div>
 
           {/* ── Login Card ── */}
-          <div className="relative bg-white overflow-hidden w-full lg:w-[604px] h-[444px] rounded-[19px] outline outline-[1.18px] outline-black/5 flex flex-col md:flex-row shadow-2xl z-10">
+          <div className="relative bg-white overflow-hidden w-full md:max-w-[604px] lg:max-w-[540px] xl:max-w-none xl:w-[604px] min-h-[444px] h-auto md:h-[444px] rounded-[19px] outline outline-[1.18px] outline-black/5 flex flex-col md:flex-row shadow-2xl z-10">
             {/* Left blue panel */}
-            <div className="relative overflow-hidden w-full md:w-[263px] h-[200px] md:h-full bg-[linear-gradient(119deg,#051D8C_0%,#030E30_100%)] flex-shrink-0">
+            <div className="relative overflow-hidden w-full md:w-[263px] lg:w-[220px] xl:w-[263px] h-[200px] md:h-full bg-[linear-gradient(119deg,#051D8C_0%,#030E30_100%)] flex-shrink-0">
               {/* Grid overlay */}
               <div className="absolute w-[263px] h-full left-0 top-9 opacity-15 bg-[linear-gradient(90deg,rgba(0,0,0,0.05)_2%,transparent_2%),linear-gradient(180deg,rgba(0,0,0,0.05)_2%,transparent_2%)]" />
               {/* Glow circle */}
@@ -155,7 +155,7 @@ export default function CompanyLandingPage() {
             </div>
 
             {/* Right sign-in panel */}
-            <div className="flex-1 flex flex-col justify-start items-start p-8 gap-7 bg-white">
+            <div className="flex-1 flex flex-col justify-start items-start p-6 md:p-8 lg:p-6 xl:p-8 gap-5 md:gap-7 lg:gap-5 xl:gap-7 bg-white">
               <div className="w-full inline-flex justify-between items-start">
                 <div className="inline-flex flex-col justify-start items-start gap-1">
                   <span className="text-[#4F5661] text-xs font-normal leading-5 tracking-[3px]">
@@ -176,7 +176,7 @@ export default function CompanyLandingPage() {
                 <span className="text-black text-[19px] font-['DM_Sans'] font-bold leading-7">
                   Access your {branding?.branding?.landingPageTitle || branding?.corporateName} travel desk
                 </span>
-                <span className="text-[#4F5661] textsm font-normal leading-6">
+                <span className="text-[#4F5661] text-sm font-normal leading-6">
                   Continue with your {branding?.branding?.landingPageTitle || branding?.corporateName} identity provider to securely sign in.
                 </span>
               </div>
@@ -211,7 +211,7 @@ export default function CompanyLandingPage() {
       </section>
 
       {/* ── CANCEL / RESCHEDULE SECTION ── */}
-      <section className="w-full bg-white py-24">
+      <section className="w-full bg-white py-16 md:py-24">
         <div className="max-w-[1280px] mx-auto px-6 flex flex-col gap-12">
           
           {/* Section header */}
@@ -220,7 +220,7 @@ export default function CompanyLandingPage() {
               <span className="text-[#4F5661] text-xs font-normal uppercase leading-4 tracking-[2.4px]">
                 Plans Change. We Adapt.
               </span>
-              <h2 className="text-black text-4xl font-['DM_Sans'] font-bold leading-10">
+              <h2 className="text-black text-3xl md:text-4xl font-['DM_Sans'] font-bold leading-tight md:leading-10">
                 Cancel or reschedule, in one click.
               </h2>
               <p className="text-[#4F5661] text-base font-normal leading-6 pt-1">
@@ -331,11 +331,11 @@ export default function CompanyLandingPage() {
       </section>
 
       {/* ── HOW IT WORKS (IT OPS) SECTION ── */}
-      <section className="w-full bg-[#F9FAFB] py-24 relative">
+      <section className="w-full bg-[#F9FAFB] py-16 md:py-24 relative">
         <div className="max-w-[1280px] mx-auto px-6 flex flex-col gap-12 relative z-10">
           <div className="flex flex-col justify-start items-start max-w-[672px] gap-3">
             <span className="text-[#4F5661] text-xs font-normal uppercase leading-4 tracking-[2.4px]">How it works</span>
-            <h2 className="text-black text-4xl font-['DM_Sans'] font-bold leading-10">Streamlined for IT Operations.</h2>
+            <h2 className="text-black text-3xl md:text-4xl font-['DM_Sans'] font-bold leading-tight md:leading-10">Streamlined for IT Operations.</h2>
             <p className="text-[#4F5661] text-base font-normal leading-6 pt-1">Four steps. Zero friction. Every rupee allocated.</p>
           </div>
 
@@ -373,7 +373,7 @@ export default function CompanyLandingPage() {
       </section>
 
       {/* ── GLOBAL REACH SECTION ── */}
-      <section className="w-full bg-white py-24">
+      <section className="w-full bg-white py-16 md:py-24">
         <div className="max-w-[1280px] mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-20">
           
           {/* Left Text Content */}
@@ -381,7 +381,7 @@ export default function CompanyLandingPage() {
             <span className="text-[#8B929E] text-[13px] font-medium uppercase leading-5 tracking-[1.5px]">
               INTEGRATED NETWORK
             </span>
-            <h2 className="text-black text-[40px] font-['DM_Sans'] font-bold leading-[48px] -tracking-[0.5px]">
+            <h2 className="text-black text-3xl md:text-[40px] font-['DM_Sans'] font-bold leading-tight md:leading-[48px] -tracking-[0.5px]">
               Global Reach, Local Support.
             </h2>
             <p className="text-[#64748B] text-[17px] font-normal leading-7 pt-1 max-w-[420px]">
@@ -392,15 +392,15 @@ export default function CompanyLandingPage() {
             <div className="flex items-start gap-20 pt-8">
               <div className="inline-flex flex-col justify-start items-start gap-1">
                 <div className="flex items-center">
-                  <span className="text-black text-[40px] font-['DM_Sans'] font-bold leading-none">500</span>
-                  <span className="text-[#051D8C] text-[40px] font-['DM_Sans'] font-bold leading-none">+</span>
+                  <span className="text-black text-3xl md:text-[40px] font-['DM_Sans'] font-bold leading-none">500</span>
+                  <span className="text-[#051D8C] text-3xl md:text-[40px] font-['DM_Sans'] font-bold leading-none">+</span>
                 </div>
                 <span className="text-[#8B929E] text-[13px] font-normal pt-2">Airlines worldwide</span>
               </div>
               <div className="inline-flex flex-col justify-start items-start gap-1">
                 <div className="flex items-center">
-                  <span className="text-black text-[40px] font-['DM_Sans'] font-bold leading-none">800K</span>
-                  <span className="text-[#051D8C] text-[40px] font-['DM_Sans'] font-bold leading-none">+</span>
+                  <span className="text-black text-3xl md:text-[40px] font-['DM_Sans'] font-bold leading-none">800K</span>
+                  <span className="text-[#051D8C] text-3xl md:text-[40px] font-['DM_Sans'] font-bold leading-none">+</span>
                 </div>
                 <span className="text-[#8B929E] text-[13px] font-normal pt-2">Properties globally</span>
               </div>
@@ -425,11 +425,11 @@ export default function CompanyLandingPage() {
                   : logo;
 
                 return (
-                  <div key={name} className="flex justify-start items-center bg-white h-[88px] px-10 hover:bg-gray-50 transition-colors gap-4 cursor-pointer">
+                  <div key={name} className="flex justify-start items-center bg-white h-[72px] md:h-[88px] px-4 md:px-10 hover:bg-gray-50 transition-colors gap-3 md:gap-4 cursor-pointer">
                     <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 bg-white">
                       <img src={logoUrl} alt={name} className="w-full h-full object-contain mix-blend-multiply" loading="eager" />
                     </div>
-                    <span className="text-[#1E293B] text-[15px] font-bold font-['DM_Sans']">{name}</span>
+                    <span className="text-[#1E293B] text-sm md:text-[15px] font-bold font-['DM_Sans']">{name}</span>
                   </div>
                 );
               })}
@@ -440,7 +440,7 @@ export default function CompanyLandingPage() {
       </section>
 
       {/* ── SECURITY SECTION ── */}
-      <section className="relative w-full overflow-hidden flex flex-col justify-center items-center bg-[linear-gradient(164deg,#051D8C_0%,#030E30_100%)] py-28">
+      <section className="relative w-full overflow-hidden flex flex-col justify-center items-center bg-[linear-gradient(164deg,#051D8C_0%,#030E30_100%)] py-16 md:py-28">
         {/* Grid overlay */}
         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(90deg,rgba(0,0,0,0.05)_2%,transparent_2%),linear-gradient(180deg,rgba(0,0,0,0.05)_2%,transparent_2%)] pointer-events-none" />
         {/* Glow */}
@@ -451,7 +451,7 @@ export default function CompanyLandingPage() {
             <span className="text-white/70 text-xs font-normal uppercase leading-4 tracking-[3px]">
               Security & Compliance
             </span>
-            <h2 className="text-white text-5xl md:text-[48px] font-['DM_Sans'] font-bold leading-tight pb-1">
+            <h2 className="text-white text-4xl md:text-[48px] font-['DM_Sans'] font-bold leading-tight pb-1">
               Enterprise-Grade<br />Security.
             </h2>
             <p className="text-white/75 text-lg font-normal leading-relaxed pt-2">
@@ -498,11 +498,11 @@ export default function CompanyLandingPage() {
       </section>
 
       {/* ── SUPPORT SECTION ── */}
-      <section className="w-full bg-white py-24 pb-32">
+      <section className="w-full bg-white py-16 pb-24 md:py-24 md:pb-32">
         <div className="max-w-[1280px] mx-auto px-6 flex flex-col gap-12">
           <div className="flex flex-col justify-start items-start gap-3">
             <span className="text-[#4F5661] text-xs font-normal uppercase leading-4 tracking-[2.4px]">Support</span>
-            <h2 className="text-black text-4xl font-['DM_Sans'] font-bold leading-10">Need Assistance?</h2>
+            <h2 className="text-black text-3xl md:text-4xl font-['DM_Sans'] font-bold leading-tight md:leading-10">Need Assistance?</h2>
             <p className="text-[#4F5661] text-base font-normal leading-6 pt-1 max-w-[448px]">
               Our team is ready to help — Monday to Saturday, 9 AM to 7 PM IST.
             </p>
@@ -522,13 +522,13 @@ export default function CompanyLandingPage() {
 
             {/* Email Support */}
             <a 
-              href={`mailto:${branding?.branding?.supportEmail || "support@traveamer.com"}`}
+              href={`mailto:"contact@traveamer.com"}`}
               className="flex flex-col justify-start items-start rounded-2xl pt-6 pb-11 px-6 outline outline-1 outline-black/10 shadow-sm gap-1 hover:shadow-lg transition-shadow cursor-pointer bg-white group no-underline"
             >
               <FiMail size={24} className="text-black mb-5 group-hover:text-[#C9A84C] transition-colors" />
               <h3 className="text-black text-lg font-['DM_Sans'] font-bold leading-7">Email Support</h3>
               <p className="text-[#4F5661] text-sm font-normal leading-5">
-                {branding?.branding?.supportEmail || "support@traveamer.com"}
+                contact@traveamer.com
               </p>
               <div className="inline-flex justify-start items-center gap-1.5 pt-5 group-hover:pl-1 transition-all">
                 <span className="text-black text-sm font-bold leading-5 group-hover:text-[#C9A84C]">Email us</span>
@@ -538,13 +538,13 @@ export default function CompanyLandingPage() {
 
             {/* Phone Support */}
             <a 
-              href={`tel:${branding?.branding?.supportPhone || "+91 12345 67890"}`}
+              href={`tel:"+91-8793353355"}`}
               className="flex flex-col justify-start items-start rounded-2xl pt-6 pb-11 px-6 outline outline-1 outline-black/10 shadow-sm gap-1 hover:shadow-lg transition-shadow cursor-pointer bg-white group no-underline"
             >
               <FiPhone size={24} className="text-black mb-5 group-hover:text-[#C9A84C] transition-colors" />
               <h3 className="text-black text-lg font-['DM_Sans'] font-bold leading-7">Phone Support</h3>
               <p className="text-[#4F5661] text-sm font-normal leading-5">
-                {branding?.branding?.supportPhone || "+91 12345 67890"}
+                +91-8793353355
               </p>
               <div className="inline-flex justify-start items-center gap-1.5 pt-5 group-hover:pl-1 transition-all">
                 <span className="text-black text-sm font-bold leading-5 group-hover:text-[#C9A84C]">Call us</span>

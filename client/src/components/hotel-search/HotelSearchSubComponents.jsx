@@ -146,7 +146,8 @@ export const SearchableSelect = ({
   displayKey = "Name", 
   valueKey = "Code",
   disabled = false,
-  variant = "default"
+  variant = "default",
+  onOpen
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -172,7 +173,7 @@ export const SearchableSelect = ({
       <button
         type="button"
         onMouseDown={(e) => disabled && e.preventDefault()}
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => { if (!disabled) { const next = !open; setOpen(next); if (next && onOpen) onOpen(); } }}
         className={`w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left
           ${variant === "minimal" ? "bg-transparent border-none p-0 shadow-none" : "bg-white border-2"}
           ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : variant === "minimal" ? "" : "hover:border-blue-400 cursor-pointer"}

@@ -149,11 +149,11 @@ class HotelService {
     console.log(`Credentials:`, { username: cfg.credentials.username, password: cfg.credentials.password });
     console.log(`[===========================]\n\n`);
 
-    logger.info("[AFFILIATE REQUEST]", {
-      url,
-      payload,
-      token,
-    });
+    // logger.info("[AFFILIATE REQUEST]", {
+    //   url,
+    //   payload,
+    //   token,
+    // });
 
     try {
       const { data } = await axios.post(
@@ -172,7 +172,7 @@ class HotelService {
         },
       );
 
-      logger.info("[AFFILIATE RESPONSE]", data);
+      // logger.info("[AFFILIATE RESPONSE]", data);
 
       return data;
     } catch (err) {
@@ -421,19 +421,11 @@ class HotelService {
      HOTEL SEARCH
   ====================================================== */
   async searchHotels(params) {
-    logger.info("[HOTEL SEARCH]", params);
+    // logger.info("[HOTEL SEARCH]", params);
 
     const env = this.getEnv();
     const cfg = config[env];
     const url = `${cfg.base1}${cfg.endpoints.hotelSearch}`;
-
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (searchHotels)`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { username: cfg.credentials.username, password: cfg.credentials.password });
-    console.log(`[===========================]\n\n`);
 
     try {
       const { data } = await axios.post(
@@ -538,7 +530,7 @@ class HotelService {
      HOTEL PRE BOOK
   ====================================================== */
   async preBookHotel(payload) {
-    logger.info("[PREBOOK HOTEL]", payload);
+    // logger.info("[PREBOOK HOTEL]", payload);
     const data = await this.affiliatePost(
       config[this.getEnv()].endpoints.hotelPreBook,
       payload,

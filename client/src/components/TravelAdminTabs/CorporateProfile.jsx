@@ -18,6 +18,7 @@ import {
   FiActivity,
   FiDollarSign,
   FiInfo,
+  FiFileText,
 } from "react-icons/fi";
 import { FaBuilding, FaRupeeSign, FaPlane, FaHotel } from "react-icons/fa";
 import { fetchCorporateAdmin, updateCorporateAdmin } from "../../Redux/Slice/corporateAdminSlice";
@@ -55,6 +56,10 @@ const GST_FIELDS = [
   { key: "gstDetails.address", label: "Address", icon: FiMapPin, type: "text" },
   { key: "gstDetails.gstEmail", label: "Email", icon: FiMail, type: "email" },
   { key: "gstDetails.contactNumber", label: "Contact", icon: FiPhone, type: "tel" },
+];
+
+const PAN_FIELDS = [
+  { key: "corporatePanCard.number", label: "PAN Number", icon: FiFileText, type: "text" },
 ];
 
 const SSO_FIELDS = [
@@ -114,7 +119,7 @@ export default function CorporateProfile() {
       {/* ── Page Header ── */}
       <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
              <div className="flex items-center gap-3">
                <button onClick={() => navigate(-1)} className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"><FiArrowRight className="rotate-180" size={20} /></button>
                <button onClick={handleRefresh} disabled={loading} className={`p-3 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}>
@@ -122,11 +127,11 @@ export default function CorporateProfile() {
                </button>
              </div>
              <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
-              <div className="flex items-center gap-5">
-               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FaBuilding size={28} /></div>
+              <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10"><FaBuilding size={24} className="md:w-7 md:h-7" /></div>
                <div>
-                 <h1 className="text-3xl font-black tracking-tight leading-none">Corporate Profile</h1>
-                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">View your corporate profile and details</p>
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Corporate Profile</h1>
+                 <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">View your corporate profile and details</p>
                </div>
              </div>
           </div>
@@ -314,15 +319,57 @@ export default function CorporateProfile() {
                       value={getNestedValue(corporate, f.key)}
                     />
                   ))}
-                  <div className="flex flex-col gap-2 text-left">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
-                        <FiShield size={10} style={{ color: C.gold }} />
-                        GST Verified
-                     </label>
-                     <div className="px-5 py-3 text-sm font-black text-slate-900 border rounded-[1.25rem] min-h-[46px] flex items-center transition-all cursor-not-allowed opacity-80" style={{ backgroundColor: C.gold + "08", borderColor: C.gold + "22" }}>
-                        <span className="text-xs font-black uppercase tracking-widest" style={{ color: C.navy }}>{corporate.gstDetails?.verified ? "Yes" : "No"}</span>
-                     </div>
-                  </div>
+                  {corporate.gstCertificate?.url && (
+                    <div className="col-span-1 md:col-span-2 mt-2">
+                       <a 
+                         href={corporate.gstCertificate.url}
+                         target="_blank"
+                         rel="noreferrer"
+                         className="inline-flex items-center gap-2 px-5 py-3 text-xs font-black uppercase tracking-widest text-blue-600 bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 transition-all"
+                       >
+                         <FiFileText size={16} />
+                         View Uploaded GST Document
+                       </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* PAN Details */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden">
+              <div className="p-8 border-b border-slate-50 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-sm">
+                  <FiFileText />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm leading-none">PAN Details</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Company PAN Card Info</p>
+                </div>
+              </div>
+
+              <div className="p-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  {PAN_FIELDS.map((f) => (
+                    <Field
+                      key={f.key}
+                      field={f}
+                      value={getNestedValue(corporate, f.key)}
+                    />
+                  ))}
+                  {corporate.corporatePanCard?.url && (
+                    <div className="col-span-1 md:col-span-2 mt-2">
+                       <a 
+                         href={corporate.corporatePanCard.url}
+                         target="_blank"
+                         rel="noreferrer"
+                         className="inline-flex items-center gap-2 px-5 py-3 text-xs font-black uppercase tracking-widest text-[#d97706] bg-[#d97706]/10 border border-[#d97706]/20 rounded-xl hover:bg-[#d97706]/20 transition-all"
+                       >
+                         <FiFileText size={16} />
+                         View Uploaded PAN Document
+                       </a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

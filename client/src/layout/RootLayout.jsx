@@ -44,14 +44,6 @@ export default function RootLayout() {
             isOpen={isSidebarOpen}
             onClose={() => dispatch(closeSidebar())}
           />
-
-          {/* BACKDROP */}
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90]"
-              onClick={() => dispatch(closeSidebar())}
-            />
-          )}
         </>
       )}
 

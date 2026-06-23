@@ -74,31 +74,56 @@ const submitContactLead = async (req, res) => {
 // ─── GET /api/v1/contact-leads (Super-Admin / Ops) ────────────────────────────
 const getAllLeads = async (req, res) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, search, fromDate, toDate } = req.query;
 
     const filter = {};
-    if (status) filter.status = status;
+    if (status && status !== "all") filter.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: search, $options: "i" } },
+        { companyName: { $regex: search, $options: "i" } },
+        { workEmail: { $regex: search, $options: "i" } },
+      ];
+    }
 
-    const [leads, total] = await Promise.all([
-      ContactLead.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean(),
-      ContactLead.countDocuments(filter),
-    ]);
+    if (fromDate || toDate) {
+      filter.createdAt = {};
+      if (fromDate) {
+        const startOfDay = new Date(fromDate);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        filter.createdAt.$gte = startOfDay;
+      }
+      if (toDate) {
+        const endOfDay = new Date(toDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        filter.createdAt.$lte = endOfDay;
+      }
+    }
+
+    const leads = await ContactLead.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
+    const total = leads.length;
+
+    // Calculate global stats (ignoring filters)
+    const allLeadsCursor = await ContactLead.find({}, "status createdAt").lean();
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const stats = {
+      total: allLeadsCursor.length,
+      reviewed: allLeadsCursor.filter(l => l.status === "contacted" || l.status === "converted").length,
+      new: allLeadsCursor.filter(l => l.status === "new" && new Date(l.createdAt) >= oneWeekAgo).length,
+      today: allLeadsCursor.filter(l => new Date(l.createdAt) >= startOfToday).length,
+    };
 
     return res.status(200).json({
       success: true,
       data: leads,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit)),
-      },
+      stats,
+      total
     });
   } catch (error) {
     console.error("[ContactLead] GetAll error:", error);

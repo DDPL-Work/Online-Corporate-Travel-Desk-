@@ -14,6 +14,7 @@ import {
   MdSearch,
   MdBed,
 } from "react-icons/md";
+import { FaGlobe } from "react-icons/fa";
 import {
   CountrySelector,
   SearchableSelect,
@@ -52,28 +53,28 @@ const DateField = ({
     <div className="relative w-full">
       <div
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-amber-50 transition-colors rounded-xl bg-amber-50/40 border border-amber-100/60"
+        className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-3 cursor-pointer hover:bg-amber-50 transition-colors rounded-lg sm:rounded-xl bg-amber-50/40 border border-amber-100/60"
       >
-        <BsCalendar4 className="shrink-0 text-base" style={{ color: ORANGE }} />
+        <BsCalendar4 className="shrink-0 text-sm sm:text-base" style={{ color: ORANGE }} />
         <div className="flex flex-col flex-1 min-w-0">
           <span
-            className="text-[10px] font-bold uppercase tracking-widest leading-none"
+            className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none whitespace-nowrap"
             style={{ color: ORANGE }}
           >
             {label}
           </span>
           {f ? (
-            <div className="flex flex-wrap items-baseline gap-1 mt-1">
-              <span className="text-lg sm:text-xl lg:text-2xl font-black text-gray-800 leading-none">
+            <div className="flex flex-wrap lg:flex-nowrap items-baseline gap-1 mt-0.5 sm:mt-1">
+              <span className="text-base sm:text-lg lg:text-lg font-black text-gray-800 leading-none whitespace-nowrap">
                 {f.day}
               </span>
-              <span className="text-xs lg:text-sm font-bold text-gray-600">
+              <span className="text-[11px] sm:text-xs lg:text-xs font-bold text-gray-600 whitespace-nowrap">
                 {f.month} '{f.year}
               </span>
-              <span className="text-[10px] lg:text-xs text-gray-400 hidden sm:inline-block">{f.weekday}</span>
+              <span className="text-[10px] lg:text-xs text-gray-400 hidden sm:inline-block whitespace-nowrap">{f.weekday}</span>
             </div>
           ) : (
-            <span className="text-sm font-bold text-gray-400 mt-1">
+            <span className="text-xs sm:text-sm font-bold text-gray-400 mt-0.5 sm:mt-1">
               Select date
             </span>
           )}
@@ -81,7 +82,7 @@ const DateField = ({
       </div>
       {open && (
         <div
-          className={`absolute top-[calc(100%+8px)] z-[300] ${align === "right" ? "right-0" : "left-0"}`}
+          className={`absolute top-[calc(100%+8px)] z-[300] ${align === "right" ? "right-0" : "left-0"} w-[min(340px,90vw)]`}
         >
           <CustomCalendar
             value={value}
@@ -267,33 +268,33 @@ const Header = () => {
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <header className="bg-[#000D26] shadow-lg">
-      <div className="container mx-auto px-4 pt-3 pb-4">
+    <header className="bg-[#000D26] shadow-lg relative z-[9000]">
+      <div className="container mx-auto px-2 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-4">
         {/* Top Actions Row */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-1 sm:mb-3">
           <button
             type="button"
             onClick={() => {
               navigate(`/travel`, { state: { activeTab: "hotel" } });
             }}
-            className="flex items-center gap-1.5 text-sm font-semibold text-white/60 hover:text-white transition"
+            className="flex items-center gap-1.5 text-[11px] sm:text-sm font-semibold text-white/60 hover:text-white transition leading-none"
           >
-            <MdArrowBack /> Back to Search
+            <MdArrowBack /> <span className="hidden xs:inline">Back to Search</span><span className="xs:hidden">Back</span>
           </button>
         </div>
         {/* Title row */}
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <MdBed className="text-2xl" style={{ color: ORANGE }} />
-          <span className="text-white font-black text-lg">Hotels</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-3 flex-wrap">
+          <MdBed className="text-lg sm:text-2xl" style={{ color: ORANGE }} />
+          <span className="text-white font-black text-sm sm:text-lg">Hotels</span>
           {form.cityName && (
             <>
-              <span className="text-white/50 text-sm">in</span>
-              <span className="text-white font-bold">{form.cityName}</span>
+              <span className="text-white/50 text-xs sm:text-sm">in</span>
+              <span className="text-white font-bold text-sm sm:text-base">{form.cityName}</span>
             </>
           )}
           {nights > 0 && (
             <span
-              className="text-xs font-black px-2.5 py-0.5 rounded-full"
+              className="text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 rounded-full"
               style={{ background: ORANGE, color: DARK }}
             >
               {nights} Night{nights !== 1 ? "s" : ""}
@@ -302,107 +303,117 @@ const Header = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="flex flex-col lg:flex-row items-stretch bg-white rounded-2xl overflow-visible shadow-2xl py-3 gap-y-2 lg:gap-y-0">
-          <div className="flex-1 min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30">
-            <CountrySelector
-              label="Country"
-              variant="minimal"
-              value={form.country}
-              countries={normalizedCountries}
-              onChange={(code) => {
-                setForm({ ...form, country: code, cityCode: "", cityName: "" });
-                if (!citiesByCountry?.[code]) {
-                  dispatch(fetchCities(code));
-                }
-              }}
-            />
-          </div>
-          <div className="flex-[1.5] min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30">
-            <SearchableSelect
-              label="City / Area"
-              variant="minimal"
-              icon={
-                <MdLocationOn className="text-lg" style={{ color: ORANGE }} />
-              }
-              value={form.cityCode}
-              options={currentCities}
-              displayKey="cityName"
-              valueKey="cityCode"
-              onChange={(item) =>
-                setForm({
-                  ...form,
-                  cityCode: item.cityCode,
-                  cityName: item.cityName,
-                })
-              }
-              placeholder="Where are you going?"
-            />
-          </div>
-          <div className="flex-1 min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100">
-            <DateField
-              label="Check-In"
-              value={form.checkIn}
-              min={today}
-              open={openCalendar === "checkIn"}
-              setOpen={(val) => setOpenCalendar(val ? "checkIn" : null)}
-              onChange={(val) =>
-                setForm({
-                  ...form,
-                  checkIn: val,
-                  checkOut:
-                    form.checkOut && form.checkOut <= val ? "" : form.checkOut,
-                })
-              }
-            />
-          </div>
-          {nights > 0 && (
-            <div className="hidden lg:flex items-center justify-center px-1 shrink-0">
-              <span
-                className="text-xs font-black px-2 py-1 rounded-full whitespace-nowrap border"
-                style={{
-                  background: `${ORANGE}1A`,
-                  color: ORANGE,
-                  borderColor: `${ORANGE}50`,
+        <div className="flex flex-col lg:flex-row items-stretch bg-white rounded-xl sm:rounded-2xl overflow-visible shadow-2xl py-1 sm:py-3 lg:py-0 gap-y-1 sm:gap-y-2 lg:gap-y-0 lg:h-[72px]">
+          <div className="flex lg:contents">
+            <div className="flex-1 min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 lg:flex lg:items-center rounded-tl-xl sm:rounded-tl-2xl lg:rounded-tr-none lg:rounded-l-2xl">
+              <SearchableSelect
+                label="Country"
+                variant="minimal"
+                icon={<FaGlobe className="text-base sm:text-lg" style={{ color: ORANGE }} />}
+                value={form.country}
+                options={normalizedCountries}
+                displayKey="name"
+                valueKey="code"
+                onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
+                onChange={(item) => {
+                  setForm({ ...form, country: item.code, cityCode: "", cityName: "" });
+                  if (!citiesByCountry?.[item.code]) {
+                    dispatch(fetchCities(item.code));
+                  }
                 }}
-              >
-                {nights}N
-              </span>
+                placeholder="Select Country"
+              />
             </div>
-          )}
-          <Divider />
-          <div className="flex-1 min-w-0 px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 lg:border-r border-gray-100">
-            <DateField
-              label="Check-Out"
-              value={form.checkOut}
-              min={form.checkIn || today}
-              open={openCalendar === "checkOut"}
-              setOpen={(val) => setOpenCalendar(val ? "checkOut" : null)}
-              align="right"
-              onChange={(val) => setForm({ ...form, checkOut: val })}
-            />
+            <div className="flex-[1.5] min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 border-l lg:border-l-0 lg:flex lg:items-center rounded-tr-xl sm:rounded-tr-2xl lg:rounded-none">
+              <SearchableSelect
+                label="City / Area"
+                variant="minimal"
+                icon={
+                  <MdLocationOn className="text-base sm:text-lg" style={{ color: ORANGE }} />
+                }
+                value={form.cityCode}
+                options={currentCities}
+                displayKey="cityName"
+                valueKey="cityCode"
+                onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
+                onChange={(item) =>
+                  setForm({
+                    ...form,
+                    cityCode: item.cityCode,
+                    cityName: item.cityName,
+                  })
+                }
+                placeholder="Where are you going?"
+              />
+            </div>
+          </div>
+          <div className="flex items-stretch flex-1 lg:items-center">
+            <div className="flex-1 min-w-0 px-1 sm:px-2 lg:px-3 py-0 border-b lg:border-b-0 lg:border-r border-gray-100 lg:flex lg:items-center">
+              <DateField
+                label="Check-In"
+                value={form.checkIn}
+                min={today}
+                open={openCalendar === "checkIn"}
+                setOpen={(val) => { setOpenCalendar(val ? "checkIn" : null); if (val) setShowGuestDropdown(false); }}
+                onChange={(val) =>
+                  setForm({
+                    ...form,
+                    checkIn: val,
+                    checkOut:
+                      form.checkOut && form.checkOut <= val ? "" : form.checkOut,
+                  })
+                }
+              />
+            </div>
+            {nights > 0 && (
+              <div className="hidden lg:flex items-center justify-center px-1 shrink-0">
+                <span
+                  className="text-xs font-black px-2 py-1 rounded-full whitespace-nowrap border"
+                  style={{
+                    background: `${ORANGE}1A`,
+                    color: ORANGE,
+                    borderColor: `${ORANGE}50`,
+                  }}
+                >
+                  {nights}N
+                </span>
+              </div>
+            )}
+            <Divider />
+            <div className="flex-1 min-w-0 px-1 sm:px-2 lg:px-3 py-0 border-b lg:border-b-0 lg:border-r border-gray-100 lg:flex lg:items-center">
+              <DateField
+                label="Check-Out"
+                value={form.checkOut}
+                min={form.checkIn || today}
+                open={openCalendar === "checkOut"}
+                setOpen={(val) => { setOpenCalendar(val ? "checkOut" : null); if (val) setShowGuestDropdown(false); }}
+                align="right"
+                onChange={(val) => setForm({ ...form, checkOut: val })}
+              />
+            </div>
           </div>
           <Divider />
           <div
-            className="flex-[1.3] min-w-0 relative px-2 lg:px-3 py-1 lg:py-0.5 border-b lg:border-b-0 border-gray-100"
+            className="flex-[1.3] min-w-0 relative px-1 sm:px-2 lg:px-3 py-0 border-b lg:border-b-0 border-gray-100 lg:flex lg:items-center"
             ref={guestRef}
           >
             <button
               type="button"
-              onClick={() => setShowGuestDropdown((v) => !v)}
-              className="w-full h-full flex items-center gap-2 px-4 py-3 bg-amber-50/40 border border-amber-100/60 text-left transition-colors rounded-xl cursor-pointer hover:bg-amber-50"
+              onClick={() => { setShowGuestDropdown((v) => !v); setOpenCalendar(null); }}
+              className="w-full h-full flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-3 lg:py-2 bg-amber-50/40 border border-amber-100/60 text-left transition-colors rounded-lg sm:rounded-xl cursor-pointer hover:bg-amber-50"
             >
               <MdPerson
-                className="shrink-0 text-lg"
+                className="shrink-0 text-base sm:text-lg"
                 style={{ color: ORANGE }}
               />
               <span className="flex flex-col flex-1 min-w-0">
                 <span
-                  className="text-[10px] font-bold uppercase tracking-widest leading-none"
+                  className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none"
                   style={{ color: ORANGE }}
                 >
                   Guests &amp; Rooms
                 </span>
-                <span className="text-sm font-bold text-gray-800 mt-1">
+                <span className="text-xs sm:text-sm font-bold text-gray-800 mt-0.5 sm:mt-1 truncate">
                   {totalGuests} Guest{totalGuests !== 1 ? "s" : ""}, {rooms}{" "}
                   Room{rooms !== 1 ? "s" : ""}
                 </span>
@@ -423,7 +434,7 @@ const Header = () => {
               </svg>
             </button>
             {showGuestDropdown && (
-              <div className="absolute top-full right-0 z-[1000] mt-2 shadow-2xl">
+              <div className="absolute top-[calc(100%+0.5rem)] left-0 lg:left-auto lg:right-0 z-[300]">
                 <HotelGuestSelection
                   rooms={form.rooms}
                   setRooms={(val) => setForm({ ...form, rooms: val })}
@@ -440,7 +451,7 @@ const Header = () => {
               </div>
             )}
           </div>
-          <div className="px-3 lg:px-4 flex items-center shrink-0 pt-2 lg:pt-0">
+          <div className="px-1 sm:px-3 lg:px-4 flex items-center shrink-0 pt-1 lg:pt-0">
             <button
               type="button"
               onClick={handleSearch}
@@ -450,7 +461,7 @@ const Header = () => {
                 !form.checkIn ||
                 !form.checkOut
               }
-              className="flex items-center justify-center gap-2 px-8 h-12 font-black text-xs uppercase tracking-widest transition-all rounded-xl cursor-pointer shadow-md active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full lg:w-auto items-center justify-center gap-2 px-5 sm:px-8 h-8 sm:h-12 font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all rounded-lg sm:rounded-xl cursor-pointer shadow-md active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: loading?.search ? AZURE : ORANGE,
                 color: loading?.search ? "#fff" : DARK,
@@ -482,7 +493,7 @@ const Header = () => {
                 </>
               ) : (
                 <>
-                  <MdSearch className="text-xl group-hover:scale-110 transition-transform" />
+                  <MdSearch className="text-lg sm:text-xl group-hover:scale-110 transition-transform" />
                   <span>Search Hotels</span>
                 </>
               )}
@@ -492,14 +503,14 @@ const Header = () => {
 
         {/* Info strip */}
         {(form.cityName || nights > 0) && (
-          <div className="flex items-center gap-4 mt-2 px-1 flex-wrap">
+          <div className="hidden xs:flex items-center gap-2 sm:gap-4 mt-1 sm:mt-2 px-1 flex-wrap">
             {form.cityName && (
-              <span className="text-white/50 text-xs font-medium flex items-center gap-1">
+              <span className="text-white/50 text-[10px] sm:text-xs font-medium flex items-center gap-1">
                 <MdLocationOn className="text-xs" /> {form.cityName}
               </span>
             )}
             {nights > 0 && (
-              <span className="text-white/50 text-xs font-medium">
+              <span className="text-white/50 text-[10px] sm:text-xs font-medium">
                 {nights} Night{nights !== 1 ? "s" : ""} · {form.rooms} Room
                 {form.rooms !== 1 ? "s" : ""} · {totalGuests} Guest
                 {totalGuests !== 1 ? "s" : ""}

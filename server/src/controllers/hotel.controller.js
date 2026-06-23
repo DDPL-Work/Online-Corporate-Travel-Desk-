@@ -1,5 +1,6 @@
 const tboService = require("../services/tektravels/hotel.service");
-const tboSearchService = require("../services/tbo.service");
+const { initiateDistributedSearch } = require("../modules/search/search.orchestrator");
+const { aggregateFinalResults, waitForSearchCompletion } = require("../modules/search/search.merge");
 const cacheService = require("../services/cache.service");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -15,6 +16,7 @@ const {
   applyHotelFilters,
   sortPreparedHotels,
 } = require("../utils/filterHotels");
+const redis = require("../config/redis");
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -133,48 +135,65 @@ const fetchFullHotelSearchDataset = async ({
     .map((hotel) => String(hotel.hotelCode || "").trim())
     .filter(Boolean);
 
-  // logger.info(
-  //   `[hotel-search] Starting full search for ${hotelCodes.length} hotel codes in city ${CityCode}`,
-  // );
+  const searchPayload = {
+    CheckIn,
+    CheckOut,
+    CityCode,
+    CityName,
+    CountryCode,
+    CountryName,
+    corporateId,
+    GuestNationality,
+    NoOfRooms,
+    PaxRooms,
+    IsDetailedResponse,
+    Filters: DEFAULT_TBO_FILTERS,
+    ResponseTime,
+  };
 
-  const tboResult = await tboSearchService.searchHotelsByCodeChunks({
-    hotelCodes,
-    searchPayload: {
-      CheckIn,
-      CheckOut,
-      CityCode,
-      CityName,
-      CountryCode,
-      CountryName,
-      corporateId,
-      GuestNationality,
-      NoOfRooms,
-      PaxRooms,
-      IsDetailedResponse,
-      Filters: DEFAULT_TBO_FILTERS,
-      ResponseTime,
-    },
-  });
+  logger.info(`[hotel-search] Initiating distributed search for ${hotelCodes.length} codes...`);
+  const { searchId, totalChunks, totalHotels } = await initiateDistributedSearch(hotelCodes, searchPayload);
 
-  if (tboResult.hotels.length === 0) {
+  if (totalChunks === 0) {
     return {
-      ...tboResult,
       hotels: [],
-      totalHotelCodes: hotelCodes.length,
+      totalHotelCodes: 0,
+      searchId: null
     };
   }
 
-  const hotelDetails = await TBOHotelDetails.find({
-    hotelCode: { $in: tboResult.hotels.map((hotel) => hotel.HotelCode) },
-  }).lean();
+  // Wait for the first chunk to complete so the initial API response is never empty
+  let firstChunkHotels = [];
+  try {
+    let attempts = 0;
+    while (attempts < 60) { // Wait up to 15 seconds (60 * 250ms)
+      const meta = await redis.hgetall(`search:${searchId}:meta`);
+      const resultsMap = await redis.hgetall(`search:${searchId}:results`);
+      
+      for (const key of Object.keys(resultsMap)) {
+        const chunkData = JSON.parse(resultsMap[key]);
+        firstChunkHotels.push(...chunkData);
+      }
 
+      // If we found hotels, OR if all chunks are completely finished (failed + completed), break out
+      if (firstChunkHotels.length > 0 || (Number(meta.completedChunks) + Number(meta.failedChunks)) >= totalChunks) {
+        break;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 250));
+      attempts++;
+    }
+  } catch (err) {
+    logger.warn(`[hotel-search] Error waiting for first chunk: ${err.message}`);
+  }
+
+  // RETURN FOR PROGRESSIVE STREAMING WITH FIRST CHUNK PRE-LOADED
   return {
-    ...tboResult,
-    hotels: mergeSearchResultsWithStaticDetails(
-      tboResult.hotels,
-      buildDetailsLookup(hotelDetails),
-    ),
-    totalHotelCodes: hotelCodes.length,
+    hotels: firstChunkHotels,
+    totalHotelCodes: totalHotels,
+    searchId,
+    totalChunks,
+    isStreaming: true
   };
 };
 
@@ -349,8 +368,8 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   if (!cacheHit) {
     logger.info(`[hotel-search] CACHE MISS for key: ${cacheKey}. Fetching from TBO...`);
     dataset = await fetchFullHotelSearchDataset(baseSearchPayload);
-    // Increase TTL to 20 minutes (1200s) to keep results alive longer
-    await cacheService.setSearchResults(cacheKey, dataset, 1200);
+    // Increase TTL to 15 minutes (900s) to keep results alive longer
+    await cacheService.setSearchResults(cacheKey, dataset, 900);
   } else {
     logger.info(`[hotel-search] CACHE HIT for key: ${cacheKey}`);
     backgroundRefreshTriggered = await cacheService.refreshInBackground({
@@ -363,11 +382,9 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   }
 
   const rawHotels = Array.isArray(dataset?.hotels) ? dataset.hotels : [];
-  const preparedHotels = prepareHotelsForFiltering(rawHotels);
-  const filterMeta = buildHotelFilterMeta(preparedHotels);
-  const allHotels = preparedHotels.map(({ hotel }) => hotel);
-  const total = allHotels.length;
-  const failedChunks = Array.isArray(dataset?.failedChunks) ? dataset.failedChunks : [];
+  const total = rawHotels.length;
+  const filterMeta = dataset?.filterMeta || null;
+  const failedChunks = Array.isArray(dataset?.searchMeta?.failedChunks) ? dataset.searchMeta.failedChunks : [];
 
   return res.status(200).json(
     new ApiResponse(
@@ -377,8 +394,10 @@ exports.searchHotels = asyncHandler(async (req, res) => {
         CityName: cityRecord?.cityName || "",
         CountryCode: cityRecord?.countryCode || "",
         CountryName: cityRecord?.countryName || "",
-        hotels: allHotels,
-        HotelResult: allHotels,
+        searchId: dataset?.searchId || null,
+        status: dataset?.isStreaming ? "processing" : "completed",
+        hotels: rawHotels,
+        HotelResult: rawHotels,
         pagination: {
           total,
           page: 1,
@@ -387,19 +406,18 @@ exports.searchHotels = asyncHandler(async (req, res) => {
           hasMore: false,
         },
         filterMeta,
-        traceId: dataset?.traceId || null,
+        traceId: dataset?.traceId || dataset?.searchId || null,
         searchMeta: {
           cacheHit,
           backgroundRefreshTriggered,
           totalHotelCodes: dataset?.totalHotelCodes || 0,
-          totalChunks: dataset?.totalChunks || 0,
-          failedChunkCount: failedChunks.length,
-          failedChunks,
-          partialResults: failedChunks.length > 0,
-          elapsedMs: dataset?.elapsedMs || 0,
+          totalChunks: dataset?.totalChunks || dataset?.searchMeta?.totalChunks || 0,
+          failedChunkCount: dataset?.searchMeta?.failedChunkCount || 0,
+          partialResults: dataset?.searchMeta?.partialResults || false,
+          elapsedMs: dataset?.searchMeta?.elapsedMs || 0,
         },
       },
-      "Hotel search results returned with full data"
+      "Hotel search initiated. Listen on WebSocket for streaming results."
     )
   );
 });
