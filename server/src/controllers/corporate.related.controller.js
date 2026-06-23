@@ -94,7 +94,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
   // --------------------------------------------------
 
   let gstCertificate = {};
-  let panCard = {};
+  let corporatePanCard = {};
 
   if (req.files?.gstCertificate?.[0]) {
     const result = await cloudinary.uploader.upload(
@@ -115,29 +115,33 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     fs.unlinkSync(req.files.gstCertificate[0].path);
   }
 
-  if (req.files?.panCard?.[0]) {
-    const result = await cloudinary.uploader.upload(req.files.panCard[0].path, {
+  if (req.files?.corporatePanCard?.[0]) {
+    const result = await cloudinary.uploader.upload(req.files.corporatePanCard[0].path, {
       folder: "corporates/pan",
       resource_type: "auto",
     });
 
-    panCard = {
+    corporatePanCard = {
       publicId: result.public_id,
       url: result.secure_url,
       uploadedAt: new Date(),
       verified: false,
     };
 
-    fs.unlinkSync(req.files.panCard[0].path);
+    fs.unlinkSync(req.files.corporatePanCard[0].path);
   }
 
   // URL fallback
-  if (req.body["gstCertificate[url]"]) {
-    gstCertificate.url = req.body["gstCertificate[url]"];
+  if (req.body["gstCertificate[url]"] || req.body.gstCertificate?.url) {
+    gstCertificate.url = req.body["gstCertificate[url]"] || req.body.gstCertificate?.url;
   }
 
-  if (req.body["panCard[url]"]) {
-    panCard.url = req.body["panCard[url]"];
+  if (req.body["corporatePanCard[url]"] || req.body.corporatePanCard?.url) {
+    corporatePanCard.url = req.body["corporatePanCard[url]"] || req.body.corporatePanCard?.url;
+  }
+
+  if (req.body["corporatePanCard[number]"] || req.body.corporatePanCard?.number) {
+    corporatePanCard.number = req.body["corporatePanCard[number]"] || req.body.corporatePanCard?.number;
   }
 
   // --------------------------------------------------
@@ -160,7 +164,7 @@ exports.onboardCorporate = asyncHandler(async (req, res) => {
     },
 
     gstCertificate,
-    panCard,
+    corporatePanCard,
 
     classification,
 
@@ -496,19 +500,19 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
     delete req.body.gstFileBase64;
   }
 
-  if (req.body.panFileBase64) {
-    const result = await cloudinary.uploader.upload(req.body.panFileBase64, {
+  if (req.body.corporatePanFileBase64) {
+    const result = await cloudinary.uploader.upload(req.body.corporatePanFileBase64, {
       folder: "corporates/pan",
       resource_type: "auto",
     });
-    req.body.panCard = {
-      ...req.body.panCard,
+    req.body.corporatePanCard = {
+      ...req.body.corporatePanCard,
       publicId: result.public_id,
       url: result.secure_url,
       uploadedAt: new Date(),
       verified: false,
     };
-    delete req.body.panFileBase64;
+    delete req.body.corporatePanFileBase64;
   }
 
   const corporate = await Corporate.findById(req.params.id);
@@ -523,7 +527,7 @@ exports.updateCorporate = asyncHandler(async (req, res) => {
     if (req.body[field] !== undefined) corporate[field] = req.body[field];
   });
 
-  const nestedFields = ["primaryContact", "registeredAddress", "billingDepartment", "gstDetails", "gstCertificate", "panCard"];
+  const nestedFields = ["primaryContact", "registeredAddress", "billingDepartment", "gstDetails", "gstCertificate", "corporatePanCard"];
   nestedFields.forEach(field => {
     if (req.body[field]) {
       const existing = typeof corporate[field]?.toObject === "function" ? corporate[field].toObject() : (corporate[field] || {});

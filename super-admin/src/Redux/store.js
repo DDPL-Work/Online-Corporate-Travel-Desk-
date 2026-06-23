@@ -15,6 +15,7 @@ import reissueReducer from "./Slice/reissueSlice";
 import blogReducer from "./Slice/blog.slice.js";
 import markupReducer from "./Slice/markup.slice.js";
 import serviceFeeLedgerReducer from "./Slice/serviceFeeLedgerSlice.js";
+import contactReducer from "./Slice/contact.slice.js";
 
 export const store = configureStore({
   reducer: {
@@ -35,5 +36,6 @@ export const store = configureStore({
     blogs: blogReducer,
     markup: markupReducer,
     serviceFeeLedger: serviceFeeLedgerReducer,
+    contact: contactReducer,
   },
 });

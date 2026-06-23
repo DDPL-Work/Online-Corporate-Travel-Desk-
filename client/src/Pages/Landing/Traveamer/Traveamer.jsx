@@ -396,14 +396,39 @@ const ContactModal = ({ onClose }) => {
     companyName: "",
     message: "",
   });
+  const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    if (errors[e.target.name]) {
+      setErrors((prev) => ({ ...prev, [e.target.name]: "" }));
+    }
+  };
+
+  const handlePhoneChange = (phone) => {
+    setForm((prev) => ({ ...prev, phone }));
+    if (errors.phone) {
+      setErrors((prev) => ({ ...prev, phone: "" }));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const newErrors = {};
+    if (!form.fullName.trim()) newErrors.fullName = "Full Name is required.";
+    if (!form.workEmail.trim()) newErrors.workEmail = "Work Email is required.";
+    if (!form.phone || form.phone.length <= 4) newErrors.phone = "Valid Phone Number is required.";
+    if (!form.companyName.trim()) newErrors.companyName = "Company Name is required.";
+    if (!form.message.trim()) newErrors.message = "Message is required.";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -533,10 +558,10 @@ const ContactModal = ({ onClose }) => {
                     name="fullName"
                     value={form.fullName}
                     onChange={handleChange}
-                    required
                     placeholder="Rahul Sharma"
-                    className="w-full h-12 px-4 rounded-[12px] border border-black/[0.10] bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all"
+                    className={`w-full h-12 px-4 rounded-[12px] border ${errors.fullName ? "border-red-500" : "border-black/[0.10]"} bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all`}
                   />
+                  {errors.fullName && <span className="text-red-500 text-[10px] font-['DM_Sans'] -mt-0.5">{errors.fullName}</span>}
                 </div>
                 <div className="flex-1 flex flex-col gap-1.5">
                   <label className="text-[#030E30] text-[11px] font-semibold font-['DM_Sans'] uppercase tracking-[1.3px]">
@@ -547,10 +572,10 @@ const ContactModal = ({ onClose }) => {
                     type="email"
                     value={form.workEmail}
                     onChange={handleChange}
-                    required
                     placeholder="rahul@company.com"
-                    className="w-full h-12 px-4 rounded-[12px] border border-black/[0.10] bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all"
+                    className={`w-full h-12 px-4 rounded-[12px] border ${errors.workEmail ? "border-red-500" : "border-black/[0.10]"} bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all`}
                   />
+                  {errors.workEmail && <span className="text-red-500 text-[10px] font-['DM_Sans'] -mt-0.5">{errors.workEmail}</span>}
                 </div>
               </div>
 
@@ -564,13 +589,10 @@ const ContactModal = ({ onClose }) => {
                     <PhoneInput
                       country="in"
                       value={form.phone}
-                      onChange={(phone) =>
-                        setForm((prev) => ({ ...prev, phone }))
-                      }
+                      onChange={handlePhoneChange}
                       enableSearch
                       inputProps={{
                         name: "phone",
-                        required: true,
                         placeholder: "98765 43210",
                       }}
                       containerStyle={{ width: "100%" }}
@@ -578,7 +600,7 @@ const ContactModal = ({ onClose }) => {
                         width: "100%",
                         height: "48px",
                         borderRadius: "12px",
-                        border: "1px solid rgba(0,0,0,0.10)",
+                        border: errors.phone ? "1px solid #ef4444" : "1px solid rgba(0,0,0,0.10)",
                         backgroundColor: "#F7F8FC",
                         fontSize: "14px",
                         fontFamily: "DM Sans, sans-serif",
@@ -587,7 +609,7 @@ const ContactModal = ({ onClose }) => {
                       }}
                       buttonStyle={{
                         borderRadius: "12px 0 0 12px",
-                        border: "1px solid rgba(0,0,0,0.10)",
+                        border: errors.phone ? "1px solid #ef4444" : "1px solid rgba(0,0,0,0.10)",
                         borderRight: "none",
                         backgroundColor: "#F7F8FC",
                         paddingLeft: "8px",
@@ -602,6 +624,7 @@ const ContactModal = ({ onClose }) => {
                       }}
                     />
                   </div>
+                  {errors.phone && <span className="text-red-500 text-[10px] font-['DM_Sans'] -mt-0.5">{errors.phone}</span>}
                 </div>
                 <div className="flex-1 flex flex-col gap-1.5">
                   <label className="text-[#030E30] text-[11px] font-semibold font-['DM_Sans'] uppercase tracking-[1.3px]">
@@ -611,10 +634,10 @@ const ContactModal = ({ onClose }) => {
                     name="companyName"
                     value={form.companyName}
                     onChange={handleChange}
-                    required
                     placeholder="Acme Pvt. Ltd."
-                    className="w-full h-12 px-4 rounded-[12px] border border-black/[0.10] bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all"
+                    className={`w-full h-12 px-4 rounded-[12px] border ${errors.companyName ? "border-red-500" : "border-black/[0.10]"} bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all`}
                   />
+                  {errors.companyName && <span className="text-red-500 text-[10px] font-['DM_Sans'] -mt-0.5">{errors.companyName}</span>}
                 </div>
               </div>
 
@@ -627,11 +650,11 @@ const ContactModal = ({ onClose }) => {
                   name="message"
                   value={form.message}
                   onChange={handleChange}
-                  required
                   rows={4}
                   placeholder="Tell us about your team size, current travel challenges, and what you're looking for..."
-                  className="w-full px-4 py-3.5 rounded-[12px] border border-black/[0.10] bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all resize-none leading-6"
+                  className={`w-full px-4 py-3.5 rounded-[12px] border ${errors.message ? "border-red-500" : "border-black/[0.10]"} bg-[#F7F8FC] text-black text-sm font-['DM_Sans'] placeholder:text-[#B0B3BD] focus:outline-none focus:border-[#051D8C] focus:ring-2 focus:ring-[#051D8C]/10 transition-all resize-none leading-6`}
                 />
+                {errors.message && <span className="text-red-500 text-[10px] font-['DM_Sans'] -mt-0.5">{errors.message}</span>}
               </div>
 
               {/* Submit */}

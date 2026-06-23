@@ -579,6 +579,31 @@ const HeroWithSearch = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state?.prefillFlightSearch]);
 
+  // --- Auto-fill from session-expired "Search Again" for Hotel ---
+  useEffect(() => {
+    const prefillHotel = location.state?.prefillHotelSearch;
+    if (!prefillHotel) return;
+
+    if (prefillHotel.city) {
+      setCity(prefillHotel.city);
+    }
+    if (prefillHotel.checkIn) {
+      setCheckIn(prefillHotel.checkIn);
+    }
+    if (prefillHotel.checkOut) {
+      setCheckOut(prefillHotel.checkOut);
+    }
+    if (prefillHotel.rooms) {
+      setRooms(prefillHotel.rooms);
+    }
+    if (prefillHotel.roomConfigs) {
+      setRoomConfigs(prefillHotel.roomConfigs);
+    }
+    if (prefillHotel.nationality) {
+      setGuestNationality(prefillHotel.nationality);
+    }
+  }, [location.state?.prefillHotelSearch]);
+
   const validateSearch = () => {
     const e = {};
     if (!fromAirport?.code) e.from = "Please select origin airport";

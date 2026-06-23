@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiUsers, FiSearch, FiRefreshCw, FiCheckCircle, FiXCircle, FiInbox, FiClock, FiX, FiEye, FiCreditCard, FiArrowLeft, FiCalendar, FiPower, FiPercent } from "react-icons/fi";
 import { MdVerifiedUser, MdBusiness, MdAccountBalanceWallet } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
-import AddCorporateModal from "../../Modal/AddCorporateModal";
+// import AddCorporateModal from "../../Modal/AddCorporateModal";
 import ViewCorporateModal from "../../Modal/ViewCorporateModal";
 import ToggleStatusModal from "../../Modal/ToggleStatusModal";
 import { fetchCorporates } from "../../Redux/Slice/corporateListSlice";
@@ -436,9 +436,9 @@ export default function OnboardedCorporates() {
         </div>
 
         {/* MODAL */}
-        {openAddModal && (
+        {/* {openAddModal && (
           <AddCorporateModal onClose={() => setOpenAddModal(false)} />
-        )}
+        )} */}
         {openViewModal && selectedCorporate && (
           <ViewCorporateModal corporate={selectedCorporate} onClose={() => setOpenViewModal(false)} />
         )}

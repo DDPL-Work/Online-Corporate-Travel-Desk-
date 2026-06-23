@@ -45,8 +45,10 @@ import {
   MdCancel,
   MdKingBed,
 } from "react-icons/md";
-import { generateHotelVoucher } from "../../Redux/Actions/hotelBooking.thunks";
-import { fetchBookedHotelDetails } from "../../Redux/Actions/hotelBooking.thunks";
+import {
+  fetchBookedHotelDetails,
+  generateHotelVoucher,
+} from "../../Redux/Actions/hotelBooking.thunks";
 import {
   sendHotelAmendment,
   getHotelAmendmentStatus,
@@ -746,7 +748,6 @@ function CheckInInstructions({ conditions = [] }) {
   );
 }
 
-
 /* ─────────────────────────────────────────────────────────────── */
 /*  Guest Section                                                  */
 /* ─────────────────────────────────────────────────────────────── */
@@ -1077,7 +1078,7 @@ function CancellationSection({
   isConfirmed,
   cancelPolicies = [],
   totalFare = 0,
-}) {
+}) {  
   const dispatch = useDispatch();
   const navigate = useNavigate();
 

@@ -203,8 +203,8 @@ export default function CreditUtilizationPostpaid() {
         usedCredit: used,
         availableCredit: available,
         pct: density,
-        usedLabel: drillCycle.isCurrent ? "Active Usage" : "Statement Usage",
-        availableLabel: drillCycle.isCurrent ? "Current Liquidity" : "Statement Liquidity",
+        usedLabel: drillCycle.isCurrent ? "Used Credit" : "Statement Usage",
+        availableLabel: drillCycle.isCurrent ? "Available Credit" : "Available Credit",
         isHistorical: !drillCycle.isCurrent
       };
     }
@@ -213,8 +213,8 @@ export default function CreditUtilizationPostpaid() {
       usedCredit: balance?.usedCredit || 0,
       availableCredit: balance?.availableCredit || 0,
       pct: balance ? Math.min(100, ((balance.usedCredit || 0) / (balance.totalLimit || 1)) * 100) : 0,
-      usedLabel: "Deployed Capital",
-      availableLabel: "Available Liquidity",
+      usedLabel: "Used Credit",
+      availableLabel: "Available Credit",
       isHistorical: false
     };
   }, [drillCycle, balance]);
@@ -377,11 +377,10 @@ export default function CreditUtilizationPostpaid() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Strategic Credit Ledger
+                  Credit Ledger
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Comprehensive Oversight of all Postpaid Corporate Fund
-                  Deployments
+                  Overview of Postpaid Credit Usage
                 </p>
               </div>
             </div>
@@ -392,10 +391,10 @@ export default function CreditUtilizationPostpaid() {
               <FiClock className="text-gold" size={16} />
               <div>
                 <p className="text-[9px] font-black uppercase opacity-50 leading-none mb-1">
-                  Reset Countdown
+                  Days Until Reset
                 </p>
                 <p className="text-xs font-black text-gold">
-                  {daysRemaining} Strategic Days
+                  {daysRemaining} Days
                 </p>
               </div>
             </div>
@@ -407,8 +406,8 @@ export default function CreditUtilizationPostpaid() {
         {/* Tabs */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
           {[
-            ["current", "Active Statement", FiActivity],
-            ["previous", "Archive Registry", FiCalendar],
+            ["current", "Current Cycle", FiActivity],
+            ["previous", "Previous Cycles", FiCalendar],
           ].map(([k, lbl, Icon]) => (
             <button
               key={k}
@@ -463,7 +462,7 @@ export default function CreditUtilizationPostpaid() {
             style={{ borderLeftWidth: "4px", borderLeftColor: pctColor }}
           >
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              {displayStats.isHistorical ? "Statement Density" : "Capital Density"}
+              Credit Utilization
             </p>
             <div>
               <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2">
@@ -490,7 +489,7 @@ export default function CreditUtilizationPostpaid() {
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
               <div className="lg:col-span-4">
-                <LabeledField label="Universal Search">
+                <LabeledField label="Search">
                   <SearchBar
                     value={searchTerm}
                     onChange={setSearchTerm}
@@ -524,7 +523,7 @@ export default function CreditUtilizationPostpaid() {
                     value={selectedEmployee}
                     onChange={setSelectedEmployee}
                     options={[
-                      { value: "", label: "All Personnel" },
+                      { value: "", label: "All Employees" },
                       ...(companyUsers || []).map((u) => ({
                         value: u._id,
                         label: `${u.name?.firstName} ${u.name?.lastName}`,
@@ -539,7 +538,7 @@ export default function CreditUtilizationPostpaid() {
                     value={selectedType}
                     onChange={setSelectedType}
                     options={[
-                      { value: "", label: "All Assets" },
+                      { value: "", label: "All Bookings" },
                       { value: "flight", label: "Flights Only" },
                       { value: "hotel", label: "Hotels Only" },
                     ]}
@@ -547,7 +546,7 @@ export default function CreditUtilizationPostpaid() {
                 </LabeledField>
               </div>
               <div className="lg:col-span-3">
-                <LabeledField label="Sort Strategy">
+                <LabeledField label="Sort By">
                   <CustomDropdown
                     value={sortBy}
                     onChange={setSortBy}
@@ -590,17 +589,17 @@ export default function CreditUtilizationPostpaid() {
             <div>
               <h2 className="text-xl font-black" style={{ color: C.navy }}>
                 {drillCycle
-                  ? `Transaction Matrix: ${drillCycle.statementId}`
+                  ? `Transactions: ${drillCycle.statementId}`
                   : activeTab === "current"
-                    ? "Active Cycle Registry"
-                    : "Archive Cycle Registry"}
+                    ? "Current Cycle Transactions"
+                    : "Previous Cycle Statements"}
               </h2>
               <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
                 {drillCycle
-                  ? `${drillTx.length} records in this matrix`
+                  ? `${drillTx.length} transactions`
                   : activeTab === "current"
-                    ? "Live monitoring of current deployments"
-                    : `${previousCycles.length} validated statements processed`}
+                    ? "Current cycle transactions"
+                    : `${previousCycles.length} past statements`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -610,7 +609,7 @@ export default function CreditUtilizationPostpaid() {
                   className="px-4 py-2.5 rounded-xl font-black text-[10px] flex items-center gap-2 border shadow-sm hover:bg-slate-50 transition-all uppercase tracking-widest"
                   style={{ borderColor: C.border, color: C.navy }}
                 >
-                  <FiChevronLeft size={14} /> Back to Registry
+                  <FiChevronLeft size={14} /> Back
                 </button>
               )}
               {canScroll && (
@@ -639,7 +638,7 @@ export default function CreditUtilizationPostpaid() {
             onExport={() => {
               if (!drillCycle) {
                 exportExcel({
-                  pageHeader: activeTab === "current" ? "Active Cycle Registry" : "Archive Cycle Registry",
+                  pageHeader: activeTab === "current" ? "Current Cycle Transactions" : "Previous Cycle Statements",
                   statCards: [
                     { label: "Total Credit Limit", value: `₹${fmtAmt(displayStats.totalLimit)}` },
                     { label: displayStats.usedLabel, value: `₹${fmtAmt(displayStats.usedCredit)}` },
@@ -658,14 +657,14 @@ export default function CreditUtilizationPostpaid() {
                 });
               } else {
                 exportExcel({
-                  pageHeader: `Transaction Matrix: ${drillCycle.statementId}`,
+                  pageHeader: `Transactions: ${drillCycle.statementId}`,
                   statCards: [
                     { label: "Total Credit Limit", value: `₹${fmtAmt(displayStats.totalLimit)}` },
                     { label: displayStats.usedLabel, value: `₹${fmtAmt(displayStats.usedCredit)}` },
                     { label: displayStats.availableLabel, value: `₹${fmtAmt(displayStats.availableCredit)}` }
                   ],
                   appliedFilters: [
-                    { label: "Universal Search", value: searchTerm || "None" },
+                    { label: "Search", value: searchTerm || "None" },
                     { label: "From Date", value: fromDate || "Any" },
                     { label: "To Date", value: toDate || "Any" },
                     { label: "Employee", value: selectedEmployee ? (companyUsers.find(u => u._id === selectedEmployee)?.name?.firstName || "Selected") : "All" },
@@ -673,9 +672,9 @@ export default function CreditUtilizationPostpaid() {
                   ],
                   data: drillTx,
                   columns: [
-                    { header: "Generation Date", value: (t) => fmt(t.createdAt) },
-                    { header: "Personnel", value: (t) => t.userId?.name ? `${t.userId.name.firstName} ${t.userId.name.lastName}` : "Staff Member" },
-                    { header: "Capital Flow", value: (t) => t.type || "—" },
+                    { header: "Date", value: (t) => fmt(t.createdAt) },
+                    { header: "Employee", value: (t) => t.userId?.name ? `${t.userId.name.firstName} ${t.userId.name.lastName}` : "Employee" },
+                    { header: "Type", value: (t) => t.type || "—" },
                     { header: "Amount", value: (t) => `₹${(t.amount || 0).toLocaleString()}` }
                   ],
                   filenamePrefix: "credit_transactions"
@@ -690,26 +689,26 @@ export default function CreditUtilizationPostpaid() {
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                   {drillCycle ? (
                     <>
-                      <Th className="!px-6 !py-5">Generation Date</Th>
-                      <Th className="!px-6 !py-5">Asset Detail</Th>
-                      <Th className="!px-6 !py-5">Personnel</Th>
+                      <Th className="!px-6 !py-5">Date</Th>
+                      <Th className="!px-6 !py-5">Booking Detail</Th>
+                      <Th className="!px-6 !py-5">Employee</Th>
                       <Th className="!px-6 !py-5">PNR/Confirmation No</Th>
                       <Th className="!px-6 !py-5">Order ID</Th>
-                      <Th className="!px-6 !py-5">Asset Type</Th>
-                      <Th className="!px-6 !py-5">Capital Flow</Th>
+                      <Th className="!px-6 !py-5">Booking Type</Th>
+                      <Th className="!px-6 !py-5">Type</Th>
                       <Th className="!px-6 !py-5">Status</Th>
                       <Th className="!px-6 !py-5 text-right">Actions</Th>
                     </>
                   ) : (
                     <>
-                      <Th className="!px-6 !py-5">Sequence</Th>
-                      <Th className="!px-6 !py-5">Statement Registry</Th>
-                      <Th className="!px-6 !py-5">Billing Horizon</Th>
-                      <Th className="!px-6 !py-5">Due Protocol</Th>
-                      <Th className="!px-6 !py-5">Payment Received</Th>
-                      <Th className="!px-6 !py-5">Compliance Status</Th>
+                      <Th className="!px-6 !py-5">No.</Th>
+                      <Th className="!px-6 !py-5">Statement</Th>
+                      <Th className="!px-6 !py-5">Billing Period</Th>
+                      <Th className="!px-6 !py-5">Due Date</Th>
+                      <Th className="!px-6 !py-5">Paid On</Th>
+                      <Th className="!px-6 !py-5">Status</Th>
                       <Th className="!px-6 !py-5 text-right">Paid Amount</Th>
-                      <Th className="!px-6 !py-5 text-right">Remaining</Th>
+                      <Th className="!px-6 !py-5 text-right">Remaining To Pay</Th>
                     </>
                   )}
                 </tr>
@@ -723,7 +722,7 @@ export default function CreditUtilizationPostpaid() {
                           <FiRefreshCw size={32} className="text-gold" />
                         </div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                          Synchronizing Protocol Matrix...
+                          Loading Transactions...
                         </p>
                       </td>
                     </tr>
@@ -756,7 +755,7 @@ export default function CreditUtilizationPostpaid() {
 
                       // Personnel logic
                       const leadTraveller = b?.travellers?.find(p => p.isLeadPassenger) || b?.travellers?.[0];
-                      const travellerName = leadTraveller ? `${leadTraveller.firstName} ${leadTraveller.lastName}` : (t.userId?.name ? `${t.userId.name.firstName} ${t.userId.name.lastName}` : "Staff Member");
+                      const travellerName = leadTraveller ? `${leadTraveller.firstName} ${leadTraveller.lastName}` : (t.userId?.name ? `${t.userId.name.firstName} ${t.userId.name.lastName}` : "Employee");
                       const travellerEmail = leadTraveller?.email || t.userId?.email || "—";
 
                       // Asset Detail Logic
@@ -891,7 +890,7 @@ export default function CreditUtilizationPostpaid() {
                               onClick={handleView}
                               disabled={!b?._id}
                               className={`p-2 rounded-xl transition-all border ${!b?._id ? "opacity-30 cursor-not-allowed" : "bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-[#003399] border-slate-100 hover:border-[#003399]/20"}`}
-                              title="View Protocol Details"
+                              title="View Details"
                             >
                               <FiEye size={16} />
                             </button>

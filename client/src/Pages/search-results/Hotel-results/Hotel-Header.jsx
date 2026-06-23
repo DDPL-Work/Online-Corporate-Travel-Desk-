@@ -14,6 +14,7 @@ import {
   MdSearch,
   MdBed,
 } from "react-icons/md";
+import { FaGlobe } from "react-icons/fa";
 import {
   CountrySelector,
   SearchableSelect,
@@ -304,21 +305,26 @@ const Header = () => {
         {/* Search Bar */}
         <div className="flex flex-col lg:flex-row items-stretch bg-white rounded-xl sm:rounded-2xl overflow-visible shadow-2xl py-1 sm:py-3 lg:py-0 gap-y-1 sm:gap-y-2 lg:gap-y-0 lg:h-[72px]">
           <div className="flex lg:contents">
-            <div className="flex-1 min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 lg:flex lg:items-center">
-              <CountrySelector
+            <div className="flex-1 min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 lg:flex lg:items-center rounded-tl-xl sm:rounded-tl-2xl lg:rounded-tr-none lg:rounded-l-2xl">
+              <SearchableSelect
                 label="Country"
                 variant="minimal"
+                icon={<FaGlobe className="text-base sm:text-lg" style={{ color: ORANGE }} />}
                 value={form.country}
-                countries={normalizedCountries}
-                onChange={(code) => {
-                  setForm({ ...form, country: code, cityCode: "", cityName: "" });
-                  if (!citiesByCountry?.[code]) {
-                    dispatch(fetchCities(code));
+                options={normalizedCountries}
+                displayKey="name"
+                valueKey="code"
+                onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
+                onChange={(item) => {
+                  setForm({ ...form, country: item.code, cityCode: "", cityName: "" });
+                  if (!citiesByCountry?.[item.code]) {
+                    dispatch(fetchCities(item.code));
                   }
                 }}
+                placeholder="Select Country"
               />
             </div>
-            <div className="flex-[1.5] min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 border-l lg:border-l-0 lg:flex lg:items-center">
+            <div className="flex-[1.5] min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 border-l lg:border-l-0 lg:flex lg:items-center rounded-tr-xl sm:rounded-tr-2xl lg:rounded-none">
               <SearchableSelect
                 label="City / Area"
                 variant="minimal"
@@ -428,7 +434,7 @@ const Header = () => {
               </svg>
             </button>
             {showGuestDropdown && (
-              <div className="absolute top-full left-0 w-full z-[300] shadow-2xl overflow-hidden rounded-b-2xl">
+              <div className="absolute top-[calc(100%+0.5rem)] left-0 lg:left-auto lg:right-0 z-[300]">
                 <HotelGuestSelection
                   rooms={form.rooms}
                   setRooms={(val) => setForm({ ...form, rooms: val })}

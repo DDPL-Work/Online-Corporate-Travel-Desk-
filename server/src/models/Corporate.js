@@ -92,7 +92,7 @@ const corporateSchema = new mongoose.Schema(
       verified: { type: Boolean, default: false },
     },
 
-    panCard: {
+    corporatePanCard: {
       number: String,
       publicId: String,
       url: String,

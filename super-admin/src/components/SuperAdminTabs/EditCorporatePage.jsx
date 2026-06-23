@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { updateCorporate, fetchCorporateById } from "../../Redux/Slice/corporateListSlice";
-import { FiX, FiInfo, FiUsers, FiDollarSign, FiFileText, FiSave, FiArrowLeft, FiEdit2, FiSettings, FiPlusCircle, FiTrash2, FiToggleLeft, FiToggleRight, FiChevronDown, FiUpload, FiCheckCircle } from "react-icons/fi";
+import { FiX, FiInfo, FiUsers, FiDollarSign, FiFileText, FiSave, FiArrowLeft, FiEdit2, FiSettings, FiPlusCircle, FiTrash2, FiToggleLeft, FiToggleRight, FiChevronDown, FiUpload, FiCheckCircle, FiXCircle } from "react-icons/fi";
 import { FaTimes, FaCheckCircle, FaPlane, FaHotel, FaStar } from "react-icons/fa";
 import { MdCorporateFare, MdAccountBalance, MdPerson, MdGroups, MdAutoGraph } from "react-icons/md";
 import PhoneInput from 'react-phone-input-2';
@@ -144,8 +144,8 @@ export default function EditCorporatePage() {
       gstEmail: corp.gstDetails?.gstEmail || "",
       gstContactNumber: corp.gstDetails?.contactNumber || "",
       gstUrl: corp.gstCertificate?.url || "",
-      panNumber: corp.panCard?.number || "",
-      panUrl: corp.panCard?.url || "",
+      panNumber: corp.corporatePanCard?.number || "",
+      panUrl: corp.corporatePanCard?.url || "",
       classification: corp.classification || "prepaid",
       serviceFeeRules: (corp.serviceFeeRules || []).map(rule => ({
         ...rule,
@@ -286,7 +286,7 @@ export default function EditCorporatePage() {
         contactNumber: form.gstContactNumber
       },
       gstCertificate: form.gstUrl ? { url: form.gstUrl } : undefined,
-      panCard: form.panNumber || form.panUrl ? { number: form.panNumber, url: form.panUrl } : undefined,
+      corporatePanCard: form.panNumber || form.panUrl ? { number: form.panNumber, url: form.panUrl } : undefined,
       gstFileBase64: form.gstFileBase64,
       panFileBase64: form.panFileBase64,
       serviceFeeRules: serviceFeeRulesFormatted
@@ -618,7 +618,29 @@ export default function EditCorporatePage() {
               
               <Section title="PAN Details" color="gold">
                 <Field label="PAN Number">
-                  <Input type="text" value={form.panNumber} onChange={v => setForm({ ...form, panNumber: v })} />
+                  <div className="relative">
+                    <Input 
+                      type="text" 
+                      value={form.panNumber} 
+                      placeholder="ABCDE1234F"
+                      maxLength={10}
+                      onChange={v => {
+                        const val = v.toUpperCase().trim();
+                        if (val.length <= 10) {
+                          setForm({ ...form, panNumber: val });
+                        }
+                      }} 
+                    />
+                    {form.panNumber && form.panNumber.length > 0 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center bg-white px-1">
+                        {/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.panNumber) ? (
+                          <span className="text-emerald-500 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"><FiCheckCircle size={14} /> Valid</span>
+                        ) : (
+                          <span className="text-rose-500 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"><FiXCircle size={14} /> Invalid</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </Field>
                 {form.panUrl ? (
                   <Field label="PAN Card">
@@ -945,13 +967,15 @@ const Field = ({ label, children, span = 1 }) => {
   );
 };
 
-const Input = ({ value, type = "text", onChange, disabled }) => (
+const Input = ({ value, type = "text", onChange, disabled, placeholder, maxLength }) => (
   <input
     className={`w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-[#003399]/10 focus:border-[#003399] placeholder:text-slate-300 transition-all font-bold shadow-sm hover:border-slate-300 ${disabled ? 'bg-slate-100 cursor-not-allowed text-slate-500 hover:border-slate-200' : 'bg-white text-slate-900'}`}
     type={type}
     value={value}
     onChange={(e) => onChange(e.target.value)}
     disabled={disabled}
+    placeholder={placeholder}
+    maxLength={maxLength}
   />
 );
 

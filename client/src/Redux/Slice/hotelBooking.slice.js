@@ -79,6 +79,9 @@ const hotelBookingSlice = createSlice({
         state.preBookLoading = false;
         state.preBookError = action.payload;
         state.preBookSuccess = false;
+        if (action.payload?.data) {
+          state.preBookData = action.payload.data;
+        }
       })
 
       /* ================= CREATE ================= */
