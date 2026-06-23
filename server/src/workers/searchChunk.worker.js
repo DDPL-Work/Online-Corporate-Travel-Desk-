@@ -117,7 +117,9 @@ const worker = new Worker(
   },
   {
     connection: createBullConnection(),
-    concurrency: 5 // Process 5 chunks concurrently per worker pod
+    concurrency: 3, // Reduced from 5 to prevent event loop lag spikes
+    lockDuration: 120000, // Extend lock to 2 minutes
+    stalledInterval: 60000 // Check for stalled jobs every 1 minute
   }
 );
 
