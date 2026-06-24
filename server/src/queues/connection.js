@@ -5,22 +5,46 @@ const createBullConnection = () => {
   const options = {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
-    retryStrategy: (times) => {
-      if (times > 5) return null;
-      return Math.min(times * 500, 3000);
-    }
+    connectTimeout: 10000,
+
+    retryStrategy(times) {
+      const delay = Math.min(times * 500, 5000);
+
+      logger.warn(
+        `[BullMQ Redis] Reconnecting attempt ${times}. Next retry in ${delay}ms`
+      );
+
+      return delay;
+    },
   };
 
-  const conn = process.env.NODE_ENV === "production"
-    ? new Redis(process.env.REDIS_URL, options)
-    : new Redis({
-        host: process.env.REDIS_HOST || '127.0.0.1',
-        port: process.env.REDIS_PORT || 6379,
-        password: process.env.REDIS_PASSWORD || undefined,
-        ...options
-      });
-      
-  conn.on("error", (err) => logger.error("[BullMQ Redis] Error:", err.message));
+  const conn = new Redis({
+    host: process.env.REDIS_HOST,
+    port: Number(process.env.REDIS_PORT),
+    password: process.env.REDIS_PASSWORD || undefined,
+    ...options,
+  });
+
+  conn.on("connect", () => {
+    logger.info("[BullMQ Redis] Connected");
+  });
+
+  conn.on("ready", () => {
+    logger.info("[BullMQ Redis] Ready");
+  });
+
+  conn.on("close", () => {
+    logger.warn("[BullMQ Redis] Connection closed");
+  });
+
+  conn.on("reconnecting", () => {
+    logger.warn("[BullMQ Redis] Reconnecting...");
+  });
+
+  conn.on("error", (err) => {
+    logger.error("[BullMQ Redis] Error:", err.message);
+  });
+
   return conn;
 };
 
