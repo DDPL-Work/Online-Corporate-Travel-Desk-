@@ -147,62 +147,107 @@ export const SearchableSelect = ({
   valueKey = "Code",
   disabled = false,
   variant = "default",
-  onOpen
+  onOpen,
+  showCodeInOptions = false
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => { 
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false); 
+        setSearch("");
+      } 
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const lowerSearch = search.toLowerCase();
   const filtered = options.filter((item) => 
-    String(item[displayKey] || "").toLowerCase().includes(search.toLowerCase())
+    String(item[displayKey] || "").toLowerCase().includes(lowerSearch) ||
+    String(item[valueKey] || "").toLowerCase().includes(lowerSearch)
   );
   
+  if (lowerSearch) {
+    filtered.sort((a, b) => {
+      const aVal = String(a[valueKey] || "").toLowerCase();
+      const bVal = String(b[valueKey] || "").toLowerCase();
+      
+      const aExact = aVal === lowerSearch;
+      const bExact = bVal === lowerSearch;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+
+      const aPrefix = aVal.startsWith(lowerSearch);
+      const bPrefix = bVal.startsWith(lowerSearch);
+      if (aPrefix && !bPrefix) return -1;
+      if (!aPrefix && bPrefix) return 1;
+
+      return 0;
+    });
+  }
+  
   const selected = options.find((opt) => opt[valueKey] === value);
+  const inputValue = open ? search : (selected ? selected[displayKey] : "");
 
   return (
     <div ref={ref} className="relative w-full">
       <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 px-1">
         <span className="text-blue-600">{icon}</span> {label}
       </label>
-      <button
-        type="button"
-        onMouseDown={(e) => disabled && e.preventDefault()}
-        onClick={() => { if (!disabled) { const next = !open; setOpen(next); if (next && onOpen) onOpen(); } }}
+      <div
         className={`w-full flex items-center justify-between rounded-xl px-3 py-3 transition-all text-left
           ${variant === "minimal" ? "bg-transparent border-none p-0 shadow-none" : "bg-white border-2"}
-          ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : variant === "minimal" ? "" : "hover:border-blue-400 cursor-pointer"}
+          ${disabled ? "bg-gray-50 border-gray-100 cursor-default" : variant === "minimal" ? "" : "hover:border-blue-400 cursor-text"}
           ${open && variant !== "minimal" ? "border-blue-600 shadow-sm" : value && variant !== "minimal" ? "border-blue-300" : variant !== "minimal" ? "border-gray-200" : ""}`}
+        onClick={() => { 
+          if (!disabled && !open) { 
+            setOpen(true); 
+            setSearch("");
+            if (onOpen) onOpen(); 
+          } 
+        }}
       >
-        <div className={`flex flex-col min-w-0 ${disabled ? "opacity-60" : ""}`}>
-          <span className={`text-sm font-bold truncate ${selected ? "text-gray-800" : "text-gray-400"}`}>
-            {selected?.[displayKey] || placeholder}
-          </span>
+        <div className={`flex flex-col min-w-0 w-full ${disabled ? "opacity-60" : ""}`}>
+          <input
+            type="text"
+            disabled={disabled}
+            placeholder={placeholder}
+            value={inputValue}
+            onChange={(e) => {
+              if (!open) {
+                setOpen(true);
+                if (onOpen) onOpen();
+              }
+              setSearch(e.target.value);
+            }}
+            className={`w-full text-sm font-bold truncate outline-none bg-transparent ${selected && !open ? "text-gray-800" : "text-gray-800 placeholder-gray-400"}`}
+          />
         </div>
-        {!disabled && <FaChevronDown className={`w-3 h-3 text-gray-400 shrink-0 ml-1 transition-transform ${open ? "rotate-180" : ""}`} />}
-      </button>
+        {!disabled && (
+          <FaChevronDown 
+            className={`w-3 h-3 text-gray-400 shrink-0 ml-1 transition-transform cursor-pointer ${open ? "rotate-180" : ""}`} 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              if (open) {
+                setOpen(false);
+                setSearch("");
+              } else {
+                setOpen(true);
+                setSearch("");
+                if (onOpen) onOpen();
+              }
+            }} 
+          />
+        )}
+      </div>
 
       {open && !disabled && (
-        <div className="absolute top-full left-0 mt-1 w-full min-w-[200px] bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-          <div className="p-2 border-b border-gray-100 bg-gray-50">
-            <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
-              <FaSearch className="text-gray-400 text-xs" />
-              <input
-                autoFocus
-                type="text"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-xs font-medium text-gray-700 outline-none bg-transparent"
-              />
-            </div>
-          </div>
-          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+        <div className="absolute top-full left-0 mt-2 w-full min-w-[200px] bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar py-1">
             {filtered.length > 0 ? (
               filtered.map((item) => (
                 <div
@@ -210,8 +255,13 @@ export const SearchableSelect = ({
                   onClick={() => { onChange(item); setOpen(false); setSearch(""); }}
                   className="px-4 py-3 text-sm cursor-pointer flex items-center justify-between hover:bg-blue-50 transition-colors group"
                 >
-                  <span className={`font-semibold group-hover:text-blue-700 ${value === item[valueKey] ? "text-blue-700" : "text-gray-700"}`}>
+                  <span className={`font-semibold flex items-center gap-2 group-hover:text-blue-700 ${value === item[valueKey] ? "text-blue-700" : "text-gray-700"}`}>
                     {item[displayKey]}
+                    {showCodeInOptions && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${value === item[valueKey] ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                        {item[valueKey]}
+                      </span>
+                    )}
                   </span>
                   {value === item[valueKey] && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                 </div>

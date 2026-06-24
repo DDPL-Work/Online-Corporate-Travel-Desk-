@@ -1,6 +1,6 @@
 const { Server } = require("socket.io");
 const { createAdapter } = require("@socket.io/redis-adapter");
-const Redis = require("ioredis");
+const redisClient = require("../config/redis");
 const logger = require("../utils/logger");
 const jwt = require("jsonwebtoken");
 
@@ -15,9 +15,8 @@ const initSocketIO = (server) => {
   });
 
   // Redis Adapter for cross-process event broadcasting
-  const pubClient = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
-  const subClient = pubClient.duplicate();
-  io.adapter(createAdapter(pubClient, subClient));
+  const subClient = redisClient.duplicate();
+  io.adapter(createAdapter(redisClient, subClient));
 
   // Authentication Middleware
   io.use((socket, next) => {
