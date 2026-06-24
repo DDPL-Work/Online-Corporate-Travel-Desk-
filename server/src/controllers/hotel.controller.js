@@ -1,4 +1,7 @@
 const tboService = require("../services/tektravels/hotel.service");
+const zlib = require("zlib");
+const { promisify } = require("util");
+const gunzip = promisify(zlib.gunzip);
 const { initiateDistributedSearch } = require("../modules/search/search.orchestrator");
 const { aggregateFinalResults, waitForSearchCompletion } = require("../modules/search/search.merge");
 const cacheService = require("../services/cache.service");
@@ -101,82 +104,58 @@ const mergeSearchResultsWithStaticDetails = (searchResults = [], detailsMap = {}
     }),
   );
 
-const fetchFullHotelSearchDataset = async ({
-  CheckIn,
-  CheckOut,
-  CityCode,
-  CityName,
-  CountryCode,
-  CountryName,
-  corporateId,
-  GuestNationality,
-  NoOfRooms,
-  PaxRooms,
-  IsDetailedResponse,
-  ResponseTime,
-}) => {
-  const localHotels = await TBOHotel.find({ cityCode: CityCode })
+const { handleSearchRequest } = require("../modules/searchCoordinator/coordinator.service");
+
+const fetchFullHotelSearchDataset = async (searchPayload) => {
+  const localHotels = await TBOHotel.find({ cityCode: searchPayload.CityCode })
     .select("hotelCode")
     .lean();
 
   if (!localHotels.length) {
-    logger.warn(`[hotel-search] No hotel codes found in DB for city ${CityCode}`);
-    return {
-      hotels: [],
-      traceId: null,
-      failedChunks: [],
-      totalChunks: 0,
-      elapsedMs: 0,
-      totalHotelCodes: 0,
-    };
+    logger.warn(`[hotel-search] No hotel codes found in DB for city ${searchPayload.CityCode}`);
+    return { searchId: null, status: 'completed', isCached: false, hotels: [], totalHotelCodes: 0 };
   }
 
   const hotelCodes = localHotels
     .map((hotel) => String(hotel.hotelCode || "").trim())
     .filter(Boolean);
 
-  const searchPayload = {
-    CheckIn,
-    CheckOut,
-    CityCode,
-    CityName,
-    CountryCode,
-    CountryName,
-    corporateId,
-    GuestNationality,
-    NoOfRooms,
-    PaxRooms,
-    IsDetailedResponse,
-    Filters: DEFAULT_TBO_FILTERS,
-    ResponseTime,
-  };
-
-  logger.info(`[hotel-search] Initiating distributed search for ${hotelCodes.length} codes...`);
-  const { searchId, totalChunks, totalHotels } = await initiateDistributedSearch(hotelCodes, searchPayload);
-
-  if (totalChunks === 0) {
-    return {
-      hotels: [],
-      totalHotelCodes: 0,
-      searchId: null
-    };
+  logger.info(`[hotel-search] Coordinator analyzing search for ${hotelCodes.length} codes...`);
+  
+  // Let the coordinator handle everything: Cache, Registry, Locks, Queues
+  const searchResult = await handleSearchRequest(searchPayload, hotelCodes);
+  
+  // If it's cached or completed instantly, return it
+  if (searchResult.status === 'completed') {
+     return searchResult;
   }
 
-  // Wait for the first chunk to complete so the initial API response is never empty
+  // Otherwise, it's either 'running' or 'pending' (someone else started it).
+  // We want to block and wait until at least ONE chunk has produced some hotels
+  // so the initial API response is never entirely empty.
   let firstChunkHotels = [];
   try {
+    const { searchId } = searchResult;
     let attempts = 0;
     while (attempts < 60) { // Wait up to 15 seconds (60 * 250ms)
-      const meta = await redis.hgetall(`search:${searchId}:meta`);
-      const resultsMap = await redis.hgetall(`search:${searchId}:results`);
+      const resultsMap = await redis.hvalsBuffer(`search:${searchId}:results`);
       
-      for (const key of Object.keys(resultsMap)) {
-        const chunkData = JSON.parse(resultsMap[key]);
-        firstChunkHotels.push(...chunkData);
+      if (resultsMap && resultsMap.length > 0) {
+        // Decompress the first available chunk
+        for (const buffer of resultsMap) {
+          try {
+            const decompressed = await gunzip(buffer);
+            const chunkHotels = JSON.parse(decompressed.toString("utf-8"));
+            if (Array.isArray(chunkHotels) && chunkHotels.length > 0) {
+              firstChunkHotels.push(...chunkHotels);
+            }
+          } catch (e) {}
+        }
       }
 
-      // If we found hotels, OR if all chunks are completely finished (failed + completed), break out
-      if (firstChunkHotels.length > 0 || (Number(meta.completedChunks) + Number(meta.failedChunks)) >= totalChunks) {
+      const meta = await redis.hgetall(`search:registry:${searchId}`);
+
+      if (firstChunkHotels.length > 0 || meta.status === 'completed') {
         break;
       }
       
@@ -187,12 +166,10 @@ const fetchFullHotelSearchDataset = async ({
     logger.warn(`[hotel-search] Error waiting for first chunk: ${err.message}`);
   }
 
-  // RETURN FOR PROGRESSIVE STREAMING WITH FIRST CHUNK PRE-LOADED
+  // Return the search result with whatever initial hotels we found
   return {
+    ...searchResult,
     hotels: firstChunkHotels,
-    totalHotelCodes: totalHotels,
-    searchId,
-    totalChunks,
     isStreaming: true
   };
 };

@@ -24,7 +24,16 @@ require("./workers/searchChunk.worker"); // Ensure worker runs in the same proce
     const server = http.createServer(app);
     
     // Initialize Socket.IO
-    initSocketIO(server);
+    const io = initSocketIO(server);
+
+    // Initialize Batched Socket Streaming
+    const socketPublisher = require("./modules/searchCoordinator/socketPublisher.service");
+    socketPublisher.setIOInstance(io);
+    socketPublisher.startPublisherLoop(250); // Emit aggregated chunks every 250ms
+
+    // Pass IO to Finalizer Worker
+    const { setIOInstance } = require("./workers/searchFinalize.worker");
+    setIOInstance(io);
 
     server.listen(PORT, () => {
       logger.info(`
