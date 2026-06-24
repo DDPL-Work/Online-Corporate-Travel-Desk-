@@ -1,4 +1,17 @@
-const Queue = require('bull');
-const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const emailQueue = new Queue('email', redisUrl);
+const Queue = require("bull");
+
+const redisConfig = {
+  host: process.env.REDIS_HOST,
+  port: Number(process.env.REDIS_PORT),
+  password: process.env.REDIS_PASSWORD || undefined,
+};
+
+const emailQueue = new Queue("email", {
+  redis: redisConfig,
+});
+
+emailQueue.on("error", (err) => {
+  console.error("[Email Queue Redis Error]", err);
+});
+
 module.exports = { emailQueue };
