@@ -80,13 +80,38 @@ const FilterSidebar = ({
     refundable:
       typeof filters?.refundable === "boolean" ? filters.refundable : null,
   };
-  const dynamicMinPrice = toSafeNumber(filterMeta?.priceRange?.min, 0);
+  const rawPrices = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    if (rawHotels && rawHotels.length > 0) {
+      rawHotels.forEach(hotel => {
+        const rooms = Array.isArray(hotel.Rooms) ? hotel.Rooms : [];
+        if (rooms.length > 0) {
+          const cheapestRoom = rooms.reduce((prev, curr) => {
+            const prevTotal = (prev.TotalFare || 0) + (prev.TotalTax || 0);
+            const currTotal = (curr.TotalFare || 0) + (curr.TotalTax || 0);
+            return currTotal < prevTotal ? curr : prev;
+          });
+          const price = cheapestRoom.TotalFare || 0;
+          if (price < min) min = price;
+          if (price > max) max = price;
+        }
+      });
+    }
+    return { min: min === Infinity ? null : min, max: max === -Infinity ? null : max };
+  }, [rawHotels]);
+
+  const dynamicMinPrice = rawPrices.min !== null ? rawPrices.min : toSafeNumber(filterMeta?.priceRange?.min, 0);
   const dynamicMaxPrice = Math.max(
-    toSafeNumber(filterMeta?.priceRange?.max, dynamicMinPrice),
+    rawPrices.max !== null ? rawPrices.max : toSafeNumber(filterMeta?.priceRange?.max, dynamicMinPrice),
     dynamicMinPrice,
   );
-  const sliderMax = Math.max(dynamicMaxPrice, dynamicMinPrice + 500);
+  
+  // Enforce a small minimum gap if min and max are the same
+  const sliderMax = Math.max(dynamicMaxPrice, dynamicMinPrice + 0);
   const priceSpread = Math.max(1, sliderMax - dynamicMinPrice);
+  
+  // Don't enforce the 500 gap for the slider thumbs if the user hasn't interacted, just use the min/max
   const selectedMinPrice = Math.min(
     Math.max(
       currentFilters.minPrice === null
@@ -94,7 +119,7 @@ const FilterSidebar = ({
         : toSafeNumber(currentFilters.minPrice, dynamicMinPrice),
       dynamicMinPrice,
     ),
-    sliderMax - 500,
+    sliderMax,
   );
   const selectedMaxPrice = Math.max(
     Math.min(
@@ -103,7 +128,7 @@ const FilterSidebar = ({
         : toSafeNumber(currentFilters.maxPrice, sliderMax),
       sliderMax,
     ),
-    selectedMinPrice + 500,
+    selectedMinPrice,
   );
   const formatPrice = (value) => toSafeNumber(Math.round(value), 0).toLocaleString();
 
@@ -194,7 +219,7 @@ const FilterSidebar = ({
     <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          {onClose && (
+          {/* {onClose && (
             <button
               type="button"
               onClick={onClose}
@@ -206,7 +231,7 @@ const FilterSidebar = ({
           )}
           <h2 className="text-lg font-bold" style={{ color: AZURE }}>
             Filters
-          </h2>
+          </h2> */}
         </div>
         {activeFilterCount > 0 && (
           <button

@@ -314,6 +314,7 @@ const Header = () => {
                 options={normalizedCountries}
                 displayKey="name"
                 valueKey="code"
+                showCodeInOptions={true}
                 onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
                 onChange={(item) => {
                   setForm({ ...form, country: item.code, cityCode: "", cityName: "" });

@@ -13,13 +13,8 @@ const MIN_CHUNK_SIZE = 50;
  * @returns {number} chunkSize
  */
 function calculateOptimalChunkSize(totalHotels, activeWorkers = 5) {
-  const targetBatches = activeWorkers * 4;
-  let chunkSize = Math.ceil(totalHotels / targetBatches);
-  
-  if (chunkSize > MAX_TBO_LIMIT) chunkSize = MAX_TBO_LIMIT;
-  if (chunkSize < MIN_CHUNK_SIZE) chunkSize = MIN_CHUNK_SIZE;
-  
-  return chunkSize;
+  // As requested: fixed chunk size of 100 hotel codes per chunk.
+  return 100;
 }
 
 /**
