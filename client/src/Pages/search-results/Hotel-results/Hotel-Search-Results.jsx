@@ -150,8 +150,16 @@ function HotelSearchResults() {
 
     console.log(`[WebSocket] Attempting to connect for searchId: ${searchId}`);
 
-    // Force connection to the backend server port to bypass Vite proxy issues
-    const API_URL = "http://localhost:5000";
+    // Dynamically derive the socket origin from the existing VITE_API_BASE_URL
+    let API_URL = undefined;
+    const apiBase = import.meta.env.VITE_API_BASE_URL;
+    if (apiBase && apiBase.startsWith("http")) {
+      try {
+        API_URL = new URL(apiBase).origin;
+      } catch (e) {
+        console.warn("Invalid VITE_API_BASE_URL for socket parsing");
+      }
+    }
 
     const socket = io(API_URL, {
       transports: ["websocket", "polling"],
