@@ -1,26 +1,24 @@
 const { Worker } = require("bullmq");
+const zlib = require("zlib");
+const { promisify } = require("util");
+const gzip = promisify(zlib.gzip);
 const createBullConnection = require("../queues/connection");
-const { SEARCH_QUEUE_NAME } = require("../queues/search.queue");
+const { SEARCH_QUEUE_NAME, finalizeQueue } = require("../queues/search.queue");
 const hotelService = require("../services/tektravels/hotel.service");
-const MarkupCalculatorService = require("../modules/markup/services/markupCalculator.service");
 const TBOHotelDetails = require("../models/TBOHotelDetails");
 const redis = require("../config/redis");
 const logger = require("../utils/logger");
-
-// Socket.IO Redis Emitter
-const { Emitter } = require("@socket.io/redis-emitter");
-const io = new Emitter(redis);
+const socketPublisher = require("../modules/searchCoordinator/socketPublisher.service");
+const registryService = require("../modules/searchCoordinator/registry.service");
 
 /**
  * Merges TBO Result with Static MongoDB Details.
- * Done at the chunk level to avoid massive Memory GC spikes at the end.
  */
 async function mergeDetailsPerChunk(tboHotels) {
   if (!tboHotels || tboHotels.length === 0) return [];
   
   const hotelCodes = tboHotels.map(h => h.HotelCode);
   
-  // Fetch details only for this chunk's hotels
   const details = await TBOHotelDetails.find({ hotelCode: { $in: hotelCodes } })
     .select('hotelCode hotelName address cityName countryName hotelRating description images hotelFacilities map image')
     .lean();
@@ -48,63 +46,55 @@ async function mergeDetailsPerChunk(tboHotels) {
   });
 }
 
-// Ensure mongoose is connected before workers start processing
-// In production, the worker process might be separate from the main API.
-
 const worker = new Worker(
   SEARCH_QUEUE_NAME,
   async (job) => {
-    const { searchId, chunkNumber, totalChunks, chunkCodes, searchPayload, corporateId } = job.data;
+    const { searchId, chunkNumber, totalChunks, chunkCodes, searchPayload } = job.data;
     const startedAt = Date.now();
 
     try {
-      // 1. Fetch from TBO (Markup is internally applied by hotelService)
+      // 1. Fetch from TBO
       const tboPayload = { ...searchPayload, HotelCodes: chunkCodes.join(",") };
       const tboResponse = await hotelService.searchHotels(tboPayload);
 
       let processedHotels = [];
       if (tboResponse && tboResponse.HotelResult && tboResponse.HotelResult.length > 0) {
-        
-        // 2. Merge Static Details (Memory intensive, good that it's chunked)
         processedHotels = await mergeDetailsPerChunk(tboResponse.HotelResult);
       }
 
-      // 3. Save results to Redis Hash mapped by SearchId
+      // 2. Save compressed results and push to buffer
       if (processedHotels.length > 0) {
         const resultKey = `search:${searchId}:results`;
-        await redis.hset(
-          resultKey, 
-          job.id, 
-          JSON.stringify(processedHotels)
-        );
+        
+        // Compress data to save massive Redis memory (reduces size by 90%)
+        const jsonString = JSON.stringify(processedHotels);
+        const compressed = await gzip(jsonString);
+        
+        // Store as buffer
+        await redis.hsetBuffer(resultKey, job.id, compressed);
         await redis.expire(resultKey, 900);
 
-        // EMIT PROGRESSIVE CHUNK TO SOCKET
-        io.to(searchId).emit("chunk_result", {
-          searchId,
+        // Push to streaming buffer (decoupled from sockets)
+        await socketPublisher.pushToBuffer(searchId, {
           hotels: processedHotels,
           chunkNumber,
           totalChunks
         });
       }
 
-      // 4. Update completed count and check if search is entirely finished
-      const completedCount = await redis.hincrby(`search:${searchId}:meta`, 'completedChunks', 1);
-      const meta = await redis.hgetall(`search:${searchId}:meta`);
-      const total = Number(meta.totalChunks);
-      const failed = Number(meta.failedChunks);
+      // 3. Update Registry and check for finalization
+      await registryService.updateRegistryProgress(searchId, 1, 0);
+      
+      const registryEntry = await registryService.getRegistryEntry(searchId);
+      if (registryEntry) {
+        const total = Number(registryEntry.totalChunks);
+        const completedCount = Number(registryEntry.completedChunks);
+        const failedCount = Number(registryEntry.failedChunks);
 
-      // If all chunks processed, trigger final completion
-      if (total > 0 && (completedCount + failed) >= total) {
-        const { aggregateFinalResults } = require("../modules/search/search.merge");
-        // We lack cityRecord here, but we can pass an empty one or fetch it.
-        const finalData = await aggregateFinalResults(searchId, {});
-        
-        io.to(searchId).emit("search_complete", {
-          searchId,
-          filterMeta: finalData.filterMeta,
-          searchMeta: finalData.searchMeta
-        });
+        // If completely done, trigger the finalizer queue!
+        if (total > 0 && (completedCount + failedCount) >= total) {
+          await finalizeQueue.add("finalize_search", { searchId });
+        }
       }
 
       const latencyMs = Date.now() - startedAt;
@@ -112,14 +102,18 @@ const worker = new Worker(
 
     } catch (error) {
       logger.error(`[Worker] Job ${job.id} failed:`, error.message);
-      throw error; // Let BullMQ retry engine handle it
+      throw error;
     }
   },
   {
     connection: createBullConnection(),
-    concurrency: 3, // Reduced from 5 to prevent event loop lag spikes
-    lockDuration: 120000, // Extend lock to 2 minutes
-    stalledInterval: 60000 // Check for stalled jobs every 1 minute
+    concurrency: 5,
+    lockDuration: 120000,
+    stalledInterval: 60000,
+    limiter: {
+      max: 20,       // Rate limit TBO API globally
+      duration: 1000 // 20 requests per 1000ms
+    }
   }
 );
 
@@ -128,20 +122,29 @@ worker.on("ready", () => {
 });
 
 worker.on("active", (job) => {
-  logger.info(`[Worker] Started processing chunk ${job.data.chunkNumber} for search ${job.data.searchId}`);
+  logger.info(`[Worker] Started chunk ${job.data.chunkNumber} for search ${job.data.searchId}`);
 });
 
 worker.on("completed", (job, returnvalue) => {
-  logger.info(`[Worker] Job ${job.id} completed. Found ${returnvalue.hotelsFound} hotels in ${returnvalue.latencyMs}ms.`);
+  logger.info(`[Worker] Chunk completed in ${returnvalue.latencyMs}ms with ${returnvalue.hotelsFound} hotels.`);
 });
 
 worker.on("failed", async (job, err) => {
-  logger.warn(`[Worker] Job ${job?.id} failed with error: ${err.message}`);
-  
+  logger.warn(`[Worker] Chunk failed with error: ${err.message}`);
   const maxAttempts = job?.opts?.attempts || 3;
   if (job && job.attemptsMade >= maxAttempts) {
     if (job.data?.searchId) {
-       await redis.hincrby(`search:${job.data.searchId}:meta`, 'failedChunks', 1);
+       await registryService.updateRegistryProgress(job.data.searchId, 0, 1);
+       // Also check if we need to finalize even on failure
+       const registryEntry = await registryService.getRegistryEntry(job.data.searchId);
+       if (registryEntry) {
+         const total = Number(registryEntry.totalChunks);
+         const completedCount = Number(registryEntry.completedChunks);
+         const failedCount = Number(registryEntry.failedChunks);
+         if (total > 0 && (completedCount + failedCount) >= total) {
+           await finalizeQueue.add("finalize_search", { searchId: job.data.searchId });
+         }
+       }
     }
   }
 });
