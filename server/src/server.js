@@ -31,6 +31,10 @@ require("./workers/searchChunk.worker"); // Ensure worker runs in the same proce
     socketPublisher.setIOInstance(io);
     socketPublisher.startPublisherLoop(250); // Emit aggregated chunks every 250ms
 
+    // Initialize Round-Robin Queue Dispatcher
+    const dispatcherService = require("./modules/searchCoordinator/dispatcher.service");
+    dispatcherService.startDispatcherLoop(100); // Feed BullMQ fairly every 100ms
+
     // Pass IO to Finalizer Worker
     const { setIOInstance } = require("./workers/searchFinalize.worker");
     setIOInstance(io);
