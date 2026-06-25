@@ -68,20 +68,30 @@ async function handleSearchRequest(payload, hotelCodes) {
     // Create registry entry
     await registryService.createRegistryEntry(searchKey, { totalChunks, totalHotelCodes: totalHotels });
 
-    // Dispatch BullMQ jobs for all chunks
-    const jobs = chunks.map((chunkCodes, index) => ({
-      name: `chunk_${index + 1}_of_${totalChunks}`,
-      data: {
-        searchId: searchKey,
-        chunkNumber: index + 1,
-        totalChunks,
-        chunkCodes,
-        searchPayload: payload,
-      }
-    }));
+    // Dispatch to Round-Robin Pending List instead of BullMQ directly
+    const listKey = `pending:chunks:${searchKey}`;
+    const multi = require("../../config/redis").multi();
 
-    // Add all to chunk queue
-    await searchQueue.addBulk(jobs);
+    chunks.forEach((chunkCodes, index) => {
+      const jobDef = {
+        name: `chunk_${index + 1}_of_${totalChunks}`,
+        data: {
+          searchId: searchKey,
+          chunkNumber: index + 1,
+          totalChunks,
+          chunkCodes,
+          searchPayload: payload,
+        }
+      };
+      multi.rpush(listKey, JSON.stringify(jobDef));
+    });
+
+    // Add this search to the active pool so the Dispatcher picks it up
+    multi.sadd("active:searches", searchKey);
+    // Safety TTL so lists don't leak if dispatcher crashes
+    multi.expire(listKey, 3600); 
+
+    await multi.exec();
 
     return {
       searchId: searchKey,

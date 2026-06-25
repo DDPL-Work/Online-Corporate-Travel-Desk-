@@ -137,7 +137,7 @@ const fetchFullHotelSearchDataset = async (searchPayload) => {
   try {
     const { searchId } = searchResult;
     let attempts = 0;
-    while (attempts < 60) { // Wait up to 15 seconds (60 * 250ms)
+    while (attempts < 240) { // Wait up to 240 seconds (60 * 250ms)
       const resultsMap = await redis.hvalsBuffer(`search:${searchId}:results`);
       
       if (resultsMap && resultsMap.length > 0) {
