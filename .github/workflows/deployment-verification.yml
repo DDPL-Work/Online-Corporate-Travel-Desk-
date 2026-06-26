@@ -73,18 +73,7 @@ jobs:
           for ip in "$SERVER1_IP" "$SERVER2_IP"; do
             label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
             ssh "$SSH_USER@$ip" "
-              pm2 jlist 2>/dev/null | python3 -c \"
-          import sys, json
-          procs = json.load(sys.stdin)
-          for p in procs:
-              n = p.get('name','?')
-              s = p.get('pm2_env',{}).get('status','?')
-              r = p.get('pm2_env',{}).get('restart_time',0)
-              m = p.get('monit',{}).get('memory',0)
-              c = p.get('monit',{}).get('cpu',0)
-              mem_mb = m // 1048576
-              print(f'{n}: {s} (restarts: {r}, mem: {mem_mb}MB, cpu: {c}%)')
-          \" 2>/dev/null || echo 'PM2 not accessible'
+              pm2 jlist 2>/dev/null | jq -r '.[] | \"\(.name): \(.pm2_env.status) (restarts: \(.pm2_env.restart_time), mem: \((.monit.memory // 0) / 1048576 | floor)MB, cpu: \(.monit.cpu // 0)% )\"' 2>/dev/null || echo 'PM2 not accessible'
             " | while read line; do
               echo "${label} ${line}"
               if echo "$line" | grep -q "not online"; then
@@ -100,16 +89,7 @@ jobs:
           for ip in "$SERVER1_IP" "$SERVER2_IP"; do
             label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
             response=$(curl -s --max-time 10 "http://${ip}:5000/health" 2>/dev/null || echo "UNREACHABLE")
-            valid=$(echo "${response}" | python3 -c "
-          import sys, json
-          try:
-              d = json.load(sys.stdin)
-              assert d.get('status') == 'OK'
-              assert d.get('env') == 'production'
-              print('VALID')
-          except:
-              print('INVALID')
-          " 2>/dev/null || echo "PARSE_ERR")
+            valid=$(echo "${response}" | jq -e 'select(.status == "OK" and .env == "production")' >/dev/null 2>&1 && echo "VALID" || echo "INVALID")
             echo "  ${label} ${valid}"
             if [ "$valid" != "VALID" ]; then ALL_PASSED=false; fi
           done

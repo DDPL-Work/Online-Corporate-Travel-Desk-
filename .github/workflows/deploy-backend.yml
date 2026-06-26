@@ -190,16 +190,8 @@ jobs:
             exit 0
           fi
 
-          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER1_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+          DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER1_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
 
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
@@ -292,16 +284,8 @@ jobs:
             exit 0
           fi
 
-          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER1_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+          DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER1_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
 
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
@@ -417,16 +401,8 @@ jobs:
             exit 0
           fi
 
-          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER2_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+          DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER2_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
 
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
@@ -512,16 +488,8 @@ jobs:
             exit 0
           fi
 
-          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER2_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+          DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER2_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
 
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \

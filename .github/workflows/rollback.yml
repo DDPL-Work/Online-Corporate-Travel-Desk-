@@ -110,16 +110,8 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
             "https://api.digitalocean.com/v2/droplets?page=1&per_page=200" | \
-            python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER1_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+            jq -r --arg ip "${{ secrets.SERVER1_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             curl -s -X DELETE \
               -H "Content-Type: application/json" \
@@ -170,16 +162,8 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
             "https://api.digitalocean.com/v2/droplets?page=1&per_page=200" | \
-            python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER1_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+            jq -r --arg ip "${{ secrets.SERVER1_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             curl -s -X POST \
               -H "Content-Type: application/json" \
@@ -230,16 +214,8 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
             "https://api.digitalocean.com/v2/droplets?page=1&per_page=200" | \
-            python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER2_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+            jq -r --arg ip "${{ secrets.SERVER2_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             curl -s -X DELETE \
               -H "Content-Type: application/json" \
@@ -273,16 +249,8 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
             "https://api.digitalocean.com/v2/droplets?page=1&per_page=200" | \
-            python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          for d in data.get('droplets', []):
-              for net in d.get('networks', {}).get('v4', []):
-                  if net.get('ip_address') == '${{ secrets.SERVER2_IP }}':
-                      print(d['id'])
-                      sys.exit(0)
-          print('NOT_FOUND')
-          ")
+            jq -r --arg ip "${{ secrets.SERVER2_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
+          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
           if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
             curl -s -X POST \
               -H "Content-Type: application/json" \
