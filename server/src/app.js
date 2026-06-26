@@ -16,7 +16,6 @@ const errorMiddleware = require("./middleware/error.middleware");
 const rateLimitMiddleware = require("./middleware/rateLimit.middleware");
 const logger = require("./utils/logger");
 const { getRedisHealth } = require("./services/redisHealth.service");
-const { getBullConnectionStatus } = require("./queues/connection");
 // const cronJobs = require("./jobs");
 
 const app = express();
@@ -119,6 +118,16 @@ app.use(`/api/${config.api.version}`, routes);
 
 // ------------------------------
 // HEALTH CHECK
+//
+// Load Balancer compatible:
+//   HTTP 200 — process is alive, endpoint executed
+//   HTTP 500 — only if this handler itself throws
+//
+// JSON status:
+//   "OK"      — Redis healthy AND Mongo connected
+//   "DEGRADED" — one or more dependencies unhealthy
+//
+// BullMQ connections are diagnostics-only — they never affect HTTP status.
 // ------------------------------
 app.get("/health", async (req, res) => {
   try {
@@ -139,11 +148,11 @@ app.get("/health", async (req, res) => {
     // Dispatcher status
     const dispatcherState = getSchedulerState();
 
-    // BullMQ status
+    // BullMQ diagnostics (does NOT affect health status)
     const bullConns = getBullConnectionStatus();
 
     // Queue depths
-    const { searchQueue, finalizeQueue, cleanupQueue } = require("./queues/search.queue");
+    const { searchQueue, finalizeQueue } = require("./queues/search.queue");
     const [searchWaiting, searchActive, finalizeWaiting, finalizeActive] = await Promise.all([
       searchQueue.getWaitingCount().catch(() => 0),
       searchQueue.getActiveCount().catch(() => 0),
@@ -157,10 +166,16 @@ app.get("/health", async (req, res) => {
     // Event loop lag
     const searchSnap = searchMetrics.getMetricsSnapshot();
 
-    const statusCode = redisHealth.status === "healthy" && mongoStatus === "connected" ? 200 : 503;
+    // Health evaluation:
+    //   OK      — Redis healthy AND Mongo connected
+    //   DEGRADED — anything else
+    // HTTP status is ALWAYS 200 (LB compatibility).
+    const overallStatus = redisHealth.status === "healthy" && mongoStatus === "connected"
+      ? "OK"
+      : "DEGRADED";
 
-    res.status(statusCode).json({
-      status: statusCode === 200 ? "OK" : "DEGRADED",
+    res.status(200).json({
+      status: overallStatus,
       env: config.env,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
@@ -180,7 +195,7 @@ app.get("/health", async (req, res) => {
         connections: socketConnections,
       },
 
-      // BullMQ
+      // BullMQ — diagnostics only, never affects health status
       bullmq: {
         connections: bullConns,
         queues: {
@@ -208,7 +223,7 @@ app.get("/health", async (req, res) => {
     });
   } catch (err) {
     logger.error("[Health] Error:", err.message);
-    res.status(503).json({ status: "ERROR", env: config.env, error: "Health check failed" });
+    res.status(500).json({ status: "ERROR", env: config.env, error: "Health check failed" });
   }
 });
 

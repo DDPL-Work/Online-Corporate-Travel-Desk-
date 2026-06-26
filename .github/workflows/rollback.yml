@@ -1,5 +1,9 @@
 name: Rollback
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   workflow_run:
     workflows: ["Deploy Backend", "Deploy Frontend"]

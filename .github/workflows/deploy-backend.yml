@@ -1,5 +1,9 @@
 name: Deploy Backend
 
+permissions:
+  contents: read
+  actions: write
+
 on:
   push:
     branches: [main]
@@ -176,6 +180,7 @@ jobs:
         run: |
           echo "::group::Removing Server 1 from DigitalOcean Load Balancer"
 
+          # Step 1: Fetch all droplets
           DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
@@ -190,24 +195,49 @@ jobs:
             exit 0
           fi
 
+          # Step 2: Find droplet by IP
+          echo "Looking for droplet with IP: ${{ secrets.SERVER1_IP }}"
           DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER1_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
-          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
-
-          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
-            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
-              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets/$DROPLET_ID")
-            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
-            if [ "$LB_HTTP" = "204" ] || [ "$LB_HTTP" = "200" ]; then
-              echo "Server 1 removed from LB (HTTP ${LB_HTTP})."
-            else
-              echo "::warning::LB removal returned HTTP ${LB_HTTP}. Check LB state manually."
-            fi
-            sleep 15
-          else
-            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER1_IP }}. Skipping LB removal."
+          if [ -z "$DROPLET_ID" ] || [ "$DROPLET_ID" = "null" ]; then
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER1_IP }}. Droplet may not exist."
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "Found droplet ID: ${DROPLET_ID}"
+
+          # Step 3: Check if droplet is attached to LB
+          LB_INFO=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}")
+          LB_HTTP_CODE=$(echo "$LB_INFO" | tail -1)
+          LB_BODY=$(echo "$LB_INFO" | sed '$d')
+
+          if [ "$LB_HTTP_CODE" = "200" ]; then
+            IS_ATTACHED=$(echo "$LB_BODY" | jq -r --arg id "$DROPLET_ID" '.load_balancer.forwarding_rules? // [] | length > 0' 2>/dev/null || echo "false")
+            ATTACHED_DROPLETS=$(echo "$LB_BODY" | jq -r '.load_balancer.droplet_ids[]?' 2>/dev/null || echo "")
+            if echo "$ATTACHED_DROPLETS" | grep -q "^${DROPLET_ID}$"; then
+              echo "Droplet ${DROPLET_ID} is attached to LB. Removing..."
+            else
+              echo "Droplet ${DROPLET_ID} is NOT attached to LB. Skipping removal."
+              echo "::endgroup::"
+              exit 0
+            fi
+          fi
+
+          # Step 4: Remove droplet from LB
+          LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets/$DROPLET_ID")
+          LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+          if [ "$LB_HTTP" = "204" ] || [ "$LB_HTTP" = "200" ]; then
+            echo "Server 1 removed from LB (HTTP ${LB_HTTP})."
+          else
+            LB_BODY=$(echo "$LB_RESPONSE" | sed '$d')
+            echo "::warning::LB removal returned HTTP ${LB_HTTP}. Response: ${LB_BODY}"
+          fi
+          sleep 15
           echo "::endgroup::"
 
       - name: Copy Deploy Script
@@ -271,6 +301,7 @@ jobs:
         run: |
           echo "::group::Adding Server 1 back to Load Balancer"
 
+          # Step 1: Fetch all droplets
           DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
@@ -284,25 +315,47 @@ jobs:
             exit 0
           fi
 
+          # Step 2: Find droplet by IP
+          echo "Looking for droplet with IP: ${{ secrets.SERVER1_IP }}"
           DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER1_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
-          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
-
-          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
-            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
-              -d "{\"droplet_ids\": [$DROPLET_ID]}" \
-              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets")
-            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
-            if [ "$LB_HTTP" = "200" ] || [ "$LB_HTTP" = "201" ]; then
-              echo "Server 1 added back to LB (HTTP ${LB_HTTP})."
-            else
-              echo "::error::LB add returned HTTP ${LB_HTTP}. Server 1 may not be receiving traffic."
-            fi
-            sleep 30
-          else
-            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER1_IP }}."
+          if [ -z "$DROPLET_ID" ] || [ "$DROPLET_ID" = "null" ]; then
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER1_IP }}. Droplet may not exist."
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "Found droplet ID: ${DROPLET_ID}"
+
+          # Step 3: Check if droplet is already attached to LB
+          LB_INFO=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}")
+          LB_HTTP_CODE=$(echo "$LB_INFO" | tail -1)
+          LB_BODY=$(echo "$LB_INFO" | sed '$d')
+
+          if [ "$LB_HTTP_CODE" = "200" ]; then
+            ATTACHED_DROPLETS=$(echo "$LB_BODY" | jq -r '.load_balancer.droplet_ids[]?' 2>/dev/null || echo "")
+            if echo "$ATTACHED_DROPLETS" | grep -q "^${DROPLET_ID}$"; then
+              echo "Droplet ${DROPLET_ID} is already attached to LB. Skipping addition."
+              echo "::endgroup::"
+              exit 0
+            fi
+          fi
+
+          # Step 4: Add droplet to LB
+          LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            -d "{\"droplet_ids\": [$DROPLET_ID]}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets")
+          LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+          if [ "$LB_HTTP" = "200" ] || [ "$LB_HTTP" = "201" ]; then
+            echo "Server 1 added back to LB (HTTP ${LB_HTTP})."
+          else
+            LB_BODY=$(echo "$LB_RESPONSE" | sed '$d')
+            echo "::error::LB add returned HTTP ${LB_HTTP}. Response: ${LB_BODY}"
+          fi
+          sleep 30
           echo "::endgroup::"
 
       - name: Deployment Status
@@ -388,6 +441,7 @@ jobs:
         run: |
           echo "::group::Removing Server 2 from Load Balancer"
 
+          # Step 1: Fetch all droplets
           DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
@@ -401,24 +455,48 @@ jobs:
             exit 0
           fi
 
+          # Step 2: Find droplet by IP
+          echo "Looking for droplet with IP: ${{ secrets.SERVER2_IP }}"
           DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER2_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
-          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
-
-          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
-            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
-              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets/$DROPLET_ID")
-            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
-            if [ "$LB_HTTP" = "204" ] || [ "$LB_HTTP" = "200" ]; then
-              echo "Server 2 removed from LB (HTTP ${LB_HTTP})."
-            else
-              echo "::warning::LB removal returned HTTP ${LB_HTTP}."
-            fi
-            sleep 15
-          else
-            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER2_IP }}."
+          if [ -z "$DROPLET_ID" ] || [ "$DROPLET_ID" = "null" ]; then
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER2_IP }}. Droplet may not exist."
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "Found droplet ID: ${DROPLET_ID}"
+
+          # Step 3: Check if droplet is attached to LB
+          LB_INFO=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}")
+          LB_HTTP_CODE=$(echo "$LB_INFO" | tail -1)
+          LB_BODY=$(echo "$LB_INFO" | sed '$d')
+
+          if [ "$LB_HTTP_CODE" = "200" ]; then
+            ATTACHED_DROPLETS=$(echo "$LB_BODY" | jq -r '.load_balancer.droplet_ids[]?' 2>/dev/null || echo "")
+            if echo "$ATTACHED_DROPLETS" | grep -q "^${DROPLET_ID}$"; then
+              echo "Droplet ${DROPLET_ID} is attached to LB. Removing..."
+            else
+              echo "Droplet ${DROPLET_ID} is NOT attached to LB. Skipping removal."
+              echo "::endgroup::"
+              exit 0
+            fi
+          fi
+
+          # Step 4: Remove droplet from LB
+          LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets/$DROPLET_ID")
+          LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+          if [ "$LB_HTTP" = "204" ] || [ "$LB_HTTP" = "200" ]; then
+            echo "Server 2 removed from LB (HTTP ${LB_HTTP})."
+          else
+            LB_BODY=$(echo "$LB_RESPONSE" | sed '$d')
+            echo "::warning::LB removal returned HTTP ${LB_HTTP}. Response: ${LB_BODY}"
+          fi
+          sleep 15
           echo "::endgroup::"
 
       - name: Deploy Server 2
@@ -475,6 +553,7 @@ jobs:
         run: |
           echo "::group::Adding Server 2 back to Load Balancer"
 
+          # Step 1: Fetch all droplets
           DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
@@ -488,25 +567,47 @@ jobs:
             exit 0
           fi
 
+          # Step 2: Find droplet by IP
+          echo "Looking for droplet with IP: ${{ secrets.SERVER2_IP }}"
           DROPLET_ID=$(echo "$DO_BODY" | jq -r --arg ip "${{ secrets.SERVER2_IP }}" '.droplets[]? | select(.networks.v4[]? | .ip_address == $ip) | .id' | head -1)
-          if [ -z "$DROPLET_ID" ]; then DROPLET_ID="NOT_FOUND"; fi
-
-          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
-            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
-              -d "{\"droplet_ids\": [$DROPLET_ID]}" \
-              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets")
-            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
-            if [ "$LB_HTTP" = "200" ] || [ "$LB_HTTP" = "201" ]; then
-              echo "Server 2 added back to LB (HTTP ${LB_HTTP})."
-            else
-              echo "::error::LB add returned HTTP ${LB_HTTP}. Server 2 may not be receiving traffic."
-            fi
-            sleep 30
-          else
-            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER2_IP }}."
+          if [ -z "$DROPLET_ID" ] || [ "$DROPLET_ID" = "null" ]; then
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER2_IP }}. Droplet may not exist."
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "Found droplet ID: ${DROPLET_ID}"
+
+          # Step 3: Check if droplet is already attached to LB
+          LB_INFO=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}")
+          LB_HTTP_CODE=$(echo "$LB_INFO" | tail -1)
+          LB_BODY=$(echo "$LB_INFO" | sed '$d')
+
+          if [ "$LB_HTTP_CODE" = "200" ]; then
+            ATTACHED_DROPLETS=$(echo "$LB_BODY" | jq -r '.load_balancer.droplet_ids[]?' 2>/dev/null || echo "")
+            if echo "$ATTACHED_DROPLETS" | grep -q "^${DROPLET_ID}$"; then
+              echo "Droplet ${DROPLET_ID} is already attached to LB. Skipping addition."
+              echo "::endgroup::"
+              exit 0
+            fi
+          fi
+
+          # Step 4: Add droplet to LB
+          LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            -d "{\"droplet_ids\": [$DROPLET_ID]}" \
+            "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets")
+          LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+          if [ "$LB_HTTP" = "200" ] || [ "$LB_HTTP" = "201" ]; then
+            echo "Server 2 added back to LB (HTTP ${LB_HTTP})."
+          else
+            LB_BODY=$(echo "$LB_RESPONSE" | sed '$d')
+            echo "::error::LB add returned HTTP ${LB_HTTP}. Response: ${LB_BODY}"
+          fi
+          sleep 30
           echo "::endgroup::"
 
       - name: Deployment Status
@@ -550,16 +651,13 @@ jobs:
 
       - name: Run Full Deployment Verification
         run: |
-          chmod +x deployment/scripts/verify-deployment.sh
-          scp deployment/scripts/verify-deployment.sh \
-            "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}:/tmp/verify-deployment.sh"
-          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
-            "SERVER1_IP=${{ secrets.SERVER1_IP }} \
-             SERVER2_IP=${{ secrets.SERVER2_IP }} \
-             APP_PATH=${{ env.APP_PATH }} \
-             SSH_USER=${{ secrets.SSH_USER }} \
-             PUBLIC_URL=https://corporate.traveamer.com \
-             bash /tmp/verify-deployment.sh"
+          for ip in "${{ secrets.SERVER1_IP }}" "${{ secrets.SERVER2_IP }}"; do
+            echo "Verifying $ip..."
+            scp -o ConnectTimeout=10 deployment/scripts/health-check.sh \
+              "${{ secrets.SSH_USER }}@${ip}:/tmp/health-check.sh"
+            ssh "${{ secrets.SSH_USER }}@${ip}" \
+              "bash /tmp/health-check.sh $ip ${{ env.APP_PATH }}"
+          done
         timeout-minutes: 5
 
   notify:

@@ -3,9 +3,9 @@ module.exports = {
     {
       name: "travel-api",
 
-      cwd: "/var/www/travel-app/server",
+      cwd: "/var/www/Online-Corporate-Travel-Desk-/server",
 
-      script: "src/index.js",
+      script: "src/server.js",
 
       instances: 1,
 
@@ -17,9 +17,9 @@ module.exports = {
 
       max_memory_restart: "1G",
 
-      error_file: "/var/www/travel-app/logs/error.log",
+      error_file: "/var/www/Online-Corporate-Travel-Desk-/logs/error.log",
 
-      out_file: "/var/www/travel-app/logs/output.log",
+      out_file: "/var/www/Online-Corporate-Travel-Desk-/logs/output.log",
 
       log_date_format: "YYYY-MM-DD HH:mm:ss",
 
