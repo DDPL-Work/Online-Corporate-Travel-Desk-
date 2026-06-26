@@ -29,6 +29,7 @@ const toSafeNumber = (value, fallback = 0) => {
 
 const FilterSidebar = ({
   hotels = [],
+  rawHotels = [],
   filterMeta,
   filters,
   setFilters,
@@ -39,6 +40,7 @@ const FilterSidebar = ({
   pagination,
   selectedLocation,
   setSelectedLocation,
+  onClose,
 }) => {
   const inputRef = useRef(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
@@ -78,13 +80,38 @@ const FilterSidebar = ({
     refundable:
       typeof filters?.refundable === "boolean" ? filters.refundable : null,
   };
-  const dynamicMinPrice = toSafeNumber(filterMeta?.priceRange?.min, 0);
+  const rawPrices = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    if (rawHotels && rawHotels.length > 0) {
+      rawHotels.forEach(hotel => {
+        const rooms = Array.isArray(hotel.Rooms) ? hotel.Rooms : [];
+        if (rooms.length > 0) {
+          const cheapestRoom = rooms.reduce((prev, curr) => {
+            const prevTotal = (prev.TotalFare || 0) + (prev.TotalTax || 0);
+            const currTotal = (curr.TotalFare || 0) + (curr.TotalTax || 0);
+            return currTotal < prevTotal ? curr : prev;
+          });
+          const price = cheapestRoom.TotalFare || 0;
+          if (price < min) min = price;
+          if (price > max) max = price;
+        }
+      });
+    }
+    return { min: min === Infinity ? null : min, max: max === -Infinity ? null : max };
+  }, [rawHotels]);
+
+  const dynamicMinPrice = rawPrices.min !== null ? rawPrices.min : toSafeNumber(filterMeta?.priceRange?.min, 0);
   const dynamicMaxPrice = Math.max(
-    toSafeNumber(filterMeta?.priceRange?.max, dynamicMinPrice),
+    rawPrices.max !== null ? rawPrices.max : toSafeNumber(filterMeta?.priceRange?.max, dynamicMinPrice),
     dynamicMinPrice,
   );
-  const sliderMax = Math.max(dynamicMaxPrice, dynamicMinPrice + 500);
+  
+  // Enforce a small minimum gap if min and max are the same
+  const sliderMax = Math.max(dynamicMaxPrice, dynamicMinPrice + 0);
   const priceSpread = Math.max(1, sliderMax - dynamicMinPrice);
+  
+  // Don't enforce the 500 gap for the slider thumbs if the user hasn't interacted, just use the min/max
   const selectedMinPrice = Math.min(
     Math.max(
       currentFilters.minPrice === null
@@ -92,7 +119,7 @@ const FilterSidebar = ({
         : toSafeNumber(currentFilters.minPrice, dynamicMinPrice),
       dynamicMinPrice,
     ),
-    sliderMax - 500,
+    sliderMax,
   );
   const selectedMaxPrice = Math.max(
     Math.min(
@@ -101,7 +128,7 @@ const FilterSidebar = ({
         : toSafeNumber(currentFilters.maxPrice, sliderMax),
       sliderMax,
     ),
-    selectedMinPrice + 500,
+    selectedMinPrice,
   );
   const formatPrice = (value) => toSafeNumber(Math.round(value), 0).toLocaleString();
 
@@ -159,34 +186,53 @@ const FilterSidebar = ({
 
   // Update dropdown position on scroll or resize
   useEffect(() => {
-    const updatePos = () => {
-      if (inputRef.current) {
-        const rect = inputRef.current.getBoundingClientRect();
-        setDropdownPos({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
-          width: rect.width,
-        });
-      }
-    };
-
-    if (openLocation) {
-      updatePos();
-      window.addEventListener("scroll", updatePos, true);
-      window.addEventListener("resize", updatePos);
-    }
-    return () => {
-      window.removeEventListener("scroll", updatePos, true);
-      window.removeEventListener("resize", updatePos);
-    };
+    // Dropdown position is now handled via native CSS absolute positioning.
   }, [openLocation]);
+
+  const availableMealTypes = useMemo(() => {
+    const meals = new Set();
+    if (rawHotels && rawHotels.length > 0) {
+      rawHotels.forEach((hotel) => {
+        const rooms = Array.isArray(hotel.Rooms) ? hotel.Rooms : [];
+        const cheapestRoom = rooms.length
+          ? rooms.reduce((prev, curr) => {
+              const prevTotal = (prev.TotalFare || 0) + (prev.TotalTax || 0);
+              const currTotal = (curr.TotalFare || 0) + (curr.TotalTax || 0);
+              return currTotal < prevTotal ? curr : prev;
+            })
+          : null;
+        if (cheapestRoom?.MealType) {
+          meals.add(cheapestRoom.MealType.replaceAll("_", " ").trim());
+        }
+      });
+    } else {
+      hotels.forEach((h) => {
+        if (h.meal && h.meal.trim()) {
+          meals.add(h.meal.trim());
+        }
+      });
+    }
+    return Array.from(meals).sort();
+  }, [rawHotels, hotels]);
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-4 space-y-2 max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
-        <h2 className="text-lg font-bold" style={{ color: AZURE }}>
-          Filters
-        </h2>
+        <div className="flex items-center gap-2">
+          {/* {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition"
+              aria-label="Close filters"
+            >
+              <IoClose className="text-xl" />
+            </button>
+          )}
+          <h2 className="text-lg font-bold" style={{ color: AZURE }}>
+            Filters
+          </h2> */}
+        </div>
         {activeFilterCount > 0 && (
           <button
             onClick={clearAllFilters}
@@ -271,19 +317,11 @@ const FilterSidebar = ({
                   <IoClose size={14} />
                 </button>
               )}
-            </div>
-
-            {/* Combined Dropdown for Nominatim and Local Areas using Portal */}
-            {(nominatimResults.length > 0 || (openLocation && filteredLocalLocations.length > 0) || (searching && locationQuery.length >= 2)) &&
-              createPortal(
+            {(nominatimResults.length > 0 || (openLocation && filteredLocalLocations.length > 0) || (searching && locationQuery.length >= 2)) && (
                 <div
-                  className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden pointer-events-auto"
+                  className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden pointer-events-auto absolute left-0 w-full mt-1 z-40"
                   style={{
-                    position: "absolute",
-                    top: dropdownPos.top + 4,
-                    left: dropdownPos.left,
-                    width: dropdownPos.width,
-                    zIndex: 99999,
+                    top: "100%",
                     maxHeight: "320px",
                     overflowY: "auto",
                   }}
@@ -352,9 +390,9 @@ const FilterSidebar = ({
                         <p className="text-[10px] text-slate-400 mt-1">Try a different area or landmark</p>
                       </div>
                     )}
-                </div>,
-                document.body
+                </div>
               )}
+            </div>
           </div>
         {/* End of mb-3 */}
 
@@ -487,29 +525,33 @@ const FilterSidebar = ({
         onToggle={() => toggleSection("meal")}
       >
         <div className="space-y-2.5">
-          {(filterMeta?.mealTypes || []).map((meal) => (
-            <label
-              key={meal.value}
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-amber-50 cursor-pointer transition-colors"
-            >
-              <span className="text-sm text-gray-700 font-medium">
-                {meal.value}
-              </span>
-              <input
-                type="checkbox"
-                onChange={() =>
-                  setFilters({
-                    ...currentFilters,
-                    mealType:
-                      currentFilters.mealType === meal.value ? null : meal.value,
-                  })
-                }
-                checked={currentFilters.mealType === meal.value}
-                className="w-4 h-4 cursor-pointer rounded"
-                style={{ accentColor: ORANGE }}
-              />
-            </label>
-          ))}
+          {availableMealTypes.length > 0 ? (
+            availableMealTypes.map((meal) => (
+              <label
+                key={meal}
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-amber-50 cursor-pointer transition-colors"
+              >
+                <span className="text-sm text-gray-700 font-medium">
+                  {meal}
+                </span>
+                <input
+                  type="checkbox"
+                  onChange={() =>
+                    setFilters({
+                      ...currentFilters,
+                      mealType:
+                        currentFilters.mealType === meal ? null : meal,
+                    })
+                  }
+                  checked={currentFilters.mealType === meal}
+                  className="w-4 h-4 cursor-pointer rounded"
+                  style={{ accentColor: ORANGE }}
+                />
+              </label>
+            ))
+          ) : (
+            <p className="text-sm text-gray-500 p-2.5">No meal types available</p>
+          )}
         </div>
       </FilterSection>
 

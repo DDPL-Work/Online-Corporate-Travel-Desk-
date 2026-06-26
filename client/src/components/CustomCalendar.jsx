@@ -213,7 +213,7 @@ export default function CustomCalendar({
       : "---";
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-[0_32px_80px_rgba(0,0,0,0.2)] border border-slate-100 overflow-hidden w-full sm:w-fit sm:min-w-[320px] max-w-[400px] animate-premium-pop mx-auto">
+    <div className="bg-white rounded-[2rem] shadow-[0_32px_80px_rgba(0,0,0,0.2)] border border-slate-100 overflow-hidden w-[90vw] sm:w-auto min-w-[300px] sm:min-w-[340px] animate-premium-pop">
 
       <div className="relative p-3 sm:p-4 flex flex-col gap-4">
         {!showMonthPicker && !showYearPicker && (

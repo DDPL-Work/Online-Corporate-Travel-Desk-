@@ -195,6 +195,12 @@ const calculateLayover = (arrival, departure) => {
   return `${hours}h ${minutes}m`;
 };
 
+const calculateNights = (ci, co) => {
+  if (!ci || !co) return 1;
+  const n = Math.ceil((new Date(co) - new Date(ci)) / (1000 * 60 * 60 * 24));
+  return n > 0 ? n : 1;
+};
+
 const TravellerField = ({ icon, label, value }) => (
   <div className="min-w-0">
     <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5 truncate">
@@ -454,6 +460,7 @@ export const PendingHotelDetailsModal = ({
   const [validationState, setValidationState] = useState("idle");
   const [validationError, setValidationError] = useState(null);
   const [updatedPrice, setUpdatedPrice] = useState(null);
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
 
   const handleValidate = async () => {
     setValidationState("loading");
@@ -516,11 +523,15 @@ export const PendingHotelDetailsModal = ({
   const bookSnap = booking.bookingSnapshot || {};
   const travelers = booking.travellers || [];
   const roomData = hotelRequest.selectedRoom || {};
-  const rawRooms = Array.isArray(roomData.rawRoomData)
+  let rawRooms = Array.isArray(roomData.rawRoomData)
     ? roomData.rawRoomData
     : roomData.rawRoomData
       ? [roomData.rawRoomData]
       : [];
+
+  if (rawRooms.length === 0 && hotelRequest.preBookResponse?.HotelResult?.[0]?.Rooms) {
+    rawRooms = hotelRequest.preBookResponse.HotelResult[0].Rooms;
+  }
 
   // Group rooms by BookingCode or Name to avoid repetition
   const groupedRooms = rawRooms.reduce((acc, room) => {
@@ -592,6 +603,25 @@ export const PendingHotelDetailsModal = ({
 
     return { totalAmount: total || 0, baseFare: base || 0, tax: tx || 0 };
   })();
+
+  const tboDetails = booking.tboHotelDetails || {};
+  const displayHotelName = tboDetails.hotelName || bookSnap.hotelName || hotelRequest?.selectedHotel?.hotelName || "N/A";
+  const displayAddress = tboDetails.address || hotelRequest?.selectedHotel?.address || "N/A";
+  const displayStarRating = tboDetails.hotelRating || hotelRequest?.selectedHotel?.starRating || 4;
+  const rawImages = tboDetails.images || [];
+  let hotelImages = rawImages.length > 0 ? rawImages : [];
+  if (hotelImages.length === 0) {
+    const singleImg = tboDetails.image || bookSnap.hotelImage || "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500";
+    hotelImages = [singleImg];
+  }
+
+  useEffect(() => {
+    if (hotelImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveImgIndex((prev) => (prev + 1) % hotelImages.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [hotelImages.length]);
 
   if (!isMounted) return null;
 
@@ -806,12 +836,9 @@ export const PendingHotelDetailsModal = ({
                   {/* Hotel Snapshot */}
                   <div className="bg-white border border-[#EAE4D9] rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
                     <div className="w-full md:w-72 h-64 md:h-auto relative shrink-0 overflow-hidden">
-                      <img src={
-                          bookSnap.hotelImage ||
-                          "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"
-                        }
-                        alt={bookSnap.hotelName}
-                        className="md:absolute md:inset-0 w-full h-full object-cover" loading="eager" />
+                      <img src={hotelImages[activeImgIndex] || hotelImages[0]}
+                        alt={displayHotelName}
+                        className="md:absolute md:inset-0 w-full h-full object-cover transition-opacity duration-700" loading="eager" />
                       <div className="absolute top-4 left-4">
                         <span className="bg-[#1A1C20]/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
                           Confirmed Rate
@@ -822,11 +849,11 @@ export const PendingHotelDetailsModal = ({
                       <div className="flex justify-between items-start">
                         <div>
                           <h3 className="text-2xl font-black text-[#1A1714] leading-tight tracking-tighter uppercase italic">
-                            {bookSnap.hotelName}
+                            {displayHotelName}
                           </h3>
                           <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2 font-medium">
                             <FiMapPin className="text-[#B5862A]" />{" "}
-                            {hotelRequest?.selectedHotel?.address || "N/A"}
+                            {displayAddress}
                           </p>
                         </div>
                         <div className="flex items-center gap-0.5 text-amber-400 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
@@ -835,8 +862,7 @@ export const PendingHotelDetailsModal = ({
                               key={i}
                               size={12}
                               fill={
-                                i <
-                                (hotelRequest?.selectedHotel?.starRating || 4)
+                                i < displayStarRating
                                   ? "currentColor"
                                   : "none"
                               }
@@ -859,7 +885,7 @@ export const PendingHotelDetailsModal = ({
                         <TravellerField
                           icon={<FiMoon />}
                           label="Nights"
-                          value={`${bookSnap.nights || 1} Night(s)`}
+                          value={`${calculateNights(bookSnap.checkInDate || hotelRequest?.checkInDate, bookSnap.checkOutDate || hotelRequest?.checkOutDate)} Night(s)`}
                         />
                         <TravellerField
                           icon={<FiHome />}
@@ -1052,7 +1078,7 @@ export const PendingHotelDetailsModal = ({
                     />
                     <div className="mt-6">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
+                        Need to Pay <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter">
                         ₹ {totalAmount.toLocaleString()}
@@ -2143,7 +2169,7 @@ export const PendingFlightDetailsModal = ({
                     />
                     <div className="mt-8 relative">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">
-                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
+                        Need to Pay <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
                       </p>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-slate-500 italic">

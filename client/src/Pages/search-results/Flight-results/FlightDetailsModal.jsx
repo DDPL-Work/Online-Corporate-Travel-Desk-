@@ -139,128 +139,128 @@ function FlightSegmentDetail({ segment }) {
   const from = segment.Origin?.Airport?.CityName;
   const fromCode = segment.Origin?.Airport?.AirportCode;
   const fromTerminal = segment.Origin?.Airport?.Terminal;
+  const fromAirport = segment.Origin?.Airport?.AirportName;
+  const fromCountry = segment.Origin?.Airport?.CountryName;
+
   const to = segment.Destination?.Airport?.CityName;
   const toCode = segment.Destination?.Airport?.AirportCode;
   const toTerminal = segment.Destination?.Airport?.Terminal;
+  const toAirport = segment.Destination?.Airport?.AirportName;
+  const toCountry = segment.Destination?.Airport?.CountryName;
 
   const durationMin = segment.Duration || 0;
   const durationH = Math.floor(durationMin / 60);
   const durationM = durationMin % 60;
+  const duration = `${durationH}h ${durationM}m`;
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-white">
       {/* Airline Header Bar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-[#0A203E]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden p-1">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#0A203E]">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden p-1">
             <img src={airlineLogo(airlineCode)}
               alt={airlineName}
               className="w-full h-full object-contain" loading="eager" />
           </div>
           <div>
-            <p className="text-sm font-black text-white leading-none">
+            <p className="text-xs sm:text-sm font-black text-white leading-none">
               {airlineName}
             </p>
-            <p className="text-[10px] font-bold text-[#C9A84C] uppercase tracking-widest mt-0.5">
+            <p className="text-[9px] sm:text-[10px] font-bold text-[#C9A84C] uppercase tracking-widest mt-0.5">
               {airlineCode} · {flightNumber}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {cabinClassLabel && (
-            <span className="px-3 py-1 bg-white/10 text-white text-[10px] font-black uppercase tracking-widest rounded-full border border-white/20">
+            <span className="px-2 sm:px-3 py-1 bg-white/10 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest rounded-full border border-white/20">
               {cabinClassLabel}
             </span>
           )}
-          <span className="px-3 py-1 bg-[#C9A84C] text-[#0A203E] text-[10px] font-black uppercase tracking-widest rounded-full">
-            {durationH}h {durationM}
-          </span>
         </div>
       </div>
 
-      {/* Flight Route */}
-      <div className="px-6 py-5 flex items-center justify-between gap-4">
-        {/* Departure */}
-        <div className="text-left min-w-[110px]">
-          <p className="text-3xl font-black text-[#0A203E] leading-none">
-            {formatTime(depTime)}
-          </p>
-          <p className="text-base font-black text-slate-800 mt-1.5">
-            {fromCode}
-          </p>
-          <p className="text-xs font-semibold text-slate-500 mt-0.5 leading-snug">
-            {from}
-          </p>
-          {fromTerminal && (
-            <span className="inline-block mt-1.5 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-wider rounded border border-amber-200">
-              Terminal {fromTerminal}
-            </span>
-          )}
-          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-1.5">
-            {formatDate(depTime)}
-          </p>
-        </div>
-
-        {/* Middle connector */}
-        <div className="flex-1 flex flex-col items-center gap-1 px-2">
-          <div className="w-full flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-full border-2 border-[#C9A84C] bg-white shrink-0" />
-            <div className="flex-1 h-0.5 bg-linear-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
-            <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center shadow-md shrink-0">
-              <FaPlane className="text-[#0A203E] text-xs" />
+      {/* Flight Route matching One-wayFlightCard */}
+      <div className="px-4 sm:px-6 py-5">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 items-center">
+          <div className="text-left space-y-0.5 min-w-0">
+            <div className="text-base sm:text-xl md:text-2xl font-bold text-slate-800">
+              {formatTime(depTime)}
             </div>
-            <div className="flex-1 h-0.5 bg-linear-to-r from-[#C9A84C] via-slate-300 to-[#C9A84C]" />
-            <div className="w-2.5 h-2.5 rounded-full border-2 border-[#C9A84C] bg-white shrink-0" />
+            <div className="text-[10px] sm:text-xs font-bold text-[#C9A84C]">
+              {formatDate(depTime)}
+            </div>
+            <div className="text-[11px] sm:text-sm font-semibold text-slate-700 mt-1 truncate">
+              {fromCode}{fromCountry ? `, ${fromCountry}` : ""}
+            </div>
+            <div className="text-[10px] sm:text-xs text-slate-500 truncate hidden sm:block">({fromAirport || from})</div>
+            {fromTerminal && (
+              <div className="text-[9px] sm:text-[10px] font-black text-[#C9A84C] bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-200 inline-block mt-0.5 uppercase tracking-wider">
+                T-{fromTerminal}
+              </div>
+            )}
           </div>
-          {craftType && (
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-              {craftType}
-            </p>
-          )}
-        </div>
 
-        {/* Arrival */}
-        <div className="text-right min-w-[110px]">
-          <p className="text-3xl font-black text-[#0A203E] leading-none">
-            {formatTime(arrTime)}
-          </p>
-          <p className="text-base font-black text-slate-800 mt-1.5">{toCode}</p>
-          <p className="text-xs font-semibold text-slate-500 mt-0.5 leading-snug">
-            {to}
-          </p>
-          {toTerminal && (
-            <span className="inline-block mt-1.5 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-wider rounded border border-amber-200">
-              Terminal {toTerminal}
-            </span>
-          )}
-          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-1.5">
-            {formatDate(arrTime)}
-          </p>
+          <div className="flex flex-col items-center gap-1 sm:gap-2 px-1 sm:px-6">
+            <div className="relative w-full mb-1 sm:mb-3">
+              <div className="h-0.5 bg-linear-to-r from-slate-200 via-[#C9A84C] to-slate-200 w-full max-w-16 sm:max-w-32 mx-auto"></div>
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1 sm:p-2 rounded-full shadow-md border border-slate-200">
+                <FaPlane className="text-[#C9A84C] text-[10px] sm:text-xs" />
+              </div>
+            </div>
+            <div className="text-[10px] sm:text-xs font-semibold text-slate-600 whitespace-nowrap">
+              {duration}
+            </div>
+            {craftType && (
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                {craftType}
+              </p>
+            )}
+          </div>
+
+          <div className="text-right space-y-0.5 min-w-0">
+            <div className="text-base sm:text-xl md:text-2xl font-bold text-slate-800">
+              {formatTime(arrTime)}
+            </div>
+            <div className="text-[10px] sm:text-xs font-bold text-[#C9A84C]">
+              {formatDate(arrTime)}
+            </div>
+            <div className="text-[11px] sm:text-sm font-semibold text-slate-700 mt-1 truncate">
+              {toCode}{toCountry ? `, ${toCountry}` : ""}
+            </div>
+            <div className="text-[10px] sm:text-xs text-slate-500 truncate hidden sm:block">({toAirport || to})</div>
+            {toTerminal && (
+              <div className="text-[9px] sm:text-[10px] font-black text-[#C9A84C] bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-200 inline-block mt-0.5 uppercase tracking-wider">
+                T-{toTerminal}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-4">
+      <div className="px-4 sm:px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
             {segment.Baggage || "Check Rules"} Check-in
           </span>
         </div>
-        <div className="w-px h-3 bg-slate-300" />
+        <div className="w-px h-3 bg-slate-300 hidden sm:block" />
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
             {segment.CabinBaggage || "7 Kg"} Cabin
           </span>
         </div>
         {segment.IsRefundable !== undefined && (
           <>
-            <div className="w-px h-3 bg-slate-300" />
+            <div className="w-px h-3 bg-slate-300 hidden sm:block" />
             <div className="flex items-center gap-1.5">
               <div
                 className={`w-1.5 h-1.5 rounded-full ${segment.IsRefundable ? "bg-emerald-500" : "bg-red-400"}`}
               />
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
                 {segment.IsRefundable ? "Refundable" : "Non-Refundable"}
               </span>
             </div>
@@ -533,8 +533,8 @@ export function FlightDetailsModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-9999 sm:p-4">
-      <div className="bg-white sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto max-h-[100dvh] sm:max-h-[90vh] lg:max-w-5xl flex flex-col overflow-hidden border border-slate-200">
+    <div className="fixed inset-0 bg-[#0A203E]/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-h-[calc(100dvh-2rem)] sm:max-h-[90dvh] lg:max-w-5xl flex flex-col overflow-hidden border border-slate-200">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#0A203E] shrink-0">
           <div className="flex items-center gap-4">

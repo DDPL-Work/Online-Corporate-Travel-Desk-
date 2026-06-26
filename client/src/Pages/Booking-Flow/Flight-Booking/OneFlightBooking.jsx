@@ -269,8 +269,8 @@ export default function OneFlightBooking() {
   }, []);
 
   useEffect(() => {
-    const resultIndex = selectedFlight?.ResultIndex;
-    const tId = searchParams?.traceId || traceId;
+    const resultIndex = selectedFlight?.ResultIndex || location.state?.resultIndex || localState?.resultIndex;
+    const tId = searchParams?.traceId || traceId || location.state?.traceId || localState?.traceId;
 
     console.log("FareQuote Trigger Check:", { resultIndex, tId });
 
@@ -285,9 +285,9 @@ export default function OneFlightBooking() {
     );
   }, [
     dispatch,
-    searchParams?.traceId, // ✅ IMPORTANT
+    searchParams?.traceId,
     traceId,
-    selectedFlight, // ✅ FULL OBJECT (NOT nested field)
+    selectedFlight,
   ]);
 
   useEffect(() => {
@@ -1001,6 +1001,23 @@ export default function OneFlightBooking() {
     }
 
     try {
+      // --- Handle Manual Project Creation ---
+      if (projectApproverData.project && !projectApproverData.project._id) {
+        try {
+          const projectRes = await api.post("/corporate-projects/create", {
+            projectCodeId: projectApproverData.project.id,
+            projectName: projectApproverData.project.name,
+            clientName: projectApproverData.project.client,
+          });
+          // Update the local project data with the created _id so further processes use it if needed
+          if (projectRes.data?.data?._id) {
+             projectApproverData.project._id = projectRes.data.data._id;
+          }
+        } catch (projErr) {
+           console.error("Failed to save manual project:", projErr);
+        }
+      }
+
       const payload = buildBookingRequestPayload();
       let result;
       if (!approvalRequired) {

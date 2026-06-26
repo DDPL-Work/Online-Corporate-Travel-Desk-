@@ -171,11 +171,11 @@ const hotelBookingRequestSchema = new mongoose.Schema(
         address: String,
         city: String,
         country: String,
-        images: [String],
+        // images: [String],
       },
 
-      rawHotelData: mongoose.Schema.Types.Mixed,
-      allRooms: mongoose.Schema.Types.Mixed,
+      // rawHotelData: mongoose.Schema.Types.Mixed,
+      // allRooms: mongoose.Schema.Types.Mixed,
 
       selectedRoom: {
         roomIndex: String,

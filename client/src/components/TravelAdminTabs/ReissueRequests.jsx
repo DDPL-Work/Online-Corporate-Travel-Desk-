@@ -268,16 +268,16 @@ export default function ReissueRequests() {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0A4D68]/10 text-[#0A4D68] flex items-center justify-center">
-              <FiRepeat size={18} />
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-[#0A4D68]/10 text-[#0A4D68] flex items-center justify-center shrink-0">
+              <FiRepeat className="w-4 h-4 md:w-5 md:h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-900">
+              <h2 className="text-lg md:text-xl font-black text-slate-900">
                 Reissue Requests
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-[10px] md:text-xs text-slate-400">
                 Flight amendment and date-change requests
               </p>
             </div>
@@ -285,7 +285,7 @@ export default function ReissueRequests() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => load()}
-              className="flex items-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+              className="flex items-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 w-full md:w-auto justify-center"
             >
               <FiRefreshCw
                 size={12}
@@ -344,7 +344,7 @@ export default function ReissueRequests() {
             placeholder="Search by employee, PNR, booking ref, reason, or request ID…"
             className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm outline-none focus:border-[#0A4D68] bg-white"
           />
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-nowrap overflow-x-auto pb-1 max-w-full">
             {["All", "PENDING", "APPROVED", "REJECTED", "COMPLETED"].map(
               (s) => (
                 <button
@@ -353,7 +353,7 @@ export default function ReissueRequests() {
                     setStatusFilter(s);
                     setCurrentPage(1);
                   }}
-                  className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider border transition ${statusFilter === s ? "bg-[#0A4D68] text-white border-[#0A4D68]" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
+                  className={`px-3 py-2 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-wider border transition whitespace-nowrap shrink-0 ${statusFilter === s ? "bg-[#0A4D68] text-white border-[#0A4D68]" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}
                 >
                   {s}
                 </button>

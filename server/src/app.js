@@ -15,7 +15,7 @@ const routes = require("./routes");
 const errorMiddleware = require("./middleware/error.middleware");
 const rateLimitMiddleware = require("./middleware/rateLimit.middleware");
 const logger = require("./utils/logger");
-const cronJobs = require("./jobs");
+// const cronJobs = require("./jobs");
 
 const app = express();
 require("./config/sso.config");
@@ -130,9 +130,9 @@ app.use(errorMiddleware);
 // ------------------------------
 // START CRON JOBS IF ENABLED
 // ------------------------------
-if (config.cronJobs.enabled) {
-  cronJobs.start();
-  logger.info("✓ Cron Jobs Started");
-}
+// if (config.cronJobs.enabled) {
+//   cronJobs.start();
+//   logger.info("✓ Cron Jobs Started");
+// }
 
 module.exports = app;

@@ -869,7 +869,7 @@ export const DocUpload = ({
         {icon}
       </div>
       <span className="font-black text-slate-700 text-sm">{title}</span>
-      <span className="ml-auto text-slate-400 text-xs">PDF or Image</span>
+      <span className="ml-auto text-slate-400 text-xs">PDF, Image or Word</span>
     </div>
     <div className="p-4 bg-white">
       <div className="flex gap-2 mb-3">
@@ -922,7 +922,7 @@ export const DocUpload = ({
           )}
           <input
             type="file"
-            accept=".pdf"
+            accept=".pdf,image/*,.doc,.docx"
             className="hidden"
             onChange={(e) => {
               const selectedFile = e.target.files[0];
@@ -935,7 +935,7 @@ export const DocUpload = ({
           icon={<MdLink />}
           value={url}
           onChange={setUrl}
-          placeholder="https://drive.google.com/... or direct PDF link"
+          placeholder="https://drive.google.com/... or direct file link"
         />
       )}
 
@@ -965,7 +965,7 @@ export const Step5 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
       setUrl={props.setGstUrl}
       errors={errors}
     />
-    {/* <DocUpload
+    <DocUpload
       title="PAN Card"
       icon={<MdCreditCard className="text-sm" />}
       mode={props.panMode}
@@ -975,13 +975,22 @@ export const Step5 = ({ form, setForm, errors, gstAutoFilled, ...props }) => (
       url={props.panUrl}
       setUrl={props.setPanUrl}
       errors={errors}
-    /> */}
+    />
 
     {gstAutoFilled && (
       <p className="text-xs text-emerald-600 font-semibold mb-2">
         ✓ GST details auto-filled from document
       </p>
     )}
+
+    <F label="Corporate PAN Number" required>
+      <Inp
+        value={form.panNumber || ""}
+        onChange={(v) => setForm({ ...form, panNumber: v.toUpperCase() })}
+        placeholder="ABCDE1234F"
+        error={errors.panNumber}
+      />
+    </F>
 
     <F label="GSTIN" required>
       <Inp

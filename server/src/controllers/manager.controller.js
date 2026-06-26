@@ -3,8 +3,10 @@ const Employee = require('../models/Employee');
 const ManagerRequest = require('../models/ManagerRequest');
 const HotelBookingRequest = require('../models/hotelBookingRequest.model');
 const BookingRequest = require('../models/BookingRequest');
+const TBOHotelDetails = require('../models/TBOHotelDetails');
 const { notify } = require('../notifications/orchestrator');
 const EVENTS = require('../events/eventConstants');
+const hotelService = require('../services/tektravels/hotel.service');
 
 exports.handleManagerSelection = async (req, res) => {
   try {
@@ -293,10 +295,29 @@ exports.getPendingHotelRequestsForApprover = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // 🔥 Fetch TBO details for each request
+    const detailedRequests = await Promise.all(
+      requests.map(async (reqItem) => {
+        let tboHotelDetails = null;
+        if (reqItem.hotelRequest?.selectedHotel?.hotelCode) {
+          const hotelCode = reqItem.hotelRequest.selectedHotel.hotelCode;
+          try {
+            tboHotelDetails = await TBOHotelDetails.findOne({ hotelCode }).lean();
+          } catch (err) {
+            console.error(`Error fetching TBO details for hotelCode ${hotelCode}:`, err);
+          }
+        }
+        return {
+          ...reqItem,
+          tboHotelDetails,
+        };
+      })
+    );
+
     return res.status(200).json({
       success: true,
-      count: requests.length,
-      data: requests, // ✅ full data
+      count: detailedRequests.length,
+      data: detailedRequests, // ✅ full data
     });
   } catch (error) {
     console.error("Error fetching pending hotel approvals:", error);
@@ -698,6 +719,44 @@ exports.getTeamExecutedHotelRequestById = async (req, res) => {
         message: "Hotel booking not found or you are not authorized to view it",
       });
     }
+
+    const rawResponse = request.bookingResult?.providerResponse || {};
+    const bookResult = rawResponse.BookResult || rawResponse;
+
+    const bookingIdTBO = request.providerBookingId || request.bookingResult?.providerBookingId || bookResult?.BookingId || bookResult?.BookingDetail?.BookingId;
+    const confirmationNo = request.bookingResult?.confirmationNumber || bookResult?.ConfirmationNo;
+    const traceId = request.providerTraceId || bookResult?.TraceId;
+    const leadPassenger = request.travellers?.find((t) => t.isLeadPassenger) || request.travellers?.[0];
+
+    if (bookingIdTBO || confirmationNo || traceId) {
+       try {
+         const bookedHotelDetails = await hotelService.getBookingDetails({
+               bookingId: bookingIdTBO,
+               confirmationNo,
+               traceId,
+               firstName: leadPassenger?.firstName,
+               lastName: leadPassenger?.lastName,
+         });
+         request.bookedHotelDetails = bookedHotelDetails;
+       } catch(err) {
+         console.error("Error fetching TBO booked details:", err.message);
+       }
+    }
+
+    // Fetch hotel images from TBOHotelDetails DB if missing
+    try {
+      const hotelCode = request.hotelRequest?.selectedHotel?.hotelCode;
+      if (hotelCode && (!request.hotelRequest.selectedHotel.images || request.hotelRequest.selectedHotel.images.length === 0)) {
+        const tboDetails = await TBOHotelDetails.findOne({ hotelCode }).select("images image").lean();
+        if (tboDetails) {
+          request.hotelRequest.selectedHotel.images = tboDetails.images?.length ? tboDetails.images : (tboDetails.image ? [tboDetails.image] : []);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching TBO hotel images from DB:", err.message);
+    }
+
+    console.log("Data:", request);
 
     return res.status(200).json({ success: true, data: request });
   } catch (error) {

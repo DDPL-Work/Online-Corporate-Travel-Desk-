@@ -35,6 +35,7 @@ import BookedFlightDetailsPage from "../components/Shared/BookedFlightDetailsPag
 import BookedHotelDetailsPage from "../components/Shared/BookedHotelDetailsPage";
 import TboCommissionsTaxes from "../components/SuperAdminTabs/TboCommissionsTaxes";
 import CorporateServiceCollection from "../components/SuperAdminTabs/CorporateServiceCollection";
+import ContactLeads from "../components/SuperAdminTabs/ContactLeads";
 
 import BlogListPage from '../components/Blog/AllBlogs'
 import BlogEditPage from '../components/Blog/BlogEditPage'
@@ -100,6 +101,7 @@ export const appRouter = createBrowserRouter([
           { path: "/commission-settings", element: <CommissionSettings /> },
           { path: "/api-configurations", element: <ApiConfigurations /> },
           { path: "/ops-management", element: <OpsTeamManagement /> },
+          { path: "/contact-leads", element: <ContactLeads /> },
           { path: "/profile", element: <ProfileSettings /> },
           {
             path: "/blog-and-articles",

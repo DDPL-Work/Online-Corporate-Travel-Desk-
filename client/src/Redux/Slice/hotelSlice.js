@@ -43,6 +43,8 @@ const hotelSlice = createSlice({
     filterMeta: null,
     searchMeta: null,
     traceId: null,
+    searchId: null,
+    status: "idle", // idle | processing | completed
     selectedHotel: null,
     searchPayload: null,
     hotelDetailsById: {},
@@ -81,6 +83,19 @@ const hotelSlice = createSlice({
     },
     clearSelectedHotel: (state) => {
       state.selectedHotel = null;
+    },
+    startStreamingSearch: (state, action) => {
+      state.searchId = action.payload.searchId;
+      state.status = "processing";
+      state.hotels = [];
+    },
+    receiveChunk: (state, action) => {
+      const incomingHotels = action.payload.hotels || [];
+      const deduplicated = dedupeHotels(state.hotels, incomingHotels);
+      state.hotels = deduplicated;
+    },
+    searchCompleted: (state) => {
+      state.status = "completed";
     },
   },
 
@@ -140,20 +155,26 @@ const hotelSlice = createSlice({
         state.loading.search = false;
         state.loading.loadMore = false;
 
-        const incomingHotels = action.payload?.hotels || [];
-        const pagination = action.payload?.pagination || {
-          total: incomingHotels.length,
-          page,
-          limit: incomingHotels.length,
-          hasMore: false,
-        };
+        // If the payload indicates it's progressive:
+        const data = action.payload?.data || action.payload;
+        if (data?.status === "processing") {
+          state.status = "processing";
+          state.searchId = data?.searchId || data?.traceId;
+          state.hotels = data?.hotels || [];
+          state.traceId = data?.traceId || state.traceId;
+        } else {
+          state.status = "completed";
+          state.searchId = data?.searchId || data?.traceId;
+          const incomingHotels = data?.hotels || [];
+          state.hotels = incomingHotels;
+          state.pagination = action.payload?.pagination || {
+            total: incomingHotels.length,
+            page,
+            limit: incomingHotels.length,
+            hasMore: false,
+          };
+        }
 
-
-        state.hotels = incomingHotels;
-
-
-
-        state.pagination = pagination;
         state.filterMeta = action.payload?.filterMeta || state.filterMeta;
         state.searchMeta = action.payload?.searchMeta || state.searchMeta;
 
@@ -219,5 +240,5 @@ const hotelSlice = createSlice({
   },
 });
 
-export const { clearHotels, clearSelectedHotel, setSearchPayload } = hotelSlice.actions;
+export const { clearHotels, clearSelectedHotel, setSearchPayload, startStreamingSearch, receiveChunk, searchCompleted } = hotelSlice.actions;
 export default hotelSlice.reducer;

@@ -208,32 +208,32 @@ export default function OneWayFlightCard({
   );
 
   return (
-    <div className="max-w-[1060px] bg-linear-to-br from-white via-slate-50 to-white border border-slate-200 rounded-2xl transition-all duration-300 overflow-hidden">
+    <div className="w-full max-w-[1060px] mx-auto bg-linear-to-br from-white via-slate-50 to-white border border-slate-200 rounded-2xl transition-all duration-300 overflow-hidden">
       <div className="relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#C9A84C]/5 rounded-full blur-3xl -z-10"></div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-4 md:p-5">
           <div className="relative">
             {/* ── Header Row ── */}
-            <div className="flex items-center justify-between gap-3 mb-5">
-              <div className="flex items-center gap-3">
-                <div className="relative">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="relative shrink-0">
                   <img src={airlineLogo(airlineCode)}
                     alt={airline}
-                    className="w-12 h-12 rounded-xl shadow-md border-2 border-white object-contain"
+                    className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-xl shadow-md border-2 border-white object-contain"
                     loading="eager"
                     onError={(e) => {
                       e.currentTarget.src = "https://via.placeholder.com/64";
                     }}
                   />
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#C9A84C] rounded-full border-2 border-white"></div>
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-[#C9A84C] rounded-full border-2 border-white"></div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="font-bold text-slate-800">{airline}</div>
+                <div className="min-w-0">
+                  <div className="flex items-center flex-wrap gap-1.5">
+                    <div className="font-bold text-slate-800 text-xs sm:text-sm md:text-base truncate max-w-[110px] sm:max-w-none">{airline}</div>
                     {flightStatus && (
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold whitespace-nowrap ${
                           FLIGHT_STATUS_MAP[flightStatus]?.className ||
                           FLIGHT_STATUS_MAP.Scheduled.className
                         }`}
@@ -242,27 +242,27 @@ export default function OneWayFlightCard({
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500 font-medium">
+                  <div className="text-[10px] sm:text-xs text-slate-500 font-medium">
                     {airlineCode}-{flightNumber}
                   </div>
                 </div>
               </div>
 
-               <div className="flex flex-wrap gap-2 items-center">
+               <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center">
                  {travelClass && (
-                    <span className="mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 uppercase">
+                    <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-50 text-slate-700 text-[9px] sm:text-xs font-bold rounded-lg border border-slate-200 uppercase whitespace-nowrap">
                       <MdAirlineSeatReclineNormal className="text-[#C9A84C]" /> {travelClass}
                     </span>
                   )}
                  {firstSegment?.NoOfSeatAvailable !== undefined && firstSegment?.NoOfSeatAvailable !== null && (
-                    <span className={`mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border uppercase ${
+                    <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 text-[9px] sm:text-xs font-bold rounded-lg border uppercase whitespace-nowrap ${
                       firstSegment.NoOfSeatAvailable <= 5
                         ? "bg-red-50 text-red-700 border-red-200"
                         : firstSegment.NoOfSeatAvailable <= 10
                         ? "bg-amber-50 text-amber-700 border-amber-200"
                         : "bg-emerald-50 text-emerald-700 border-emerald-200"
                     }`}>
-                      <MdAirlineSeatReclineNormal className="text-[14px]" /> {firstSegment.NoOfSeatAvailable} Seats Left
+                      <MdAirlineSeatReclineNormal className="text-[12px] sm:text-[14px]" /> {firstSegment.NoOfSeatAvailable} Seats Left
                     </span>
                   )}
                </div>
@@ -277,54 +277,53 @@ export default function OneWayFlightCard({
             </div>
 
             {/* ── Flight Timeline ── */}
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-6 items-center">
-              <div className="text-left space-y-1">
-                <div className="text-2xl font-bold text-slate-800">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 items-center">
+              <div className="text-left space-y-0.5 min-w-0">
+                <div className="text-base sm:text-xl md:text-2xl font-bold text-slate-800">
                   {departure}
                 </div>
-                <div className="text-xs font-bold text-[#C9A84C]">
+                <div className="text-[10px] sm:text-xs font-bold text-[#C9A84C]">
                   {formatDate(depTime)}
                 </div>
-                <div className="text-sm font-semibold text-slate-700 mt-2">
+                <div className="text-[11px] sm:text-sm font-semibold text-slate-700 mt-1 truncate">
                   {from}, {fromCountry}
                 </div>
-                <div className="text-xs text-slate-500">({fromAirport})</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 truncate hidden sm:block">({fromAirport})</div>
                 {fromTerminal && (
-                  <div className="text-[10px] font-black text-[#C9A84C] bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 inline-block mt-1 uppercase tracking-wider">
+                  <div className="text-[9px] sm:text-[10px] font-black text-[#C9A84C] bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-200 inline-block mt-0.5 uppercase tracking-wider">
                     T-{fromTerminal}
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-col items-center gap-2 px-6">
-               
-                <div className="relative w-full mb-3">
-                  <div className="h-0.5 bg-linear-to-r from-slate-200 via-[#C9A84C] to-slate-200 w-32"></div>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-2 rounded-full shadow-md border border-slate-200">
-                    <MdOutlineFlight className="text-[#C9A84C] text-xl rotate-90" />
+              <div className="flex flex-col items-center gap-1 sm:gap-2 px-1 sm:px-6">
+                <div className="relative w-full mb-1 sm:mb-3">
+                  <div className="h-0.5 bg-linear-to-r from-slate-200 via-[#C9A84C] to-slate-200 w-full max-w-16 sm:max-w-32 mx-auto"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1 sm:p-2 rounded-full shadow-md border border-slate-200">
+                    <MdOutlineFlight className="text-[#C9A84C] text-sm sm:text-xl rotate-90" />
                   </div>
                 </div>
-                <div className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                <div className="text-[10px] sm:text-xs font-semibold text-slate-600 whitespace-nowrap">
                   {duration}
                 </div>
-                <div className="px-3 py-1 bg-linear-to-r from-emerald-50 to-emerald-100 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                <div className="px-1.5 sm:px-3 py-0.5 sm:py-1 bg-linear-to-r from-emerald-50 to-emerald-100 text-emerald-700 text-[9px] sm:text-xs font-bold rounded-full border border-emerald-200 text-center leading-tight">
                   {stops}
                 </div>
               </div>
 
-              <div className="text-right space-y-1">
-                <div className="text-2xl font-bold text-slate-800">
+              <div className="text-right space-y-0.5 min-w-0">
+                <div className="text-base sm:text-xl md:text-2xl font-bold text-slate-800">
                   {arrival}
                 </div>
-                <div className="text-xs font-bold text-[#C9A84C]">
+                <div className="text-[10px] sm:text-xs font-bold text-[#C9A84C]">
                   {formatDate(arrTime)}
                 </div>
-                <div className="text-sm font-semibold text-slate-700 mt-2">
+                <div className="text-[11px] sm:text-sm font-semibold text-slate-700 mt-1 truncate">
                   {to}, {toCountry}
                 </div>
-                <div className="text-xs text-slate-500">({toAirport})</div>
+                <div className="text-[10px] sm:text-xs text-slate-500 truncate hidden sm:block">({toAirport})</div>
                 {toTerminal && (
-                  <div className="text-[10px] font-black text-[#C9A84C] bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200 inline-block mt-1 uppercase tracking-wider">
+                  <div className="text-[9px] sm:text-[10px] font-black text-[#C9A84C] bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-200 inline-block mt-0.5 uppercase tracking-wider">
                     T-{toTerminal}
                   </div>
                 )}
@@ -332,11 +331,11 @@ export default function OneWayFlightCard({
             </div>
 
             {/* ── Fare Options ── */}
-            <div className="mt-5 rounded-xl border border-slate-100 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="mt-3 rounded-xl border border-slate-100 p-2 sm:p-3">
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400">
                 Fare options
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-1.5 flex flex-wrap gap-1.5 sm:gap-2">
                 {normalizedFareOptions.map((fare, index) => {
                   const isSelected =
                     selectedFare?.resultIndex != null
@@ -351,24 +350,24 @@ export default function OneWayFlightCard({
                       onClick={() =>
                         setSelectedFareResultIndex(fare.resultIndex)
                       }
-                      className={`rounded-lg border px-3 py-2 text-left transition ${
+                      className={`rounded-lg border px-2.5 py-1.5 sm:px-3 sm:py-2 text-left transition ${
                         isSelected
                           ? "border-[#C9A84C] bg-slate-50 shadow-sm"
                           : "border-slate-200 bg-white hover:border-[#C9A84C]/50 hover:bg-slate-50"
                       }`}
                     >
-                      <div className="text-xs font-semibold text-slate-600">
+                      <div className="text-[10px] sm:text-xs font-semibold text-slate-600">
                         {fare.supplierFareClass}
                       </div>
                       <div
-                        className={`text-sm font-bold ${
+                        className={`text-xs sm:text-sm font-bold ${
                           isSelected ? "text-[#C9A84C]" : "text-slate-800"
                         }`}
                       >
                         &#8377;{Math.ceil(fare.publishedFare).toLocaleString()}
                       </div>
                       {isLowest && (
-                        <div className="text-[10px] font-semibold text-emerald-600">
+                        <div className="text-[9px] sm:text-[10px] font-semibold text-emerald-600">
                           Lowest fare
                         </div>
                       )}
@@ -379,8 +378,8 @@ export default function OneWayFlightCard({
             </div>
 
             {/* ── Bottom Action Row ── */}
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-2 sm:mt-1">
+              <div className="flex flex-wrap gap-1.5 sm:gap-3">
                 {/* <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">
                   <BsSuitcase /> {baggage}
                 </span> */}
@@ -394,7 +393,7 @@ export default function OneWayFlightCard({
                 <button
                   type="button"
                   onClick={() => setShowFlightDetails((prev) => !prev)}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 text-[11px] font-black rounded-xl border transition-all cursor-pointer uppercase tracking-widest shadow-sm
+                  className={`inline-flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[9px] sm:text-[11px] font-black rounded-xl border transition-all cursor-pointer uppercase tracking-widest shadow-sm whitespace-nowrap
                     ${
                       showFlightDetails
                         ? "bg-[#0A203E] text-white border-[#0A203E]"
@@ -407,7 +406,7 @@ export default function OneWayFlightCard({
                 <button
                   onClick={handleFareOptionsClick}
                   disabled={isLoadingMoreFares}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-[11px] font-black rounded-xl border uppercase tracking-widest shadow-sm transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[9px] sm:text-[11px] font-black rounded-xl border uppercase tracking-widest shadow-sm transition-all whitespace-nowrap ${
                     isLoadingMoreFares
                       ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
                       : "bg-slate-50 border-slate-200 text-slate-600 hover:text-[#C9A84C] hover:border-[#C9A84C]/50 cursor-pointer"
@@ -455,7 +454,7 @@ export default function OneWayFlightCard({
                       
                       window.open("/one-way-flight/booking", "_blank");
                     }}
-                    className="relative group px-8 py-3 bg-[#0A203E] text-white rounded-xl font-black shadow-lg shadow-[#0A203E]/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 uppercase tracking-widest text-xs"
+                    className="relative group px-4 sm:px-8 py-2 sm:py-3 bg-[#0A203E] text-white rounded-xl font-black shadow-lg shadow-[#0A203E]/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 uppercase tracking-widest text-[10px] sm:text-xs whitespace-nowrap"
                   >
                     <span className="relative z-10">Book Now</span>
                   </button>

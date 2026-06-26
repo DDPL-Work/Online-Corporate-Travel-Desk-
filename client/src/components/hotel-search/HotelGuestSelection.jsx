@@ -122,15 +122,7 @@ export default function HotelGuestSelection({
   onApply,
   CountrySelector,
 }) {
-  const [isMobile, setIsMobile] = useState(false);
   const modalRef = useRef(null);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 640);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   const totalAdults = roomConfigs.reduce((acc, r) => acc + (r.adults || 0), 0);
   const totalChildren = roomConfigs.reduce((acc, r) => acc + (r.children || 0), 0);
@@ -205,8 +197,7 @@ export default function HotelGuestSelection({
   const content = (
     <div
       ref={modalRef}
-      className="bg-white rounded-t-[1.5rem] sm:rounded-[1.25rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 overflow-hidden flex flex-col w-full sm:w-[520px] max-w-[95vw] animate-premium-pop origin-top-right transition-all duration-300"
-      style={isMobile ? {} : { position: "absolute", right: 0, zIndex: 1000 }}
+      className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 overflow-hidden flex flex-col w-full sm:w-[580px] animate-premium-pop transition-all duration-300"
     >
       {/* Ultra Compact Header */}
       <div className="bg-[#000D26] p-4 text-white relative overflow-hidden shrink-0">
@@ -234,7 +225,7 @@ export default function HotelGuestSelection({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row overflow-y-auto custom-scrollbar max-h-[50vh] sm:max-h-[380px]">
+      <div className="flex flex-col sm:flex-row overflow-y-auto custom-scrollbar max-h-[40vh] sm:max-h-[50vh] lg:max-h-[60vh]">
         {/* Left Side: Management */}
         <div className="flex-1 p-4 bg-slate-50/40 border-b sm:border-b-0 sm:border-r border-slate-100 space-y-5">
            <div className="relative">
@@ -305,6 +296,5 @@ export default function HotelGuestSelection({
     </div>
   );
 
-  if (isMobile) return <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">{content}</div>;
   return content;
 }

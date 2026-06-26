@@ -89,6 +89,8 @@ export const searchHotels = createAsyncThunk(
         filterMeta: data?.data?.filterMeta || null,
         searchMeta: data?.data?.searchMeta || null,
         traceId: data?.data?.traceId || data?.data?.TraceId || null,
+        searchId: data?.data?.searchId || null,
+        status: data?.data?.status || "completed",
       };
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);

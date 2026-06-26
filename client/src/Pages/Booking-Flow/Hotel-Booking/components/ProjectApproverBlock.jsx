@@ -1,5 +1,4 @@
 // ProjectApproverBlock.jsx
-// Drop this component into HotelReviewBooking.jsx and place <ProjectApproverBlock /> just above the confirm button
 
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -531,23 +530,3 @@ export function ProjectApproverBlock({ onChange, errors = {}, approvalRequired }
     </div>
   );
 }
-
-/* ─────────────────────────────────────────────────────────────── */
-/*  Usage in HotelReviewBooking.jsx                               */
-/*                                                                 */
-/*  1. Import:                                                     */
-/*     import { ProjectApproverBlock } from "./ProjectApproverBlock";
-/*                                                                 */
-/*  2. Add state near the top of HotelReviewBooking:              */
-/*     const [projectApproverData, setProjectApproverData] =      */
-/*        useState({ project: null, approver: null });             */
-/*                                                                 */
-/*  3. Place just above the confirm button in the price summary:   */
-/*     <ProjectApproverBlock onChange={setProjectApproverData} />  */
-/*                                                                 */
-/*  4. Include in your payload (handleRequestApproval):            */
-/*     projectName: projectApproverData.project?.name,             */
-/*     projectId: projectApproverData.project?.id,                 */
-/*     approverId: projectApproverData.approver?.id,               */
-/*     approverEmail: projectApproverData.approver?.email,         */
-/* ─────────────────────────────────────────────────────────────── */

@@ -75,6 +75,7 @@ export const consumeHotelPreBookSessionExpiredNotice = () => {
 export const handleHotelPreBookSessionExpiry = ({
   navigate,
   message = DEFAULT_HOTEL_PREBOOK_SESSION_MESSAGE,
+  searchData = null,
 } = {}) => {
   const finalMessage = message || DEFAULT_HOTEL_PREBOOK_SESSION_MESSAGE;
   const travelPath = "/travel?activeTab=hotel&hotelSessionExpired=1";
@@ -82,6 +83,7 @@ export const handleHotelPreBookSessionExpiry = ({
     activeTab: "hotel",
     hotelSessionExpired: true,
     hotelSessionExpiredMessage: finalMessage,
+    prefillHotelSearch: searchData,
   };
 
   persistHotelPreBookSessionExpiredNotice(finalMessage);
