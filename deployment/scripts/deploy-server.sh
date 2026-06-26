@@ -17,6 +17,28 @@ RELEASES_DIR="${APP_PATH}/releases"
 CURRENT_DIR="${APP_PATH}/current"
 SHARED_DIR="${APP_PATH}/shared"
 LOG_DIR="${APP_PATH}/logs"
+
+# =============================================================================
+# Logging Initialization (must happen before ANY log calls)
+# =============================================================================
+
+mkdir -p "${LOG_DIR}" || {
+    echo "ERROR: Failed to create log directory ${LOG_DIR}"
+    exit 1
+}
+
+[[ -d "${LOG_DIR}" ]] || {
+    echo "ERROR: Log directory does not exist after creation: ${LOG_DIR}"
+    exit 1
+}
+
+[[ -w "${LOG_DIR}" ]] || {
+    echo "ERROR: Log directory is not writable: ${LOG_DIR}"
+    exit 1
+}
+
+chmod 775 "${LOG_DIR}" 2>/dev/null || true
+
 DEPLOY_LOG="${LOG_DIR}/deploy-$(date +%Y%m%d-%H%M%S).log"
 
 # Colors for output
@@ -52,13 +74,19 @@ log "Commit: ${COMMIT_HASH}"
 log "Deployed by: ${DEPLOYED_BY}"
 log "Node environment: ${NODE_ENV}"
 
-# Create required directories
-mkdir -p "$RELEASES_DIR" "$SHARED_DIR" "$LOG_DIR" 2>/dev/null || true
+# Validate APP_PATH exists
+[[ -d "$APP_PATH" ]] || error "APP_PATH does not exist: ${APP_PATH}"
+
+# Create required directories (fail if critical dirs cannot be created)
+mkdir -p "$RELEASES_DIR" || error "Unable to create releases directory: ${RELEASES_DIR}"
+mkdir -p "$SHARED_DIR" || error "Unable to create shared directory: ${SHARED_DIR}"
 
 # Verify we're in the right directory
-if [ ! -d "$APP_PATH/.git" ]; then
-    error "Git repository not found at ${APP_PATH}"
-fi
+[[ -d "$APP_PATH/.git" ]] || error "Git repository not found at ${APP_PATH} — expected .git directory"
+
+# Test write permissions on releases directory
+touch "${RELEASES_DIR}/.permission_test" 2>/dev/null || error "Cannot write to ${RELEASES_DIR} — check permissions for user $(whoami)"
+rm -f "${RELEASES_DIR}/.permission_test"
 
 # =============================================================================
 # Git Operations
@@ -69,25 +97,25 @@ cd "$APP_PATH"
 
 # Fetch all changes
 if ! git fetch --all --prune 2>&1 | tee -a "$DEPLOY_LOG"; then
-    error "Git fetch failed"
+    error "Git fetch failed — check network connectivity and repository access"
 fi
 
 # Reset to the specified commit or latest main
 if [ -n "$COMMIT_HASH" ]; then
     log "Checking out commit: ${COMMIT_HASH}"
     if ! git checkout "$COMMIT_HASH" 2>&1 | tee -a "$DEPLOY_LOG"; then
-        error "Git checkout failed for commit ${COMMIT_HASH}"
+        error "Git checkout failed for commit ${COMMIT_HASH} — commit may not exist in repository"
     fi
 else
     log "Checking out main branch..."
     if ! git checkout main 2>&1 | tee -a "$DEPLOY_LOG"; then
-        error "Git checkout main failed"
+        error "Git checkout main failed — branch may not exist"
     fi
 fi
 
 # Pull latest changes
 if ! git pull origin main 2>&1 | tee -a "$DEPLOY_LOG"; then
-    error "Git pull failed"
+    error "Git pull failed — possible merge conflict or network issue"
 fi
 
 log "Current commit: $(git rev-parse HEAD)"
@@ -99,13 +127,16 @@ log "Current commit: $(git rev-parse HEAD)"
 log "Installing server dependencies..."
 cd "${APP_PATH}/server"
 
+# Verify package.json exists
+[[ -f "${APP_PATH}/server/package.json" ]] || error "package.json not found in ${APP_PATH}/server"
+
 # Clean install
 if ! rm -rf node_modules 2>&1 | tee -a "$DEPLOY_LOG"; then
-    warn "Failed to remove node_modules, continuing..."
+    warn "Failed to remove node_modules, continuing with fresh install..."
 fi
 
 if ! npm ci --production 2>&1 | tee -a "$DEPLOY_LOG"; then
-    error "npm ci failed for server"
+    error "npm ci failed for server — check package.json and package-lock.json for errors"
 fi
 
 log "Server dependencies installed successfully"
@@ -153,7 +184,7 @@ pm2 delete travel-api 2>/dev/null || true
 # Start with ecosystem config
 cd "${APP_PATH}/server"
 if ! pm2 start ecosystem.config.js 2>&1 | tee -a "$DEPLOY_LOG"; then
-    error "PM2 start failed"
+    error "PM2 start failed — check ecosystem.config.js and server logs in ${LOG_DIR}"
 fi
 
 # Save PM2 process list
@@ -169,9 +200,13 @@ log "Waiting for application to start..."
 sleep 5
 
 # Check if process is running
-if ! pm2 list | grep -q "travel-api.*online"; then
-    error "PM2 process travel-api is not online"
+if ! pm2 list 2>&1 | tee -a "$DEPLOY_LOG" | grep -q "travel-api.*online"; then
+    warn "PM2 process travel-api is not online — dumping PM2 status for diagnostics:"
+    pm2 list 2>&1 | tee -a "$DEPLOY_LOG"
+    error "PM2 process travel-api failed to start — check ${LOG_DIR}/error.log and ${LOG_DIR}/output.log"
 fi
+
+log "PM2 process travel-api is online"
 
 # Quick HTTP check
 for i in 1 2 3; do
@@ -181,9 +216,9 @@ for i in 1 2 3; do
         break
     fi
     if [ "$i" -eq 3 ]; then
-        error "Health check failed after 3 attempts (last HTTP: ${HTTP_CODE})"
+        error "Health check failed after 3 attempts — last HTTP response: ${HTTP_CODE} — API may not be responding on port 5000"
     fi
-    warn "Health check attempt $i failed, retrying in 5s..."
+    warn "Health check attempt $i failed (HTTP ${HTTP_CODE}), retrying in 5s..."
     sleep 5
 done
 
