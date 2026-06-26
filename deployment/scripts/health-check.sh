@@ -11,7 +11,7 @@ APP_PATH="${APP_PATH:-/var/www/Online-Corporate-Travel-Desk-}"
 API_URL="${API_URL:-http://localhost:5000}"
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:80}"
 ADMIN_URL="${ADMIN_URL:-http://localhost:80}"
-LOG_DIR="${LOG_DIR:-/var/log/travel-app}"
+LOG_DIR="${LOG_DIR:-${APP_PATH}/logs}"
 
 # =============================================================================
 # Logging Initialization (must happen before ANY log calls)

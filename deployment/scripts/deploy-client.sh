@@ -11,7 +11,7 @@ ARTIFACT_NAME="${ARTIFACT_NAME:?ARTIFACT_NAME is required}"
 ARTIFACT_PATH="${ARTIFACT_PATH:?ARTIFACT_PATH is required}"
 CLIENT_DIR="${CLIENT_DIR:?CLIENT_DIR is required}"
 NGINX_HTML="${NGINX_HTML:-/var/www/html}"
-LOG_DIR="${LOG_DIR:-/var/log/travel-app}"
+LOG_DIR="${LOG_DIR:-${APP_PATH:-/var/www/Online-Corporate-Travel-Desk-}/logs}"
 
 # =============================================================================
 # Logging Initialization (must happen before ANY log calls)

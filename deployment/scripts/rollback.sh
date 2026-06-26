@@ -11,7 +11,7 @@ APP_PATH="${APP_PATH:?APP_PATH is required}"
 ROLLBACK_TARGET="${ROLLBACK_TARGET:?ROLLBACK_TARGET is required}"
 ROLLBACK_CONFIRMED="${ROLLBACK_CONFIRMED:-false}"
 DEPLOYED_BY="${DEPLOYED_BY:-unknown}"
-LOG_DIR="${LOG_DIR:-/var/log/travel-app}"
+LOG_DIR="${LOG_DIR:-${APP_PATH}/logs}"
 
 # Derived paths
 RELEASES_DIR="${APP_PATH}/releases"
