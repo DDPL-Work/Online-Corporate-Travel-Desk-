@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { searchQueue } = require("../../queues/search.queue");
-const redis = require("../../config/redis");
+const { getConnections } = require("../../config/redisConnections");
+const redis = getConnections().coordinator;
 const chunkArray = require("../../utils/chunkArray");
 
 const MAX_TBO_LIMIT = 200;

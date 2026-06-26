@@ -1,4 +1,5 @@
-const redis = require("../../config/redis");
+const { getConnections } = require("../../config/redisConnections");
+const redis = getConnections().coordinator;
 const zlib = require("zlib");
 const { promisify } = require("util");
 

@@ -2,8 +2,6 @@ const tboService = require("../services/tektravels/hotel.service");
 const zlib = require("zlib");
 const { promisify } = require("util");
 const gunzip = promisify(zlib.gunzip);
-const { initiateDistributedSearch } = require("../modules/search/search.orchestrator");
-const { aggregateFinalResults, waitForSearchCompletion } = require("../modules/search/search.merge");
 const cacheService = require("../services/cache.service");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -19,7 +17,8 @@ const {
   applyHotelFilters,
   sortPreparedHotels,
 } = require("../utils/filterHotels");
-const redis = require("../config/redis");
+const { getConnections } = require("../config/redisConnections");
+const redis = getConnections().coordinator;
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -122,51 +121,59 @@ const fetchFullHotelSearchDataset = async (searchPayload) => {
 
   logger.info(`[hotel-search] Coordinator analyzing search for ${hotelCodes.length} codes...`);
   
-  // Let the coordinator handle everything: Cache, Registry, Locks, Queues
   const searchResult = await handleSearchRequest(searchPayload, hotelCodes);
   
-  // If it's cached or completed instantly, return it
   if (searchResult.status === 'completed') {
      return searchResult;
   }
 
-  // Otherwise, it's either 'running' or 'pending' (someone else started it).
-  // We want to block and wait until at least ONE chunk has produced some hotels
-  // so the initial API response is never entirely empty.
-  let firstChunkHotels = [];
-  try {
-    const { searchId } = searchResult;
+  // Promise.race: first chunk arriving OR 1-second timeout
+  const { searchId } = searchResult;
+  
+  const waitForFirstChunk = new Promise((resolve) => {
+    let resolved = false;
     let attempts = 0;
-    while (attempts < 240) { // Wait up to 240 seconds (60 * 250ms)
-      const resultsMap = await redis.hvalsBuffer(`search:${searchId}:results`);
-      
-      if (resultsMap && resultsMap.length > 0) {
-        // Decompress the first available chunk
-        for (const buffer of resultsMap) {
-          try {
+    const maxAttempts = 10; // 10 * 100ms = 1 second
+
+    const poll = async () => {
+      if (resolved || attempts >= maxAttempts) {
+        resolve([]);
+        return;
+      }
+      attempts++;
+
+      try {
+        const resultsMap = await redis.hvalsBuffer(`search:${searchId}:results`);
+        if (resultsMap && resultsMap.length > 0) {
+          const hotels = [];
+          for (const buffer of resultsMap) {
+            try {
             const decompressed = await gunzip(buffer);
             const chunkHotels = JSON.parse(decompressed.toString("utf-8"));
-            if (Array.isArray(chunkHotels) && chunkHotels.length > 0) {
-              firstChunkHotels.push(...chunkHotels);
+            if (Array.isArray(chunkHotels)) {
+              for (let i = 0; i < chunkHotels.length; i += 1000) {
+                hotels.push.apply(hotels, chunkHotels.slice(i, i + 1000));
+              }
             }
-          } catch (e) {}
+            } catch (e) {}
+          }
+          if (hotels.length > 0) {
+            resolved = true;
+            resolve(hotels);
+            return;
+          }
         }
-      }
+      } catch (e) {}
 
-      const meta = await redis.hgetall(`search:registry:${searchId}`);
+      setTimeout(poll, 100);
+    };
+    poll();
+  });
 
-      if (firstChunkHotels.length > 0 || meta.status === 'completed') {
-        break;
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 250));
-      attempts++;
-    }
-  } catch (err) {
-    logger.warn(`[hotel-search] Error waiting for first chunk: ${err.message}`);
-  }
+  const timeout = new Promise((resolve) => setTimeout(() => resolve([]), 1000));
 
-  // Return the search result with whatever initial hotels we found
+  const firstChunkHotels = await Promise.race([waitForFirstChunk, timeout]);
+
   return {
     ...searchResult,
     hotels: firstChunkHotels,

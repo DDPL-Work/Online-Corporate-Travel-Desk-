@@ -1,4 +1,5 @@
-const redis = require("../../../config/redis");
+const { getConnections } = require("../../../config/redisConnections");
+const redis = getConnections().general;
 const CorporateMarkup = require("../../../models/markup");
 const logger = require("../../../utils/logger");
 

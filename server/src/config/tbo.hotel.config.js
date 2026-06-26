@@ -1,6 +1,6 @@
 //server\src\config\tbo.hotel.config.js
 module.exports = {
-  timeout: 500000,
+  timeout: 30000,
 
   /* ---------------- COMMON ---------------- */
   common: {

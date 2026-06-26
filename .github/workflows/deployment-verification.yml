@@ -1,0 +1,207 @@
+name: Deployment Verification
+
+on:
+  workflow_run:
+    workflows: ["Deploy Backend", "Deploy Frontend"]
+    types:
+      - completed
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+env:
+  APP_PATH: /var/www/Online-Corporate-Travel-Desk-
+  SSH_USER: deploy
+  SERVER1_IP: ${{ secrets.SERVER1_IP }}
+  SERVER2_IP: ${{ secrets.SERVER2_IP }}
+
+concurrency:
+  group: deployment-verification
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify Both Servers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config << 'CFG'
+          Host *
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            User ${{ secrets.SSH_USER }}
+          CFG
+
+      - name: Run Comprehensive Verification
+        id: verify
+        env:
+          SERVER1_IP: ${{ secrets.SERVER1_IP }}
+          SERVER2_IP: ${{ secrets.SERVER2_IP }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          APP_PATH: /var/www/Online-Corporate-Travel-Desk-
+        run: |
+          ALL_PASSED=true
+
+          echo ""
+          echo "============================================"
+          echo " 1/8 GIT COMMIT HASH"
+          echo "============================================"
+          C1=$(ssh "$SSH_USER@$SERVER1_IP" "cat ${APP_PATH}/current/.commit 2>/dev/null | grep '^commit=' | cut -d= -f2 || cd $APP_PATH && git rev-parse HEAD" 2>/dev/null || echo "FAILED")
+          C2=$(ssh "$SSH_USER@$SERVER2_IP" "cat ${APP_PATH}/current/.commit 2>/dev/null | grep '^commit=' | cut -d= -f2 || cd $APP_PATH && git rev-parse HEAD" 2>/dev/null || echo "FAILED")
+          echo "  [SRV1] ${C1:0:12}"
+          echo "  [SRV2] ${C2:0:12}"
+          if [ "$C1" = "FAILED" ] || [ "$C2" = "FAILED" ]; then
+            ALL_PASSED=false; echo "  FAILED (cannot read commit)"
+          elif [ "${C1:0:12}" = "${C2:0:12}" ]; then
+            echo "  MATCH"
+          else
+            ALL_PASSED=false; echo "  MISMATCH"
+          fi
+
+          echo ""
+          echo "============================================"
+          echo " 2/8 PM2 PROCESS STATUS"
+          echo "============================================"
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
+            ssh "$SSH_USER@$ip" "
+              pm2 jlist 2>/dev/null | python3 -c \"
+          import sys, json
+          procs = json.load(sys.stdin)
+          for p in procs:
+              n = p.get('name','?')
+              s = p.get('pm2_env',{}).get('status','?')
+              r = p.get('pm2_env',{}).get('restart_time',0)
+              m = p.get('monit',{}).get('memory',0)
+              c = p.get('monit',{}).get('cpu',0)
+              mem_mb = m // 1048576
+              print(f'{n}: {s} (restarts: {r}, mem: {mem_mb}MB, cpu: {c}%)')
+          \" 2>/dev/null || echo 'PM2 not accessible'
+            " | while read line; do
+              echo "${label} ${line}"
+              if echo "$line" | grep -q "not online"; then
+                ALL_PASSED=false
+              fi
+            done
+          done
+
+          echo ""
+          echo "============================================"
+          echo " 3/8 API HEALTH ENDPOINT"
+          echo "============================================"
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
+            response=$(curl -s --max-time 10 "http://${ip}:5000/health" 2>/dev/null || echo "UNREACHABLE")
+            valid=$(echo "${response}" | python3 -c "
+          import sys, json
+          try:
+              d = json.load(sys.stdin)
+              assert d.get('status') == 'OK'
+              assert d.get('env') == 'production'
+              print('VALID')
+          except:
+              print('INVALID')
+          " 2>/dev/null || echo "PARSE_ERR")
+            echo "  ${label} ${valid}"
+            if [ "$valid" != "VALID" ]; then ALL_PASSED=false; fi
+          done
+
+          echo ""
+          echo "============================================"
+          echo " 4/8 FRONTEND ASSETS"
+          echo "============================================"
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
+            exists=$(ssh "$SSH_USER@$ip" "test -f ${APP_PATH}/current/client/dist/index.html && echo YES || echo NO" 2>/dev/null || echo "FAIL")
+            echo "  ${label} Client index.html: ${exists}"
+            if [ "$exists" != "YES" ]; then ALL_PASSED=false; fi
+          done
+
+          echo ""
+          echo "============================================"
+          echo " 5/8 NGINX CONFIGURATION"
+          echo "============================================"
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
+            nginx_test=$(ssh "$SSH_USER@$ip" "nginx -t 2>&1" || echo "FAIL")
+            if echo "$nginx_test" | grep -q "syntax is ok"; then
+              echo "  ${label} Nginx syntax OK"
+            else
+              echo "  ${label} ${nginx_test}"
+              ALL_PASSED=false
+            fi
+          done
+
+          echo ""
+          echo "============================================"
+          echo " 6/8 SSL CERTIFICATE"
+          echo "============================================"
+          DOMAINS="traveamer.com api.traveamer.com admin.traveamer.com"
+          for domain in $DOMAINS; do
+            expiry=$(echo | openssl s_client -servername "$domain" -connect "${domain}:443" 2>/dev/null | \
+              openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || echo "FAIL")
+            if [ "$expiry" != "FAIL" ]; then
+              days_left=$(( ($(date -d "$expiry" +%s) - $(date +%s)) / 86400 ))
+              echo "  ${domain}: ${days_left} days remaining"
+              if [ "$days_left" -le 7 ]; then ALL_PASSED=false; fi
+            fi
+          done
+
+          echo ""
+          echo "============================================"
+          echo " 7/8 CRITICAL DEPENDENCIES"
+          echo "============================================"
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
+            deps=$(ssh "$SSH_USER@$ip" \
+              "cd ${APP_PATH}/current/server && node -e \"try { require('express'); require('mongoose'); require('socket.io'); require('ioredis'); require('bullmq'); require('winston'); console.log('ALL_OK'); } catch(e) { console.log('MISSING: ' + e.message); }\"" \
+              2>/dev/null || echo "FAIL")
+            echo "  ${label} ${deps}"
+            if [ "$deps" != "ALL_OK" ]; then ALL_PASSED=false; fi
+          done
+
+          echo ""
+          echo "============================================"
+          echo " 8/8 SERVER UPTIME & LOAD"
+          echo "============================================"
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            label="[$( [ "$ip" = "$SERVER1_IP" ] && echo "SRV1" || echo "SRV2" )]"
+            ssh "$SSH_USER@$ip" \
+              "echo 'Uptime:'; uptime; echo 'Disk:'; df -h ${APP_PATH} | tail -1; echo 'Memory:'; free -m | grep Mem" \
+              2>/dev/null | while read line; do echo "  ${label} ${line}"; done
+          done
+
+          echo ""
+          echo "============================================"
+          if [ "$ALL_PASSED" = "true" ]; then
+            echo "  ALL VERIFICATION CHECKS PASSED"
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "  SOME CHECKS FAILED"
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+          echo "============================================"
+
+      - name: Send Summary
+        if: ${{ always() }}
+        run: |
+          STATUS="${{ steps.verify.outputs.status }}"
+          EMOJI="✅"; COLOR="36a64f"
+          if [ "$STATUS" != "passed" ]; then
+            EMOJI="❌"; COLOR="d00000"
+          fi
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"${COLOR}\",
+                \"text\": \"${EMOJI} Deployment Verification ${STATUS}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>\"
+              }]
+            }" ${{ secrets.SLACK_WEBHOOK_URL }} || true

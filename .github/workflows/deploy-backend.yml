@@ -1,0 +1,711 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "deployment/scripts/deploy-server.sh"
+      - "deployment/pm2/ecosystem.config.js"
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Target server (both, server1, server2)"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - server1
+          - server2
+      skip-health-check:
+        description: "Skip health verification"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  APP_PATH: /var/www/Online-Corporate-Travel-Desk-
+  SSH_USER: deploy
+  SERVER1_IP: ${{ secrets.SERVER1_IP }}
+  SERVER2_IP: ${{ secrets.SERVER2_IP }}
+  DO_LB_ID: ${{ secrets.DO_LB_ID }}
+  DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+  NODE_VERSION: "20"
+  COMMIT_HASH: ${{ github.sha }}
+  DEPLOYED_BY: ${{ github.actor }}
+
+concurrency:
+  group: backend-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate & Gate
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_server1: ${{ steps.targets.outputs.deploy_server1 }}
+      deploy_server2: ${{ steps.targets.outputs.deploy_server2 }}
+      deploy_time: ${{ steps.meta.outputs.deploy_time }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Branch Protection Check
+        run: |
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]] && [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            echo "::error::Deployments only allowed from main branch or manual dispatch."
+            exit 1
+          fi
+
+      - name: Determine Deployment Targets
+        id: targets
+        run: |
+          INPUT_SERVER="${{ github.event.inputs.server }}"
+          EVENT_NAME="${{ github.event_name }}"
+
+          DEPLOY_S1="false"
+          DEPLOY_S2="false"
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            DEPLOY_S1="true"
+            DEPLOY_S2="true"
+          elif [ "$INPUT_SERVER" = "both" ]; then
+            DEPLOY_S1="true"
+            DEPLOY_S2="true"
+          elif [ "$INPUT_SERVER" = "server1" ]; then
+            DEPLOY_S1="true"
+          elif [ "$INPUT_SERVER" = "server2" ]; then
+            DEPLOY_S2="true"
+          fi
+
+          echo "deploy_server1=$DEPLOY_S1" >> $GITHUB_OUTPUT
+          echo "deploy_server2=$DEPLOY_S2" >> $GITHUB_OUTPUT
+          echo "Deploy: Server1=$DEPLOY_S1, Server2=$DEPLOY_S2"
+
+      - name: Deployment Metadata
+        id: meta
+        run: |
+          echo "deploy_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "commit_short=${{ github.sha }}" | head -c 12 >> /dev/null
+
+      - name: Validate Required Secrets
+        run: |
+          required_secrets=(
+            "SSH_PRIVATE_KEY"
+            "SERVER1_IP"
+            "SERVER2_IP"
+            "DO_API_TOKEN"
+            "DO_LB_ID"
+          )
+          missing=0
+          for secret in "${required_secrets[@]}"; do
+            if [[ -z "${!secret}" ]]; then
+              echo "::error::Missing required secret: $secret"
+              ((missing++))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::$missing required secret(s) missing. Aborting deployment."
+            exit 1
+          fi
+          echo "All required secrets present."
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER1_IP: ${{ secrets.SERVER1_IP }}
+          SERVER2_IP: ${{ secrets.SERVER2_IP }}
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          DO_LB_ID: ${{ secrets.DO_LB_ID }}
+
+  deploy-server1:
+    name: Deploy Server 1
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: ${{ needs.validate.outputs.deploy_server1 == 'true' }}
+    outputs:
+      status: ${{ steps.deploy-status.outputs.status }}
+      commit: ${{ steps.deploy-status.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config << 'SSHCONFIG'
+          Host *
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            User deploy
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          SSHCONFIG
+
+      - name: Pre-Deployment Validation — Server 1
+        run: |
+          echo "::group::Pre-deployment validation for Server 1 (${{ secrets.SERVER1_IP }})"
+
+          for i in 1 2 3; do
+            if ssh -o ConnectTimeout=10 "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" "echo SSH_OK" 2>/dev/null; then
+              echo "SSH connectivity: OK"
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::SSH to Server 1 failed after 3 attempts."
+              exit 1
+            fi
+            echo "SSH attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" "command -v pm2" 2>/dev/null || { echo "::error::PM2 not found on Server 1"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" "command -v node && node --version" 2>/dev/null || { echo "::error::Node not found on Server 1"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" "test -d ${{ env.APP_PATH }}" 2>/dev/null || { echo "::error::App path not found on Server 1"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" "test -d ${{ env.APP_PATH }}/.git" 2>/dev/null || { echo "::error::Git repo not found on Server 1"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" "mkdir -p ${{ env.APP_PATH }}/releases"
+
+          echo "::endgroup::"
+          echo "Pre-deployment validations passed for Server 1."
+
+      - name: Remove Server 1 from Load Balancer
+        if: ${{ env.DO_LB_ID != '' && env.DO_API_TOKEN != '' }}
+        run: |
+          echo "::group::Removing Server 1 from DigitalOcean Load Balancer"
+
+          DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/droplets?page=1&per_page=200")
+
+          DO_HTTP_CODE=$(echo "$DO_API_RESPONSE" | tail -1)
+          DO_BODY=$(echo "$DO_API_RESPONSE" | sed '$d')
+
+          if [ "$DO_HTTP_CODE" != "200" ]; then
+            echo "::warning::DO API returned HTTP ${DO_HTTP_CODE}. Skipping LB removal."
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for d in data.get('droplets', []):
+              for net in d.get('networks', {}).get('v4', []):
+                  if net.get('ip_address') == '${{ secrets.SERVER1_IP }}':
+                      print(d['id'])
+                      sys.exit(0)
+          print('NOT_FOUND')
+          ")
+
+          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
+            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets/$DROPLET_ID")
+            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+            if [ "$LB_HTTP" = "204" ] || [ "$LB_HTTP" = "200" ]; then
+              echo "Server 1 removed from LB (HTTP ${LB_HTTP})."
+            else
+              echo "::warning::LB removal returned HTTP ${LB_HTTP}. Check LB state manually."
+            fi
+            sleep 15
+          else
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER1_IP }}. Skipping LB removal."
+          fi
+          echo "::endgroup::"
+
+      - name: Copy Deploy Script
+        run: |
+          cp deployment/scripts/deploy-server.sh /tmp/deploy-server.sh
+          chmod +x /tmp/deploy-server.sh
+
+      - name: Deploy Server 1
+        id: deploy
+        run: |
+          echo "::group::Deploying Server 1"
+
+          for i in 1 2 3; do
+            if scp -o ConnectTimeout=10 /tmp/deploy-server.sh \
+              "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}:/tmp/deploy-server.sh"; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::SCP to Server 1 failed after 3 attempts."
+              exit 1
+            fi
+            echo "SCP attempt $i failed, retrying..."
+            sleep 5
+          done
+
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
+            "APP_PATH=${{ env.APP_PATH }} \
+             COMMIT_HASH=${{ github.sha }} \
+             NODE_ENV=production \
+             DEPLOYED_BY=${{ github.actor }} \
+             bash /tmp/deploy-server.sh"
+
+          echo "::endgroup::"
+        timeout-minutes: 15
+
+      - name: Health Check Server 1
+        if: ${{ github.event.inputs.skip-health-check != 'true' }}
+        id: health
+        run: |
+          echo "::group::Health Check Server 1"
+          for i in 1 2 3; do
+            if scp -o ConnectTimeout=10 deployment/scripts/health-check.sh \
+              "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}:/tmp/health-check.sh"; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::SCP health-check to Server 1 failed after 3 attempts."
+              exit 1
+            fi
+            sleep 3
+          done
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
+            "SSH_USER=${{ secrets.SSH_USER }} \
+             bash /tmp/health-check.sh ${{ secrets.SERVER1_IP }} ${{ env.APP_PATH }}"
+          echo "Server 1 health check passed."
+          echo "::endgroup::"
+        timeout-minutes: 5
+
+      - name: Add Server 1 Back to Load Balancer
+        if: ${{ always() && env.DO_LB_ID != '' && env.DO_API_TOKEN != '' }}
+        run: |
+          echo "::group::Adding Server 1 back to Load Balancer"
+
+          DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/droplets?page=1&per_page=200")
+          DO_HTTP_CODE=$(echo "$DO_API_RESPONSE" | tail -1)
+          DO_BODY=$(echo "$DO_API_RESPONSE" | sed '$d')
+
+          if [ "$DO_HTTP_CODE" != "200" ]; then
+            echo "::warning::DO API returned HTTP ${DO_HTTP_CODE}. Cannot add to LB."
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for d in data.get('droplets', []):
+              for net in d.get('networks', {}).get('v4', []):
+                  if net.get('ip_address') == '${{ secrets.SERVER1_IP }}':
+                      print(d['id'])
+                      sys.exit(0)
+          print('NOT_FOUND')
+          ")
+
+          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
+            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+              -d "{\"droplet_ids\": [$DROPLET_ID]}" \
+              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets")
+            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+            if [ "$LB_HTTP" = "200" ] || [ "$LB_HTTP" = "201" ]; then
+              echo "Server 1 added back to LB (HTTP ${LB_HTTP})."
+            else
+              echo "::error::LB add returned HTTP ${LB_HTTP}. Server 1 may not be receiving traffic."
+            fi
+            sleep 30
+          else
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER1_IP }}."
+          fi
+          echo "::endgroup::"
+
+      - name: Deployment Status
+        id: deploy-status
+        if: ${{ always() }}
+        run: |
+          if [[ "${{ steps.health.outcome }}" == "success" ]] || [[ "${{ github.event.inputs.skip-health-check }}" == "true" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "::error::Server 1 deployment FAILED."
+            exit 1
+          fi
+
+      - name: Upload Deploy Logs on Failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-server1-logs
+          path: /tmp/deploy-*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  deploy-server2:
+    name: Deploy Server 2
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-server1]
+    if: ${{ always() && needs.deploy-server1.outputs.status == 'success' && needs.validate.outputs.deploy_server2 == 'true' }}
+    outputs:
+      status: ${{ steps.deploy-status.outputs.status }}
+      commit: ${{ steps.deploy-status.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config << 'SSHCONFIG'
+          Host *
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            User deploy
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          SSHCONFIG
+
+      - name: Pre-Deployment Validation — Server 2
+        run: |
+          echo "::group::Pre-deployment validation for Server 2 (${{ secrets.SERVER2_IP }})"
+
+          for i in 1 2 3; do
+            if ssh -o ConnectTimeout=10 "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" "echo SSH_OK" 2>/dev/null; then
+              echo "SSH connectivity: OK"
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::SSH to Server 2 failed after 3 attempts."
+              exit 1
+            fi
+            echo "SSH attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" "command -v pm2" 2>/dev/null || { echo "::error::PM2 not found on Server 2"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" "command -v node && node --version" 2>/dev/null || { echo "::error::Node not found on Server 2"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" "test -d ${{ env.APP_PATH }}" 2>/dev/null || { echo "::error::App path not found on Server 2"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" "test -d ${{ env.APP_PATH }}/.git" 2>/dev/null || { echo "::error::Git repo not found on Server 2"; exit 1; }
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" "mkdir -p ${{ env.APP_PATH }}/releases"
+
+          echo "::endgroup::"
+          echo "Pre-deployment validations passed for Server 2."
+
+      - name: Remove Server 2 from Load Balancer
+        if: ${{ env.DO_LB_ID != '' && env.DO_API_TOKEN != '' }}
+        run: |
+          echo "::group::Removing Server 2 from Load Balancer"
+
+          DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/droplets?page=1&per_page=200")
+          DO_HTTP_CODE=$(echo "$DO_API_RESPONSE" | tail -1)
+          DO_BODY=$(echo "$DO_API_RESPONSE" | sed '$d')
+
+          if [ "$DO_HTTP_CODE" != "200" ]; then
+            echo "::warning::DO API returned HTTP ${DO_HTTP_CODE}. Skipping LB removal."
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for d in data.get('droplets', []):
+              for net in d.get('networks', {}).get('v4', []):
+                  if net.get('ip_address') == '${{ secrets.SERVER2_IP }}':
+                      print(d['id'])
+                      sys.exit(0)
+          print('NOT_FOUND')
+          ")
+
+          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
+            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets/$DROPLET_ID")
+            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+            if [ "$LB_HTTP" = "204" ] || [ "$LB_HTTP" = "200" ]; then
+              echo "Server 2 removed from LB (HTTP ${LB_HTTP})."
+            else
+              echo "::warning::LB removal returned HTTP ${LB_HTTP}."
+            fi
+            sleep 15
+          else
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER2_IP }}."
+          fi
+          echo "::endgroup::"
+
+      - name: Deploy Server 2
+        run: |
+          echo "::group::Deploying Server 2"
+
+          for i in 1 2 3; do
+            if scp -o ConnectTimeout=10 deployment/scripts/deploy-server.sh \
+              "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}:/tmp/deploy-server.sh"; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::SCP to Server 2 failed after 3 attempts."
+              exit 1
+            fi
+            echo "SCP attempt $i failed, retrying..."
+            sleep 5
+          done
+
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
+            "APP_PATH=${{ env.APP_PATH }} \
+             COMMIT_HASH=${{ github.sha }} \
+             NODE_ENV=production \
+             DEPLOYED_BY=${{ github.actor }} \
+             bash /tmp/deploy-server.sh"
+          echo "::endgroup::"
+        timeout-minutes: 15
+
+      - name: Health Check Server 2
+        if: ${{ github.event.inputs.skip-health-check != 'true' }}
+        id: health
+        run: |
+          echo "::group::Health Check Server 2"
+          for i in 1 2 3; do
+            if scp -o ConnectTimeout=10 deployment/scripts/health-check.sh \
+              "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}:/tmp/health-check.sh"; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::SCP health-check to Server 2 failed after 3 attempts."
+              exit 1
+            fi
+            sleep 3
+          done
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
+            "SSH_USER=${{ secrets.SSH_USER }} \
+             bash /tmp/health-check.sh ${{ secrets.SERVER2_IP }} ${{ env.APP_PATH }}"
+          echo "Server 2 health check passed."
+          echo "::endgroup::"
+        timeout-minutes: 5
+
+      - name: Add Server 2 Back to Load Balancer
+        if: ${{ always() && env.DO_LB_ID != '' && env.DO_API_TOKEN != '' }}
+        run: |
+          echo "::group::Adding Server 2 back to Load Balancer"
+
+          DO_API_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            "https://api.digitalocean.com/v2/droplets?page=1&per_page=200")
+          DO_HTTP_CODE=$(echo "$DO_API_RESPONSE" | tail -1)
+          DO_BODY=$(echo "$DO_API_RESPONSE" | sed '$d')
+
+          if [ "$DO_HTTP_CODE" != "200" ]; then
+            echo "::warning::DO API returned HTTP ${DO_HTTP_CODE}."
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          DROPLET_ID=$(echo "$DO_BODY" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for d in data.get('droplets', []):
+              for net in d.get('networks', {}).get('v4', []):
+                  if net.get('ip_address') == '${{ secrets.SERVER2_IP }}':
+                      print(d['id'])
+                      sys.exit(0)
+          print('NOT_FOUND')
+          ")
+
+          if [ "$DROPLET_ID" != "NOT_FOUND" ]; then
+            LB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+              -d "{\"droplet_ids\": [$DROPLET_ID]}" \
+              "https://api.digitalocean.com/v2/load_balancers/${{ secrets.DO_LB_ID }}/droplets")
+            LB_HTTP=$(echo "$LB_RESPONSE" | tail -1)
+            if [ "$LB_HTTP" = "200" ] || [ "$LB_HTTP" = "201" ]; then
+              echo "Server 2 added back to LB (HTTP ${LB_HTTP})."
+            else
+              echo "::error::LB add returned HTTP ${LB_HTTP}. Server 2 may not be receiving traffic."
+            fi
+            sleep 30
+          else
+            echo "::warning::Could not find droplet ID for ${{ secrets.SERVER2_IP }}."
+          fi
+          echo "::endgroup::"
+
+      - name: Deployment Status
+        id: deploy-status
+        if: ${{ always() }}
+        run: |
+          if [[ "${{ steps.health.outcome }}" == "success" ]] || [[ "${{ github.event.inputs.skip-health-check }}" == "true" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "::error::Server 2 deployment FAILED."
+            exit 1
+          fi
+
+      - name: Upload Deploy Logs on Failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-server2-logs
+          path: /tmp/deploy-*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  verify:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-server1, deploy-server2]
+    if: ${{ always() && (needs.deploy-server1.outputs.status == 'success' || needs.deploy-server2.outputs.status == 'success') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+
+      - name: Run Full Deployment Verification
+        run: |
+          chmod +x deployment/scripts/verify-deployment.sh
+          scp deployment/scripts/verify-deployment.sh \
+            "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}:/tmp/verify-deployment.sh"
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
+            "SERVER1_IP=${{ secrets.SERVER1_IP }} \
+             SERVER2_IP=${{ secrets.SERVER2_IP }} \
+             APP_PATH=${{ env.APP_PATH }} \
+             SSH_USER=${{ secrets.SSH_USER }} \
+             PUBLIC_URL=https://corporate.traveamer.com \
+             bash /tmp/verify-deployment.sh"
+        timeout-minutes: 5
+
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-server1, deploy-server2, verify]
+    if: ${{ always() }}
+    steps:
+      - name: Determine Status
+        id: status
+        run: |
+          S1="${{ needs.deploy-server1.result }}"
+          S2="${{ needs.deploy-server2.result }}"
+          VRFY="${{ needs.verify.result }}"
+          DEPLOY_S1="${{ needs.validate.outputs.deploy_server1 }}"
+          DEPLOY_S2="${{ needs.validate.outputs.deploy_server2 }}"
+
+          if [ "$S1" = "success" ] && [ "$S2" = "success" ] && [ "$VRFY" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "color=36a64f" >> $GITHUB_OUTPUT
+            echo "summary=Both servers deployed and verified" >> $GITHUB_OUTPUT
+          elif [ "$S1" = "success" ] && [ "$DEPLOY_S2" = "false" ] && [ "$VRFY" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "color=36a64f" >> $GITHUB_OUTPUT
+            echo "summary=Server 1 deployed and verified (Server 2 not targeted)" >> $GITHUB_OUTPUT
+          elif [ "$S2" = "success" ] && [ "$DEPLOY_S1" = "false" ] && [ "$VRFY" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "color=36a64f" >> $GITHUB_OUTPUT
+            echo "summary=Server 2 deployed and verified (Server 1 not targeted)" >> $GITHUB_OUTPUT
+          elif [ "$S1" = "cancelled" ] || [ "$S2" = "cancelled" ]; then
+            echo "status=cancelled" >> $GITHUB_OUTPUT
+            echo "color=808080" >> $GITHUB_OUTPUT
+            echo "summary=Deployment cancelled" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "color=d00000" >> $GITHUB_OUTPUT
+            DETAILS=""
+            if [ "$S1" != "success" ] && [ "$DEPLOY_S1" = "true" ]; then
+              DETAILS="${DETAILS}Server1: ${S1} "
+            fi
+            if [ "$S2" != "success" ] && [ "$DEPLOY_S2" = "true" ]; then
+              DETAILS="${DETAILS}Server2: ${S2} "
+            fi
+            if [ "$VRFY" != "success" ]; then
+              DETAILS="${DETAILS}Verify: ${VRFY}"
+            fi
+            echo "summary=Deployment FAILED — ${DETAILS}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack Notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          COMMIT_MSG=$(git log --format="%s" -1)
+          COMMIT_AUTHOR=$(git log --format="%an" -1)
+          DEPLOY_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          S1_RESULT="${{ needs.deploy-server1.result }}"
+          S2_RESULT="${{ needs.deploy-server2.result }}"
+          VRFY_RESULT="${{ needs.verify.result }}"
+          DEPLOY_S1="${{ needs.validate.outputs.deploy_server1 }}"
+          DEPLOY_S2="${{ needs.validate.outputs.deploy_server2 }}"
+
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"${{ steps.status.outputs.color }}\",
+                \"blocks\": [
+                  {
+                    \"type\": \"header\",
+                    \"text\": {
+                      \"type\": \"plain_text\",
+                      \"text\": \"Backend Deployment ${{ steps.status.outputs.status }}\"
+                    }
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"fields\": [
+                      {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\n<${DEPLOY_URL}|${{ github.sha }}\"},
+                      {\"type\": \"mrkdwn\", \"text\": \"*Author:*\n${COMMIT_AUTHOR}\"}
+                    ]
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"fields\": [
+                      {\"type\": \"mrkdwn\", \"text\": \"*Message:*\n${COMMIT_MSG}\"},
+                      {\"type\": \"mrkdwn\", \"text\": \"*Summary:*\n${{ steps.status.outputs.summary }}\"}
+                    ]
+                  },
+                  {
+                    \"type\": \"section\",
+                    \"fields\": [
+                      {\"type\": \"mrkdwn\", \"text\": \"*Server 1 (${DEPLOY_S1}):*\n${S1_RESULT}\"},
+                      {\"type\": \"mrkdwn\", \"text\": \"*Server 2 (${DEPLOY_S2}):*\n${S2_RESULT}\"}
+                    ]
+                  },
+                  {
+                    \"type\": \"context\",
+                    \"elements\": [
+                      {\"type\": \"mrkdwn\", \"text\": \"*Verification:* ${VRFY_RESULT} | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\"}
+                    ]
+                  }
+                ]
+              }]
+            }" ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          COMMIT_HASH: ${{ github.sha }}
+
+      - name: Trigger Rollback on Failure
+        if: ${{ steps.status.outputs.status == 'failure' }}
+        run: |
+          echo "::error::DEPLOYMENT FAILED — Attempting automatic rollback..."
+          curl -s -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/rollback.yml/dispatches" \
+            -d "{\"ref\": \"main\", \"inputs\": {\"servers\": \"both\", \"confirm\": \"rollback\"}}" || true
+          echo "::warning::Rollback workflow triggered. Monitor: https://github.com/${{ github.repository }}/actions/workflows/rollback.yml"
