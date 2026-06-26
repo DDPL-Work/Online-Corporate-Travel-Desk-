@@ -135,13 +135,17 @@ jobs:
         run: |
           scp deployment/scripts/rollback.sh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}:/tmp/rollback.sh"
 
-          ROLLBACK_OPTS="--auto"
+          ROLLBACK_TARGET="previous"
           if [[ "${{ github.event.inputs.target }}" == "specific" ]] && [[ -n "${{ github.event.inputs.specific-release }}" ]]; then
-            ROLLBACK_OPTS="--target ${APP_PATH}/releases/${{ github.event.inputs.specific-release }}"
+            ROLLBACK_TARGET="${{ github.event.inputs.specific-release }}"
           fi
 
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
-            "APP_PATH=${APP_PATH} ROLLBACK_CONFIRMED=true bash /tmp/rollback.sh ${ROLLBACK_OPTS}"
+            "APP_PATH=${APP_PATH} \
+             ROLLBACK_TARGET=${ROLLBACK_TARGET} \
+             ROLLBACK_CONFIRMED=true \
+             DEPLOYED_BY=${{ github.actor }} \
+             bash /tmp/rollback.sh"
 
           echo "Rollback executed on Server 1."
         timeout-minutes: 10
@@ -151,7 +155,7 @@ jobs:
         run: |
           scp deployment/scripts/health-check.sh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}:/tmp/health-check.sh"
           if ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
-            "SSH_USER=${SSH_USER} bash /tmp/health-check.sh ${{ secrets.SERVER1_IP }} ${APP_PATH}"; then
+            "APP_PATH=${APP_PATH} bash /tmp/health-check.sh"; then
             echo "Server 1 healthy after rollback."
           else
             echo "::error::Server 1 UNHEALTHY after rollback — manual intervention required."
@@ -231,19 +235,25 @@ jobs:
       - name: Execute Rollback on Server 2
         run: |
           scp deployment/scripts/rollback.sh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}:/tmp/rollback.sh"
-          ROLLBACK_OPTS="--auto"
+
+          ROLLBACK_TARGET="previous"
           if [[ "${{ github.event.inputs.target }}" == "specific" ]] && [[ -n "${{ github.event.inputs.specific-release }}" ]]; then
-            ROLLBACK_OPTS="--target ${APP_PATH}/releases/${{ github.event.inputs.specific-release }}"
+            ROLLBACK_TARGET="${{ github.event.inputs.specific-release }}"
           fi
+
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
-            "APP_PATH=${APP_PATH} ROLLBACK_CONFIRMED=true bash /tmp/rollback.sh ${ROLLBACK_OPTS}"
+            "APP_PATH=${APP_PATH} \
+             ROLLBACK_TARGET=${ROLLBACK_TARGET} \
+             ROLLBACK_CONFIRMED=true \
+             DEPLOYED_BY=${{ github.actor }} \
+             bash /tmp/rollback.sh"
         timeout-minutes: 10
 
       - name: Verify Health After Rollback
         run: |
           scp deployment/scripts/health-check.sh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}:/tmp/health-check.sh"
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
-            "SSH_USER=${SSH_USER} bash /tmp/health-check.sh ${{ secrets.SERVER2_IP }} ${APP_PATH}"
+            "APP_PATH=${APP_PATH} bash /tmp/health-check.sh"
         timeout-minutes: 5
 
       - name: Add Server 2 Back to Load Balancer

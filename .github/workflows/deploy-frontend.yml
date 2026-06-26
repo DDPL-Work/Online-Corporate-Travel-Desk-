@@ -221,7 +221,10 @@ jobs:
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
             "APP_PATH=${{ env.APP_PATH }} \
              COMMIT_HASH=${{ github.sha }} \
-             bash /tmp/deploy-client.sh /tmp/client-dist.tar.gz"
+             ARTIFACT_NAME=client-dist \
+             ARTIFACT_PATH=/tmp/client-dist.tar.gz \
+             CLIENT_DIR=/var/www/client \
+             bash /tmp/deploy-client.sh"
         timeout-minutes: 10
 
       - name: Deploy Super Admin to Server 1
@@ -233,7 +236,10 @@ jobs:
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
             "APP_PATH=${{ env.APP_PATH }} \
              COMMIT_HASH=${{ github.sha }} \
-             bash /tmp/deploy-admin.sh /tmp/admin-dist.tar.gz"
+             ARTIFACT_NAME=admin-dist \
+             ARTIFACT_PATH=/tmp/admin-dist.tar.gz \
+             ADMIN_DIR=/var/www/admin \
+             bash /tmp/deploy-admin.sh"
         timeout-minutes: 10
 
       - name: Validate Frontend Assets
@@ -328,7 +334,10 @@ jobs:
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
             "APP_PATH=${{ env.APP_PATH }} \
              COMMIT_HASH=${{ github.sha }} \
-             bash /tmp/deploy-client.sh /tmp/client-dist.tar.gz"
+             ARTIFACT_NAME=client-dist \
+             ARTIFACT_PATH=/tmp/client-dist.tar.gz \
+             CLIENT_DIR=/var/www/client \
+             bash /tmp/deploy-client.sh"
         timeout-minutes: 10
 
       - name: Deploy Super Admin to Server 2
@@ -340,7 +349,10 @@ jobs:
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
             "APP_PATH=${{ env.APP_PATH }} \
              COMMIT_HASH=${{ github.sha }} \
-             bash /tmp/deploy-admin.sh /tmp/admin-dist.tar.gz"
+             ARTIFACT_NAME=admin-dist \
+             ARTIFACT_PATH=/tmp/admin-dist.tar.gz \
+             ADMIN_DIR=/var/www/admin \
+             bash /tmp/deploy-admin.sh"
         timeout-minutes: 10
 
       - name: Validate Frontend Assets

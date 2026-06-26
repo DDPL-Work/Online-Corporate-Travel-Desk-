@@ -290,8 +290,7 @@ jobs:
             sleep 3
           done
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
-            "SSH_USER=${{ secrets.SSH_USER }} \
-             bash /tmp/health-check.sh ${{ secrets.SERVER1_IP }} ${{ env.APP_PATH }}"
+            "APP_PATH=${{ env.APP_PATH }} bash /tmp/health-check.sh"
           echo "Server 1 health check passed."
           echo "::endgroup::"
         timeout-minutes: 5
@@ -542,8 +541,7 @@ jobs:
             sleep 3
           done
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
-            "SSH_USER=${{ secrets.SSH_USER }} \
-             bash /tmp/health-check.sh ${{ secrets.SERVER2_IP }} ${{ env.APP_PATH }}"
+            "APP_PATH=${{ env.APP_PATH }} bash /tmp/health-check.sh"
           echo "Server 2 health check passed."
           echo "::endgroup::"
         timeout-minutes: 5
@@ -656,7 +654,7 @@ jobs:
             scp -o ConnectTimeout=10 deployment/scripts/health-check.sh \
               "${{ secrets.SSH_USER }}@${ip}:/tmp/health-check.sh"
             ssh "${{ secrets.SSH_USER }}@${ip}" \
-              "bash /tmp/health-check.sh $ip ${{ env.APP_PATH }}"
+              "APP_PATH=${{ env.APP_PATH }} bash /tmp/health-check.sh"
           done
         timeout-minutes: 5
 
