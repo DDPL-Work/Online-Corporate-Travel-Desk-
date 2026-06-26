@@ -8,6 +8,7 @@ on:
       - "super-admin/**"
       - "deployment/scripts/deploy-client.sh"
       - "deployment/scripts/deploy-admin.sh"
+      - ".github/workflows/**"
   workflow_dispatch:
     inputs:
       server:
