@@ -380,10 +380,16 @@ jobs:
           fi
 
       - name: Send Slack Notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
           STATUS_EMOJI="${{ steps.status.outputs.status == 'success' && '✅' || '❌' }}"
           curl -s -X POST -H 'Content-type: application/json' \
             --data "{
               \"text\": \"${STATUS_EMOJI} Frontend Deployment ${{ steps.status.outputs.status }}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\"
-            }" ${{ secrets.SLACK_WEBHOOK_URL }}
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

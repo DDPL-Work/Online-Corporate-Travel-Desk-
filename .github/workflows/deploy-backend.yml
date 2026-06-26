@@ -86,7 +86,6 @@ jobs:
         id: meta
         run: |
           echo "deploy_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-          echo "commit_short=${{ github.sha }}" | head -c 12 >> /dev/null
 
       - name: Validate Required Secrets
         run: |
@@ -610,8 +609,12 @@ jobs:
           fi
 
       - name: Send Slack Notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
           COMMIT_MSG=$(git log --format="%s" -1)
           COMMIT_AUTHOR=$(git log --format="%an" -1)
           DEPLOY_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -663,9 +666,10 @@ jobs:
                   }
                 ]
               }]
-            }" ${{ secrets.SLACK_WEBHOOK_URL }}
+            }" "$SLACK_WEBHOOK_URL"
         env:
           COMMIT_HASH: ${{ github.sha }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Trigger Rollback on Failure
         if: ${{ steps.status.outputs.status == 'failure' }}

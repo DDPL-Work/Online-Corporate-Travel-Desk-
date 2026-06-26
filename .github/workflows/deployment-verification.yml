@@ -173,6 +173,11 @@ jobs:
       - name: Send Summary
         if: ${{ always() }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
           STATUS="${{ steps.verify.outputs.status }}"
           EMOJI="✅"; COLOR="36a64f"
           if [ "$STATUS" != "passed" ]; then
@@ -184,4 +189,6 @@ jobs:
                 \"color\": \"${COLOR}\",
                 \"text\": \"${EMOJI} Deployment Verification ${STATUS}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>\"
               }]
-            }" ${{ secrets.SLACK_WEBHOOK_URL }} || true
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

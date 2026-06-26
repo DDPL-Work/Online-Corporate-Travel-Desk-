@@ -288,8 +288,12 @@ jobs:
           fi
 
       - name: Send Slack Notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
           curl -s -X POST -H 'Content-type: application/json' \
             --data "{
               \"attachments\": [{
@@ -320,4 +324,6 @@ jobs:
                   }
                 ]
               }]
-            }" ${{ secrets.SLACK_WEBHOOK_URL }}
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

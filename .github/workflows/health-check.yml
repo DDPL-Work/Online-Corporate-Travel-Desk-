@@ -300,6 +300,11 @@ jobs:
       - name: Send Slack Alert on Failure
         if: ${{ steps.summary.outputs.all_ok == 'false' || needs.ssl-health.outputs.expiring == 'true' }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
           REPORT="${{ steps.summary.outputs.report }}"
           curl -s -X POST -H 'Content-type: application/json' \
             --data "{
@@ -311,11 +316,18 @@ jobs:
                   {\"type\": \"context\", \"elements\": [{\"type\": \"mrkdwn\", \"text\": \"<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>\"}]}
                 ]
               }]
-            }" ${{ secrets.SLACK_WEBHOOK_URL }}
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Send Success Summary
         if: ${{ steps.summary.outputs.all_ok == 'true' && github.event.inputs.notify-on-success == 'true' }}
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
           REPORT="${{ steps.summary.outputs.report }}"
           curl -s -X POST -H 'Content-type: application/json' \
             --data "{
@@ -323,4 +335,6 @@ jobs:
                 \"color\": \"#36a64f\",
                 \"blocks\": [{\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"✅ Production Health Summary\n\`\`\`${REPORT}\`\`\`\"}}]
               }]
-            }" ${{ secrets.SLACK_WEBHOOK_URL }}
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
