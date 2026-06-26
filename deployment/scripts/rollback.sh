@@ -183,8 +183,8 @@ log "Server dependencies installed"
 if [[ -d "$PREV_RELEASE" ]]; then
     log "Rolling back frontend..."
     
-    CLIENT_DIR="/var/www/client"
-    ADMIN_DIR="/var/www/admin"
+    CLIENT_DIR="${APP_PATH:-/var/www/Online-Corporate-Travel-Desk-}/client"
+    ADMIN_DIR="${APP_PATH:-/var/www/Online-Corporate-Travel-Desk-}/super-admin"
     
     # Backup current before rollback
     if [[ -d "$CLIENT_DIR" ]]; then

@@ -223,7 +223,7 @@ jobs:
              COMMIT_HASH=${{ github.sha }} \
              ARTIFACT_NAME=client-dist \
              ARTIFACT_PATH=/tmp/client-dist.tar.gz \
-             CLIENT_DIR=/var/www/client \
+             CLIENT_DIR=${{ env.APP_PATH }}/client \
              bash /tmp/deploy-client.sh"
         timeout-minutes: 10
 
@@ -238,7 +238,7 @@ jobs:
              COMMIT_HASH=${{ github.sha }} \
              ARTIFACT_NAME=admin-dist \
              ARTIFACT_PATH=/tmp/admin-dist.tar.gz \
-             ADMIN_DIR=/var/www/admin \
+             ADMIN_DIR=${{ env.APP_PATH }}/super-admin \
              bash /tmp/deploy-admin.sh"
         timeout-minutes: 10
 
@@ -336,7 +336,7 @@ jobs:
              COMMIT_HASH=${{ github.sha }} \
              ARTIFACT_NAME=client-dist \
              ARTIFACT_PATH=/tmp/client-dist.tar.gz \
-             CLIENT_DIR=/var/www/client \
+             CLIENT_DIR=${{ env.APP_PATH }}/client \
              bash /tmp/deploy-client.sh"
         timeout-minutes: 10
 
@@ -351,7 +351,7 @@ jobs:
              COMMIT_HASH=${{ github.sha }} \
              ARTIFACT_NAME=admin-dist \
              ARTIFACT_PATH=/tmp/admin-dist.tar.gz \
-             ADMIN_DIR=/var/www/admin \
+             ADMIN_DIR=${{ env.APP_PATH }}/super-admin \
              bash /tmp/deploy-admin.sh"
         timeout-minutes: 10
 

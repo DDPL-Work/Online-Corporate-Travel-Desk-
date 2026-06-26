@@ -10,7 +10,7 @@ set -euo pipefail
 ARTIFACT_NAME="${ARTIFACT_NAME:?ARTIFACT_NAME is required}"
 ARTIFACT_PATH="${ARTIFACT_PATH:?ARTIFACT_PATH is required}"
 CLIENT_DIR="${CLIENT_DIR:?CLIENT_DIR is required}"
-NGINX_HTML="${NGINX_HTML:-/var/www/html}"
+NGINX_HTML="${NGINX_HTML:-${APP_PATH:-/var/www/Online-Corporate-Travel-Desk-}/client}"
 LOG_DIR="${LOG_DIR:-${APP_PATH:-/var/www/Online-Corporate-Travel-Desk-}/logs}"
 
 # =============================================================================
