@@ -18,7 +18,8 @@
  *   await cache.delPattern('flights:*');
  */
 
-const redis = require("../config/redis");
+const { getConnections } = require("../config/redisConnections");
+const redis = getConnections().cache;
 const logger = require("./logger");
 
 const DEFAULT_TTL = 300; // 5 minutes

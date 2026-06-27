@@ -1,4 +1,5 @@
-const redis = require("../../config/redis");
+const { getConnections } = require("../../config/redisConnections");
+const redis = getConnections().coordinator;
 const { buildHotelFilterMeta, prepareHotelsForFiltering } = require("../../utils/filterHotels");
 const logger = require("../../utils/logger");
 
@@ -44,7 +45,10 @@ async function aggregateFinalResults(searchId, cityRecord) {
       await new Promise(resolve => setImmediate(resolve));
       const parsed = JSON.parse(chunkStr);
       if (Array.isArray(parsed)) {
-        allHotels.push(...parsed);
+        // Batch push avoids stack overflow on large arrays (push.apply limit ~65k args)
+        for (let i = 0; i < parsed.length; i += 1000) {
+          allHotels.push.apply(allHotels, parsed.slice(i, i + 1000));
+        }
       }
     } catch (e) {
       logger.error(`[Aggregate] Failed to parse a chunk result for ${searchId}`);

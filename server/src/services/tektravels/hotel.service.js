@@ -35,14 +35,6 @@ class HotelService {
     const cfg = config[type];
     const url = `${cfg.sharedBase}${cfg.endpoints.authenticate}`;
 
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (authenticate)`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${type}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { ClientId: cfg.credentials.clientId, UserName: cfg.credentials.username, Password: cfg.credentials.password });
-    console.log(`[===========================]\n\n`);
-
     logger.info("[AUTH REQUEST]", {
       url,
       clientId: cfg.credentials.clientId,
@@ -101,14 +93,6 @@ class HotelService {
     const cfg = config[env];
     const url = `${cfg.staticBase}${endpoint}${query}`;
 
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (staticGet: ${endpoint})`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { username: cfg.credentials.tboUSerName, password: cfg.credentials.tboPassword });
-    console.log(`[===========================]\n\n`);
-
     logger.info("[STATIC GET REQUEST]", {
       url,
       username: cfg.credentials.tboUSerName,
@@ -140,20 +124,6 @@ class HotelService {
     const cfg = config[env];
     const token = await this.getToken(env);
     const url = `${cfg.base1}${endpoint}`;
-
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (affiliatePost: ${endpoint})`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { username: cfg.credentials.username, password: cfg.credentials.password });
-    console.log(`[===========================]\n\n`);
-
-    // logger.info("[AFFILIATE REQUEST]", {
-    //   url,
-    //   payload,
-    //   token,
-    // });
 
     try {
       const { data } = await axios.post(
@@ -189,14 +159,6 @@ class HotelService {
     const cfg = config[env];
     const token = await this.getToken(env);
     const url = `${cfg[baseType]}${endpoint}`;
-
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (${endpoint})`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { ClientId: cfg.credentials.clientId, username: cfg.credentials.username, password: cfg.credentials.password });
-    console.log(`[===========================]\n\n`);
 
     logger.info("[TOKEN POST REQUEST]", {
       url,
@@ -273,10 +235,7 @@ class HotelService {
 
       return data;
     } catch (err) {
-      console.log(
-        "HOTEL BOOK ERROR:",
-        JSON.stringify(err.response?.data, null, 2)
-      );
+      logger.error("TBO HOTEL BOOK ERROR:", err.response?.data || err.message);
       throw new ApiError(500, "TBO hotel booking failed");
     }
   }
@@ -292,19 +251,9 @@ class HotelService {
   }
 
   async getCityList(countryCode) {
-    // logger.info("[GET CITY LIST]", { countryCode });
-
     const env = this.getEnv();
     const cfg = config[env];
     const url = `${cfg.staticBase}${cfg.endpoints.cityLIst}`;
-
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (getCityList)`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { username: cfg.credentials.tboUSerName, password: cfg.credentials.tboPassword });
-    console.log(`[===========================]\n\n`);
 
     try {
       const { data } = await axios.post(
@@ -337,14 +286,6 @@ class HotelService {
     const cfg = config[env];
     const url = `${cfg.staticBase}${cfg.endpoints.tboHotelCodeList}`;
 
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (getTBOHotelCodeList)`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { username: cfg.credentials.tboUSerName, password: cfg.credentials.tboPassword });
-    console.log(`[===========================]\n\n`);
-
     try {
       const { data } = await axios.post(
         url,
@@ -374,21 +315,11 @@ class HotelService {
   }
 
   async getStaticHotelDetails(hotelCode) {
-    // logger.info("[GET STATIC HOTEL DETAILS]", { hotelCode });
-
     if (!hotelCode) throw new ApiError(400, "hotelCode required");
 
     const env = this.getEnv();
     const cfg = config[env];
     const url = `${cfg.staticBase}${cfg.endpoints.hotelDetails}`;
-
-    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
-    console.log(`Service: TBO Hotel API (getStaticHotelDetails)`);
-    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`Env Type: ${env}`);
-    console.log(`URL: ${url}`);
-    console.log(`Credentials:`, { username: cfg.credentials.tboUSerName, password: cfg.credentials.tboPassword });
-    console.log(`[===========================]\n\n`);
 
     try {
       const { data } = await axios.post(
@@ -409,10 +340,7 @@ class HotelService {
 
       return data;
     } catch (err) {
-      console.log(
-        "STATIC HOTEL DETAILS ERROR:",
-        err.response?.data || err.message,
-      );
+      logger.error("STATIC HOTEL DETAILS ERROR:", err.response?.data || err.message);
       throw new ApiError(500, "TBO static hotel details failed");
     }
   }
@@ -529,7 +457,7 @@ class HotelService {
 
       return data;
     } catch (err) {
-      console.log("FULL ERROR:", err.response?.data || err.message);
+      logger.error("FULL ERROR:", err.response?.data || err.message);
       throw new ApiError(500, "TBO hotel search request failed");
     }
   }

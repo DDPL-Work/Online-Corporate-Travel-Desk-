@@ -15,6 +15,7 @@ const routes = require("./routes");
 const errorMiddleware = require("./middleware/error.middleware");
 const rateLimitMiddleware = require("./middleware/rateLimit.middleware");
 const logger = require("./utils/logger");
+const { getRedisHealth } = require("./services/redisHealth.service");
 // const cronJobs = require("./jobs");
 
 const app = express();
@@ -117,9 +118,182 @@ app.use(`/api/${config.api.version}`, routes);
 
 // ------------------------------
 // HEALTH CHECK
+//
+// Load Balancer compatible:
+//   HTTP 200 — process is alive, endpoint executed
+//   HTTP 500 — only if this handler itself throws
+//
+// JSON status:
+//   "OK"      — Redis healthy AND Mongo connected
+//   "DEGRADED" — one or more dependencies unhealthy
+//
+// BullMQ connections are diagnostics-only — they never affect HTTP status.
 // ------------------------------
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", env: config.env });
+app.get("/health", async (req, res) => {
+  try {
+    const redisHealth = getRedisHealth();
+    const searchMetrics = require("./modules/searchCoordinator/metrics.service");
+    const { getBullConnectionStatus } = require("./queues/connection");
+    const { getSchedulerState } = require("./modules/searchCoordinator/dispatcher.service");
+    const mongoose = require("mongoose");
+
+    // MongoDB status
+    const mongoStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+
+    // Socket.IO status
+    const io = require("./sockets/search.socket").getIO();
+    const socketStatus = io ? "connected" : "disconnected";
+    const socketConnections = io ? io.engine.clientsCount : 0;
+
+    // Dispatcher status
+    const dispatcherState = getSchedulerState();
+
+    // BullMQ diagnostics (does NOT affect health status)
+    const bullConns = getBullConnectionStatus();
+
+    // Queue depths
+    const { searchQueue, finalizeQueue } = require("./queues/search.queue");
+    const [searchWaiting, searchActive, finalizeWaiting, finalizeActive] = await Promise.all([
+      searchQueue.getWaitingCount().catch(() => 0),
+      searchQueue.getActiveCount().catch(() => 0),
+      finalizeQueue.getWaitingCount().catch(() => 0),
+      finalizeQueue.getActiveCount().catch(() => 0),
+    ]);
+
+    // Memory
+    const mem = process.memoryUsage();
+
+    // Event loop lag
+    const searchSnap = searchMetrics.getMetricsSnapshot();
+
+    // Health evaluation:
+    //   OK      — Redis healthy AND Mongo connected
+    //   DEGRADED — anything else
+    // HTTP status is ALWAYS 200 (LB compatibility).
+    const overallStatus = redisHealth.status === "healthy" && mongoStatus === "connected"
+      ? "OK"
+      : "DEGRADED";
+
+    res.status(200).json({
+      status: overallStatus,
+      env: config.env,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+
+      // Subsystem status
+      redis: {
+        status: redisHealth.status,
+        connections: redisHealth.connections,
+      },
+      mongodb: {
+        status: mongoStatus,
+        host: mongoose.connection.host,
+        name: mongoose.connection.name,
+      },
+      socketio: {
+        status: socketStatus,
+        connections: socketConnections,
+      },
+
+      // BullMQ — diagnostics only, never affects health status
+      bullmq: {
+        connections: bullConns,
+        queues: {
+          search: { waiting: searchWaiting, active: searchActive },
+          finalize: { waiting: finalizeWaiting, active: finalizeActive },
+        },
+      },
+
+      // Dispatcher
+      dispatcher: dispatcherState,
+
+      // Search metrics
+      search: searchSnap,
+
+      // Memory
+      memory: {
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+        rss: mem.rss,
+        external: mem.external,
+      },
+
+      // Event loop
+      eventLoop: searchSnap.eventLoop,
+    });
+  } catch (err) {
+    logger.error("[Health] Error:", err.message);
+    res.status(500).json({ status: "ERROR", env: config.env, error: "Health check failed" });
+  }
+});
+
+// ------------------------------
+// PROMETHEUS METRICS ENDPOINT
+// ------------------------------
+app.get("/metrics", async (req, res) => {
+  try {
+    const searchMetrics = require("./modules/searchCoordinator/metrics.service");
+    const { getRedisMetrics } = require("./services/redisHealth.service");
+    const { getSchedulerState } = require("./modules/searchCoordinator/dispatcher.service");
+    const { getBullConnectionStatus } = require("./queues/connection");
+    const { searchQueue, finalizeQueue } = require("./queues/search.queue");
+
+    const body = searchMetrics.getPrometheusMetrics();
+    const queueState = getSchedulerState();
+
+    let metrics = body;
+
+    // Dispatcher metrics
+    metrics += `\n# HELP dispatcher_batch_size Current dispatcher batch size\ndispatcher_batch_size ${queueState.batchSize}\n`;
+    metrics += `# HELP dispatcher_tick_ms Current dispatcher tick interval\ndispatcher_tick_ms ${queueState.tickMs}\n`;
+    metrics += `# HELP dispatcher_high_latency_ticks Consecutive high latency ticks\ndispatcher_high_latency_ticks ${queueState.highLatencyTicks}\n`;
+    metrics += `# HELP dispatcher_active_searches Active searches\ndispatcher_active_searches ${queueState.activeSearchCount}\n`;
+
+    // Application Redis metrics
+    const redisMetrics = getRedisMetrics();
+    for (const [name, data] of Object.entries(redisMetrics)) {
+      metrics += `# HELP redis_${name}_connects Redis ${name} connect count\nredis_${name}_connects ${data.connectCount}\n`;
+      metrics += `# HELP redis_${name}_reconnects Redis ${name} reconnect count\nredis_${name}_reconnects ${data.reconnectCount}\n`;
+      metrics += `# HELP redis_${name}_errors Redis ${name} error count\nredis_${name}_errors ${data.errorCount}\n`;
+    }
+
+    // BullMQ connection metrics (Phase 3 + 11)
+    const bullConns = getBullConnectionStatus();
+    metrics += `# HELP bullmq_connections_total Total BullMQ Redis connections\nbullmq_connections_total ${bullConns.length}\n`;
+    for (const conn of bullConns) {
+      const safeLabel = (conn.label || "unknown").replace(/[^a-zA-Z0-9_]/g, "_");
+      metrics += `# HELP bullmq_conn_${safeLabel}_ready Connection ready (1=yes)\nbullmq_conn_${safeLabel}_ready ${conn.status === "ready" ? 1 : 0}\n`;
+      metrics += `# HELP bullmq_conn_${safeLabel}_errors Connection error count\nbullmq_conn_${safeLabel}_errors ${conn.errorCount}\n`;
+      metrics += `# HELP bullmq_conn_${safeLabel}_reconnects Connection reconnect count\nbullmq_conn_${safeLabel}_reconnects ${conn.reconnectCount}\n`;
+      metrics += `# HELP bullmq_conn_${safeLabel}_age_ms Connection age in ms\nbullmq_conn_${safeLabel}_age_ms ${conn.ageMs}\n`;
+    }
+
+    // Queue depth metrics (Phase 11)
+    const [searchWaiting, searchActive, finalizeWaiting, finalizeActive] = await Promise.all([
+      searchQueue.getWaitingCount().catch(() => 0),
+      searchQueue.getActiveCount().catch(() => 0),
+      finalizeQueue.getWaitingCount().catch(() => 0),
+      finalizeQueue.getActiveCount().catch(() => 0),
+    ]);
+    metrics += `# HELP bullmq_search_waiting Search queue waiting jobs\nbullmq_search_waiting ${searchWaiting}\n`;
+    metrics += `# HELP bullmq_search_active Search queue active jobs\nbullmq_search_active ${searchActive}\n`;
+    metrics += `# HELP bullmq_finalize_waiting Finalize queue waiting jobs\nbullmq_finalize_waiting ${finalizeWaiting}\n`;
+    metrics += `# HELP bullmq_finalize_active Finalize queue active jobs\nbullmq_finalize_active ${finalizeActive}\n`;
+
+    // Node.js metrics
+    const mem = process.memoryUsage();
+    metrics += `# HELP node_heap_used_bytes Node.js heap used\nnode_heap_used_bytes ${mem.heapUsed}\n`;
+    metrics += `# HELP node_heap_total_bytes Node.js heap total\nnode_heap_total_bytes ${mem.heapTotal}\n`;
+    metrics += `# HELP node_rss_bytes Node.js RSS\nnode_rss_bytes ${mem.rss}\n`;
+    metrics += `# HELP node_external_bytes Node.js external\nnode_external_bytes ${mem.external}\n`;
+    metrics += `# HELP node_uptime_seconds Process uptime\nnode_uptime_seconds ${Math.round(process.uptime())}\n`;
+
+    res.set("Content-Type", "text/plain");
+    res.send(metrics);
+  } catch (err) {
+    logger.error("[Metrics] Error:", err.message);
+    res.status(500).send("# Error generating metrics\n");
+  }
 });
 
 // ------------------------------
