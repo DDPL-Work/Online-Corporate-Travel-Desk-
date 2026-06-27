@@ -109,8 +109,7 @@ export default function CorporateProfile() {
   const initials = getInitials(corporate.corporateName);
   const walletBalance = corporate.walletBalance || 0;
   const creditLimit = corporate.creditLimit || 0;
-  const creditUtilization = corporate.creditUtilization || 0;
-  const usedCredit = (creditLimit * creditUtilization) / 100;
+  const usedCredit = corporate.currentCredit || 0;
 
   const isActive = corporate.status?.toLowerCase() === "active";
 
@@ -170,8 +169,8 @@ export default function CorporateProfile() {
                   )}
                   {corporate.classification === "postpaid" && (
                     <>
-                      <InfoRow icon={FiCreditCard} value={`₹${creditLimit.toLocaleString()}`} label="Credit Limit" />
-                      <InfoRow icon={FiActivity} value={`₹${usedCredit.toLocaleString()}`} label="Used Credit" />
+                      <InfoRow icon={FiCreditCard} value={`₹${creditLimit.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`} label="Credit Limit" />
+                      <InfoRow icon={FiActivity} value={`₹${usedCredit.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`} label="Used Credit" />
                       <InfoRow icon={FiCalendar} value={`${corporate.dueDays || 0} Days`} label="Payment Due Days" />
                     </>
                   )}

@@ -30,11 +30,13 @@ import { PiForkKnifeBold } from "react-icons/pi";
 import { RiHotelLine } from "react-icons/ri";
 import { HiOutlineLocationMarker } from "react-icons/hi";
 import { LuInfo } from "react-icons/lu";
+import { FiUser, FiMail, FiPhone, FiCalendar, FiShield, FiMapPin, FiGlobe, FiBookOpen, FiInfo, FiTag } from "react-icons/fi";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 import { useNavigate } from "react-router-dom";
 import { airlineLogo, airlineThemes } from "../../../utils/formatter";
 import "./Fares.css"; // custom animation + minor overrides
+import CustomDatePicker from "../../../components/Shared/CustomDatePicker";
 
 // Updated color scheme - corporate premium
 export const orangeText = "text-[#C9A84C]";
@@ -228,6 +230,8 @@ export const parseRoundTripBooking = ({ onward, return: ret }) => {
 
   const onwardParsed = parseOneWayData(onward);
   const returnParsed = parseOneWayData(ret);
+
+  if (!onwardParsed || !returnParsed) return null;
 
   return {
     type: "round-trip",
@@ -566,29 +570,28 @@ const RuleCard = ({ fareRule, theme }) => {
   const { origin, destination, fareBasisCode, baggage, mealAndSeat, cancellation, reissue, notes, fareInclusions } = fareRule;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md transition-shadow duration-300 overflow-hidden mb-5">
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-md shadow-black/20 overflow-hidden mb-5">
       {/* Card Header */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center justify-between px-6 py-5 bg-[#0A203E] text-white group`}
+        className="w-full flex items-center justify-between px-6 py-4 bg-white group border-b border-slate-100"
       >
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-[10px] font-black uppercase tracking-wider shrink-0 transition-transform group-hover:scale-105">
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C] font-black uppercase tracking-wider text-[10px]">
             {origin || "?"}
-          </div>
+          </span>
           <div className="text-left flex flex-col justify-center">
-            <p className="font-bold text-sm tracking-wide text-white drop-shadow-sm">
+            <h3 className="font-semibold text-sm text-slate-800">
               {origin} → {destination}
-            </p>
+            </h3>
             {fareBasisCode && (
-              <p className="text-[11px] font-medium text-white/80 mt-1 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-white/60"></span>
+              <p className="text-[11px] font-bold text-slate-500 mt-0.5 uppercase tracking-wider">
                 Fare basis: {fareBasisCode}
               </p>
             )}
           </div>
         </div>
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 transition-colors">
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 group-hover:bg-slate-200 text-slate-500 transition-colors">
           {open ? <IoChevronUp size={16} /> : <IoChevronDown size={16} />}
         </div>
       </button>
@@ -837,11 +840,18 @@ export const PriceSummary = ({
   const totalAmount = Math.max(0, subtotal - discountAmount);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden shadow-black/20">
       {/* Header */}
-      <div className="bg-[#0A203E] text-white p-5 border-b border-[#C9A84C]/20">
-        <h3 className="text-xl font-black uppercase tracking-tight">Fare Summary</h3>
-        <p className="text-[10px] text-[#C9A84C] font-black uppercase tracking-widest mt-1">Complete price breakdown</p>
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
+            <span className="text-sm font-black">₹</span>
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">Fare Summary</h3>
+            <p className="text-[11px] text-slate-500">Complete price breakdown</p>
+          </div>
+        </div>
       </div>
 
       <div className="p-5 space-y-3">
@@ -914,8 +924,8 @@ export const PriceSummary = ({
         )}
 
         <div className="border-t border-slate-200 pt-4 mt-2 flex justify-between items-center">
-          <span className="text-base font-black text-slate-900 uppercase tracking-tight">Total Payable</span>
-          <span className="text-2xl font-black text-[#0A203E]">
+          <span className="text-sm font-semibold text-slate-800 uppercase tracking-tight">Total Payable</span>
+          <span className="text-2xl font-black text-slate-900">
             ₹{totalAmount.toLocaleString()}
           </span>
         </div>
@@ -1098,6 +1108,65 @@ const calculateAgeFromDOB = (dob) => {
   return age;
 };
 
+const SectionHeading = ({ icon, title, badge }) => (
+  <div className="flex items-center justify-between mb-4">
+    <div className="flex items-center gap-2 text-slate-800">
+      <span className="text-[#C9A84C]">{icon}</span>
+      <h4 className="text-xs font-bold uppercase tracking-wider">{title}</h4>
+    </div>
+    {badge && <span className="text-[9px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-0.5 rounded-full border border-[#C9A84C]/20">{badge}</span>}
+  </div>
+);
+const Required = () => <span className="text-red-500 ml-0.5">*</span>;
+const Divider = () => <hr className="border-slate-100 my-5" />;
+
+const CustomSelect = ({ options, value, onChange, placeholder, hasError }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((opt) => String(opt.value) === String(value));
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <div
+        className={`field-input flex items-center justify-between cursor-pointer select-none ${hasError ? "border-red-500 ring-1 ring-red-500" : ""} ${isOpen ? "border-[#C9A84C] ring-2 ring-[#C9A84C]/10" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className={selectedOption ? "text-slate-800" : "text-[#cbd5e1]"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <IoChevronDown className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
+          {options.map((opt) => (
+            <div
+              key={opt.value}
+              className={`px-4 py-2 text-sm cursor-pointer hover:bg-slate-50 transition-colors ${String(value) === String(opt.value) ? "bg-[#C9A84C]/10 text-[#C9A84C] font-semibold" : "text-slate-700"}`}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const TravelerForm = ({
   travelers = [],
   updateTraveler,
@@ -1108,7 +1177,7 @@ export const TravelerForm = ({
   isInternational: isIntlFromProp,
   onAddTraveler,
   canAddMore = false,
-  gstDetails = { gstin: "", legalName: "", address: "", gstEmail:"", },
+  gstDetails = { gstin: "", legalName: "", address: "", gstEmail:"", contactNumber:"" },
   setGstDetails = () => {},
 }) => {
   if (!Array.isArray(travelers)) travelers = [];
@@ -1125,543 +1194,433 @@ export const TravelerForm = ({
     .filter(Boolean);
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-      {/* ================= HEADER ================= */}
-      <div className="bg-[#0A203E] text-white p-6 border-b border-[#C9A84C]/30">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#C9A84C] rounded-full flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
-              <FaUser className="text-[#0A203E] text-xl" />
-            </div>
+    <div className="space-y-6">
+      {/* Main Wrapper */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
+              <FiUser size={15} />
+            </span>
             <div>
-              <h2 className="text-2xl font-black uppercase tracking-tight">Traveler Details</h2>
-              <p className="text-[11px] text-[#C9A84C] font-black uppercase tracking-widest mt-0.5">
-                Enter passenger information
-              </p>
+              <h3 className="text-sm font-semibold text-slate-800">Traveler Details</h3>
+              <p className="text-[11px] text-slate-500">Enter passenger information</p>
             </div>
           </div>
+        </div>
+
+        {/* Form Body */}
+        <div className="p-6 space-y-5">
+          {travelers.map((traveler, index) => (
+            <div key={traveler.id ?? index} className="rounded-2xl border border-slate-200 shadow-md shadow-black/20 relative" style={{ zIndex: travelers.length - index + 10 }}>
+              {/* Card Header */}
+              <div className="flex items-center justify-between px-5 py-3 bg-linear-to-r from-[#C9A84C]/5 to-[#C9A84C]/10 border-b border-slate-200 rounded-t-2xl">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-[#C9A84C] flex items-center justify-center text-white text-xs font-bold">
+                    {index + 1}
+                  </div>
+                  <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                    <FiUser size={13} className="text-[#C9A84C]" />
+                    {(traveler.type || "ADULT").toUpperCase()} {index + 1}
+                  </span>
+                  {traveler.type === "INFANT" && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2.5 py-0.5 rounded-full border border-[#C9A84C]/20">
+                      Linked Passenger Required
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-5 space-y-6 bg-white rounded-b-2xl">
+                {/* Name Details */}
+                <div>
+                  <SectionHeading icon={<FiUser size={12} />} title="Passenger Details" />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">Title <Required /></label>
+                      <CustomSelect
+                        value={traveler.title || "MR"}
+                        onChange={(newTitle) => {
+                          let newGender = traveler.gender;
+                          if (["MR", "MSTR"].includes(newTitle)) newGender = "MALE";
+                          if (["MRS", "MS", "MISS"].includes(newTitle)) newGender = "FEMALE";
+                          updateTraveler(traveler.id, "title", newTitle);
+                          if (newGender) updateTraveler(traveler.id, "gender", newGender);
+                        }}
+                        options={((traveler.type || "ADULT") === "ADULT" ? ["MR", "MRS", "MS", "MISS"] : ["MSTR", "MISS"]).map((opt) => ({
+                          value: opt,
+                          label: opt === "MSTR" ? "Master" : opt === "MR" ? "Mr" : opt === "MRS" ? "Mrs" : opt === "MS" ? "Ms" : opt === "MISS" ? "Miss" : opt
+                        }))}
+                        placeholder="Select Title"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">First Name <Required /></label>
+                      <input
+                        type="text"
+                        value={traveler.firstName || ""}
+                        onChange={(e) =>
+                          updateTraveler(traveler.id, "firstName", e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""))
+                        }
+                        className={`field-input ${errors?.[index]?.firstName ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                        required
+                      />
+                      {errors?.[index]?.firstName && (
+                        <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                          {errors[index].firstName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">Middle Name <span className="text-slate-500 font-normal normal-case">(optional)</span></label>
+                      <input
+                        type="text"
+                        value={traveler.middleName || ""}
+                        onChange={(e) =>
+                          updateTraveler(traveler.id, "middleName", e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""))
+                        }
+                        className="field-input"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">Last Name <Required /></label>
+                      <input
+                        type="text"
+                        value={traveler.lastName || ""}
+                        onChange={(e) =>
+                          updateTraveler(traveler.id, "lastName", e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""))
+                        }
+                        className={`field-input ${errors?.[index]?.lastName ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                        required
+                      />
+                      {errors?.[index]?.lastName && (
+                        <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                          {errors[index].lastName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Divider />
+
+                {/* Primary Adult Extra Fields (Email, Mobile, Nationality) */}
+                {index === 0 && (
+                  <div>
+                    <SectionHeading icon={<FiMail size={12} />} title="Contact Details" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Email Address <Required /></label>
+                        <div className="relative">
+                          <FiMail className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                          <input
+                            type="email"
+                            value={traveler.email || ""}
+                            onChange={(e) => updateTraveler(traveler.id, "email", e.target.value)}
+                            className={`field-input pl-9 ${errors?.[index]?.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                            required
+                          />
+                          {errors?.[index]?.email && (
+                            <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                              {errors[index].email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Phone Number <Required /></label>
+                        <PhoneInput
+                          country={"in"}
+                          value={traveler.phoneWithCode || ""}
+                          onChange={(phone, countryData) => {
+                            updateTraveler(traveler.id, "phoneWithCode", phone);
+                            const isoCode = countryData?.countryCode?.toUpperCase();
+                            if (isoCode) {
+                              updateTraveler(traveler.id, "nationality", isoCode);
+                            }
+                          }}
+                          inputClass={`!h-10 !w-full !text-sm !bg-white !border !rounded-lg !text-slate-800 focus:!border-[#C9A84C] focus:!ring-2 focus:!ring-[#C9A84C]/10 ${errors?.[index]?.phoneWithCode ? "!border-red-500 !ring-1 !ring-red-500" : "!border-slate-200"}`}
+                          buttonClass="!border !border-slate-200 !rounded-l-lg !bg-white"
+                          containerClass="w-full"
+                          enableSearch
+                          required
+                        />
+                        {errors?.[index]?.phoneWithCode && (
+                          <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                            {errors[index].phoneWithCode}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Nationality <Required /></label>
+                        <input
+                          type="text"
+                          value={traveler.nationality || "IN"}
+                          readOnly
+                          className="field-input cursor-not-allowed bg-slate-50"
+                        />
+                      </div>
+                    </div>
+                    <Divider />
+                  </div>
+                )}
+
+                {/* Personal Details */}
+                <div>
+                  <SectionHeading icon={<FiInfo size={12} />} title="Personal Details" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">Gender <Required /></label>
+                      <CustomSelect
+                        value={traveler.gender || "MALE"}
+                        onChange={(val) => updateTraveler(traveler.id, "gender", val)}
+                        hasError={!!errors?.[index]?.gender}
+                        placeholder="Select Gender"
+                        options={[
+                          { value: "MALE", label: "Male" },
+                          { value: "FEMALE", label: "Female" },
+                          { value: "OTHER", label: "Other" },
+                        ]}
+                      />
+                      {errors?.[index]?.gender && (
+                        <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                          {errors[index].gender}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">Date of Birth {isInternational && <Required />}</label>
+                      <div className={errors?.[index]?.dob ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                        <CustomDatePicker
+                          value={traveler.dob || ""}
+                          onChange={(dob) => {
+                            const newDob = dob || "";
+                            const age = newDob ? calculateAgeFromDOB(newDob) : "";
+                            updateTraveler(traveler.id, "dob", newDob);
+                            updateTraveler(traveler.id, "age", age);
+                          }}
+                          placeholder="Select DOB"
+                          maxDate={new Date().toISOString().split("T")[0]}
+                        />
+                      </div>
+                      {errors?.[index]?.dob && (
+                        <p className="text-[10px] text-red-500 mt-1 font-bold tracking-tight">
+                          {errors[index].dob}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="field-label">Age <span className="text-slate-500 font-normal normal-case">(auto-calculated)</span></label>
+                      <input
+                        type="text"
+                        value={traveler.age || ""}
+                        readOnly
+                        placeholder="—"
+                        className="field-input cursor-not-allowed bg-slate-50"
+                      />
+                    </div>
+                  </div>
+
+                  {traveler.type === "INFANT" && adultOptions.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Linked Adult <Required /></label>
+                        <select
+                          value={typeof traveler.linkedAdultIndex === "number" ? traveler.linkedAdultIndex : ""}
+                          onChange={(e) => updateTraveler(traveler.id, "linkedAdultIndex", Number(e.target.value))}
+                          className={`field-input ${errors?.[index]?.linkedAdultIndex ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                          required
+                        >
+                          <option value="" disabled>Select adult</option>
+                          {adultOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                        {errors?.[index]?.linkedAdultIndex && (
+                          <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                            {errors[index].linkedAdultIndex}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* International (Passport) */}
+                {isInternational && (
+                  <>
+                    <Divider />
+                    <div>
+                      <SectionHeading icon={<FiBookOpen size={12} />} title="Passport Details" badge="International" />
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="field-label">Passport Number <Required /></label>
+                          <input
+                            type="text"
+                            value={traveler.passportNumber || ""}
+                            onChange={(e) => updateTraveler(traveler.id, "passportNumber", e.target.value)}
+                            className={`field-input font-mono tracking-widest ${errors?.[index]?.passportNumber ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                            required
+                          />
+                          {errors?.[index]?.passportNumber && (
+                            <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                              {errors[index].passportNumber}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="field-label">Passport Issue <Required /></label>
+                          <div className={errors?.[index]?.PassportIssueDate ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                            <CustomDatePicker
+                              value={traveler.PassportIssueDate || ""}
+                              onChange={(date) => updateTraveler(traveler.id, "PassportIssueDate", date || "")}
+                              placeholder="Issue Date"
+                              maxDate={new Date().toISOString().split("T")[0]}
+                            />
+                          </div>
+                          {errors?.[index]?.PassportIssueDate && (
+                            <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                              {errors[index].PassportIssueDate}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="field-label">Passport Expiry <Required /></label>
+                          <div className={errors?.[index]?.passportExpiry ? "rounded-lg border border-red-500 ring-1 ring-red-500" : ""}>
+                            <CustomDatePicker
+                              value={traveler.passportExpiry || ""}
+                              onChange={(date) => updateTraveler(traveler.id, "passportExpiry", date || "")}
+                              placeholder="Expiry Date"
+                              minDate={new Date().toISOString().split("T")[0]}
+                            />
+                          </div>
+                          {errors?.[index]?.passportExpiry && (
+                            <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
+                              {errors[index].passportExpiry}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Note */}
+                <div className="mt-6 bg-blue-50 border-l-4 border-blue-900 p-4 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-bold text-blue-900">Note:</span> Ensure all details match your government ID.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <style>{`
+            .field-label {
+              font-size: 11px; font-weight: 600; color: #64748b;
+              text-transform: uppercase; letter-spacing: 0.05em;
+            }
+            .field-input {
+              height: 40px; width: 100%; padding: 0 12px;
+              font-size: 14px; color: #334155; background: white;
+              border: 1px solid #e2e8f0; border-radius: 8px;
+              outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+            }
+            .field-input:focus {
+              border-color: #C9A84C;
+              box-shadow: 0 0 0 3px rgba(10,77,104,0.08);
+            }
+            .field-input:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
+            .field-input::placeholder { color: #cbd5e1; }
+          `}</style>
+
+          {canAddMore && (
+            <button
+              type="button"
+              onClick={onAddTraveler}
+              className="w-full py-3 border-2 border-dashed border-slate-300 text-slate-600 font-semibold rounded-lg hover:border-[#C9A84C] hover:text-[#C9A84C] hover:bg-[#C9A84C]/5 transition"
+            >
+              + Add Traveler
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ================= BODY ================= */}
-      <div className="p-6 space-y-6 bg-linear-to-b from-gray-50 to-white">
-        {/* ================= PURPOSE OF TRAVEL ================= */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-sm font-black text-[#0A203E] uppercase tracking-widest mb-3">
-            Purpose of Travel <span className="text-[#C9A84C]">*</span>
-          </h3>
-
-          <textarea
-            rows={3}
-            value={purposeOfTravel || ""}
-            onChange={(e) => setPurposeOfTravel(e.target.value)}
-            placeholder="E.g. Client meeting, Project deployment, Training, Conference"
-            className={`w-full px-4 py-3 border-2 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.purposeOfTravel ? "border-red-400" : "border-gray-300"
-            }`}
-            required
-          />
-
-          {errors.purposeOfTravel && (
-            <p className="text-sm text-red-600 mt-1 font-medium">
-              {errors.purposeOfTravel}
-            </p>
-          )}
-
-          <p className="text-xs text-gray-500 mt-2">
-            This information is mandatory for approval by the travel
-            administrator.
-          </p>
-        </div>
-
-        {/* ================= GST DETAILS ================= */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-sm font-black text-[#0A203E] uppercase tracking-widest">
-              GST Details
+      {/* Purpose of Travel */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
+        <div className="flex items-center gap-2.5 mb-4">
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
+            <FiShield size={15} />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">
+              Purpose of Travel
             </h3>
-            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-wider">
-              Fetched from Profile
-            </span>
+            <p className="text-[11px] text-slate-500">
+              Required for corporate approval
+            </p>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                GSTIN
-              </label>
-              <input
-                type="text"
-                value={gstDetails.gstin || ""}
-                readOnly
-                placeholder="GSTIN"
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Legal Name
-              </label>
-              <input
-                type="text"
-                value={gstDetails.legalName || ""}
-                readOnly
-                placeholder="Company legal name"
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                GST Email
-              </label>
-              <input
-                type="text"
-                value={gstDetails.gstEmail || ""}
-                readOnly
-                placeholder="GST Email"
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                GST Contact Number
-              </label>
-              <input
-                type="text"
-                value={gstDetails.contactNumber || ""}
-                readOnly
-                placeholder="GST Contact Number"
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-              />
-            </div>
-            <div className="lg:col-span-4">
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Billing Address
-              </label>
-              <input
-                type="text"
-                value={gstDetails.address || ""}
-                readOnly
-                placeholder="Street, City, State, PIN"
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-              />
-            </div>
-          </div>
-          <p className="mt-4 text-[11px] text-gray-400 italic">
-            * Note: GST details are managed by your Travel Administrator. Please contact them for any corrections.
-          </p>
         </div>
+        <textarea
+          onChange={(e) => setPurposeOfTravel(e.target.value)}
+          placeholder="E.g. Client meeting, Project deployment, Training, Conference"
+          value={purposeOfTravel || ""}
+          className={`w-full bg-white border ${errors.purposeOfTravel ? "border-red-500 ring-1 ring-red-500" : "border-slate-200"} rounded-xl px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/10 focus:bg-white min-h-[100px] transition resize-none`}
+          required
+        />
+        {errors.purposeOfTravel && (
+          <p className="text-[11px] text-red-500 mt-2 font-medium">
+            {errors.purposeOfTravel}
+          </p>
+        )}
+      </div>
 
-        {travelers.map((traveler, index) => (
-          <div
-            key={traveler.id ?? index}
-            className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-xs text-gray-500 font-semibold uppercase">
-                  Passenger {index + 1}
-                </p>
-                <p className="text-sm font-bold text-gray-800">
-                  {(traveler.type || "ADULT").toUpperCase()}
-                </p>
-              </div>
-              {traveler.type === "INFANT" && (
-                <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#0A203E] text-[#C9A84C] font-black uppercase tracking-widest">
-                  Linked Passenger Required
-                </span>
-              )}
-            </div>
-            {/* ===== Name Section ===== */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Title <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={traveler.title || "MR"}
-                  onChange={(e) => {
-                    const newTitle = e.target.value;
-                    let newGender = traveler.gender;
-                    if (["MR", "MSTR"].includes(newTitle)) newGender = "MALE";
-                    if (["MRS", "MS", "MISS"].includes(newTitle)) newGender = "FEMALE";
-                    
-                    updateTraveler(traveler.id, "title", newTitle);
-                    if (newGender) updateTraveler(traveler.id, "gender", newGender);
-                  }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
-                  required
-                >
-                  {((traveler.type || "ADULT") === "ADULT"
-                    ? ["MR", "MRS", "MS", "MISS"]
-                    : ["MSTR", "MISS"]
-                  ).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt === "MSTR" ? "Master" : opt === "MR" ? "Mr" : opt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  First Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={traveler.firstName || ""}
-                  onChange={(e) =>
-                    updateTraveler(
-                      traveler.id,
-                      "firstName",
-                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
-                    )
-                  }
-                  className={`w-full px-4 py-3 border-2 rounded-lg ${
-                    errors?.[index]?.firstName ? "border-red-500" : "border-gray-300"
-                  }`}
-                  required
-                />
-                {errors?.[index]?.firstName && (
-                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                    {errors[index].firstName}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Middle Name
-                </label>
-                <input
-                  type="text"
-                  value={traveler.middleName || ""}
-                  onChange={(e) =>
-                    updateTraveler(
-                      traveler.id,
-                      "middleName",
-                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
-                    )
-                  }
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Last Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={traveler.lastName || ""}
-                  onChange={(e) =>
-                    updateTraveler(
-                      traveler.id,
-                      "lastName",
-                      e.target.value.toUpperCase().replace(/[^A-Z ]/g, ""),
-                    )
-                  }
-                  className={`w-full px-4 py-3 border-2 rounded-lg ${
-                    errors?.[index]?.lastName ? "border-red-500" : "border-gray-300"
-                  }`}
-                  required
-                />
-                {errors?.[index]?.lastName && (
-                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                    {errors[index].lastName}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* ===== Primary Adult Extra Fields ===== */}
-            {index === 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={traveler.email || ""}
-                    onChange={(e) =>
-                      updateTraveler(traveler.id, "email", e.target.value)
-                    }
-                    className={`w-full px-4 py-3 border-2 rounded-lg ${
-                      errors?.[index]?.email ? "border-red-500" : "border-gray-300"
-                    }`}
-                    required
-                  />
-                  {errors?.[index]?.email && (
-                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                      {errors[index].email}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Mobile Number <span className="text-red-500">*</span>
-                  </label>
-                  <PhoneInput
-                    country={"in"}
-                    value={traveler.phoneWithCode || ""}
-                    onChange={(phone, countryData) => {
-                      updateTraveler(traveler.id, "phoneWithCode", phone);
-
-                      // set nationality to 2-letter ISO code
-                      const isoCode = countryData?.countryCode?.toUpperCase();
-                      if (isoCode) {
-                        updateTraveler(traveler.id, "nationality", isoCode);
-                      }
-                    }}
-                    enableSearch
-                    containerStyle={{ width: "100%" }}
-                    inputStyle={{
-                      width: "100%",
-                      height: "48px",
-                      border: errors?.[index]?.phoneWithCode
-                        ? "2px solid #ef4444"
-                        : "2px solid #d1d5db",
-                      borderRadius: "0.5rem",
-                      paddingLeft: "48px",
-                    }}
-                    required
-                  />
-                  {errors?.[index]?.phoneWithCode && (
-                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                      {errors[index].phoneWithCode}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Nationality<span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={traveler.nationality || "IN"}
-                    readOnly
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* ===== Gender + DOB + Calculated Age ===== */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              {/* Gender */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Gender <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={traveler.gender || "MALE"}
-                  onChange={(e) =>
-                    updateTraveler(traveler.id, "gender", e.target.value)
-                  }
-                  className={`w-full px-4 py-3 border-2 rounded-lg ${
-                    errors?.[index]?.gender ? "border-red-500" : "border-gray-300"
-                  }`}
-                  required
-                >
-                  <option value="">Select Gender</option>
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                </select>
-                {errors?.[index]?.gender && (
-                  <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                    {errors[index].gender}
-                  </p>
-                )}
-              </div>
-
-              {/* DOB */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Date of Birth {isInternational && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="date"
-                  value={traveler.dob || ""}
-                  onChange={(e) => {
-                    const dob = e.target.value;
-                    const age = calculateAgeFromDOB(dob);
-
-                    updateTraveler(traveler.id, "dob", dob);
-                    updateTraveler(traveler.id, "age", age); // derived
-                  }}
-                  className={`w-full px-4 py-3 border-2 rounded-lg ${
-                    errors?.[index]?.dob ? "border-red-500" : "border-gray-300"
-                  }`}
-                />
-                {errors?.[index]?.dob && (
-                  <p className="text-[10px] text-red-500 mt-1 font-bold  tracking-tight">
-                    {errors[index].dob}
-                  </p>
-                )}
-              </div>
-
-              {/* Calculated Age (Read-only) */}
-              {traveler.dob && (
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Age (Auto-calculated)
-                  </label>
-                  <input
-                    type="text"
-                    value={traveler.age || ""}
-                    readOnly
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
-                  />
-                </div>
-              )}
-            </div>
-
-            {traveler.type === "INFANT" && adultOptions.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Linked Adult <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={
-                      typeof traveler.linkedAdultIndex === "number"
-                        ? traveler.linkedAdultIndex
-                        : ""
-                    }
-                    onChange={(e) =>
-                      updateTraveler(
-                        traveler.id,
-                        "linkedAdultIndex",
-                        Number(e.target.value),
-                      )
-                    }
-                    className={`w-full px-4 py-3 border-2 rounded-lg ${
-                      errors?.[index]?.linkedAdultIndex ? "border-red-500" : "border-gray-300"
-                    }`}
-                    required
-                  >
-                    <option value="" disabled>
-                      Select adult
-                    </option>
-                    {adultOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors?.[index]?.linkedAdultIndex && (
-                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                      {errors[index].linkedAdultIndex}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {isInternational && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Passport Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={traveler.passportNumber || ""}
-                    onChange={(e) =>
-                      updateTraveler(
-                        traveler.id,
-                        "passportNumber",
-                        e.target.value,
-                      )
-                    }
-                    className={`w-full px-4 py-3 border-2 rounded-lg ${
-                      errors?.[index]?.passportNumber ? "border-red-500" : "border-gray-300"
-                    }`}
-                    required
-                  />
-                  {errors?.[index]?.passportNumber && (
-                    <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                      {errors[index].passportNumber}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Passport Issue <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={traveler.PassportIssueDate || ""}
-                      onChange={(e) =>
-                        updateTraveler(
-                          traveler.id,
-                          "PassportIssueDate",
-                          e.target.value,
-                        )
-                      }
-                      className={`w-full px-4 py-3 border-2 rounded-lg ${
-                        errors?.[index]?.PassportIssueDate ? "border-red-500" : "border-gray-300"
-                      }`}
-                      required
-                    />
-                    {errors?.[index]?.PassportIssueDate && (
-                      <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                        {errors[index].PassportIssueDate}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Passport Expiry <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={traveler.passportExpiry || ""}
-                      onChange={(e) =>
-                        updateTraveler(
-                          traveler.id,
-                          "passportExpiry",
-                          e.target.value,
-                        )
-                      }
-                      className={`w-full px-4 py-3 border-2 rounded-lg ${
-                        errors?.[index]?.passportExpiry ? "border-red-500" : "border-gray-300"
-                      }`}
-                      required
-                    />
-                    {errors?.[index]?.passportExpiry && (
-                      <p className="text-[10px] text-red-500 mt-1 font-bold uppercase tracking-tight">
-                        {errors[index].passportExpiry}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ===== Note ===== */}
-            <div className="mt-6 bg-blue-50 border-l-4 border-blue-900 p-4 rounded-lg">
-              <p className="text-sm text-gray-700">
-                <span className="font-bold text-blue-900">Note:</span> Ensure
-                all details match your government ID.
+      {/* GST Details */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/20 text-green-600">
+              <FiTag size={15} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">
+                GST Details
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Fetched automatically from your corporate profile
               </p>
             </div>
           </div>
-        ))}
-
-        {canAddMore && (
-          <button
-            type="button"
-            onClick={onAddTraveler}
-            className="w-full py-3 border-2 border-dashed border-blue-200 text-blue-700 font-semibold rounded-lg hover:border-blue-400 hover:bg-blue-50 transition"
-          >
-            + Add Traveler
-          </button>
-        )}
+          <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-1 rounded border border-slate-200 uppercase tracking-wider">
+            Profile Locked
+          </span>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {[
+            { label: "GSTIN", key: "gstin", placeholder: "GSTIN" },
+            { label: "Legal Name", key: "legalName", placeholder: "Company legal name" },
+            { label: "GST Email", key: "gstEmail", placeholder: "GST Email" },
+            { label: "GST Contact Number", key: "contactNumber", placeholder: "GST Contact Number" },
+            { label: "Billing Address", key: "address", placeholder: "Street, City, State, PIN" },
+          ].map(({ label, key, placeholder }) => (
+            <div key={key} className={key === 'address' ? 'lg:col-span-3' : ''}>
+              <label className="block text-sm font-bold text-slate-800 mb-2">
+                {label}
+              </label>
+              <input
+                type="text"
+                value={gstDetails[key] || ""}
+                readOnly
+                placeholder={placeholder}
+                className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed outline-none"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-[11px] text-gray-400 italic">
+          * Note: GST details are managed by your Travel Administrator. Please contact them for any corrections.
+        </p>
       </div>
     </div>
   );
@@ -1669,15 +1628,14 @@ export const TravelerForm = ({
 
 export const CTABox = () => {
   return (
-    <div className="bg-[#0A203E] rounded-2xl p-5 shadow-lg border border-[#C9A84C]/20 overflow-hidden relative">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-[#C9A84C]/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6 overflow-hidden relative">
       <div className="flex items-center gap-4 relative z-10">
-        <div className="w-12 h-12 bg-[#C9A84C] rounded-full flex items-center justify-center shrink-0 shadow-lg shadow-[#C9A84C]/20">
-          <BsInfoCircleFill className="text-[#0A203E] text-xl" />
+        <div className="w-12 h-12 bg-[#C9A84C]/10 rounded-full flex items-center justify-center shrink-0">
+          <BsInfoCircleFill className="text-[#C9A84C] text-xl" />
         </div>
         <div>
-          <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-widest">Need Assistance?</p>
-          <p className="text-sm font-bold text-white mt-0.5">
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Need Assistance?</p>
+          <p className="text-sm font-black text-slate-800 mt-0.5">
             Call us at <span className="text-[#C9A84C]">1800-123-4567</span>
           </p>
         </div>
@@ -1689,21 +1647,18 @@ export const CTABox = () => {
 export const HotelHomeButton = () => {
   const navigate = useNavigate();
   return (
-    <div className="bg-white rounded-lg border border-gray-300 p-4 space-y-3">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6 space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#C9A84C] rounded-xl flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
-          <RiHotelLine className="text-[#0A203E] text-xl font-bold" />
+        <div className="w-10 h-10 bg-[#C9A84C]/10 rounded-lg flex items-center justify-center">
+          <RiHotelLine className="text-[#C9A84C] text-xl font-bold" />
         </div>
-        <span className="text-base font-black text-[#0A203E] uppercase tracking-tight">
+        <span className="text-sm font-semibold text-slate-800">
           Need a Hotel?
         </span>
       </div>
-      {/* <p className="text-xs text-gray-600">
-        Save up to 20% when booking hotel with your flight
-      </p> */}
       <button
         onClick={() => navigate("/travel", { state: { activeTab: "hotel" } })}
-        className="w-full py-3 border border-[#0A203E] text-[#0A203E] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#0A203E] hover:text-white transition-all duration-300 cursor-pointer shadow-sm active:scale-95"
+        className="w-full py-3 border-2 border-[#C9A84C] text-[#C9A84C] rounded-lg text-xs font-black uppercase tracking-widest hover:bg-[#C9A84C] hover:text-white transition-all duration-300 cursor-pointer shadow-sm active:scale-95"
       >
         Browse Hotels
       </button>
@@ -1815,22 +1770,24 @@ export const FareOptions = ({ fareRules = null, fareRulesStatus = "idle" }) => {
           sec.hasData && (
             <div
               key={sec.key}
-              className="border border-gray-200 bg-white rounded-xl shadow-sm overflow-hidden transition-all hover:shadow-md"
+              className="border border-slate-200 bg-white rounded-2xl shadow-sm overflow-hidden transition-all hover:shadow-md mb-3"
             >
               <button
                 onClick={() => toggle(sec.key)}
-                className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100 transition"
+                className="w-full flex items-center justify-between px-6 py-4 bg-white hover:bg-slate-50 transition border-b border-slate-100"
               >
                 <div className="flex items-center gap-3">
-                  <span className={sec.color}>{sec.icon}</span>
-                  <span className="font-semibold text-gray-800 text-sm md:text-base">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-500">
+                    {sec.icon}
+                  </span>
+                  <span className="font-semibold text-slate-800 text-sm">
                     {sec.title}
                   </span>
                 </div>
                 {open[sec.key] ? (
-                  <span className="text-gray-500 text-sm">▲</span>
+                  <span className="text-slate-400 text-sm">▲</span>
                 ) : (
-                  <span className="text-gray-500 text-sm">▼</span>
+                  <span className="text-slate-400 text-sm">▼</span>
                 )}
               </button>
               {open[sec.key] && (

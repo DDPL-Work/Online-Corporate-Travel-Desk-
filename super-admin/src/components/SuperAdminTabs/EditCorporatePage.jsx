@@ -288,7 +288,7 @@ export default function EditCorporatePage() {
       gstCertificate: form.gstUrl ? { url: form.gstUrl } : undefined,
       corporatePanCard: form.panNumber || form.panUrl ? { number: form.panNumber, url: form.panUrl } : undefined,
       gstFileBase64: form.gstFileBase64,
-      panFileBase64: form.panFileBase64,
+      corporatePanFileBase64: form.panFileBase64,
       serviceFeeRules: serviceFeeRulesFormatted
     };
 

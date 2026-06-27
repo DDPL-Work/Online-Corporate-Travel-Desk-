@@ -43,7 +43,8 @@ module.exports = {
       /* Hotel Static Data */
       countryList: "/TBOHolidays_HotelAPI/CountryList",
       cityLIst: "/TBOHolidays_HotelAPI/CityList",
-      hotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
+      tboHotelCodeList: "/TBOHolidays_HotelAPI/TBOHotelCodeList",
+      hotelCodeList: "/TBOHolidays_HotelAPI/hotelcodelist",
       hotelDetails: "/HotelAPI/Hoteldetails",
 
       /* Hotel Search */
@@ -76,8 +77,8 @@ module.exports = {
       username: process.env.TBO_PROD_USERNAME,
       password: process.env.TBO_PROD_PASSWORD,
       clientId: process.env.TBO_PROD_CLIENT_ID,
-      tboUSerName: process.env.TBO_STATIC_USERNAME,
-      tboPassword: process.env.TBO_STATIC_PASSWORD,
+      tboUSerName: process.env.TBO_PROD_USERNAME,
+      tboPassword: process.env.TBO_PROD_PASSWORD,
     },
 
     tokens: {

@@ -18,6 +18,7 @@ import { FaRupeeSign } from "react-icons/fa";
 import { apiConfigurationsData } from "../../data/dummyData";
 import AddApiConfigModal from "../../Modal/AddApiConfigModal";
 import EditApiConfigModal from "../../Modal/EditApiConfigModal";
+import TboSyncModal from "../../Modal/TboSyncModal";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTboBalance } from "../../Redux/Slice/tboBalanceSlice";
 import TableActionBar from "../Shared/TableActionBar";
@@ -44,6 +45,7 @@ export default function ApiConfigurations() {
   const [records, setRecords] = useState(apiConfigurationsData);
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+  const [openSyncModal, setOpenSyncModal] = useState(false);
   const [selected, setSelected] = useState(null);
 
   // Filter states
@@ -182,13 +184,22 @@ export default function ApiConfigurations() {
           </div>
 
           {/* Add Button in header */}
-          <button
-            onClick={() => setOpenAdd(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
-          >
-            <FiPlusCircle size={16} />
-            Add Connection
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setOpenSyncModal(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#d97706] hover:bg-amber-600 border border-amber-600/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+            >
+              <FiRefreshCw size={16} />
+              TBO Hotel Sync
+            </button>
+            {/* <button
+              onClick={() => setOpenAdd(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+            >
+              <FiPlusCircle size={16} />
+              Add Connection
+            </button> */}
+          </div>
         </div>
       </div>
 
@@ -423,6 +434,9 @@ export default function ApiConfigurations() {
         </div>
 
         {/* MODALS */}
+        {openSyncModal && (
+          <TboSyncModal onClose={() => setOpenSyncModal(false)} />
+        )}
         {openAdd && (
           <AddApiConfigModal onClose={() => setOpenAdd(false)} onSave={addConfig} />
         )}

@@ -5,6 +5,8 @@ import { loginUser } from "../../Redux/Slice/authSlice";
 import { useNavigate } from "react-router-dom";
 import { getDefaultDashboardPath } from "../../constants/rbac";
 
+import { toast } from "sonner";
+
 const travelStack =
   "https://plus.unsplash.com/premium_photo-1661962174396-e6d539b5c0d8?fm=jpg&q=60&w=2400";
 const travelBg =
@@ -30,12 +32,16 @@ const Login = () => {
     )
       .unwrap()
       .then((data) => {
+        toast.success("Login successful");
         navigate(
           getDefaultDashboardPath({
             role: data.role || data.user?.role || data.user?.userRole,
-            permissions: data.user?.permissions || [],
+            permissions: data.permissions || data.user?.permissions || [],
           }),
         );
+      })
+      .catch((err) => {
+        toast.error(typeof err === "string" ? err : err?.message || "Failed to login");
       });
   };
 
@@ -44,7 +50,6 @@ const Login = () => {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-linear-to-br from-gray-100 to-gray-300 relative overflow-hidden p-4">
       {/* Decorative Background Blurs */}
-      {/* <div className="absolute top-10 -left-16 w-72 h-72 bg-blue-600 rounded-full blur-[120px] opacity-30"></div> */}
       <div className="absolute bottom-10 -right-16 w-72 h-72 bg-purple-600 rounded-full blur-[120px] opacity-30"></div>
 
       {/* Right Panel (BIGGER) */}
@@ -57,20 +62,6 @@ const Login = () => {
             className="absolute inset-0 w-full h-full object-cover"
             alt="bg"
           />
-
-          {/* Stack Images */}
-          {/* <div className="absolute bottom-10 right-10 flex flex-col gap-4 z-20">
-            <img
-              src={travelStack}
-              className="w-28 h-28 rounded-2xl shadow-2xl shadow-blue-900/50 hover:scale-105 transition"
-              alt="img1"
-            />
-            <img
-              src={travelBg}
-              className="w-28 h-28 rounded-2xl shadow-2xl shadow-blue-900/50 hover:scale-105 transition"
-              alt="img2"
-            />
-          </div> */}
         </div>
 
         {/* LEFT LOGIN FORM — OVERLAYED */}
