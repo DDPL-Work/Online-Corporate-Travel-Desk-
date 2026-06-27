@@ -37,7 +37,7 @@ router.use(verifyToken);
 router.get(
   "/corporate-bookings/flights",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Bookings"),
+  requireOpsPermission("Booking Management"),
   corporateController.getAllFlightBookings,
 );
 
@@ -45,7 +45,7 @@ router.get(
 router.get(
   "/corporate-bookings/hotels",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Bookings"),
+  requireOpsPermission("Booking Management"),
   corporateController.getAllHotelBookings,
 );
 
@@ -56,28 +56,28 @@ router.get(
 router.get(
   "/corporate-bookings/flights/cancellations",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("Manage Cancellations"),
+  requireOpsPermission("Cancellation Management"),
   corporateController.getCancelledOrRequestedFlights
 );
 
 router.get(
   "/corporate-bookings/hotels/cancellations",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("Manage Cancellations"),
+  requireOpsPermission("Cancellation Management"),
   corporateController.getCancelledOrRequestedHotels
 );
 
 router.get(
   "/corporate-bookings/flights/:id",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Bookings"),
+  requireOpsPermission("Booking Management"),
   corporateController.getFlightBookingById,
 );
 
 router.get(
   "/corporate-bookings/hotels/:id",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Bookings"),
+  requireOpsPermission("Booking Management"),
   corporateController.getHotelBookingById,
 );
 
@@ -85,7 +85,7 @@ router.get(
 router.get(
   "/",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("Manage Corporates"),
+  requireOpsPermission("Corporate Management"),
   corporateController.getAllCorporates,
 );
 
@@ -98,7 +98,7 @@ router.get(
 router.get(
   "/cancellation-queries",
   authorizeRoles("super-admin", "ops-member", "employee", "manager", "travel-admin"),
-  requireOpsPermission("Manage Cancellations"),
+  requireOpsPermission("Cancellation Management"),
   corporateController.fetchCancellationQueries
 );
 
@@ -106,7 +106,7 @@ router.get(
 router.get(
   "/cancellation-queries/:id",
   authorizeRoles("super-admin", "ops-member", "employee", "manager", "travel-admin"),
-  requireOpsPermission("Manage Cancellations"),
+  requireOpsPermission("Cancellation Management"),
   corporateController.fetchCancellationQueryById
 );
 
@@ -117,63 +117,63 @@ router.get(
 router.get(
   "/revenue/total-breakdown",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getTotalRevenueBreakdown
 );
 
 router.get(
   "/revenue/summary",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getRevenueSummary
 );
 
 router.get(
   "/revenue/company-wise",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getCompanyWiseRevenue
 );
 
 router.get(
   "/revenue/monthly",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getMonthlyRevenue
 );
 
 router.get(
   "/revenue/quarterly",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getQuarterlyRevenue
 );
 
 router.get(
   "/revenue/half-yearly",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getHalfYearlyRevenue
 );
 
 router.get(
   "/revenue/yearly",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getYearlyRevenue
 );
 
 router.get(
   "/revenue/daily",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getDailyRevenue
 );
 
 router.get(
   "/revenue/corporate-details/:id",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   revenueController.getCorporateDetailedBookings
 );
 
@@ -181,7 +181,7 @@ router.get(
 router.patch(
   "/cancellation-queries/:id/status",
   authorizeRoles("super-admin", "ops-member", "travel-admin"),
-  requireOpsPermission("Manage Cancellations"),
+  requireOpsPermission("Cancellation Management"),
   corporateController.updateCancellationQueryStatus
 );
 
@@ -191,7 +191,7 @@ router.patch(
 router.get(
   "/tbo-commissions",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("View Finance"),
+  requireOpsPermission("Finance Management"),
   corporateController.getTboCommissionsAndTaxes
 );
 
@@ -199,7 +199,7 @@ router.get(
 router.get(
   "/:id",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("Manage Corporates"),
+  requireOpsPermission("Corporate Management"),
   corporateController.getCorporate
 );
 
@@ -207,7 +207,7 @@ router.get(
 router.put(
   "/:id",
   authorizeRoles("super-admin", "travel-admin", "ops-member"),
-  requireOpsPermission("Manage Corporates"),
+  requireOpsPermission("Corporate Management"),
   sanitizeBody(["corporateName", "primaryContact.email"]),
   validate(corporateValidation.updateCorporate),
   corporateController.updateCorporate,
@@ -217,7 +217,7 @@ router.put(
 router.put(
   "/:id/approve",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("Manage Corporates"),
+  requireOpsPermission("Corporate Management"),
   corporateController.approveCorporate,
 );
 
@@ -225,7 +225,7 @@ router.put(
 router.patch(
   "/:id/toggle-status",
   authorizeRoles("super-admin", "ops-member"),
-  requireOpsPermission("Manage Corporates"),
+  requireOpsPermission("Corporate Management"),
   corporateController.toggleCorporateStatus,
 );
 

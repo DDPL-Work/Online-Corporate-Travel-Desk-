@@ -6,7 +6,7 @@ const { requireOpsPermission } = require("../middleware/requireOpsPermission.mid
 
 router.use(verifyToken);
 router.use(authorizeRoles("super-admin", "ops-member"));
-router.use(requireOpsPermission("View Finance"));
+router.use(requireOpsPermission("Finance Management"));
 
 router.get(
   "/",

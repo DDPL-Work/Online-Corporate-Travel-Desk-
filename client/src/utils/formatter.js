@@ -81,6 +81,34 @@ export const formatDuration = (mins = 0) =>
 export const getTotalDuration = (segments = []) =>
   segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
 
+export const getJourneyDurationString = (segments = []) => {
+  if (!segments || segments.length === 0) return "";
+  
+  const formatHm = (mins) => `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  
+  if (segments.length === 1) {
+    return formatHm(segments[0].Duration || 0);
+  }
+  
+  let totalMins = 0;
+  
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    totalMins += (seg.Duration || 0);
+    
+    if (i < segments.length - 1) {
+      const nextSeg = segments[i + 1];
+      const arrTime = new Date(seg.Destination?.ArrTime).getTime();
+      const depTime = new Date(nextSeg.Origin?.DepTime).getTime();
+      if (!isNaN(arrTime) && !isNaN(depTime) && depTime > arrTime) {
+         totalMins += Math.floor((depTime - arrTime) / 60000);
+      }
+    }
+  }
+  
+  return formatHm(totalMins);
+};
+
 const IST_OFFSET_MINUTES = 330; // +5:30
 
 export const getDateInIST = (input) => {

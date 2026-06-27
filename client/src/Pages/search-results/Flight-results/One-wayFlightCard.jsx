@@ -8,6 +8,7 @@ import {
   FLIGHT_STATUS_MAP,
   formatDate,
   formatTime,
+  getJourneyDurationString,
 } from "../../../utils/formatter";
 import { getFareUpsell, getFareRule } from "../../../Redux/Actions/flight.thunks";
 import { BiSolidOffer } from "react-icons/bi";
@@ -190,8 +191,7 @@ export default function OneWayFlightCard({
   const depTime = firstSegment.Origin?.DepTime;
   const arrTime = lastSegment.Destination?.ArrTime;
 
-  const durationMin = segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
-  const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
+  const duration = getJourneyDurationString(segments);
 
   const stopCities = segments.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean);
   const stops = segments.length === 1 

@@ -12,6 +12,7 @@ import {
   formatDuration,
   formatTime,
   getCabinClassLabel,
+  getJourneyDurationString,
 } from "../../../../utils/formatter";
 import { useDispatch } from "react-redux";
 import { getFareUpsell } from "../../../../Redux/Actions/flight.thunks";
@@ -110,8 +111,7 @@ export default function ReturnInternationalFlightCard({
     const depDate = formatDate(firstSeg?.Origin?.DepTime);
     const arrDate = formatDate(lastSeg?.Destination?.ArrTime);
 
-    const durationMin = segments.reduce((sum, s) => sum + (s.Duration || 0), 0);
-    const duration = `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`;
+    const duration = getJourneyDurationString(segments);
 
     const stopCities = segments.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean);
     const stops = segments.length === 1 

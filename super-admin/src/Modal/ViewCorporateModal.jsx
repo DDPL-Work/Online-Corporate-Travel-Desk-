@@ -16,6 +16,7 @@ import {
   FiToggleRight,
   FiNavigation,
   FiHome,
+  FiCopy,
 } from "react-icons/fi";
 
 const C = {
@@ -238,6 +239,30 @@ export default function ViewCorporateModal({ corporate, onClose }) {
                       "en-GB",
                     )}
                   />
+                  {corporate.corporateUrl && (
+                    <div className="col-span-2">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                        Corporate Link
+                      </p>
+                      <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <p className="text-[13px] text-[#003399] font-bold truncate flex-1 underline">
+                          <a href={corporate.corporateUrl} target="_blank" rel="noreferrer">
+                            {corporate.corporateUrl}
+                          </a>
+                        </p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(corporate.corporateUrl);
+                            alert("Link copied to clipboard!");
+                          }}
+                          className="p-1.5 bg-white text-slate-500 border border-slate-200 rounded hover:text-[#003399] hover:border-[#003399] transition-colors"
+                          title="Copy Link"
+                        >
+                          <FiCopy size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </Section>
                 <Section title="Registered Address" color="gold">
                   <Item label="Full Address" value={fullAddress} span={2} />
@@ -620,11 +645,11 @@ const DocCard = ({ label, url, verified }) => (
       <p className="text-xs font-black text-slate-700 uppercase tracking-widest">
         {label}
       </p>
-      <p
+      {/* <p
         className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${verified ? "text-emerald-600" : "text-[#d97706]"}`}
       >
         {verified ? "✓ Verified" : "⚠ Unverified"}
-      </p>
+      </p> */}
     </div>
     <a
       href={url}

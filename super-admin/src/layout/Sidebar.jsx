@@ -84,16 +84,19 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/all-corporates",
           label: "All Corporates",
           icon: <FaBuilding />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_CORPORATES],
         },
         {
           to: "/pending-corporates",
           label: "Pending Corporates",
           icon: <MdOutlinePendingActions />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_CORPORATES],
         },
         {
           to: "/corporate-access-control",
           label: "Access Control",
           icon: <FaUserShield />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_CORPORATES],
         },
       ],
     },
@@ -106,21 +109,25 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/bookings-summary",
           label: "Bookings Summary",
           icon: <FaClipboardList />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_BOOKINGS],
         },
         {
           to: "/all-reissue-requests",
           label: "Reissue Requests",
           icon: <FaExchangeAlt />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_REISSUES],
         },
         {
           to: "/cancellation-summary",
           label: "Cancellation Summary",
           icon: <FaBan />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_CANCELLATIONS],
         },
         {
           to: "/cancellation-queries",
           label: "Cancel Queries",
           icon: <FaQuestionCircle />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_CANCELLATIONS],
         },
       ],
     },
@@ -133,31 +140,37 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/corporate-revenue",
           label: "Corporate Revenue",
           icon: <FaFileInvoiceDollar />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
         {
           to: "/total-revenue-breakdown",
           label: "Total Revenue Breakdown",
           icon: <FaFileInvoiceDollar />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
         {
           to: "/markup-revenue",
           label: "Markup Revenue & Audit",
           icon: <FaFileInvoiceDollar />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
         {
           to: "/wallet-recharge-logs",
           label: "Wallet Recharge Logs",
           icon: <FaWallet />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
         {
           to: "/credit-status-alerts",
           label: "Credit Alerts",
           icon: <FaBell />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
         {
           to: "/tbo-commissions-taxes",
           label: "TBO Commissions",
           icon: <FaMoneyBillWave />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
       ],
     },
@@ -170,28 +183,13 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/global-markup-engine",
           label: "Markup Engine",
           icon: <FaPercent />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
         {
           to: "/service-fee-management",
           label: "Service Fees",
           icon: <FaMoneyBillWave />,
-        },
-      ],
-    },
-
-    {
-      label: "Administration",
-      icon: <FaUserShield />,
-      subItems: [
-        {
-          to: "/ops-management",
-          label: "OPS Team Management",
-          icon: <FaUsers />,
-        },
-        {
-          to: "/api-configurations",
-          label: "API Configurations",
-          icon: <FaServer />,
+          requiredPermissions: [OPS_PERMISSIONS.VIEW_FINANCE],
         },
       ],
     },
@@ -204,10 +202,12 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/blog-and-articles",
           label: "Blog Section",
           icon: <FaBlog />,
+          requiredPermissions: [OPS_PERMISSIONS.SEO_MANAGEMENT],
         },
       ],
     },
 
+    
     {
       label: "Leads & Inquiries",
       icon: <FaUsers />,
@@ -216,6 +216,37 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
           to: "/contact-leads",
           label: "Contact Leads",
           icon: <FaListAlt />,
+          requiredPermissions: [OPS_PERMISSIONS.MANAGE_CORPORATES], // Assuming only corporate managers can see leads
+        },
+      ],
+    },
+    {
+      label: "Administration",
+      icon: <FaUserShield />,
+      subItems: [
+        {
+          to: "/ops-management",
+          label: "OPS Team Management",
+          icon: <FaUsers />,
+          superAdminOnly: true,
+        },
+        {
+          to: "/api-configurations",
+          label: "API Configurations",
+          icon: <FaServer />,
+          superAdminOnly: true,
+        },
+      ],
+    },
+
+    {
+      label: "My Account",
+      icon: <FaUserCog />,
+      subItems: [
+        {
+          to: "/profile",
+          label: "My Profile",
+          icon: <FaUserCog />,
         },
       ],
     },
@@ -236,14 +267,35 @@ export default function Sidebar({ isOpen, onClose, role, permissions = [] }) {
 
   const menus = {
     "super-admin": superAdminMenu,
-    "ops-member": superAdminMenu.filter((item) =>
-      canAccessMenuItem({
-        role,
-        permissions,
-        requiredPermissions: item.requiredPermissions,
-        superAdminOnly: item.superAdminOnly,
-      }),
-    ),
+    "ops-member": superAdminMenu
+      .map((item) => {
+        if (!item.subItems) {
+          // It's a top-level link
+          const canAccess = canAccessMenuItem({
+            role,
+            permissions,
+            requiredPermissions: item.requiredPermissions,
+            superAdminOnly: item.superAdminOnly,
+          });
+          return canAccess ? item : null;
+        }
+
+        // It's a parent group, filter subItems
+        const filteredSubItems = item.subItems.filter((sub) =>
+          canAccessMenuItem({
+            role,
+            permissions,
+            requiredPermissions: sub.requiredPermissions,
+            superAdminOnly: sub.superAdminOnly,
+          })
+        );
+
+        if (filteredSubItems.length > 0) {
+          return { ...item, subItems: filteredSubItems };
+        }
+        return null;
+      })
+      .filter(Boolean),
   };
 
   const activeMenu = menus[role] || [];

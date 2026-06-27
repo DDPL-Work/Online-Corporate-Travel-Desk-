@@ -33,7 +33,7 @@ export const loginUser = createAsyncThunk(
         email,
         password,
       });
-      return data; // { token, role, user }
+      return data.data || data; // { token, role, user }
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
     }

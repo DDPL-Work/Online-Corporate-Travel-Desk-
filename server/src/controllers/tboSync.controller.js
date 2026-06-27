@@ -2,8 +2,10 @@ const TBOCity = require("../models/TBOCity");
 const TBOHotel = require("../models/TBOHotel");
 const TBOHotelDetails = require("../models/TBOHotelDetails");
 const TBOSyncProgress = require("../models/TBOSyncProgress");
+const TBOSyncLog = require("../models/TBOSyncLog");
 const Airline = require("../models/Airline");
 const Airport = require("../models/Airport");
+const Country = require("../models/CountryList");
 const hotelService = require("../services/tektravels/hotel.service");
 const logger = require("../utils/logger");
 const asyncHandler = require("../utils/asyncHandler");
@@ -11,8 +13,43 @@ const path = require("path");
 const fs = require("fs");
 
 // Global sync states
+const getActiveSyncs = () => {
+    const active = [];
+    if (typeof countrySyncState !== 'undefined' && countrySyncState.isSyncing) active.push('Country Sync');
+    if (typeof citySyncState !== 'undefined' && citySyncState.isSyncing) active.push('City Sync');
+    if (typeof hotelSyncState !== 'undefined' && hotelSyncState.isSyncing) active.push('Hotel Sync');
+    if (typeof hotelDetailsSyncState !== 'undefined' && hotelDetailsSyncState.isSyncing) active.push('Hotel Details Sync');
+    return active;
+};
+
+const addLog = async (type, message, affectedSyncs = []) => {
+    try {
+        await TBOSyncLog.create({
+            type,
+            message,
+            affectedSyncs,
+        });
+    } catch (err) {
+        logger.error("Failed to insert TBOSyncLog:", err.message);
+    }
+};
+
+let countrySyncState = {
+    isSyncing: false,
+    isPaused: false,
+    isCancelled: false,
+    totalCountries: 0,
+    processedCountries: 0,
+    totalSaved: 0,
+    errors: [],
+    startTime: null,
+    endTime: null,
+};
+
 let citySyncState = {
     isSyncing: false,
+    isPaused: false,
+    isCancelled: false,
     totalCountries: 0,
     processedCountries: 0,
     totalCitiesSaved: 0,
@@ -24,6 +61,8 @@ let citySyncState = {
 
 let hotelSyncState = {
     isSyncing: false,
+    isPaused: false,
+    isCancelled: false,
     totalCities: 0,
     processedCities: 0,
     totalHotelsSaved: 0,
@@ -35,11 +74,94 @@ let hotelSyncState = {
 };
 
 /**
+ * Background processor for country synchronization
+ */
+exports.processCountrySync = async () => {
+    if (countrySyncState.isSyncing) return;
+    countrySyncState.isSyncing = true;
+    countrySyncState.isPaused = false;
+    countrySyncState.isCancelled = false;
+    countrySyncState.startTime = new Date();
+    countrySyncState.errors = [];
+    countrySyncState.totalCountries = 0;
+    addLog('START', 'Country Sync process started.', ['Country Sync']);
+    countrySyncState.processedCountries = 0;
+    countrySyncState.totalSaved = 0;
+
+    try {
+        const countryRes = await hotelService.getCountryList();
+        if (!countryRes || !countryRes.CountryList) {
+            throw new Error("Failed to fetch country list from TBO");
+        }
+
+        const countries = countryRes.CountryList;
+        countrySyncState.totalCountries = countries.length;
+
+        const existingDocs = await Country.find({}).lean();
+        const existingMap = new Map(existingDocs.map(c => [c.Code, c.Name]));
+
+        const bulkOps = [];
+        let insertedCount = 0;
+        let modifiedCount = 0;
+        let skippedCount = 0;
+
+        for (const country of countries) {
+            const existingName = existingMap.get(country.Code);
+            if (!existingName) {
+                logger.info(`[COUNTRY SYNC] 🆕 Saving new country: ${country.Name} (${country.Code})`);
+                insertedCount++;
+                bulkOps.push({
+                    updateOne: {
+                        filter: { Code: country.Code },
+                        update: { $set: { Code: country.Code, Name: country.Name } },
+                        upsert: true
+                    }
+                });
+            } else if (existingName !== country.Name) {
+                logger.info(`[COUNTRY SYNC] 🔄 Updating country: ${country.Code} from '${existingName}' to '${country.Name}'`);
+                modifiedCount++;
+                bulkOps.push({
+                    updateOne: {
+                        filter: { Code: country.Code },
+                        update: { $set: { Code: country.Code, Name: country.Name } },
+                        upsert: true
+                    }
+                });
+            } else {
+                logger.info(`[COUNTRY SYNC] ⏭️ Skipping country: ${country.Name} (${country.Code}) - No changes.`);
+                skippedCount++;
+            }
+        }
+
+        if (bulkOps.length > 0) {
+            await Country.bulkWrite(bulkOps, { ordered: false });
+            logger.info(`[COUNTRY SYNC] Completed. Matched/Skipped: ${skippedCount}, Modified: ${modifiedCount}, Inserted: ${insertedCount}`);
+            countrySyncState.totalSaved = modifiedCount + insertedCount;
+        } else {
+            logger.info(`[COUNTRY SYNC] No countries found to sync.`);
+        }
+        
+        countrySyncState.processedCountries = countries.length;
+        countrySyncState.endTime = new Date();
+        addLog('COMPLETE', `Country Sync completed successfully. Total processed: ${countrySyncState.processedCountries}. Total saved/modified: ${countrySyncState.totalSaved}.`, ['Country Sync']);
+        return true;
+    } catch (error) {
+        logger.error("[COUNTRY SYNC] Critical failure:", error.message);
+        countrySyncState.errors.push(error.message);
+        return false;
+    } finally {
+        countrySyncState.isSyncing = false;
+    }
+};
+
+/**
  * Background processor for city synchronization
  */
 exports.processCitySync = async () => {
     if (citySyncState.isSyncing) return;
     citySyncState.isSyncing = true;
+    citySyncState.isPaused = false;
+    citySyncState.isCancelled = false;
     try {
         const countryRes = await hotelService.getCountryList();
         if (!countryRes || !countryRes.CountryList) {
@@ -54,6 +176,13 @@ exports.processCitySync = async () => {
         citySyncState.startTime = new Date();
 
         for (const country of countries) {
+            if (citySyncState.isCancelled) {
+                logger.warn("[CITY SYNC] Cancelled by user.");
+                break;
+            }
+            while (citySyncState.isPaused && !citySyncState.isCancelled) {
+                await new Promise((r) => setTimeout(r, 2000));
+            }
             try {
                 const countryCode = country.Code;
                 const countryName = country.Name;
@@ -71,20 +200,48 @@ exports.processCitySync = async () => {
                 const cityRes = await hotelService.getCityList(countryCode);
 
                 if (cityRes && cityRes.CityList && Array.isArray(cityRes.CityList)) {
-                    const cityOperations = cityRes.CityList.map((city) => ({
-                        updateOne: {
-                            filter: { cityCode: city.Code, countryCode: countryCode },
-                            update: {
-                                $set: {
-                                    cityCode: city.Code,
-                                    cityName: city.Name,
-                                    countryCode: countryCode,
-                                    countryName: countryName,
+                    const existingCities = await TBOCity.find({ countryCode }).lean();
+                    const existingMap = new Map(existingCities.map(c => [c.cityCode, c.cityName]));
+
+                    const cityOperations = [];
+                    for (const city of cityRes.CityList) {
+                        const existingName = existingMap.get(city.Code);
+                        if (!existingName) {
+                            logger.info(`[CITY SYNC] 🆕 Saving new city: ${city.Name} (${city.Code}) in ${countryName}`);
+                            cityOperations.push({
+                                updateOne: {
+                                    filter: { cityCode: city.Code, countryCode: countryCode },
+                                    update: {
+                                        $set: {
+                                            cityCode: city.Code,
+                                            cityName: city.Name,
+                                            countryCode: countryCode,
+                                            countryName: countryName,
+                                        },
+                                    },
+                                    upsert: true,
                                 },
-                            },
-                            upsert: true,
-                        },
-                    }));
+                            });
+                        } else if (existingName !== city.Name) {
+                            logger.info(`[CITY SYNC] 🔄 Updating city: ${city.Code} from '${existingName}' to '${city.Name}'`);
+                            cityOperations.push({
+                                updateOne: {
+                                    filter: { cityCode: city.Code, countryCode: countryCode },
+                                    update: {
+                                        $set: {
+                                            cityCode: city.Code,
+                                            cityName: city.Name,
+                                            countryCode: countryCode,
+                                            countryName: countryName,
+                                        },
+                                    },
+                                    upsert: true,
+                                },
+                            });
+                        } else {
+                            logger.info(`[CITY SYNC] ⏭️ Skipping city: ${city.Name} (${city.Code}) - No changes.`);
+                        }
+                    }
 
                     if (cityOperations.length > 0) {
                         const result = await TBOCity.bulkWrite(cityOperations);
@@ -106,9 +263,11 @@ exports.processCitySync = async () => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         citySyncState.endTime = new Date();
+        addLog('COMPLETE', `City Sync completed successfully. Total countries processed: ${citySyncState.processedCountries}. Total cities saved: ${citySyncState.totalCitiesSaved}.`, ['City Sync']);
         return true; // Finished successfully
     } catch (error) {
         logger.error("[CITY SYNC] Critical failure:", error.message);
+        addLog('ERROR', 'City Sync failed: ' + error.message, ['City Sync']);
         return false;
     } finally {
         citySyncState.isSyncing = false;
@@ -118,10 +277,17 @@ exports.processCitySync = async () => {
 /**
  * Background processor for hotel synchronization
  */
-exports.processHotelSync = async () => {
+exports.processHotelSync = async (forceRestart = false) => {
     if (hotelSyncState.isSyncing) return;
     hotelSyncState.isSyncing = true;
+    hotelSyncState.isPaused = false;
+    hotelSyncState.isCancelled = false;
     try {
+        if (forceRestart) {
+            await TBOSyncProgress.findOneAndUpdate({ syncType: "hotels" }, { lastProcessedId: null, processedCount: 0 });
+            logger.info("[HOTEL SYNC] Force restarted from index 0");
+        }
+
         // Resume from checkpoint if exists
         const progress = await TBOSyncProgress.findOne({ syncType: "hotels" });
         let startFromId = progress?.lastProcessedId || null;
@@ -129,33 +295,50 @@ exports.processHotelSync = async () => {
         const query = startFromId ? { _id: { $gt: startFromId } } : {};
         const cities = await TBOCity.find(query).sort({ _id: 1 });
 
-        hotelSyncState.totalCities = await TBOCity.countDocuments({});
+        hotelSyncState.totalCities = await TBOCity.estimatedDocumentCount();
         hotelSyncState.processedCities = progress?.processedCount || 0;
-        hotelSyncState.totalHotelsSaved = await TBOHotel.countDocuments({});
+        hotelSyncState.totalHotelsSaved = await TBOHotel.estimatedDocumentCount();
         hotelSyncState.errors = [];
         hotelSyncState.startTime = new Date();
+        addLog('START', 'Hotel Sync process started.', ['Hotel Sync']);
 
         logger.info(`[HOTEL SYNC] Started. Resume index: ${hotelSyncState.processedCities}/${hotelSyncState.totalCities}`);
 
         for (const city of cities) {
             try {
+                if (hotelSyncState.isCancelled) {
+                    logger.info("[HOTEL SYNC] Process cancelled by user.");
+                    break;
+                }
+                while (hotelSyncState.isPaused) {
+                    if (hotelSyncState.isCancelled) break;
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+                if (hotelSyncState.isCancelled) break;
+
                 hotelSyncState.lastCity = `${city.cityName}, ${city.countryName}`;
 
-                // OPTIMIZATION: Check if this city already has hotels in our DB
-                // If it does, we skip the API call for this city to save time and API quota.
-                const existingHotelCount = await TBOHotel.countDocuments({ cityCode: city.cityCode });
-                if (existingHotelCount > 0) {
-                    logger.info(`[HOTEL SYNC] ⏭️ Skipping ${city.cityName} - Already have ${existingHotelCount} hotels.`);
-                    hotelSyncState.processedCities++;
-                    hotelSyncState.totalHotelsSaved += existingHotelCount;
-                    continue;
-                }
+                // OPTIMIZATION removed to check every city for missing or updated hotels
+                // It will now hit the TBO API for every city and verify hotels individually.
 
                 let pageIndex = 1;
                 let hasMore = true;
                 let previousBatchSignature = "";
 
                 while (hasMore) {
+                    if (hotelSyncState.isCancelled) {
+                        hasMore = false;
+                        break;
+                    }
+                    while (hotelSyncState.isPaused) {
+                        if (hotelSyncState.isCancelled) break;
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                    if (hotelSyncState.isCancelled) {
+                        hasMore = false;
+                        break;
+                    }
+
                     hotelSyncState.currentPage = pageIndex;
                     const res = await hotelService.getTBOHotelCodeList(city.cityCode, pageIndex);
                     const hotelList = res?.Hotels || res?.HotelList;
@@ -173,27 +356,69 @@ exports.processHotelSync = async () => {
                         previousBatchSignature = currentSignature;
 
                         if (rawCount > 0) {
-                            const hotelOps = hotelList
-                                .filter(h => h.HotelCode)
-                                .map((h) => ({
-                                    updateOne: {
-                                        filter: { hotelCode: h.HotelCode, cityCode: city.cityCode },
-                                        update: {
-                                            $set: {
-                                                hotelCode: h.HotelCode,
-                                                hotelName: h.HotelName || "",
-                                                hotelAddress: h.HotelAddress || "",
-                                                starRating: h.StarRating || "",
-                                                cityCode: city.cityCode,
-                                                cityName: city.cityName,
-                                                countryCode: city.countryCode,
-                                                thumbnail: h.HotelThumbnail || "",
-                                                location: h.HotelLocation || "",
+                            const validHotels = hotelList.filter(h => h.HotelCode);
+                            const hotelCodes = validHotels.map(h => String(h.HotelCode));
+                            const existingDocs = await TBOHotel.find({ cityCode: city.cityCode, hotelCode: { $in: hotelCodes } }).lean();
+                            const existingMap = new Map(existingDocs.map(h => [String(h.hotelCode), h]));
+
+                            const hotelOps = [];
+                            for (const h of validHotels) {
+                                const existing = existingMap.get(String(h.HotelCode));
+                                const hotelName = h.HotelName || "";
+                                
+                                if (!existing) {
+                                    logger.info(`[HOTEL SYNC] 🆕 Saving new hotel: ${hotelName} (${h.HotelCode}) in ${city.cityName}`);
+                                    hotelOps.push({
+                                        updateOne: {
+                                            filter: { hotelCode: h.HotelCode, cityCode: city.cityCode },
+                                            update: {
+                                                $set: {
+                                                    hotelCode: h.HotelCode,
+                                                    hotelName: hotelName,
+                                                    hotelAddress: h.HotelAddress || "",
+                                                    starRating: h.StarRating || "",
+                                                    cityCode: city.cityCode,
+                                                    cityName: city.cityName,
+                                                    countryCode: city.countryCode,
+                                                    thumbnail: h.HotelThumbnail || "",
+                                                    location: h.HotelLocation || "",
+                                                },
                                             },
+                                            upsert: true,
                                         },
-                                        upsert: true,
-                                    },
-                                }));
+                                    });
+                                } else {
+                                    // Basic equality check for essential fields to determine update vs skip
+                                    const hasChanges = existing.hotelName !== hotelName || 
+                                                       existing.starRating !== (h.StarRating || "") ||
+                                                       existing.hotelAddress !== (h.HotelAddress || "");
+                                    
+                                    if (hasChanges) {
+                                        logger.info(`[HOTEL SYNC] 🔄 Updating hotel: ${hotelName} (${h.HotelCode}) in ${city.cityName}`);
+                                        hotelOps.push({
+                                            updateOne: {
+                                                filter: { hotelCode: h.HotelCode, cityCode: city.cityCode },
+                                                update: {
+                                                    $set: {
+                                                        hotelCode: h.HotelCode,
+                                                        hotelName: hotelName,
+                                                        hotelAddress: h.HotelAddress || "",
+                                                        starRating: h.StarRating || "",
+                                                        cityCode: city.cityCode,
+                                                        cityName: city.cityName,
+                                                        countryCode: city.countryCode,
+                                                        thumbnail: h.HotelThumbnail || "",
+                                                        location: h.HotelLocation || "",
+                                                    },
+                                                },
+                                                upsert: true,
+                                            },
+                                        });
+                                    } else {
+                                        logger.info(`[HOTEL SYNC] ⏭️ Skipping hotel: ${hotelName} (${h.HotelCode}) - No changes.`);
+                                    }
+                                }
+                            }
 
                             if (hotelOps.length > 0) {
                                 const result = await TBOHotel.bulkWrite(hotelOps, { ordered: false });
@@ -203,7 +428,7 @@ exports.processHotelSync = async () => {
 
                                 // Update the real count from DB periodically instead of just adding
                                 if (pageIndex % 5 === 0 || newOrModified > 0) {
-                                    hotelSyncState.totalHotelsSaved = await TBOHotel.countDocuments({});
+                                    hotelSyncState.totalHotelsSaved = await TBOHotel.estimatedDocumentCount();
                                 }
 
                                 logger.info(`[HOTEL SYNC] ✅ ${city.cityName} (Page ${pageIndex}): Processed ${rawCount} | New: ${newOrModified} | DB Total: ${hotelSyncState.totalHotelsSaved}`);
@@ -248,17 +473,29 @@ exports.processHotelSync = async () => {
             await new Promise((r) => setTimeout(r, 1000));
         }
         hotelSyncState.endTime = new Date();
+        addLog('COMPLETE', `Hotel Code Sync completed successfully. Total cities processed: ${hotelSyncState.processedCities}. Total hotels saved: ${hotelSyncState.totalHotelsSaved}.`, ['Hotel Sync']);
     } catch (error) {
         logger.error("[HOTEL SYNC] Critical failure:", error.message);
+        addLog('ERROR', 'Hotel Sync failed: ' + error.message, ['Hotel Sync']);
     } finally {
         hotelSyncState.isSyncing = false;
     }
 };
 
 /**
+ * Trigger country sync
+ */
+exports.syncAllTboCountries = asyncHandler(async (req, res) => {
+    addLog('START', `Initiated Master Country Sync to fetch the global country list from TBO API.`, ['Country Sync']);
+    this.processCountrySync(); // Run in background
+    res.status(202).json({ success: true, message: "Country sync started" });
+});
+
+/**
  * Trigger city sync
  */
 exports.syncAllTboCities = asyncHandler(async (req, res) => {
+    addLog('START', `Initiated Master City Sync to fetch all cities for all available countries.`, ['City Sync']);
     this.processCitySync(); // Run in background
     res.status(202).json({ success: true, message: "City sync started" });
 });
@@ -267,13 +504,48 @@ exports.syncAllTboCities = asyncHandler(async (req, res) => {
  * Trigger hotel sync
  */
 exports.syncAllTboHotels = asyncHandler(async (req, res) => {
-    this.processHotelSync(); // Run in background
-    res.status(202).json({ success: true, message: "Hotel sync started" });
+    const forceRestart = req.query.reset === 'true';
+    addLog('START', `Initiated Hotel Code Sync to fetch hotel codes across all cities. Force Restart: ${forceRestart}`, ['Hotel Sync']);
+    this.processHotelSync(forceRestart); // Run in background
+    res.status(202).json({ success: true, message: "Hotel sync started", forceRestart });
+});
+
+exports.pauseHotelSync = asyncHandler(async (req, res) => {
+    hotelSyncState.isPaused = true;
+    addLog('PAUSE', `Paused Hotel Sync process.`, ['Hotel Sync']);
+    res.json({ success: true, message: "Hotel sync paused successfully." });
+});
+
+exports.resumeHotelSync = asyncHandler(async (req, res) => {
+    hotelSyncState.isPaused = false;
+    addLog('RESUME', `Resumed Hotel Sync process.`, ['Hotel Sync']);
+    res.json({ success: true, message: "Hotel sync resumed successfully." });
+});
+
+exports.cancelHotelSync = asyncHandler(async (req, res) => {
+    hotelSyncState.isCancelled = true;
+    hotelSyncState.isPaused = false; // Unpause to unblock loops
+    addLog('CANCEL', `Cancelled Hotel Sync process by user request.`, ['Hotel Sync']);
+    res.json({ success: true, message: "Hotel sync cancellation requested." });
+});
+
+exports.getSyncLogs = asyncHandler(async (req, res) => {
+    const logs = await TBOSyncLog.find().sort({ createdAt: -1 }).limit(100);
+    // map _id to id, createdAt to timestamp to match frontend expectation
+    const formattedLogs = logs.map(log => ({
+        id: log._id.toString(),
+        type: log.type,
+        message: log.message,
+        affectedSyncs: log.affectedSyncs,
+        timestamp: log.createdAt
+    }));
+    res.json({ success: true, logs: formattedLogs });
 });
 
 exports.getSyncStatus = asyncHandler(async (req, res) => {
     res.json({
         success: true,
+        countrySync: countrySyncState,
         citySync: citySyncState,
         hotelSync: hotelSyncState,
         hotelDetailsSync: hotelDetailsSyncState,
@@ -312,6 +584,8 @@ exports.searchHotelsLocally = asyncHandler(async (req, res) => {
 ====================================================== */
 let hotelDetailsSyncState = {
     isSyncing: false,
+    isPaused: false,
+    isCancelled: false,
     totalCities: 0,
     processedCities: 0,
     totalHotelsInCity: 0,
@@ -335,82 +609,19 @@ let hotelDetailsSyncState = {
 exports.processHotelDetailsSync = async (targetCityCode = null) => {
     if (hotelDetailsSyncState.isSyncing) return;
     hotelDetailsSyncState.isSyncing = true;
+    hotelDetailsSyncState.isPaused = false;
+    hotelDetailsSyncState.isCancelled = false;
 
     try {
-        const priorityCountries = [
-            // { label: "Singapore", codes: ["SG"], names: ["singapore"] },
-            // { label: "Malaysia", codes: ["MY"], names: ["malaysia"] },
-            // { label: "Indonesia", codes: ["ID"], names: ["indonesia"] },
-            // { label: "Japan", codes: ["JP"], names: ["japan"] },
-            // { label: "Sri Lanka", codes: ["LK"], names: ["sri lanka"] },
-            // { label: "Maldives", codes: ["MV"], names: ["maldives"] },
-            { label: "Thailand", codes: ["TH"], names: ["thailand"] },
-            {
-                label: "Philippines",
-                codes: ["PH"],
-                names: ["philippines", "phillippines"],
-            },
-            { label: "Cambodia", codes: ["KH"], names: ["cambodia"] },
-            {
-                label: "Laos",
-                codes: ["LA"],
-                names: [
-                    "laos",
-                    "lao pdr",
-                    "lao people's democratic republic",
-                    "lao peoples democratic republic",
-                ],
-            },
-            {
-                label: "China",
-                codes: ["CN"],
-                names: ["china", "people s republic of china", "peoples republic of china"],
-            },
-            {
-                label: "Saudi Arabia",
-                codes: ["SA"],
-                names: ["saudi arabia", "kingdom of saudi arabia"],
-            },
-            { label: "Kazakhstan", codes: ["KZ"], names: ["kazakhstan"] },
-        ];
-
         const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-        const normalizeCountryValue = (value = "") =>
-            value
-                .toString()
-                .trim()
-                .toLowerCase()
-                .replace(/[^a-z\s]/g, " ")
-                .replace(/\s+/g, " ")
-                .trim();
 
         const chunkArray = (arr, size) =>
             Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
                 arr.slice(i * size, i * size + size)
             );
 
-        const getPriorityIndex = (countryCode = "", countryName = "") => {
-            const normalizedCode = countryCode.toString().trim().toUpperCase();
-            const normalizedName = normalizeCountryValue(countryName);
-
-            const index = priorityCountries.findIndex(
-                (country) =>
-                    country.codes.includes(normalizedCode) ||
-                    country.names.includes(normalizedName),
-            );
-
-            return index === -1 ? priorityCountries.length : index;
-        };
-
-        const sortCitiesByPriority = (cities = []) =>
+        const sortCitiesAlphabetically = (cities = []) =>
             [...cities].sort((left, right) => {
-                const priorityDiff =
-                    getPriorityIndex(left.countryCode, left.countryName) -
-                    getPriorityIndex(right.countryCode, right.countryName);
-
-                if (priorityDiff !== 0) return priorityDiff;
-
                 const countryCompare = (left.countryName || "").localeCompare(
                     right.countryName || "",
                 );
@@ -466,6 +677,60 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
             thumbnail: detail.Image || "",
         });
 
+        const mergeHotelDetails = (existing, incoming) => {
+            if (!existing) return incoming;
+            if (!incoming) return existing;
+
+            const merged = { ...existing };
+
+            for (const key in incoming) {
+                const val = incoming[key];
+                
+                if (val === undefined || val === null || val === "") continue;
+                if (Array.isArray(val) && val.length === 0) continue;
+                if (key === 'hotelRating' && val === 0 && existing[key] > 0) continue;
+
+                if (Array.isArray(val)) {
+                    const existingArr = Array.isArray(existing[key]) ? existing[key] : [];
+
+                    if (key === 'roomDetails') {
+                        const roomsMap = new Map();
+                        existingArr.forEach(r => {
+                            if (r && r.roomId) roomsMap.set(String(r.roomId), r);
+                        });
+                        val.forEach(newRoom => {
+                            if (!newRoom || !newRoom.roomId) return;
+                            const rid = String(newRoom.roomId);
+                            if (roomsMap.has(rid)) {
+                                roomsMap.set(rid, mergeHotelDetails(roomsMap.get(rid), newRoom));
+                            } else {
+                                roomsMap.set(rid, newRoom);
+                            }
+                        });
+                        merged[key] = Array.from(roomsMap.values());
+                    } else if (key === 'hotelFacilities' || key === 'images' || key === 'optional' || key === 'mandatory' || key === 'imageURL') {
+                        merged[key] = Array.from(new Set([...existingArr, ...val]));
+                    } else {
+                        const set = new Set();
+                        const result = [];
+                        [...existingArr, ...val].forEach(item => {
+                            const str = typeof item === 'object' ? JSON.stringify(item) : String(item);
+                            if (!set.has(str)) {
+                                set.add(str);
+                                result.push(item);
+                            }
+                        });
+                        merged[key] = result;
+                    }
+                } else if (typeof val === 'object' && val !== null) {
+                    merged[key] = mergeHotelDetails(existing[key] || {}, val);
+                } else {
+                    merged[key] = val;
+                }
+            }
+            return merged;
+        };
+
         const saveCityProgress = async (cityId, status = "running") => {
             await TBOSyncProgress.findOneAndUpdate(
                 { syncType: "hotelDetails" },
@@ -497,10 +762,16 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
                 return false;
             }
 
+            const incomingPayload = buildHotelDetailsPayload(matchedDetail);
+            const existingDoc = await TBOHotelDetails.findOne({ hotelCode: matchedDetail.HotelCode }).lean();
+            const mergedPayload = mergeHotelDetails(existingDoc || {}, incomingPayload);
+            delete mergedPayload._id;
+            delete mergedPayload.__v;
+
             await Promise.all([
                 TBOHotelDetails.findOneAndUpdate(
                     { hotelCode: matchedDetail.HotelCode },
-                    { $set: buildHotelDetailsPayload(matchedDetail) },
+                    { $set: mergedPayload },
                     { upsert: true },
                 ),
                 TBOHotel.updateOne(
@@ -522,7 +793,7 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
             cities = await TBOCity.find({ cityCode: targetCityCode }).lean();
         } else {
             const allCities = await TBOCity.find({}).lean();
-            cities = sortCitiesByPriority(allCities);
+            cities = sortCitiesAlphabetically(allCities);
         }
 
         hotelDetailsSyncState.totalCities = cities.length;
@@ -530,22 +801,28 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
         hotelDetailsSyncState.totalHotelsInCity = 0;
         hotelDetailsSyncState.processedHotelsInCity = 0;
         hotelDetailsSyncState.totalDetailsSaved =
-            await TBOHotelDetails.countDocuments({});
+            await TBOHotelDetails.estimatedDocumentCount();
         hotelDetailsSyncState.errors = [];
         hotelDetailsSyncState.startTime = new Date();
         hotelDetailsSyncState.endTime = null;
+        addLog('START', 'Hotel Details Sync process started.', ['Hotel Details Sync']);
 
         await saveCityProgress(null, "running");
 
         logger.info(
-            `[HOTEL DETAILS SYNC] Started sync for ${cities.length} cities. Priority countries: ${priorityCountries
-                .map((country) => country.label)
-                .join(", ")}.`,
+            `[HOTEL DETAILS SYNC] Started sync for ${cities.length} cities processing in alphabetical order.`,
         );
 
         let lastProgressSaveTime = 0;
 
         for (const city of cities) {
+            if (hotelDetailsSyncState.isCancelled) {
+                logger.warn("[HOTEL DETAILS SYNC] Cancelled by user.");
+                break;
+            }
+            while (hotelDetailsSyncState.isPaused && !hotelDetailsSyncState.isCancelled) {
+                await new Promise((r) => setTimeout(r, 2000));
+            }
             hotelDetailsSyncState.lastCity = `${city.cityName}, ${city.countryName}`;
             hotelDetailsSyncState.lastHotel = "";
 
@@ -646,13 +923,28 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
                             batchHotelCodes.has(String(detail.HotelCode)),
                         );
 
-                        const detailOps = matchedDetails.map((detail) => ({
-                            updateOne: {
-                                filter: { hotelCode: detail.HotelCode },
-                                update: { $set: buildHotelDetailsPayload(detail) },
-                                upsert: true,
-                            },
-                        }));
+                        const returnedHotelCodeSet = new Set(
+                            matchedDetails.map((detail) => String(detail.HotelCode)),
+                        );
+
+                        const existingDocs = await TBOHotelDetails.find({ hotelCode: { $in: Array.from(returnedHotelCodeSet) } }).lean();
+                        const existingMap = new Map(existingDocs.map(doc => [String(doc.hotelCode), doc]));
+
+                        const detailOps = matchedDetails.map((detail) => {
+                            const incomingPayload = buildHotelDetailsPayload(detail);
+                            const existingDoc = existingMap.get(String(detail.HotelCode)) || {};
+                            const mergedPayload = mergeHotelDetails(existingDoc, incomingPayload);
+                            delete mergedPayload._id;
+                            delete mergedPayload.__v;
+
+                            return {
+                                updateOne: {
+                                    filter: { hotelCode: detail.HotelCode },
+                                    update: { $set: mergedPayload },
+                                    upsert: true,
+                                },
+                            };
+                        });
 
                         const enrichmentOps = matchedDetails.map((detail) => ({
                             updateOne: {
@@ -672,9 +964,6 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
 
                         hotelDetailsSyncState.totalDetailsSaved += detailOps.length;
 
-                        const returnedHotelCodeSet = new Set(
-                            matchedDetails.map((detail) => String(detail.HotelCode)),
-                        );
                         const missingHotels = batch.filter(
                             (hotel) => !returnedHotelCodeSet.has(String(hotel.hotelCode)),
                         );
@@ -750,8 +1039,9 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
 
         hotelDetailsSyncState.endTime = new Date();
         hotelDetailsSyncState.totalDetailsSaved =
-            await TBOHotelDetails.countDocuments({});
+            await TBOHotelDetails.estimatedDocumentCount();
         await saveCityProgress(null, "completed");
+        addLog('COMPLETE', `Hotel Details Sync completed successfully. Total hotel details saved: ${hotelDetailsSyncState.totalDetailsSaved}.`, ['Hotel Details Sync']);
         logger.info(
             `[HOTEL DETAILS SYNC] Complete. Total hotel details in DB: ${hotelDetailsSyncState.totalDetailsSaved}.`,
         );
@@ -781,6 +1071,7 @@ exports.syncAllTboHotelDetails = asyncHandler(async (req, res) => {
     if (hotelDetailsSyncState.isSyncing) {
         return res.status(409).json({ success: false, message: "Hotel details sync is already running" });
     }
+    addLog('START', `Initiated Detailed Hotel Data Sync for ${cityCode ? 'city ' + cityCode : 'all global cities'}.`, ['Hotel Details Sync']);
     this.processHotelDetailsSync(cityCode);
     res.status(202).json({ success: true, message: cityCode ? `Sync started for city ${cityCode}` : "Hierarchical details sync started" });
 });

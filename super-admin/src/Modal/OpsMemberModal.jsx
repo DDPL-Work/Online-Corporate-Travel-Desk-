@@ -13,11 +13,11 @@ import {
 } from "../constants/opsMember";
 
 const PERMISSIONS_LIST = [
-  "View Bookings",
-  "Manage Cancellations",
-  "Manage Reissues",
-  "View Finance",
-  "Manage Corporates",
+  "Booking Management",
+  "Cancellation Management",
+  "Re-issue Management",
+  "Finance Management",
+  "Corporate Management",
   "SEO Management",
 ];
 

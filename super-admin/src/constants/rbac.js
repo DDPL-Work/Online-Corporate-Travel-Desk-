@@ -4,11 +4,11 @@ export const DASHBOARD_ROLES = Object.freeze({
 });
 
 export const OPS_PERMISSIONS = Object.freeze({
-  VIEW_BOOKINGS: "View Bookings",
-  MANAGE_CANCELLATIONS: "Manage Cancellations",
-  MANAGE_REISSUES: "Manage Reissues",
-  VIEW_FINANCE: "View Finance",
-  MANAGE_CORPORATES: "Manage Corporates",
+  VIEW_BOOKINGS: "Booking Management",
+  MANAGE_CANCELLATIONS: "Cancellation Management",
+  MANAGE_REISSUES: "Re-issue Management",
+  VIEW_FINANCE: "Finance Management",
+  MANAGE_CORPORATES: "Corporate Management",
   SEO_MANAGEMENT: "SEO Management",
 });
 

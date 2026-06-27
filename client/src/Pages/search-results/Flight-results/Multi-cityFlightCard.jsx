@@ -10,6 +10,7 @@ import {
   FLIGHT_STATUS_MAP,
   formatDate,
   formatTime,
+  getJourneyDurationString,
 } from "../../../utils/formatter";
 
 import { FlightDetailsModal } from "./FlightDetailsModal";
@@ -94,13 +95,7 @@ export default function MultiCityFlightCard({
           const from = firstSegment.Origin?.Airport?.CityName;
           const to = lastSegment.Destination?.Airport?.CityName;
 
-          const durationMin = segments.reduce(
-            (sum, s) => sum + (s.Duration || 0),
-            0,
-          );
-          const duration = `${Math.floor(durationMin / 60)}h ${
-            durationMin % 60
-          }m`;
+          const duration = getJourneyDurationString(segments);
           const stopCities = segments.slice(0, -1).map(s => s.Destination?.Airport?.AirportCode).filter(Boolean);
           const stops = segments.length === 1 
             ? "Non-stop" 

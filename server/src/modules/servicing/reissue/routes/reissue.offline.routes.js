@@ -43,7 +43,7 @@ router.get(
 router.get(
   "/admin/list",
   verifyToken,
-  requireOpsPermission("Manage Reissues"),
+  requireOpsPermission("Re-issue Management"),
   controller.listAdmin,
 );
 
@@ -67,7 +67,7 @@ router.get(
 router.patch(
   "/:id/status",
   verifyToken,
-  requireOpsPermission("Manage Reissues"),
+  requireOpsPermission("Re-issue Management"),
   controller.updateStatus,
 );
 
@@ -79,14 +79,14 @@ router.patch(
 router.patch(
   "/:id/reassign",
   verifyToken,
-  requireOpsPermission("Manage Reissues"),
+  requireOpsPermission("Re-issue Management"),
   controller.reassign,
 );
 
 router.post(
   "/:id/generate-ticket",
   verifyToken,
-  requireOpsPermission("Manage Reissues"),
+  requireOpsPermission("Re-issue Management"),
   controller.generateTicket,
 );
 

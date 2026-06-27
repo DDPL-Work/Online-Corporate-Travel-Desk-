@@ -4,6 +4,7 @@ import { useFlightSearch } from "../../../context/FlightSearchContext";
 import { MdArrowBack, MdFlightTakeoff, MdFlightLand } from "react-icons/md";
 import { BsCalendar4 } from "react-icons/bs";
 import { AiOutlineMinus, AiOutlinePlus } from "react-icons/ai";
+import { FiInfo } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { ToastWithTimer } from "../../../utils/ToastConfirm";
 import {
@@ -603,7 +604,7 @@ export default function RoundTripFlightBooking() {
           title: "Fare Revalidation Failed",
           text: errorMsg,
           icon: "warning",
-          confirmButtonColor: "#0A4D68",
+          confirmButtonColor: "#04112F",
         }).then(() => {
           window.close();
           setTimeout(() => {
@@ -1723,9 +1724,9 @@ export default function RoundTripFlightBooking() {
 
   if (loading || isFareQuoteLoading) {
     return (
-      <div className="min-h-screen bg-[#0A203E] flex items-center justify-center">
+      <div className="min-h-screen bg-[#000D26] flex items-center justify-center">
         <div className="text-center p-8 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl">
-          <div className="h-16 w-16 border-4 border-slate-600 border-t-[#C9A84C] rounded-full animate-spin mx-auto mb-6 shadow-inner" />
+          <div className="h-16 w-16 border-4 border-slate-600 border-t-[#C9A240] rounded-full animate-spin mx-auto mb-6 shadow-inner" />
           <p className="text-white font-semibold text-lg mb-2">Revalidating Round-Trip Flight & Fares...</p>
           <p className="text-slate-400 text-sm">Please wait while we fetch the latest fare details and seat maps.</p>
         </div>
@@ -1742,7 +1743,7 @@ export default function RoundTripFlightBooking() {
           </p>
           <button
             onClick={() => navigate("/")}
-            className="w-full py-4 bg-[#0A203E] text-white rounded-xl font-bold hover:brightness-110 transition shadow-lg shadow-[#0A203E]/20 uppercase tracking-widest text-xs"
+            className="w-full py-4 bg-[#000D26] text-white rounded-xl font-bold hover:brightness-110 transition shadow-lg shadow-[#000D26]/20 uppercase tracking-widest text-xs"
           >
             Back to Search
           </button>
@@ -1787,7 +1788,7 @@ export default function RoundTripFlightBooking() {
       />
 
       {/* Top Bar - Journey Details */}
-      <div className="bg-[#0A203E] border-b border-[#0A203E]/80 sticky top-0 z-40 shadow-md">
+      <div className="bg-[#000D26] border-b border-[#000D26]/80 sticky top-0 z-40 shadow-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">
@@ -1795,8 +1796,8 @@ export default function RoundTripFlightBooking() {
             </span>
             <div className="h-4 w-[1px] bg-slate-500/50"></div>
             <div className="flex flex-wrap gap-2">
-              <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#C9A84C] text-[#0A203E] uppercase tracking-wider shadow-sm flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0A203E] animate-pulse"></span>
+              <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#C9A240] text-[#000D26] uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#000D26] animate-pulse"></span>
                 {tripType?.replace("-", " ")}
               </span>
               <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider border ${
@@ -1810,12 +1811,12 @@ export default function RoundTripFlightBooking() {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#1a3a5a]/60 text-slate-100 border border-[#1a3a5a] uppercase tracking-wider flex items-center gap-1">
+            <span className="px-3 py-1 text-xs font-black rounded-lg bg-[#102238]/60 text-slate-100 border border-[#102238] uppercase tracking-wider flex items-center gap-1">
               <span className="text-[10px] text-slate-400 font-semibold uppercase">Cabin:</span>{" "}
               {CABIN_MAP[rawFlightData?.onward?.Segments?.[0]?.[0]?.CabinClass || rawFlightData?.Segments?.[0]?.[0]?.CabinClass || selectedFlight?.Segments?.[0]?.[0]?.CabinClass] || "Economy"}
             </span>
             {(rawFlightData?.onward?.Segments?.[0]?.[0]?.SupplierFareClass || rawFlightData?.Segments?.[0]?.[0]?.SupplierFareClass || selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass) && (
-              <span className="px-3 py-1 text-xs font-black rounded-lg bg-amber-950/30 text-[#C9A84C] border border-[#C9A84C]/30 uppercase tracking-wider flex items-center gap-1">
+              <span className="px-3 py-1 text-xs font-black rounded-lg bg-amber-950/30 text-[#C9A240] border border-[#C9A240]/30 uppercase tracking-wider flex items-center gap-1">
                 <span className="text-[10px] text-amber-500/70 font-semibold uppercase">Class:</span>{" "}
                 {rawFlightData?.onward?.Segments?.[0]?.[0]?.SupplierFareClass || rawFlightData?.Segments?.[0]?.[0]?.SupplierFareClass || selectedFlight?.Segments?.[0]?.[0]?.SupplierFareClass}
               </span>
@@ -1830,16 +1831,25 @@ export default function RoundTripFlightBooking() {
           {/* LEFT COLUMN */}
           <div className="lg:col-span-2 space-y-8">
             {/* Flight Summary Card */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 bg-slate-50 border-b border-slate-200">
-                <div className="flex justify-between items-start mb-5">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
+                    <MdFlightTakeoff size={15} />
+                  </span>
                   <div>
-                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                    <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                       Round Trip Flight Details
-                    </h2>
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#C9A84C]/10 text-[#C9A84C] uppercase tracking-widest border border-[#C9A84C]/20">
+                        {tripType}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Review your onward & return journey</p>
                   </div>
                 </div>
+              </div>
 
+              <div className="p-6">
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
                   <InfoBox
                     icon={<MdFlightTakeoff />}
@@ -1905,17 +1915,17 @@ export default function RoundTripFlightBooking() {
             </div>
             {/* Onward Flight Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 bg-slate-50 border-l-4 border-[#C9A84C]">
+              <div className="p-5 bg-slate-50 border-l-4 border-[#C9A240]">
                 <button
                   onClick={() => toggleSection("onwardFlightDetails")}
                   className="w-full flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#0A203E] rounded-full flex items-center justify-center shadow-lg shadow-[#0A203E]/20">
-                      <MdFlightTakeoff className="text-[#C9A84C] text-2xl" />
+                    <div className="w-12 h-12 bg-[#000D26] rounded-full flex items-center justify-center shadow-lg shadow-[#000D26]/20">
+                      <MdFlightTakeoff className="text-[#C9A240] text-2xl" />
                     </div>
                     <div className="text-left">
-                      <p className="font-black text-lg text-[#0A203E] uppercase tracking-tight">
+                      <p className="font-black text-lg text-[#000D26] uppercase tracking-tight">
                         Onward Journey
                       </p>
                       <p className="text-sm text-slate-700 font-bold">
@@ -1941,8 +1951,8 @@ export default function RoundTripFlightBooking() {
               </div>
 
               {expandedSections.onwardFlightDetails && (
-                <div className="p-6 bg-slate-50">
-                  <div className="bg-white rounded-xl p-5">
+                <div className="p-6 bg-slate-50 border-t border-slate-100">
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
                     <RoundTripFlightTimeline
                       segments={parsedFlightData.onwardSegments}
                       isReturnJourney={false}
@@ -1963,17 +1973,17 @@ export default function RoundTripFlightBooking() {
             </div>
             {/* Return Flight Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 bg-slate-50 border-l-4 border-[#0A203E]">
+              <div className="p-5 bg-slate-50 border-l-4 border-[#000D26]">
                 <button
                   onClick={() => toggleSection("returnFlightDetails")}
                   className="w-full flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#C9A84C] rounded-full flex items-center justify-center shadow-lg shadow-[#C9A84C]/20">
-                      <MdFlightLand className="text-[#0A203E] text-2xl" />
+                    <div className="w-12 h-12 bg-[#C9A240] rounded-full flex items-center justify-center shadow-lg shadow-[#C9A240]/20">
+                      <MdFlightLand className="text-[#000D26] text-2xl" />
                     </div>
                     <div className="text-left">
-                      <p className="font-black text-lg text-[#0A203E] uppercase tracking-tight">
+                      <p className="font-black text-lg text-[#000D26] uppercase tracking-tight">
                         Return Journey
                       </p>
                       <p className="text-sm text-slate-700 font-bold">
@@ -1999,8 +2009,8 @@ export default function RoundTripFlightBooking() {
               </div>
 
               {expandedSections.returnFlightDetails && (
-                <div className="p-6 bg-slate-50">
-                  <div className="bg-white rounded-xl p-5">
+                <div className="p-6 bg-slate-50 border-t border-slate-100">
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
                     <RoundTripFlightTimeline
                       segments={parsedFlightData.returnSegments}
                       isReturnJourney={true}
@@ -2032,8 +2042,7 @@ export default function RoundTripFlightBooking() {
             />
 
             {/* Traveller Details */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <TravelerForm
+            <TravelerForm
                 travelers={travelers}
                 updateTraveler={updateTraveler}
                 errors={travelerErrors}
@@ -2077,14 +2086,23 @@ export default function RoundTripFlightBooking() {
                   })
                 }
               />
-            </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 p-6">
               {/* Section Header */}
               <div className="flex items-center justify-between">
-                <h2 className="text-lg md:text-xl font-bold text-slate-900">
-                  Fare Rules & Policies
-                </h2>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A84C]/10 text-[#C9A84C]">
+                    <FiInfo size={15} />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      Fare Rules & Policies
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Cancellation & modification details
+                    </p>
+                  </div>
+                </div>
                 {/* Button + Modal */}
                 <FareDetailsModal fareQuote={fareQuote} fareRule={fareRule} />
               </div>
@@ -2115,7 +2133,7 @@ export default function RoundTripFlightBooking() {
                 approvalRequired={approvalRequired}
               />
 
-              <Amenities />
+              {/* <Amenities /> */}
               <HotelHomeButton />
               <CTABox />
             </div>
@@ -2128,11 +2146,13 @@ export default function RoundTripFlightBooking() {
 
 /* Helper Component */
 const InfoBox = ({ icon, label, value }) => (
-  <div className="bg-white rounded-xl border border-gray-300 p-4 shadow-sm">
-    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-      {icon}
-      {label}
+  <div className="bg-gradient-to-br from-[#0A203E]/[0.02] to-[#C9A84C]/[0.05] rounded-xl border border-[#0A203E]/10 p-4 shadow-sm hover:border-[#C9A84C]/40 hover:shadow-md transition-all">
+    <div className="flex items-center gap-2 text-[#C9A84C] text-[11px] mb-3 font-black uppercase tracking-widest">
+      <div className="p-1.5 bg-white rounded-md shadow-sm border border-[#C9A84C]/20">
+        {icon}
+      </div>
+      <span className="text-[#0A203E]">{label}</span>
     </div>
-    <div className="text-slate-900">{value}</div>
+    <div className="text-[#0A203E] text-sm">{value}</div>
   </div>
 );
