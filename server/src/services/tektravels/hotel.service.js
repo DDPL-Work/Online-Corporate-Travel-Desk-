@@ -427,6 +427,14 @@ class HotelService {
     const cfg = config[env];
     const url = `${cfg.base1}${cfg.endpoints.hotelSearch}`;
 
+    console.log(`\n\n[=== HOTEL SERVICE HIT ===]`);
+    console.log(`Service: TBO Hotel API (searchHotels: ${cfg.endpoints.hotelSearch})`);
+    console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`Env Type: ${env}`);
+    console.log(`URL: ${url}`);
+    console.log(`Credentials:`, { username: cfg.credentials.username, password: cfg.credentials.password });
+    console.log(`[===========================]\n\n`);
+
     try {
       const { data } = await axios.post(
         url,
