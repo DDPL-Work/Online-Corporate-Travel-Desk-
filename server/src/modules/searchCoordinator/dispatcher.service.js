@@ -56,11 +56,14 @@ function startDispatcherLoop(intervalMs = 100) {
       // Add the interleaved batch of chunks to BullMQ
       // (e.g. [User1-Chunk1, User2-Chunk1, User3-Chunk1, User4-Chunk1])
       if (jobsToDispatch.length > 0) {
+        logger.info(`[Dispatcher] Dispatching ${jobsToDispatch.length} chunks to BullMQ...`);
         await searchQueue.addBulk(jobsToDispatch);
+        logger.info(`[Dispatcher] Successfully pushed chunks!`);
       }
 
       // Cleanup finished searches from the active pool
       if (emptySearches.length > 0) {
+        logger.info(`[Dispatcher] Cleaning up empty searches: ${emptySearches.join(',')}`);
         await redis.srem("active:searches", ...emptySearches);
       }
 
