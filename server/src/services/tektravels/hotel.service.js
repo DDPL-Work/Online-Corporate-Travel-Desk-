@@ -542,7 +542,7 @@ class HotelService {
     return this.basicAuthPost(
       config[this.getEnv()].endpoints.hotelBook,
       payload,
-      "base",
+      "base2",
     );
   }
 
@@ -554,7 +554,7 @@ class HotelService {
     return this.tokenPost(
       config[this.getEnv()].endpoints.generateVoucher,
       payload,
-      "base",
+      "base2",
     );
   }
 

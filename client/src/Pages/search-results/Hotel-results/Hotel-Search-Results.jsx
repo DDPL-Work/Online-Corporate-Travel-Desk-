@@ -385,13 +385,19 @@ function HotelSearchResults() {
     return result;
   }, [hotels, traceId, searchText, filters, sortOrder, selectedLocation]);
 
-  const isInitialLoading = loading?.search && (hotels?.length || 0) === 0;
+  const isInitialLoading = (loading?.search || status === "processing") && (hotels?.length || 0) === 0;
   const isLoadingMore = loading?.loadMore;
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">
       <LandingHeader />
-      <Header />
+      <Header 
+        onSearch={() => {
+          setFilters({ ...DEFAULT_FILTERS });
+          setSelectedLocation(null);
+          setSearchText("");
+        }} 
+      />
 
       {/* ── Mobile Filter Trigger Bar ── */}
       <div className="lg:hidden sticky top-0 z-[8000] bg-white border-b border-slate-200 shadow-sm">
@@ -671,13 +677,23 @@ function HotelSearchResults() {
                     Loading hotels...
                   </p>
                 ) : transformedHotels?.length === 0 ? (
-                  <NoResultsFound
-                    title="No hotels match your filters"
-                    message="Try adjusting your budget, star rating, or amenities to find more available hotels."
-                    onBack={() => {
-                      navigate(`/travel`, { state: { activeTab: "hotel" } });
-                    }}
-                  />
+                  hotels?.length === 0 ? (
+                    <NoResultsFound
+                      title="No hotels found for your search"
+                      message="We couldn't find any hotels for the selected destination and dates. Please try searching with different dates or a different location."
+                      onBack={() => {
+                        navigate(`/travel`, { state: { activeTab: "hotel" } });
+                      }}
+                    />
+                  ) : (
+                    <NoResultsFound
+                      title="No hotels match your filters"
+                      message="Try adjusting your budget, star rating, or amenities to find more available hotels."
+                      onBack={() => {
+                        navigate(`/travel`, { state: { activeTab: "hotel" } });
+                      }}
+                    />
+                  )
                 ) : (
                   <>
                     {transformedHotels.map((hotel) => (

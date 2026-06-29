@@ -341,9 +341,9 @@ export default function FlightSearchResults() {
   const [selectedFareUpsell, setSelectedFareUpsell] = useState(null);
 
   const initialFilterState = {
-    priceValues: [1000, 70000],
-    durationValues: [0, 1440],
-    selectedMaxDuration: 1440,
+    priceValues: [0, 0],
+    durationValues: [0, 0],
+    selectedMaxDuration: 0,
     selectedStops: [],
     selectedTime: "",
     selectedAirlines: [],
@@ -705,6 +705,10 @@ export default function FlightSearchResults() {
     setActiveTab("onward");
     setOnwardFilters(initialFilterState);
     setReturnFilters(initialFilterState);
+    setSortKey("Best");
+
+    // Yield to let React re-render and clear the filters from DOM before the API blocks
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     if (jt === 3) {
       await dispatch(searchFlightsMC(appPayload));
@@ -755,6 +759,7 @@ export default function FlightSearchResults() {
 
     result = result.filter((f) => {
       const price = f?.Fare?.OfferedFare || f?.Fare?.PublishedFare || 0;
+      if (priceValues && priceValues[0] === 0 && priceValues[1] === 0) return true;
       return price >= priceValues[0] && price <= priceValues[1];
     });
 
@@ -863,6 +868,7 @@ export default function FlightSearchResults() {
     /* ---------------- DURATION ---------------- */
 
     result = result.filter((f) => {
+      if (!selectedMaxDuration) return true;
       const duration = getSegments(f)[0]?.Duration || 0;
       return duration <= selectedMaxDuration;
     });

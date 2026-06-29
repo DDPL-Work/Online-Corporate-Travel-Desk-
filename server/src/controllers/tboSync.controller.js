@@ -749,7 +749,10 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
             hotelDetailsSyncState.lastHotel = hotel.hotelName || hotel.hotelCode || "";
 
             const res = await hotelService.getStaticHotelDetails(hotel.hotelCode);
-            const details = Array.isArray(res?.HotelDetails) ? res.HotelDetails : [];
+            let details = [];
+            if (res?.HotelDetails) {
+                details = Array.isArray(res.HotelDetails) ? res.HotelDetails : [res.HotelDetails];
+            }
             const matchedDetail =
                 details.find(
                     (detail) => String(detail?.HotelCode || "") === String(hotel.hotelCode),
@@ -912,9 +915,11 @@ exports.processHotelDetailsSync = async (targetCityCode = null) => {
                             batch[0].hotelName || batch[0].hotelCode || "";
 
                         const res = await hotelService.getStaticHotelDetails(hotelCodes);
-                        const returnedDetails = Array.isArray(res?.HotelDetails)
-                            ? res.HotelDetails.filter((detail) => detail?.HotelCode)
-                            : [];
+                        let returnedDetailsRaw = [];
+                        if (res?.HotelDetails) {
+                            returnedDetailsRaw = Array.isArray(res.HotelDetails) ? res.HotelDetails : [res.HotelDetails];
+                        }
+                        const returnedDetails = returnedDetailsRaw.filter((detail) => detail?.HotelCode);
                         const batchHotelCodes = new Set(
                             batch.map((hotel) => String(hotel.hotelCode)),
                         );

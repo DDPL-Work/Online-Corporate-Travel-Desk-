@@ -2112,7 +2112,7 @@ export default function RoundTripFlightBooking() {
           {/* RIGHT SIDEBAR */}
           <div className="lg:col-span-1">
             <div className="sticky top-6 space-y-6">
-              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} />
+              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} isOverLimit={isOverLimit} applicableLimit={applicableLimit} />
               <PriceSummary
                 parsedFlightData={{
                   baseFare: uiTotalFare,

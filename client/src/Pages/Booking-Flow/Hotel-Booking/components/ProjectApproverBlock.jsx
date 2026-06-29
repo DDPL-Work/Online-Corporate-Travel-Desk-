@@ -11,6 +11,7 @@ import {
   FiCheck,
   FiEdit3,
   FiHash,
+  FiInfo,
 } from "react-icons/fi";
 import { MdBusiness } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
@@ -92,7 +93,7 @@ function SearchDropdown({
 /* ─────────────────────────────────────────────────────────────── */
 /*  Main Block                                                      */
 /* ─────────────────────────────────────────────────────────────── */
-export function ProjectApproverBlock({ onChange, errors = {}, approvalRequired }) {
+export function ProjectApproverBlock({ onChange, errors = {}, approvalRequired, isOverLimit, applicableLimit }) {
   const getDisplayName = (item) => {
     if (!item) return "Unnamed";
     if (typeof item.name === "string") return item.name || "Unnamed";
@@ -357,6 +358,14 @@ export function ProjectApproverBlock({ onChange, errors = {}, approvalRequired }
         {/* ════════════════════════════════════════ */}
         {approvalRequired && (
           <div className="p-5 space-y-3">
+            {isOverLimit && applicableLimit > 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-[11px] font-medium leading-relaxed mb-3 flex items-start gap-2 shadow-sm">
+                <FiInfo className="mt-0.5 shrink-0" size={14} />
+                <p>
+                  <strong>Approval Required:</strong> The total booking amount exceeds your policy limit of <strong>₹{applicableLimit.toLocaleString("en-IN")}</strong>. You must select an approver to proceed with this booking.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
                 <FiUser size={13} className="text-[#0A203E]" />

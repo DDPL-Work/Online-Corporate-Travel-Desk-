@@ -2,6 +2,13 @@ const tboService = require("../services/tektravels/hotel.service");
 const zlib = require("zlib");
 const { promisify } = require("util");
 const gunzip = promisify(zlib.gunzip);
+const {
+  initiateDistributedSearch,
+} = require("../modules/search/search.orchestrator");
+const {
+  aggregateFinalResults,
+  waitForSearchCompletion,
+} = require("../modules/search/search.merge");
 const cacheService = require("../services/cache.service");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
@@ -17,8 +24,7 @@ const {
   applyHotelFilters,
   sortPreparedHotels,
 } = require("../utils/filterHotels");
-const { getConnections } = require("../config/redisConnections");
-const redis = getConnections().coordinator;
+const redis = require("../config/redis");
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -82,7 +88,10 @@ const buildDetailsLookup = (details = []) =>
     return lookup;
   }, {});
 
-const mergeSearchResultsWithStaticDetails = (searchResults = [], detailsMap = {}) =>
+const mergeSearchResultsWithStaticDetails = (
+  searchResults = [],
+  detailsMap = {},
+) =>
   deduplicateHotels(
     searchResults.map((hotel) => {
       const details = detailsMap[hotel.HotelCode];
@@ -103,7 +112,9 @@ const mergeSearchResultsWithStaticDetails = (searchResults = [], detailsMap = {}
     }),
   );
 
-const { handleSearchRequest } = require("../modules/searchCoordinator/coordinator.service");
+const {
+  handleSearchRequest,
+} = require("../modules/searchCoordinator/coordinator.service");
 
 const fetchFullHotelSearchDataset = async (searchPayload) => {
   const localHotels = await TBOHotel.find({ cityCode: searchPayload.CityCode })
@@ -111,73 +122,81 @@ const fetchFullHotelSearchDataset = async (searchPayload) => {
     .lean();
 
   if (!localHotels.length) {
-    logger.warn(`[hotel-search] No hotel codes found in DB for city ${searchPayload.CityCode}`);
-    return { searchId: null, status: 'completed', isCached: false, hotels: [], totalHotelCodes: 0 };
+    logger.warn(
+      `[hotel-search] No hotel codes found in DB for city ${searchPayload.CityCode}`,
+    );
+    return {
+      searchId: null,
+      status: "completed",
+      isCached: false,
+      hotels: [],
+      totalHotelCodes: 0,
+    };
   }
 
   const hotelCodes = localHotels
     .map((hotel) => String(hotel.hotelCode || "").trim())
     .filter(Boolean);
 
-  logger.info(`[hotel-search] Coordinator analyzing search for ${hotelCodes.length} codes...`);
-  
+  logger.info(
+    `[hotel-search] Coordinator analyzing search for ${hotelCodes.length} codes...`,
+  );
+
+  // Let the coordinator handle everything: Cache, Registry, Locks, Queues
   const searchResult = await handleSearchRequest(searchPayload, hotelCodes);
-  
-  if (searchResult.status === 'completed') {
-     return searchResult;
+
+  // If it's cached or completed instantly, return it
+  if (searchResult.status === "completed") {
+    return searchResult;
   }
 
-  // Promise.race: first chunk arriving OR 1-second timeout
-  const { searchId } = searchResult;
-  
-  const waitForFirstChunk = new Promise((resolve) => {
-    let resolved = false;
+  // Otherwise, it's either 'running' or 'pending' (someone else started it).
+  // We want to block and wait until at least ONE chunk has produced some hotels
+  // so the initial API response is never entirely empty.
+  let firstChunkHotels = [];
+  let isCompleted = false;
+  try {
+    const { searchId } = searchResult;
     let attempts = 0;
-    const maxAttempts = 10; // 10 * 100ms = 1 second
+    while (attempts < 240) {
+      // Wait up to 240 seconds (60 * 250ms)
+      const resultsMap = await redis.hvalsBuffer(`search:${searchId}:results`);
 
-    const poll = async () => {
-      if (resolved || attempts >= maxAttempts) {
-        resolve([]);
-        return;
-      }
-      attempts++;
-
-      try {
-        const resultsMap = await redis.hvalsBuffer(`search:${searchId}:results`);
-        if (resultsMap && resultsMap.length > 0) {
-          const hotels = [];
-          for (const buffer of resultsMap) {
-            try {
+      if (resultsMap && resultsMap.length > 0) {
+        // Decompress the first available chunk
+        for (const buffer of resultsMap) {
+          try {
             const decompressed = await gunzip(buffer);
             const chunkHotels = JSON.parse(decompressed.toString("utf-8"));
-            if (Array.isArray(chunkHotels)) {
-              for (let i = 0; i < chunkHotels.length; i += 1000) {
-                hotels.push.apply(hotels, chunkHotels.slice(i, i + 1000));
-              }
+            if (Array.isArray(chunkHotels) && chunkHotels.length > 0) {
+              firstChunkHotels.push(...chunkHotels);
             }
-            } catch (e) {}
-          }
-          if (hotels.length > 0) {
-            resolved = true;
-            resolve(hotels);
-            return;
-          }
+          } catch (e) {}
         }
-      } catch (e) {}
+      }
 
-      setTimeout(poll, 100);
-    };
-    poll();
-  });
+      const meta = await redis.hgetall(`search:registry:${searchId}`);
 
-  const timeout = new Promise((resolve) => setTimeout(() => resolve([]), 1000));
+      if (meta && meta.status === "completed") {
+        isCompleted = true;
+      }
 
-  const firstChunkHotels = await Promise.race([waitForFirstChunk, timeout]);
+      if (firstChunkHotels.length > 0 || isCompleted) {
+        break;
+      }
 
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      attempts++;
+    }
+  } catch (err) {
+    logger.warn(`[hotel-search] Error waiting for first chunk: ${err.message}`);
+  }
+
+  // Return the search result with whatever initial hotels we found
   return {
     ...searchResult,
     hotels: firstChunkHotels,
-    isStreaming: true
+    isStreaming: !isCompleted,
   };
 };
 
@@ -207,13 +226,15 @@ exports.getCountryList = asyncHandler(async (req, res) => {
     await Country.bulkWrite(bulkOps);
   }
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      data,
-      "Country list fetched and synced successfully",
-    ),
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        data,
+        "Country list fetched and synced successfully",
+      ),
+    );
 });
 
 exports.getCountriesFromDB = asyncHandler(async (req, res) => {
@@ -221,13 +242,15 @@ exports.getCountriesFromDB = asyncHandler(async (req, res) => {
     .sort({ Name: 1 })
     .select("Code Name -_id");
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      countries,
-      "Country list fetched from database successfully",
-    ),
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        countries,
+        "Country list fetched from database successfully",
+      ),
+    );
 });
 
 exports.getCityList = asyncHandler(async (req, res) => {
@@ -249,13 +272,15 @@ exports.getCityList = asyncHandler(async (req, res) => {
     .select("cityCode cityName countryCode countryName -_id")
     .sort({ cityName: 1 });
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      cities,
-      "City list fetched from database successfully",
-    ),
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        cities,
+        "City list fetched from database successfully",
+      ),
+    );
 });
 
 exports.getStaticHotelDetails = asyncHandler(async (req, res) => {
@@ -271,13 +296,15 @@ exports.getStaticHotelDetails = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Hotel details not found in database");
   }
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      hotel,
-      "Static hotel details fetched successfully from DB",
-    ),
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        hotel,
+        "Static hotel details fetched successfully from DB",
+      ),
+    );
 });
 
 exports.searchHotels = asyncHandler(async (req, res) => {
@@ -350,7 +377,9 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   let backgroundRefreshTriggered = false;
 
   if (!cacheHit) {
-    logger.info(`[hotel-search] CACHE MISS for key: ${cacheKey}. Fetching from TBO...`);
+    logger.info(
+      `[hotel-search] CACHE MISS for key: ${cacheKey}. Fetching from TBO...`,
+    );
     dataset = await fetchFullHotelSearchDataset(baseSearchPayload);
     // Increase TTL to 15 minutes (900s) to keep results alive longer
     await cacheService.setSearchResults(cacheKey, dataset, 900);
@@ -359,7 +388,8 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     backgroundRefreshTriggered = await cacheService.refreshInBackground({
       cacheKey,
       refreshFn: async () => {
-        const freshDataset = await fetchFullHotelSearchDataset(baseSearchPayload);
+        const freshDataset =
+          await fetchFullHotelSearchDataset(baseSearchPayload);
         await cacheService.setSearchResults(cacheKey, freshDataset);
       },
     });
@@ -368,7 +398,9 @@ exports.searchHotels = asyncHandler(async (req, res) => {
   const rawHotels = Array.isArray(dataset?.hotels) ? dataset.hotels : [];
   const total = rawHotels.length;
   const filterMeta = dataset?.filterMeta || null;
-  const failedChunks = Array.isArray(dataset?.searchMeta?.failedChunks) ? dataset.searchMeta.failedChunks : [];
+  const failedChunks = Array.isArray(dataset?.searchMeta?.failedChunks)
+    ? dataset.searchMeta.failedChunks
+    : [];
 
   return res.status(200).json(
     new ApiResponse(
@@ -395,13 +427,14 @@ exports.searchHotels = asyncHandler(async (req, res) => {
           cacheHit,
           backgroundRefreshTriggered,
           totalHotelCodes: dataset?.totalHotelCodes || 0,
-          totalChunks: dataset?.totalChunks || dataset?.searchMeta?.totalChunks || 0,
+          totalChunks:
+            dataset?.totalChunks || dataset?.searchMeta?.totalChunks || 0,
           failedChunkCount: dataset?.searchMeta?.failedChunkCount || 0,
           partialResults: dataset?.searchMeta?.partialResults || false,
           elapsedMs: dataset?.searchMeta?.elapsedMs || 0,
         },
       },
-      "Hotel search initiated. Listen on WebSocket for streaming results."
-    )
+      "Hotel search initiated. Listen on WebSocket for streaming results.",
+    ),
   );
 });

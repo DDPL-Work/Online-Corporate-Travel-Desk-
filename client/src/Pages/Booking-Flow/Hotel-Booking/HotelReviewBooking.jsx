@@ -1296,6 +1296,8 @@ const HotelReviewBooking = () => {
                 onChange={setProjectApproverData}
                 errors={formErrors}
                 approvalRequired={approvalRequired}
+                isOverLimit={isOverLimit}
+                applicableLimit={applicableLimit}
               />
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-md shadow-black/20 overflow-hidden">

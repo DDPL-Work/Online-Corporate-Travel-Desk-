@@ -103,7 +103,7 @@ const Divider = () => (
   <div className="hidden md:block w-px self-stretch bg-gray-200 my-2 shrink-0" />
 );
 
-const Header = () => {
+const Header = ({ onSearch }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -249,6 +249,7 @@ const Header = () => {
       Filters: { Refundable: true, MealType: "All" },
       ResponseTime: 23,
     };
+    if (onSearch) onSearch();
     dispatch(setSearchPayload(payload));
   };
 

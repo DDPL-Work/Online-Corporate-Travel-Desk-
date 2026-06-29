@@ -656,7 +656,7 @@ export default function PendingTravelRequests() {
       <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
         {/* Tab Switcher */}
         <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit max-w-full overflow-x-auto">
-           {[["flight", "Pending Flights", FaPlane], ["hotel", "Pending Hotels", FaHotel]].map(([k, lbl, Icon]) => (
+           {[["flight", "Flight Requests", FaPlane], ["hotel", "Hotel Requests", FaHotel]].map(([k, lbl, Icon]) => (
              <button 
                 key={k} 
                 onClick={() => setActiveTab(k)} 

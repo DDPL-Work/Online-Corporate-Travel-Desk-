@@ -1328,7 +1328,7 @@ export default function MultiCityFlightBooking() {
           {/* RIGHT */}
           <div className="space-y-6">
             <div className="sticky top-6 space-y-6">
-              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} />
+              <ProjectApproverBlock onChange={setProjectApproverData} approvalRequired={approvalRequired} isOverLimit={isOverLimit} applicableLimit={applicableLimit} />
               <PriceSummary
                 parsedFlightData={{
                   ...parsedFlightData,
