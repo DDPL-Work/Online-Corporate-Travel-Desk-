@@ -1,4 +1,5 @@
-const redis = require("../config/redis");
+const { getConnections } = require("../config/redisConnections");
+const redis = getConnections().cache;
 const logger = require("../utils/logger");
 
 const DEFAULT_SEARCH_CACHE_TTL_SECONDS = 900;

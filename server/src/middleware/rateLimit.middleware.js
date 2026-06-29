@@ -2,7 +2,8 @@
 const rateLimit = require("express-rate-limit");
 const { RateLimiterRedis } = require("rate-limiter-flexible");
 const config = require("../config");
-const redis = require("../config/redis");
+const { getConnections } = require("../config/redisConnections");
+const redis = getConnections().rateLimit;
 const logger = require("../utils/logger");
 
 /* ─────────────────────────────────────────────

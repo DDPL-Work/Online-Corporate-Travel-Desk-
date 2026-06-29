@@ -1,13 +1,12 @@
 const Queue = require("bull");
+const { getConnections } = require("../config/redisConnections");
 
-const redisConfig = {
-  host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT),
-  password: process.env.REDIS_PASSWORD || undefined,
-};
-
+/**
+ * Legacy Bull email queue.
+ * Now routes through the centralized Redis connection pool.
+ */
 const emailQueue = new Queue("email", {
-  redis: redisConfig,
+  redis: { connection: getConnections().general },
 });
 
 emailQueue.on("error", (err) => {

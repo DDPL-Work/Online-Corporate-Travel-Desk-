@@ -3,7 +3,8 @@ const stringify = require("fast-json-stable-stringify");
 const BookingIntent = require("../../models/BookingIntent");
 const BookingRequest = require("../../models/BookingRequest");
 const Corporate = require("../../models/Corporate");
-const redis = require("../../config/redis");
+const { getConnections } = require("../../config/redisConnections");
+const redis = getConnections().general;
 const ApiError = require("../../utils/ApiError");
 const logger = require("../../utils/logger");
 const {
