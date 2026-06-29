@@ -69,10 +69,12 @@ const getVoucherDate = (b) => {
 };
 
 function BookingHistory({ booking }) {
+  const tboStatus = booking?.bookedHotelDetails?.GetBookingDetailResult?.HotelBookingStatus || booking?.bookedHotelDetails?.HotelBookingStatus;
+  const isAmendmentCancellation = booking?.amendment?.status && booking.amendment.status !== "not_requested";
   const isCancelled =
     ["cancelled", "cancel_requested"].includes(
       (booking.executionStatus || "").toLowerCase(),
-    ) || !!booking.cancellation;
+    ) || !!booking.cancellation || isAmendmentCancellation || tboStatus === "Cancelled";
   const isConfirmed =
     ["voucher_generated", "confirmed", "booked"].includes(
       (booking.executionStatus || "").toLowerCase(),
@@ -134,10 +136,12 @@ function BookingHistory({ booking }) {
     },
     {
       label: "Cancellation",
-      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
-      desc: isCancelled
-        ? "Booking has been cancelled"
-        : "No cancellation requested",
+      date: booking.cancelledAt || booking?.amendment?.requestedAt || (isCancelled ? booking.updatedAt : null),
+      desc: isCancelled ? (
+        <div>
+          <div>Booking has been cancelled</div>
+        </div>
+      ) : "No cancellation requested",
       icon: <FiXCircle size={14} />,
       active: isCancelled,
       isLast: true,
@@ -203,9 +207,9 @@ function BookingHistory({ booking }) {
                     </span>
                   )}
                 </div>
-                <p className="text-[13px] text-[#7A7068] leading-relaxed font-medium">
+                <div className="text-[13px] text-[#7A7068] leading-relaxed font-medium">
                   {step.desc}
-                </p>
+                </div>
               </div>
             </div>
           ))}
@@ -249,7 +253,7 @@ function nightsCount(ci, co) {
 function StatusPill({ status }) {
   const s = (status || "").toLowerCase();
   const labelMap = {
-    voucher_generated: "Confirmed",
+    voucher_generated: "Voucher Generated",
     booked: "Booked",
     confirmed: "Confirmed",
     cancelled: "Cancelled",
@@ -413,9 +417,11 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
     "";
   const tboRef = detail?.TBOReferenceNo || "";
   const executionStatus = booking?.executionStatus || "";
+  const bookingAmendmentStatus = booking?.amendment?.status || "";
+  const tboStatus = booking?.bookedHotelDetails?.GetBookingDetailResult?.HotelBookingStatus || booking?.bookedHotelDetails?.HotelBookingStatus;
   const isCancelled = ["cancelled", "cancel_requested"].includes(
     (executionStatus || "").toLowerCase(),
-  );
+  ) || (bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested") || tboStatus === "Cancelled";
 
   const issuedDate = booking?.approvedAt || booking?.createdAt;
 
@@ -496,14 +502,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
             )}
             {executionStatus && (
               <div className="mt-[10px] flex items-center gap-2 flex-wrap">
-                <StatusPill status={executionStatus} />
-                {booking?.amendment?.status &&
-                  booking.amendment.status !== "completed" &&
-                  booking.amendment.status !== "not_requested" && (
-                    <StatusPill
-                      status={`amendment_${booking.amendment.status}`}
-                    />
-                  )}
+                <StatusPill status={isCancelled ? "cancelled" : executionStatus} />
               </div>
             )}
           </div>
@@ -2459,9 +2458,10 @@ export default function HotelBookingDetails() {
     executionStatus === "voucher_generated" ||
     executionStatus === "confirmed" ||
     executionStatus === "booked";
+  const tboStatus = booking?.bookedHotelDetails?.GetBookingDetailResult?.HotelBookingStatus || booking?.bookedHotelDetails?.HotelBookingStatus;
   const isCancelled = ["cancelled", "cancel_requested"].includes(
     executionStatus.toLowerCase(),
-  );
+  ) || (bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested") || tboStatus === "Cancelled";
   const isAmendmentPending =
     bookingAmendmentStatus === "requested" ||
     bookingAmendmentStatus === "in_progress";
@@ -2501,14 +2501,7 @@ export default function HotelBookingDetails() {
             {/* Status pills — hidden on xs, visible sm+ */}
             {executionStatus && (
               <div className="hidden sm:flex items-center gap-2">
-                <StatusPill status={executionStatus} />
-                {bookingAmendmentStatus &&
-                  bookingAmendmentStatus !== "not_requested" &&
-                  bookingAmendmentStatus !== "completed" && (
-                    <StatusPill
-                      status={`amendment_${bookingAmendmentStatus}`}
-                    />
-                  )}
+                <StatusPill status={isCancelled ? "cancelled" : executionStatus} />
               </div>
             )}
             {/* Order ID — hidden on mobile */}
@@ -2520,12 +2513,8 @@ export default function HotelBookingDetails() {
                 </strong>
               </span>
             )}
-            {/* Download voucher — icon-only on mobile */}
             {isConfirmed && !isCancelled && (
               <div className="flex items-center gap-2">
-                <span className="hidden sm:flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#2C7A4B] bg-[#EDF7F2] border border-[#C3E4D2] px-[12px] py-1">
-                  <MdVerifiedUser size={11} /> Voucher Issued
-                </span>
                 <button
                   onClick={() => dispatch(generateHotelVoucher(booking._id))}
                   className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[10px] sm:px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
@@ -2589,14 +2578,7 @@ export default function HotelBookingDetails() {
                   {/* Status pills row on mobile */}
                   {executionStatus && (
                     <div className="flex items-center gap-2 flex-wrap px-4 pt-3 pb-2 border-b border-[#EAE4D9]">
-                      <StatusPill status={executionStatus} />
-                      {bookingAmendmentStatus &&
-                        bookingAmendmentStatus !== "not_requested" &&
-                        bookingAmendmentStatus !== "completed" && (
-                          <StatusPill
-                            status={`amendment_${bookingAmendmentStatus}`}
-                          />
-                        )}
+                      <StatusPill status={isCancelled ? "cancelled" : executionStatus} />
                       {(booking.orderId || booking.bookingReference) && (
                         <span className="text-[11px] text-[#A89F94] ml-auto">
                           <strong className="text-[#1A1714] font-['DM_Mono']">

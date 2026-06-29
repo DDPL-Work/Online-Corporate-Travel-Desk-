@@ -56,6 +56,13 @@ const FilterSidebar = ({
     loading: searching,
     clearResults
   } = useLocationIntelligence(cityName);
+
+  useEffect(() => {
+    if (!filters?.location) {
+      setLocationQuery("");
+    }
+  }, [filters?.location, setLocationQuery]);
+
   const [expandedSections, setExpandedSections] = useState({
     search: true,
     price: true,

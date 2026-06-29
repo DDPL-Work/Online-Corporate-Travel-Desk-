@@ -244,7 +244,6 @@ exports.getCancelledHotelBookingsAdmin = async (req, res) => {
       corporateId,
       requestStatus: "approved",
 
-      // ✅ CORRECT LOGIC (BASED ON YOUR DB)
       $or: [
         {
           executionStatus: {
@@ -256,15 +255,26 @@ exports.getCancelledHotelBookingsAdmin = async (req, res) => {
         },
       ],
     })
+      .select("orderId bookingReference userId bookingSnapshot hotelRequest.purposeOfTravel hotelRequest.selectedHotel executionStatus amendment pricingSnapshot.totalAmount createdAt")
       .populate("userId", "name email")
-      .populate("approvedBy", "name email role")
-      .populate("approverId", "name email role")
       .sort({ createdAt: -1 })
       .lean();
 
     const formattedBookings = bookings.map((b) => ({
-      ...b,
-      orderId: b.orderId || "N/A",
+      _id: b._id,
+      orderId: b.orderId || b.bookingReference || "N/A",
+      userId: b.userId,
+      executionStatus: b.executionStatus,
+      amendment: b.amendment,
+      pricingSnapshot: b.pricingSnapshot,
+      createdAt: b.createdAt,
+      hotelRequest: {
+        purposeOfTravel: b.hotelRequest?.purposeOfTravel || "",
+        selectedHotel: {
+          hotelName: b.bookingSnapshot?.hotelName || "Unknown Hotel",
+          city: b.bookingSnapshot?.city || ""
+        }
+      }
     }));
 
     return res.status(200).json({

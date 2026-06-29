@@ -134,6 +134,7 @@ const fetchFullHotelSearchDataset = async (searchPayload) => {
   // We want to block and wait until at least ONE chunk has produced some hotels
   // so the initial API response is never entirely empty.
   let firstChunkHotels = [];
+  let isCompleted = false;
   try {
     const { searchId } = searchResult;
     let attempts = 0;
@@ -155,7 +156,11 @@ const fetchFullHotelSearchDataset = async (searchPayload) => {
 
       const meta = await redis.hgetall(`search:registry:${searchId}`);
 
-      if (firstChunkHotels.length > 0 || meta.status === 'completed') {
+      if (meta && meta.status === 'completed') {
+        isCompleted = true;
+      }
+
+      if (firstChunkHotels.length > 0 || isCompleted) {
         break;
       }
       
@@ -170,7 +175,7 @@ const fetchFullHotelSearchDataset = async (searchPayload) => {
   return {
     ...searchResult,
     hotels: firstChunkHotels,
-    isStreaming: true
+    isStreaming: !isCompleted
   };
 };
 
