@@ -2409,37 +2409,49 @@ export default function BookingDetails() {
 
                   if (Array.isArray(raw)) {
                     raw.forEach((item) => {
-                      const info = item.response?.Response?.TicketCRInfo?.[0];
-                      if (info) {
+                      const ticketInfos = item.response?.Response?.TicketCRInfo || [];
+                      ticketInfos.forEach((info) => {
                         totalRefund += Number(info.RefundedAmount || 0);
                         totalCharge += Number(info.CancellationCharge || 0);
-                        if (info.CreditNoteNo && info.CreditNoteNo !== "—")
+                        if (info.CreditNoteNo && info.CreditNoteNo !== "—" && !creditNotes.includes(info.CreditNoteNo))
                           creditNotes.push(info.CreditNoteNo);
-                        if (info.Remarks && info.Remarks !== "Successful")
+                        if (info.Remarks && info.Remarks !== "Successful" && !providerRemarks.includes(info.Remarks))
                           providerRemarks.push(info.Remarks);
                         sectorBreakdown.push({
-                          label: getSectorLabel(item.bookingId),
+                          label: `${getSectorLabel(item.bookingId)}${info.PaxId ? ` (Pax ID: ${info.PaxId})` : (info.ChangeRequestId ? ` (Req: ${info.ChangeRequestId})` : '')}`,
                           refund: info.RefundedAmount,
                           charge: info.CancellationCharge,
                           creditNote: info.CreditNoteNo,
                           remarks: info.Remarks,
                         });
-                      }
+                      });
                     });
                   } else {
-                    const info = raw?.Response?.TicketCRInfo?.[0];
-                    totalRefund = Number(
-                      info?.RefundedAmount ||
-                        booking.amendment?.refundedAmount ||
-                        0,
-                    );
-                    totalCharge = Number(
-                      info?.CancellationCharge ||
-                        booking.amendment?.cancellationCharge ||
-                        0,
-                    );
-                    if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
-                    if (info?.Remarks) providerRemarks.push(info.Remarks);
+                    const ticketInfos = raw?.Response?.TicketCRInfo || [];
+                    if (ticketInfos.length > 0) {
+                      ticketInfos.forEach((info) => {
+                        totalRefund += Number(info.RefundedAmount || 0);
+                        totalCharge += Number(info.CancellationCharge || 0);
+                        if (info.CreditNoteNo && info.CreditNoteNo !== "—" && !creditNotes.includes(info.CreditNoteNo))
+                          creditNotes.push(info.CreditNoteNo);
+                        if (info.Remarks && info.Remarks !== "Successful" && !providerRemarks.includes(info.Remarks))
+                          providerRemarks.push(info.Remarks);
+                        sectorBreakdown.push({
+                          label: `Booking Segment${info.PaxId ? ` (Pax ID: ${info.PaxId})` : (info.ChangeRequestId ? ` (Req: ${info.ChangeRequestId})` : '')}`,
+                          refund: info.RefundedAmount,
+                          charge: info.CancellationCharge,
+                          creditNote: info.CreditNoteNo,
+                          remarks: info.Remarks,
+                        });
+                      });
+                    } else {
+                      totalRefund = Number(
+                        booking.amendment?.refundedAmount || 0,
+                      );
+                      totalCharge = Number(
+                        booking.amendment?.cancellationCharge || 0,
+                      );
+                    }
                   }
 
                   const displayRefund =
@@ -2575,7 +2587,7 @@ export default function BookingDetails() {
                       )}
 
                       {/* Sector breakdown */}
-                      {sectorBreakdown.length > 1 && (
+                      {sectorBreakdown.length > 0 && (
                         <div className="p-6 border-b border-[#EAE4D9] bg-[#FAF8F4]">
                           <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A] mb-4">
                             Per-Sector Breakdown
