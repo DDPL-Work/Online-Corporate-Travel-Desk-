@@ -2637,6 +2637,82 @@ export default function BookingDetails() {
                         </div>
                       )}
 
+                      {/* Passenger Cancellation Status */}
+                      {travellers.length > 0 && (isCancelled || (booking.amendment?.status && booking.amendment?.status !== "not_requested")) && (
+                          <div className="p-6 border-b border-[#EAE4D9]">
+                            <h3 className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714] mb-4">Passenger Cancellation Status</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-[#FAF8F4] border-b border-[#EAE4D9] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                                            <th className="px-4 py-3">Passenger</th>
+                                            <th className="px-4 py-3">Ticket No</th>
+                                            <th className="px-4 py-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#EAE4D9]">
+                                    {travellers.map((trav, idx) => {
+                                        const onwardPassengers = bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger || [];
+                                        const returnPassengers = bookingResult?.returnResponse?.Response?.Response?.FlightItinerary?.Passenger || [];
+                                        const singleTripPassengers = bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger || [];
+                                        
+                                        const isRoundTripBooking = onwardPassengers.length > 0 || returnPassengers.length > 0;
+                                        const resolvedOnwardPax = isRoundTripBooking ? onwardPassengers : singleTripPassengers;
+                                        const resolvedReturnPax = isRoundTripBooking ? returnPassengers : [];
+                                        
+                                        const tickets = [];
+                                        
+                                        const onwardPaxInfo = resolvedOnwardPax[idx];
+                                        if (onwardPaxInfo) {
+                                            let status = onwardPaxInfo?.Ticket?.Status || "—";
+                                            if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
+                                                status = "CANCELLED";
+                                            }
+                                            tickets.push({ no: onwardPaxInfo?.Ticket?.TicketNumber || "—", status });
+                                        }
+                                        
+                                        const returnPaxInfo = resolvedReturnPax[idx];
+                                        if (returnPaxInfo) {
+                                            let status = returnPaxInfo?.Ticket?.Status || "—";
+                                            if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
+                                                status = "CANCELLED";
+                                            }
+                                            const ticketNo = returnPaxInfo?.Ticket?.TicketNumber || "—";
+                                            if (ticketNo !== "—" && !tickets.find(t => t.no === ticketNo)) {
+                                                tickets.push({ no: ticketNo, status });
+                                            }
+                                        }
+
+                                        if (tickets.length === 0) {
+                                            tickets.push({ no: "—", status: "—" });
+                                        }
+                                        
+                                        return (
+                                            <tr key={idx}>
+                                                <td className="px-4 py-3 text-[13px] font-semibold text-[#1A1714] align-top">{trav.title} {trav.firstName} {trav.lastName}</td>
+                                                <td className="px-4 py-3 text-[12px] text-[#7A7068] font-mono align-top">
+                                                    <div className="space-y-2">
+                                                        {tickets.map((t, i) => <div key={i}>{t.no}</div>)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <div className="space-y-2">
+                                                        {tickets.map((t, i) => (
+                                                            <div key={i}>
+                                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 ${t.status.toUpperCase() === 'CANCELLED' ? 'bg-[#FDF1EE] text-[#B5341A]' : 'bg-[#EDF7F2] text-[#2C7A4B]'}`}>{t.status}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    </tbody>
+                                </table>
+                            </div>
+                          </div>
+                      )}
+
                       {/* Reissue action - hide if reissue is in progress or completed */}
                       {!hasReissue && !isCancelled && (
                         <div className="px-6 py-4 flex gap-3 flex-wrap">
