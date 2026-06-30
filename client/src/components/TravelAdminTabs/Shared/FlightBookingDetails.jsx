@@ -2223,28 +2223,62 @@ export default function FlightBookingDetails() {
                                </tr>
                            </thead>
                            <tbody className="divide-y divide-[#EAE4D9]">
-                               {travellers.map((trav, idx) => {
-                                   const onwardPassengers = safeGet(bookingResult, "onwardResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
-                                   const singleTripPassengers = safeGet(bookingResult, "providerResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
-                                   const isRoundTripBooking = onwardPassengers.length > 0;
-                                   const resolvedPax = isRoundTripBooking ? onwardPassengers : singleTripPassengers;
-                                   const paxInfo = resolvedPax[idx];
-                                   const ticketNo = paxInfo?.Ticket?.TicketNumber || "—";
-                                   let status = paxInfo?.Ticket?.Status || "—";
+                           {travellers.map((trav, idx) => {
+                               const onwardPassengers = safeGet(bookingResult, "onwardResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
+                               const returnPassengers = safeGet(bookingResult, "returnResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
+                               const singleTripPassengers = safeGet(bookingResult, "providerResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
+                               
+                               const isRoundTripBooking = onwardPassengers.length > 0 || returnPassengers.length > 0;
+                               const resolvedOnwardPax = isRoundTripBooking ? onwardPassengers : singleTripPassengers;
+                               const resolvedReturnPax = isRoundTripBooking ? returnPassengers : [];
+                               
+                               const tickets = [];
+                               
+                               const onwardPaxInfo = resolvedOnwardPax[idx];
+                               if (onwardPaxInfo) {
+                                   let status = onwardPaxInfo?.Ticket?.Status || "—";
                                    if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
                                        status = "CANCELLED";
                                    }
-                                   
-                                   return (
-                                       <tr key={idx}>
-                                           <td className="px-4 py-3 text-[13px] font-semibold text-[#1A1714]">{trav.title} {trav.firstName} {trav.lastName}</td>
-                                           <td className="px-4 py-3 text-[12px] text-[#7A7068] font-mono">{ticketNo}</td>
-                                           <td className="px-4 py-3">
-                                               <span className={`text-[10px] font-bold uppercase px-2 py-1 ${status.toUpperCase() === 'CANCELLED' ? 'bg-[#FDF1EE] text-[#B5341A]' : 'bg-[#EDF7F2] text-[#2C7A4B]'}`}>{status}</span>
-                                           </td>
-                                       </tr>
-                                   );
-                               })}
+                                   tickets.push({ no: onwardPaxInfo?.Ticket?.TicketNumber || "—", status });
+                               }
+                               
+                               const returnPaxInfo = resolvedReturnPax[idx];
+                               if (returnPaxInfo) {
+                                   let status = returnPaxInfo?.Ticket?.Status || "—";
+                                   if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
+                                       status = "CANCELLED";
+                                   }
+                                   const ticketNo = returnPaxInfo?.Ticket?.TicketNumber || "—";
+                                   if (ticketNo !== "—" && !tickets.find(t => t.no === ticketNo)) {
+                                       tickets.push({ no: ticketNo, status });
+                                   }
+                               }
+
+                               if (tickets.length === 0) {
+                                   tickets.push({ no: "—", status: "—" });
+                               }
+                               
+                               return (
+                                   <tr key={idx}>
+                                       <td className="px-4 py-3 text-[13px] font-semibold text-[#1A1714] align-top">{trav.title} {trav.firstName} {trav.lastName}</td>
+                                       <td className="px-4 py-3 text-[12px] text-[#7A7068] font-mono align-top">
+                                           <div className="space-y-2">
+                                               {tickets.map((t, i) => <div key={i}>{t.no}</div>)}
+                                           </div>
+                                       </td>
+                                       <td className="px-4 py-3 align-top">
+                                           <div className="space-y-2">
+                                               {tickets.map((t, i) => (
+                                                   <div key={i}>
+                                                       <span className={`text-[10px] font-bold uppercase px-2 py-1 ${t.status.toUpperCase() === 'CANCELLED' ? 'bg-[#FDF1EE] text-[#B5341A]' : 'bg-[#EDF7F2] text-[#2C7A4B]'}`}>{t.status}</span>
+                                                   </div>
+                                               ))}
+                                           </div>
+                                       </td>
+                                   </tr>
+                               );
+                           })}
                            </tbody>
                        </table>
                    </div>
