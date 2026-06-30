@@ -106,12 +106,14 @@ const mergeSearchResultsWithStaticDetails = (searchResults = [], detailsMap = {}
 const { handleSearchRequest } = require("../modules/searchCoordinator/coordinator.service");
 
 const fetchFullHotelSearchDataset = async (searchPayload) => {
-  const localHotels = await TBOHotel.find({ cityCode: searchPayload.CityCode })
+  const cityCodes = String(searchPayload.CityCode).split(",").map(c => c.trim()).filter(Boolean);
+
+  const localHotels = await TBOHotel.find({ cityCode: { $in: cityCodes } })
     .select("hotelCode")
     .lean();
 
   if (!localHotels.length) {
-    logger.warn(`[hotel-search] No hotel codes found in DB for city ${searchPayload.CityCode}`);
+    logger.warn(`[hotel-search] No hotel codes found in DB for cities: ${cityCodes.join(", ")}`);
     return { searchId: null, status: 'completed', isCached: false, hotels: [], totalHotelCodes: 0 };
   }
 
@@ -321,7 +323,8 @@ exports.searchHotels = asyncHandler(async (req, res) => {
     throw new ApiError(400, "NoOfRooms must match PaxRooms length");
   }
 
-  const cityRecord = await TBOCity.findOne({ cityCode: CityCode }).lean();
+  const primaryCityCode = String(CityCode).split(",")[0].trim();
+  const cityRecord = await TBOCity.findOne({ cityCode: primaryCityCode }).lean();
 
   const baseSearchPayload = {
     CheckIn,

@@ -1217,8 +1217,8 @@ const getTicketDate = (b) => {
 };
 
 function BookingHistory({ booking }) {
-  const isCancelled = booking.executionStatus === "cancelled" || !!booking.cancellation;
-  const isTicketed = booking.executionStatus === "ticketed" || (isCancelled && !!booking.bookingResult?.pnr);
+  const isCancelled = ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase()) || !!booking.cancellation;
+  const isTicketed = booking.executionStatus === "ticketed" || !!booking.bookingResult?.pnr;
 
   const steps = [
     {
@@ -1319,7 +1319,7 @@ function BookingHistory({ booking }) {
                   }`}>
                     {step.label}
                   </p>
-                  {step.date && (
+                  {step.date && step.active && (
                     <span className="text-[10px] font-semibold text-[#B5862A] border border-[#EAE4D9] bg-[#FAF8F4] px-2 py-[2px] tracking-wide">
                       {formatDate(step.date)} · {formatTime(step.date)}
                     </span>
@@ -1696,17 +1696,23 @@ export default function FlightBookingDetails() {
                   className={`flex items-center gap-[6px] text-[15px] font-semibold ${
                     executionStatus === "ticketed" || executionStatus === "confirmed"
                       ? "text-[#2C7A4B]"
+                      : executionStatus === "cancelled" || executionStatus === "cancel_requested"
+                      ? "text-[#B5341A]"
                       : "text-[#8A6200]"
                   }`}
                 >
                   {executionStatus === "ticketed" || executionStatus === "confirmed" ? (
                     <FiCheckCircle size={13} />
+                  ) : executionStatus === "cancelled" || executionStatus === "cancel_requested" ? (
+                    <FiXCircle size={13} />
                   ) : (
                     <FiRefreshCw size={13} className="animate-spin" />
                   )}
                   <span>
                     {executionStatus === "ticketed" || executionStatus === "confirmed"
                       ? "Issued"
+                      : executionStatus === "cancelled" || executionStatus === "cancel_requested"
+                      ? "Cancelled"
                       : "Processing…"}
                   </span>
                 </div>
@@ -1816,7 +1822,7 @@ export default function FlightBookingDetails() {
                           resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
                         const returnTicket =
                           resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
-
+                        
                       return (
                         <tr key={trav._id || idx} className="hover:bg-[#FAF8F4] transition-colors">
                           {/* Name Column */}
@@ -1947,11 +1953,14 @@ export default function FlightBookingDetails() {
 
         {activeTab === "cancellation" && (
           <div className="space-y-6">
-            
             <FareRulesSection bookingResult={bookingResult} fareSnapshot={fareSnapshot} booking={booking} />
-            
+          </div>
+        )}
+
+        {activeTab === "amendment" && (
+          <div className="space-y-8">
             {/* Cancellation Details */}
-            {isCancelled &&
+            {!hasReissue && (isCancelled || (bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested")) &&
               (() => {
                 const raw = booking.amendment?.response || booking.amendment?.raw;
                 let totalRefund = 0;
@@ -2159,7 +2168,7 @@ export default function FlightBookingDetails() {
                     )}
 
                     {/* Remarks Section */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                    <div className="bg-white border border-gray-200 shadow-sm p-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
@@ -2200,148 +2209,47 @@ export default function FlightBookingDetails() {
                   </div>
                 );
               })()}
-          </div>
-        )}
-
-        {activeTab === "amendment" && (
-          <div className="space-y-8">
-            {/* Cancellation / Amendment Response — shown when cancelled or amendment requested */}
-            {!hasReissue && (isCancelled || (bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested")) && (() => {
-              const raw = booking.amendment?.response || booking.amendment?.raw;
-              let totalRefund = 0;
-              let totalCharge = 0;
-              let creditNotes = [];
-              let providerRemarks = [];
-              const sectorBreakdown = [];
-
-              const onwardBookingId =
-                booking.bookingResult?.onwardResponse?.Response?.Response?.BookingId ||
-                booking.bookingResult?.providerResponse?.Response?.Response?.BookingId;
-              const returnBookingId =
-                booking.bookingResult?.returnResponse?.Response?.Response?.BookingId;
-
-              const getSectorLabel = (bId) => {
-                if (bId && bId === onwardBookingId) {
-                  const segs = booking.flightRequest?.segments?.filter((s) => s.journeyType === "onward") || [];
-                  return segs.length > 0 ? `Onward: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}` : "Onward Journey";
-                }
-                if (bId && bId === returnBookingId) {
-                  const segs = booking.flightRequest?.segments?.filter((s) => s.journeyType === "return") || [];
-                  return segs.length > 0 ? `Return: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}` : "Return Journey";
-                }
-                return "Booking Segment";
-              };
-
-              if (Array.isArray(raw)) {
-                raw.forEach((item) => {
-                  const info = item.response?.Response?.TicketCRInfo?.[0];
-                  if (info) {
-                    totalRefund += Number(info.RefundedAmount || 0);
-                    totalCharge += Number(info.CancellationCharge || 0);
-                    if (info.CreditNoteNo && info.CreditNoteNo !== "—") creditNotes.push(info.CreditNoteNo);
-                    if (info.Remarks && info.Remarks !== "Successful") providerRemarks.push(info.Remarks);
-                    sectorBreakdown.push({ label: getSectorLabel(item.bookingId), refund: info.RefundedAmount, charge: info.CancellationCharge, creditNote: info.CreditNoteNo, remarks: info.Remarks });
-                  }
-                });
-              } else {
-                const info = raw?.Response?.TicketCRInfo?.[0];
-                totalRefund = Number(info?.RefundedAmount || booking.amendment?.refundedAmount || 0);
-                totalCharge = Number(info?.CancellationCharge || booking.amendment?.cancellationCharge || 0);
-                if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
-                if (info?.Remarks) providerRemarks.push(info.Remarks);
-              }
-
-              const displayRefund = totalRefund || booking.amendment?.refundedAmount || "—";
-              const displayCharge = totalCharge || booking.amendment?.cancellationCharge || "—";
-              const displayCreditNote = creditNotes.length > 0 ? creditNotes.join(", ") : "—";
-              const displayRemarks = providerRemarks.length > 0 ? providerRemarks.join(" | ") : Array.isArray(raw) ? "Successful" : "";
-
-              const amendStatus = booking.amendment?.status || (isCancelled ? "cancelled" : "");
-              const statusLabel = { requested: "Pending", in_progress: "In Progress", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled" }[amendStatus] || amendStatus;
-              const statusColor = { requested: "text-[#8A6200] bg-[#FDF8EE] border-[#F0E0A8]", in_progress: "text-[#1A4A7A] bg-[#EEF4FD] border-[#C0D4F0]", approved: "text-[#2C7A4B] bg-[#EDF7F2] border-[#C3E4D2]", rejected: "text-[#B5341A] bg-[#FDF1EE] border-[#F0C4BA]", cancelled: "text-[#B5341A] bg-[#FDF1EE] border-[#F0C4BA]" }[amendStatus] || "text-[#1A1714] bg-[#FAF8F4] border-[#EAE4D9]";
-
-              return (
-                <div className="bg-white border border-[#EAE4D9] overflow-hidden">
-                  {/* Status header */}
-                  <div className="px-6 py-4 border-b border-[#EAE4D9] flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#A89F94]">{hasReissue ? "Reissue Status" : "Cancellation Status"}</div>
-                      {statusLabel && (
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold tracking-[0.12em] uppercase border ${statusColor}`}>
-                          {statusLabel}
-                        </span>
-                      )}
-                    </div>
-                    {(booking.updatedAt || booking.amendment?.requestedAt) && (
-                      <div className="text-[11px] text-[#A89F94]">
-                        {new Date(booking.updatedAt || booking.amendment?.requestedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Financial summary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[#EAE4D9] border-b border-[#EAE4D9]">
-                    <div className="px-6 py-5">
-                      <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">Total Refund</div>
-                      <div className="text-[18px] font-bold text-[#2C7A4B]">{displayRefund !== "—" ? `₹${Number(displayRefund).toLocaleString("en-IN")}` : "—"}</div>
-                    </div>
-                    <div className="px-6 py-5">
-                      <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">{hasReissue ? "Reissue Charges" : "Cancellation Charges"}</div>
-                      <div className="text-[18px] font-bold text-[#B5341A]">{displayCharge !== "—" ? `₹${Number(displayCharge).toLocaleString("en-IN")}` : "—"}</div>
-                    </div>
-                    <div className="px-6 py-5">
-                      <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">Credit Note(s)</div>
-                      <div className="text-[14px] font-semibold text-[#1A1714] font-['DM_Mono']">{displayCreditNote}</div>
-                    </div>
-                    <div className="px-6 py-5">
-                      <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">{hasReissue ? "Reissue Reason" : "Cancellation Reason"}</div>
-                      <div className="text-[13px] font-medium text-[#1A1714] italic">"{booking.cancellation?.reason || booking.amendment?.remarks || "User Requested"}"</div>
-                    </div>
-                  </div>
-
-                  {/* Provider remarks */}
-                  {displayRemarks && (
-                    <div className="px-6 py-4 bg-[#EEF4FD] border-b border-[#C0D4F0] flex items-start gap-3">
-                      <FiInfo size={13} className="text-[#1A4A7A] shrink-0 mt-0.5" />
-                      <p className="text-[12px] text-[#1A4A7A] font-medium">{displayRemarks}</p>
-                    </div>
-                  )}
-
-                  {/* Sector breakdown */}
-                  {sectorBreakdown.length > 1 && (
-                    <div className="p-6 border-b border-[#EAE4D9] bg-[#FAF8F4]">
-                      <div className="text-[9px] font-bold tracking-[0.18em] uppercase text-[#B5862A] mb-4">Per-Sector Breakdown</div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sectorBreakdown.map((sector, idx) => (
-                          <div key={idx} className="bg-white border border-[#EAE4D9] p-5">
-                            <p className="text-[10px] font-bold text-[#1A1714] uppercase tracking-wider mb-4 flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#A89F94]" />
-                              {sector.label}
-                            </p>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">Refund</div>
-                                <div className="text-[14px] font-bold text-[#2C7A4B]">₹{sector.refund || "0"}</div>
-                              </div>
-                              <div>
-                                <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">Charges</div>
-                                <div className="text-[14px] font-bold text-[#B5341A]">₹{sector.charge || "0"}</div>
-                              </div>
-                              {sector.creditNote && sector.creditNote !== "—" && (
-                                <div className="col-span-2">
-                                  <div className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-1">Credit Note</div>
-                                  <div className="text-[12px] font-semibold font-['DM_Mono'] text-[#1A1714]">{sector.creditNote}</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+              
+            {travellers.length > 1 && (isCancelled || (bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested")) && (
+               <div className="bg-white border border-[#EAE4D9] p-6 mt-6">
+                   <h3 className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714] mb-4">Passenger Cancellation Status</h3>
+                   <div className="overflow-x-auto">
+                       <table className="w-full text-left border-collapse">
+                           <thead>
+                               <tr className="bg-[#FAF8F4] border-b border-[#EAE4D9] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                                   <th className="px-4 py-3">Passenger</th>
+                                   <th className="px-4 py-3">Ticket No</th>
+                                   <th className="px-4 py-3">Status</th>
+                               </tr>
+                           </thead>
+                           <tbody className="divide-y divide-[#EAE4D9]">
+                               {travellers.map((trav, idx) => {
+                                   const onwardPassengers = safeGet(bookingResult, "onwardResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
+                                   const singleTripPassengers = safeGet(bookingResult, "providerResponse", "Response", "Response", "FlightItinerary", "Passenger") || [];
+                                   const isRoundTripBooking = onwardPassengers.length > 0;
+                                   const resolvedPax = isRoundTripBooking ? onwardPassengers : singleTripPassengers;
+                                   const paxInfo = resolvedPax[idx];
+                                   const ticketNo = paxInfo?.Ticket?.TicketNumber || "—";
+                                   let status = paxInfo?.Ticket?.Status || "—";
+                                   if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
+                                       status = "CANCELLED";
+                                   }
+                                   
+                                   return (
+                                       <tr key={idx}>
+                                           <td className="px-4 py-3 text-[13px] font-semibold text-[#1A1714]">{trav.title} {trav.firstName} {trav.lastName}</td>
+                                           <td className="px-4 py-3 text-[12px] text-[#7A7068] font-mono">{ticketNo}</td>
+                                           <td className="px-4 py-3">
+                                               <span className={`text-[10px] font-bold uppercase px-2 py-1 ${status.toUpperCase() === 'CANCELLED' ? 'bg-[#FDF1EE] text-[#B5341A]' : 'bg-[#EDF7F2] text-[#2C7A4B]'}`}>{status}</span>
+                                           </td>
+                                       </tr>
+                                   );
+                               })}
+                           </tbody>
+                       </table>
+                   </div>
+               </div>
+            )}
 
             {/* Active booking — show amendment action buttons */}
             {!isCancelled && (

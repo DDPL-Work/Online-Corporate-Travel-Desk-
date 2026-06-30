@@ -520,6 +520,30 @@ class SendgridService {
     `;
     return this.sendEmail({ to: lead.workEmail, subject, html });
   }
+
+  // -----------------------------------------------------
+  // FORGOT PASSWORD OTP EMAIL
+  // -----------------------------------------------------
+  async sendForgotPasswordOtpEmail({ to, name, otp }) {
+    const fs   = require('fs');
+    const path = require('path');
+
+    const templatePath = path.join(__dirname, 'templates', 'forgot-password-otp.html');
+    let html = fs.readFileSync(templatePath, 'utf-8');
+
+    html = html
+      .replace(/\{\{name\}\}/g,  name || 'Admin')
+      .replace(/\{\{email\}\}/g, to)
+      .replace(/\{\{otp\}\}/g,   otp)
+      .replace(/\{\{year\}\}/g,  String(new Date().getFullYear()));
+
+    return this.sendEmail({
+      to,
+      subject: `Your Traveamer Admin OTP: ${otp}`,
+      text: `Hello ${name || 'Admin'},\n\nYour one-time passcode for password reset is: ${otp}\n\nThis OTP expires in 15 minutes. Do not share it with anyone.\n\nIf you did not request this, please ignore this email.\n\n— Traveamer Security Team`,
+      html,
+    });
+  }
 }
 
 module.exports = new SendgridService();

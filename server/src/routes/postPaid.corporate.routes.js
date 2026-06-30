@@ -20,42 +20,42 @@ const {
 router.get(
   "/balance",
   verifyToken,
-  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  authorizeRoles("travel-admin","finance_team", "super-admin", "ops-member"),
   getPostpaidBalance,
 );
 
 router.get(
   "/transactions",
   verifyToken,
-  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  authorizeRoles("travel-admin","finance_team", "super-admin", "ops-member"),
   getPostpaidTransactions,
 );
 
 router.post(
   "/usage",
   verifyToken,
-  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  authorizeRoles("travel-admin","finance_team", "super-admin", "ops-member"),
   createCreditUsage,
 );
 
 router.get(
   "/cycles",
   verifyToken,
-  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  authorizeRoles("travel-admin","finance_team", "super-admin", "ops-member"),
   getPreviousCycles,
 );
 
 router.get(
   "/cycles/:cycleIndex/transactions",
   verifyToken,
-  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  authorizeRoles("travel-admin","finance_team", "super-admin", "ops-member"),
   getCycleTransactions,
 );
 
 router.post(
   "/cycles/receipt",
   verifyToken,
-  authorizeRoles("travel-admin", "super-admin", "ops-member"),
+  authorizeRoles("travel-admin","finance_team", "super-admin", "ops-member"),
   updateCycleReceipt,
 );
 

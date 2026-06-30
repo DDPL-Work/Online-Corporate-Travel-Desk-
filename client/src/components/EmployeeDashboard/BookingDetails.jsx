@@ -569,6 +569,8 @@ function PaymentStatusCard({
   isConfirmed,
   isTravelAdmin,
 }) {
+  const isCancelled = ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase()) || !!booking?.cancellation || !!booking?.amendment?.requestedAt;
+
   const items = [
     {
       label: "Payment",
@@ -583,9 +585,12 @@ function PaymentStatusCard({
     },
     {
       label: "Ticket",
-      value: isConfirmed ? "Issued" : "Processing…",
-      ok: isConfirmed,
-      icon: isConfirmed ? (
+      value: isCancelled ? "Cancelled" : isConfirmed ? "Issued" : "Processing…",
+      ok: isCancelled ? false : isConfirmed,
+      isError: isCancelled,
+      icon: isCancelled ? (
+        <FiXCircle size={13} />
+      ) : isConfirmed ? (
         <FiCheckCircle size={13} />
       ) : (
         <FiRefreshCw size={13} className="animate-spin" />
@@ -607,7 +612,7 @@ function PaymentStatusCard({
 
   return (
     <div
-      className={`grid ${!isTravelAdmin ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-3"} gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9] mb-8`}
+      className={`grid grid-cols-2 ${items.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"} gap-[1px] border border-[#EAE4D9] bg-[#EAE4D9] mb-8`}
     >
       {items.map((item, i) => (
         <div key={i} className="bg-white p-5">
@@ -616,7 +621,9 @@ function PaymentStatusCard({
           </div>
           <div
             className={`flex items-center gap-[6px] text-[15px] font-semibold ${
-              item.ok === true
+              item.isError
+                ? "text-[#B5341A]"
+                : item.ok === true
                 ? "text-[#2C7A4B]"
                 : item.ok === false
                   ? "text-[#8A6200]"
@@ -625,7 +632,9 @@ function PaymentStatusCard({
           >
             <span
               className={
-                item.ok === true
+                item.isError
+                  ? "text-[#B5341A]"
+                  : item.ok === true
                   ? "text-[#2C7A4B]"
                   : item.ok === false
                     ? "text-[#8A6200]"
@@ -950,7 +959,8 @@ const getTicketDate = (b) => {
 /* ────────────────────────────────────────────────────────────── */
 function BookingHistory({ booking, reissueRequest }) {
   const isCancelled =
-    booking.executionStatus === "cancelled" || !!booking.cancellation;
+    ["cancelled", "cancel_requested"].includes(booking.executionStatus?.toLowerCase()) || !!booking.cancellation || !!booking.amendment?.requestedAt;
+
   const isTicketed =
     booking.executionStatus === "ticketed" ||
     (isCancelled && !!booking.bookingResult?.pnr);
@@ -1006,11 +1016,12 @@ function BookingHistory({ booking, reissueRequest }) {
     steps.push({
       label: "Cancelled",
       date:
+        booking.amendment?.requestedAt ||
         booking.cancelledAt ||
         booking.cancellation?.cancelledAt ||
         booking.updatedAt,
-      desc: `Booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
-      icon: <FiXCircle size={14} className="text-red-500" />,
+      desc: `Booking cancelled. ${booking.cancellation?.reason || booking.amendment?.remarks ? `Reason: ${booking.cancellation?.reason || booking.amendment?.remarks}` : ""}`,
+      icon: <FiXCircle size={14} className="text-[#B5341A]" />,
       active: true,
       isError: true,
     });
@@ -2063,290 +2074,7 @@ export default function BookingDetails() {
                 fareSnapshot={fareSnapshot}
                 booking={booking}
               />
-
-              {/* Cancellation Details */}
-              {isCancelled &&
-                (() => {
-                  const raw =
-                    booking.amendment?.response || booking.amendment?.raw;
-                  let totalRefund = 0;
-                  let totalCharge = 0;
-                  let creditNotes = [];
-                  let providerRemarks = [];
-
-                  const onwardBookingId =
-                    booking.bookingResult?.onwardResponse?.Response?.Response
-                      ?.BookingId ||
-                    booking.bookingResult?.providerResponse?.Response?.Response
-                      ?.BookingId;
-                  const returnBookingId =
-                    booking.bookingResult?.returnResponse?.Response?.Response
-                      ?.BookingId;
-
-                  const sectorBreakdown = [];
-
-                  const getSectorLabel = (bId) => {
-                    if (bId && bId === onwardBookingId) {
-                      const segs =
-                        booking.flightRequest?.segments?.filter(
-                          (s) => s.journeyType === "onward",
-                        ) || [];
-                      if (segs.length > 0) {
-                        return `Onward: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}`;
-                      }
-                      return "Onward Journey";
-                    }
-                    if (bId && bId === returnBookingId) {
-                      const segs =
-                        booking.flightRequest?.segments?.filter(
-                          (s) => s.journeyType === "return",
-                        ) || [];
-                      if (segs.length > 0) {
-                        return `Return: ${segs[0].origin?.airportCode} → ${segs[segs.length - 1].destination?.airportCode}`;
-                      }
-                      return "Return Journey";
-                    }
-                    return "Booking Segment";
-                  };
-
-                  if (Array.isArray(raw)) {
-                    raw.forEach((item) => {
-                      const info = item.response?.Response?.TicketCRInfo?.[0];
-                      if (info) {
-                        totalRefund += Number(info.RefundedAmount || 0);
-                        totalCharge += Number(info.CancellationCharge || 0);
-                        if (info.CreditNoteNo && info.CreditNoteNo !== "—")
-                          creditNotes.push(info.CreditNoteNo);
-                        if (info.Remarks && info.Remarks !== "Successful")
-                          providerRemarks.push(info.Remarks);
-
-                        sectorBreakdown.push({
-                          label: getSectorLabel(item.bookingId),
-                          refund: info.RefundedAmount,
-                          charge: info.CancellationCharge,
-                          creditNote: info.CreditNoteNo,
-                          remarks: info.Remarks,
-                        });
-                      }
-                    });
-                  } else {
-                    const info = raw?.Response?.TicketCRInfo?.[0];
-                    totalRefund = Number(
-                      info?.RefundedAmount ||
-                        booking.amendment?.refundedAmount ||
-                        0,
-                    );
-                    totalCharge = Number(
-                      info?.CancellationCharge ||
-                        booking.amendment?.cancellationCharge ||
-                        0,
-                    );
-                    if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
-                    if (info?.Remarks) providerRemarks.push(info.Remarks);
-                  }
-
-                  const displayRefund =
-                    totalRefund || booking.amendment?.refundedAmount || "_";
-                  const displayCharge =
-                    totalCharge || booking.amendment?.cancellationCharge || "_";
-                  const displayCreditNote =
-                    creditNotes.length > 0 ? creditNotes.join(", ") : "_";
-                  const displayRemarks =
-                    providerRemarks.length > 0
-                      ? providerRemarks.join(" | ")
-                      : Array.isArray(raw)
-                        ? "Successful"
-                        : "";
-
-                  return (
-                    <div className="space-y-6">
-                      {/* Total Aggregated Summary */}
-                      <div className="bg-white border border-[#EAE4D9] p-8">
-                        <div className="flex items-center justify-between mb-8">
-                          <p className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714]">
-                            Overall Cancellation Summary
-                          </p>
-                          <div className="flex items-center gap-1.5 px-3 py-1 border border-[#F0C4BA] bg-[#FDF1EE]">
-                            <span className="w-1.5 h-1.5 bg-[#B5341A] animate-pulse" />
-                            <span className="text-[9px] font-bold uppercase text-[#B5341A] tracking-wider">
-                              {booking.amendment?.status || "Cancelled"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-                          <div>
-                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                              Cancelled On
-                            </p>
-                            <p className="text-[14px] font-semibold text-[#1A1714]">
-                              {new Date(
-                                booking.updatedAt ||
-                                  booking.amendment?.requestedAt,
-                              ).toLocaleDateString("en-IN", {
-                                day: "2-digit",
-                                month: "long",
-                                year: "numeric",
-                              })}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                              Total Refund
-                            </p>
-                            <p className="text-[14px] font-semibold text-[#2C7A4B]">
-                              ₹{displayRefund}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                              Total Charges
-                            </p>
-                            <p className="text-[14px] font-semibold text-[#B5341A]">
-                              ₹{displayCharge}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] mb-2">
-                              Credit Note(s)
-                            </p>
-                            <p className="text-[14px] font-semibold text-[#1A1714] font-['DM_Mono']">
-                              {displayCreditNote}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="pt-6 border-t border-[#EAE4D9] flex gap-4">
-                          {eligibilityLoading ? (
-                            <button
-                              disabled
-                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#EAE4D9] text-[#7A7068] border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase cursor-not-allowed"
-                            >
-                              <FiLoader size={12} className="animate-spin" />{" "}
-                              Checking...
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                window.dispatchEvent(
-                                  new Event("openReissueModal"),
-                                );
-                              }}
-                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
-                            >
-                              <FiRefreshCw size={12} />{" "}
-                              {isOnlineEligible
-                                ? "Reissue Online"
-                                : "Raise Reissue Request"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Sector Breakdown Breakdown */}
-                      {sectorBreakdown.length > 1 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {sectorBreakdown.map((sector, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-[#FAF8F4] border border-[#EAE4D9] p-6"
-                            >
-                              <div className="flex items-center justify-between mb-4">
-                                <p className="text-[10px] font-bold text-[#1A1714] uppercase tracking-wider flex items-center gap-2">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                  {sector.label}
-                                </p>
-                              </div>
-                              <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                                <div>
-                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                    Refund
-                                  </p>
-                                  <p className="text-sm font-bold text-emerald-600">
-                                    ₹{sector.refund || "0"}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                    Charge
-                                  </p>
-                                  <p className="text-sm font-bold text-red-500">
-                                    ₹{sector.charge || "0"}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                    Credit Note
-                                  </p>
-                                  <p className="text-sm font-mono font-bold text-slate-700">
-                                    {sector.creditNote || "—"}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                    Remarks
-                                  </p>
-                                  <p
-                                    className="text-xs font-semibold text-blue-600 truncate"
-                                    title={sector.remarks}
-                                  >
-                                    {sector.remarks || "Successful"}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Remarks Section */}
-                      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                              <FiAlertCircle
-                                size={14}
-                                className="text-slate-400"
-                              />
-                            </div>
-                            <div>
-                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
-                                Cancellation Reason
-                              </p>
-                              <p className="text-sm text-gray-600 italic">
-                                "
-                                {booking.cancellation?.reason ||
-                                  booking.amendment?.remarks ||
-                                  "User Requested"}
-                                "
-                              </p>
-                            </div>
-                          </div>
-
-                          {(displayRemarks ||
-                            (Array.isArray(raw) && raw.length > 0)) && (
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                                <FiInfo size={14} className="text-blue-400" />
-                              </div>
-                              <div>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
-                                  Provider Remarks
-                                </p>
-                                <p className="text-sm text-blue-600 font-medium">
-                                  {displayRemarks || "Successful"}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+              {/* Cancellation Details moved to Amendment Tab */}
             </div>
           )}
 
@@ -2452,6 +2180,25 @@ export default function BookingDetails() {
                           resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
                         const returnTicket =
                           resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
+                        
+                        const paxId = resolvedOnwardPax[idx]?.PaxId;
+                        const paxCancelInfo =
+                          Array.isArray(booking?.amendment?.response)
+                            ? booking?.amendment?.response.find((res) =>
+                                res?.response?.Response?.TicketCRInfo?.some(
+                                  (info) =>
+                                    info?.PaxId?.toString() ===
+                                    paxId?.toString(),
+                                ),
+                              )
+                            : booking?.amendment?.response?.Response?.TicketCRInfo?.some(
+                                (info) =>
+                                  info?.PaxId?.toString() === paxId?.toString(),
+                              ) || booking?.amendment?.raw?.Response?.TicketCRInfo?.some(
+                                (info) =>
+                                  info?.PaxId?.toString() === paxId?.toString(),
+                              );
+                        const isPaxCancelled = paxCancelInfo || isCancelled;
 
                         return (
                           <tr
@@ -2468,9 +2215,14 @@ export default function BookingDetails() {
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-2">
-                                    <p className="text-[14px] font-bold text-gray-900 leading-none">
+                                    <p className="text-[14px] font-bold text-gray-900 leading-none flex items-center gap-2">
                                       {trav.title} {trav.firstName}{" "}
                                       {trav.lastName}
+                                      {isPaxCancelled && (
+                                        <span className="text-[9px] font-bold uppercase tracking-wider text-[#B5341A] bg-[#FDF1EE] border border-[#F0C4BA] px-1.5 py-0.5 rounded">
+                                          Cancelled
+                                        </span>
+                                      )}
                                     </p>
                                     {trav.isLeadPassenger && (
                                       <FiStar

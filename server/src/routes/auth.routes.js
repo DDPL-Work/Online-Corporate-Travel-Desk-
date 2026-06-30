@@ -18,6 +18,16 @@ router.post("/request-set-password", authCtrl.requestSetPassword);
 // Set password using token
 router.post("/set-password/:token", authCtrl.setPassword);
 
+// ── OTP-based Forgot Password (Super Admin & OPS) ──────────────────
+// Step 1 – send OTP to email
+router.post("/forgot-password", authCtrl.forgotPassword);
+
+// Step 2 – verify OTP
+router.post("/verify-otp", authCtrl.verifyOtp);
+
+// Step 3 – reset password with verified OTP
+router.post("/reset-password", authCtrl.resetPassword);
+
 // ----------------------
 // Protected Routes (any authenticated user)
 // ----------------------

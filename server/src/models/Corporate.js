@@ -189,8 +189,8 @@ const corporateSchema = new mongoose.Schema(
       welcomeMessage: { type: String, default: "Welcome to our Travel Portal" },
       landingPageTitle: { type: String, default: "Corporate Travel Desk" },
       companyType: { type: String, default: "Private Limited" },
-      supportEmail: { type: String, default: "support@traveldesk.com" },
-      supportPhone: { type: String, default: "+1 800 123 4567" },
+      supportEmail: { type: String, default: "contact@traveamer.com" },
+      supportPhone: { type: String, default: "+91-8793353355" },
     },
 
     corporateSlug: {

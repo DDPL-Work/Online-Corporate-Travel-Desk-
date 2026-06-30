@@ -148,7 +148,9 @@ export const SearchableSelect = ({
   disabled = false,
   variant = "default",
   onOpen,
-  showCodeInOptions = false
+  showCodeInOptions = false,
+  allowGroupAll = false,
+  displayValue = ""
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -188,10 +190,28 @@ export const SearchableSelect = ({
 
       return 0;
     });
+
+    if (allowGroupAll && filtered.length > 1) {
+      const combinedCodes = filtered.map(opt => opt[valueKey]).join(",");
+      filtered.unshift({
+        [displayKey]: `All cities in ${search}`,
+        [valueKey]: combinedCodes,
+        isGroup: true
+      });
+    }
+  } else {
+    if (allowGroupAll && filtered.length > 1 && filtered.length < 10) {
+      const combinedCodes = filtered.map(opt => opt[valueKey]).join(",");
+      filtered.unshift({
+        [displayKey]: `All cities`,
+        [valueKey]: combinedCodes,
+        isGroup: true
+      });
+    }
   }
   
   const selected = options.find((opt) => opt[valueKey] === value);
-  const inputValue = open ? search : (selected ? selected[displayKey] : "");
+  const inputValue = open ? search : (selected ? selected[displayKey] : (displayValue || ""));
 
   return (
     <div ref={ref} className="relative w-full">

@@ -809,7 +809,17 @@ const HeroWithSearch = ({
       return name.includes(val.toLowerCase());
     });
 
-    setFilteredCities(filtered);
+    const finalFiltered = [...filtered];
+    if (val.trim() && filtered.length > 1) {
+      const combinedCodes = filtered.map(c => c.cityCode || c.CityCode || c.Code).join(",");
+      finalFiltered.unshift({
+        cityName: `All cities in ${val}`,
+        cityCode: combinedCodes,
+        isGroup: true
+      });
+    }
+
+    setFilteredCities(finalFiltered);
     setShowCitySuggestions(true);
   };
 
@@ -1472,9 +1482,19 @@ const HeroWithSearch = ({
                           </p>
                         </div>
                         {(() => {
-                          const listToRender = city.trim()
+                          let listToRender = city.trim()
                             ? filteredCities
                             : currentCities;
+
+                          if (!city.trim() && currentCities.length > 1 && currentCities.length < 10) {
+                            const combinedCodes = currentCities.map(c => c.cityCode || c.CityCode || c.Code).join(",");
+                            const groupOption = {
+                              cityName: `All cities in ${selectedCountry?.name || country}`,
+                              cityCode: combinedCodes,
+                              isGroup: true
+                            };
+                            listToRender = [groupOption, ...listToRender];
+                          }
                           return listToRender.map((c, idx) => (
                             <div
                               key={(c.cityName || c.cityCode || idx) + idx}
@@ -2142,7 +2162,7 @@ const SupportSection = ({ branding }) => {
               icon: <RiPhoneLine size={22} />,
               title: "Emergency Helpline",
               desc: "Missed flights, urgent cancellations, or on-field emergencies.",
-              detail: support.supportPhone || "+91 9999 000 000",
+              detail: "+91-8793353355",
               tag: "24 × 7",
               tagColor: "#059669",
             },
@@ -2150,7 +2170,7 @@ const SupportSection = ({ branding }) => {
               icon: <RiMailLine size={22} />,
               title: "Travel Admin Support",
               desc: "Policy queries, approval escalation, manual ticketing assistance.",
-              detail: support.supportEmail || "admin.travel@company.com",
+              detail: "contact@traveamer.com",
               tag: "Mon–Sat",
               tagColor: GOLD,
             },

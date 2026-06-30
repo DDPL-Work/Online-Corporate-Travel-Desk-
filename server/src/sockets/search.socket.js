@@ -47,9 +47,20 @@ const initSocketIO = (server) => {
   io.on("connection", (socket) => {
     logger.info(`[Socket.IO] Client connected: ${socket.id}`);
 
-    socket.on("join_search", (searchId) => {
+    socket.on("join_search", async (searchId) => {
       socket.join(searchId);
       logger.debug(`[Socket.IO] Client ${socket.id} joined ${searchId}`);
+      
+      try {
+        const coordinatorRedis = getConnections().coordinator;
+        const status = await coordinatorRedis.hget(`search:registry:${searchId}`, "status");
+        if (status === "completed") {
+          // Prevent infinite loading if search finished before socket connection
+          socket.emit("search_complete", { searchId });
+        }
+      } catch (err) {
+        logger.warn(`[Socket.IO] Error checking search status on join: ${err.message}`);
+      }
     });
 
     socket.on("leave_search", (searchId) => {

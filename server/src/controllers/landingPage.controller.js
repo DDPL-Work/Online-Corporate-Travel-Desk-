@@ -86,8 +86,8 @@ exports.updateBrandingDetails = async (req, res) => {
         welcomeMessage: "Welcome to our Travel Portal",
         landingPageTitle: "Corporate Travel Desk",
         companyType: "Private Limited",
-        supportEmail: "support@traveldesk.com",
-        supportPhone: "+1 800 123 4567",
+        supportEmail: "contact@traveamer.com",
+        supportPhone: "+91-8793353355",
       };
     }
 

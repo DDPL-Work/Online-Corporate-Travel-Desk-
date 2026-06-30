@@ -269,3 +269,129 @@ exports.updateProfile = asyncHandler(async (req, res) => {
 exports.register = asyncHandler(async () => {
   throw new ApiError(400, "Public registration is disabled");
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORGOT PASSWORD — OTP via Redis (no DB storage)
+// ─────────────────────────────────────────────────────────────────────────────
+const { getConnections } = require("../config/redisConnections");
+
+const ADMIN_MODELS = [
+  { model: SuperAdmin, role: "super-admin" },
+  { model: OpsMember,  role: "ops-member"  },
+];
+
+const OTP_TTL_SECONDS  = 15 * 60; // 15 minutes
+const OTP_REDIS_PREFIX = "fp:otp:";
+
+/** 6-character alphanumeric OTP (A-Z, 0-9) */
+function generateOtp() {
+  const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let otp = "";
+  for (let i = 0; i < 6; i++) {
+    otp += CHARS.charAt(Math.floor(Math.random() * CHARS.length));
+  }
+  return otp;
+}
+
+/** SHA-256 hash of a value (hex) */
+function hashValue(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+// ── Step 1: Generate OTP → hash → Redis (TTL 15 min) → email ─────────────────
+exports.forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) throw new ApiError(400, "Email is required");
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Locate the admin user (super-admin or ops-member only)
+  let foundUser = null;
+  for (const { model } of ADMIN_MODELS) {
+    const u = await model.findOne({ email: normalizedEmail });
+    if (u) { foundUser = u; break; }
+  }
+
+  // Always return 200 to prevent email enumeration
+  if (!foundUser) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "If that email exists, an OTP has been sent."));
+  }
+
+  const otp       = generateOtp();
+  const hashedOtp = hashValue(otp);
+
+  // Store ONLY the hash in Redis — plain OTP lives only in the email
+  const redis = getConnections().cache;
+  await redis.setex(`${OTP_REDIS_PREFIX}${normalizedEmail}`, OTP_TTL_SECONDS, hashedOtp);
+
+  const userName =
+    typeof foundUser.name === "string"
+      ? foundUser.name
+      : `${foundUser.name?.firstName || ""} ${foundUser.name?.lastName || ""}`.trim() || "Admin";
+
+  await emailService.sendForgotPasswordOtpEmail({ to: normalizedEmail, name: userName, otp });
+
+  res.status(200).json(new ApiResponse(200, {}, "OTP sent to your registered email address."));
+});
+
+// ── Step 2: Verify OTP (compare hash in Redis) ────────────────────────────────
+exports.verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) throw new ApiError(400, "Email and OTP are required");
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedOtp   = otp.toUpperCase().trim();
+
+  const redis      = getConnections().cache;
+  const storedHash = await redis.get(`${OTP_REDIS_PREFIX}${normalizedEmail}`);
+
+  if (!storedHash || storedHash !== hashValue(normalizedOtp)) {
+    throw new ApiError(400, "Invalid or expired OTP");
+  }
+
+  // OTP is correct but keep the key alive — reset-password step will delete it
+  res.status(200).json(new ApiResponse(200, {}, "OTP verified successfully."));
+});
+
+// ── Step 3: Reset password → delete Redis key → done ─────────────────────────
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword) {
+    throw new ApiError(400, "Email, OTP, and new password are required");
+  }
+  if (newPassword.length < 8) {
+    throw new ApiError(400, "Password must be at least 8 characters");
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedOtp   = otp.toUpperCase().trim();
+
+  // Re-verify OTP from Redis
+  const redis      = getConnections().cache;
+  const redisKey   = `${OTP_REDIS_PREFIX}${normalizedEmail}`;
+  const storedHash = await redis.get(redisKey);
+
+  if (!storedHash || storedHash !== hashValue(normalizedOtp)) {
+    throw new ApiError(400, "Invalid or expired OTP");
+  }
+
+  // Find the user and update password
+  let foundUser = null;
+  for (const { model } of ADMIN_MODELS) {
+    const u = await model.findOne({ email: normalizedEmail }).select("+password");
+    if (u) { foundUser = u; break; }
+  }
+
+  if (!foundUser) throw new ApiError(404, "User not found");
+
+  // Assign plain text — the model's pre("save") hook will hash it
+  foundUser.password = newPassword;
+  await foundUser.save();
+
+  // Immediately invalidate the OTP — single-use guarantee
+  await redis.del(redisKey);
+
+  res.status(200).json(new ApiResponse(200, {}, "Password reset successfully. You may now sign in."));
+});

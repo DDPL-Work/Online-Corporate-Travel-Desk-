@@ -344,6 +344,8 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
     booking?.hotelName ||
     snapshot?.hotelName ||
     detail?.HotelName ||
+    booking?.bookedHotelDetails?.GetBookingDetailResult?.HotelName ||
+    booking?.bookedHotelDetails?.HotelName ||
     tboHotelDetails?.hotelName ||
     selectedHotel?.hotelName ||
     "Hotel";
@@ -479,11 +481,7 @@ function HotelHeroCard({ booking, bookingDetail, paymentSuccessful }) {
           <div className="mb-6">
             <div className="flex items-center gap-4 flex-wrap mb-2">
               <h1 className="font-['Cormorant_Garamond'] text-[26px] sm:text-[32px] md:text-[36px] font-bold leading-[1.1] text-[#1A1714]">
-                {isCancelled
-                  ? "Your trip was cancelled."
-                  : location.state?.isPastTrip || source === "past"
-                    ? "Your trip is completed."
-                    : hotelName}
+                {hotelName}
               </h1>
               <Stars count={starRating} />
             </div>
@@ -585,6 +583,8 @@ function PaymentStatusCard({
   hotelReq,
   isTravelAdmin,
 }) {
+  const isCancelled = booking?.executionStatus === "cancelled" || !!booking?.cancellation;
+
   const items = [
     {
       label: "Payment",
@@ -599,9 +599,12 @@ function PaymentStatusCard({
     },
     {
       label: "Invoice",
-      value: isConfirmed ? "Issued" : "Processing…",
-      ok: isConfirmed,
-      icon: isConfirmed ? (
+      value: isCancelled ? "Cancelled" : isConfirmed ? "Issued" : "Processing…",
+      ok: isCancelled ? false : isConfirmed,
+      isError: isCancelled,
+      icon: isCancelled ? (
+        <FiXCircle size={13} className="text-[#B5341A]" />
+      ) : isConfirmed ? (
         <MdVerifiedUser size={13} />
       ) : (
         <FiRefreshCw size={13} className="animate-spin" />
@@ -651,7 +654,9 @@ function PaymentStatusCard({
           </div>
           <div
             className={`flex items-center gap-[6px] text-[15px] font-semibold ${
-              item.ok === true
+              item.isError
+                ? "text-[#B5341A]"
+                : item.ok === true
                 ? "text-[#2C7A4B]"
                 : item.ok === false
                   ? "text-[#8A6200]"
@@ -660,7 +665,9 @@ function PaymentStatusCard({
           >
             <span
               className={
-                item.ok === true
+                item.isError
+                  ? "text-[#B5341A]"
+                  : item.ok === true
                   ? "text-[#2C7A4B]"
                   : item.ok === false
                     ? "text-[#8A6200]"
@@ -1571,15 +1578,30 @@ function CancellationSection({
   if (hotelChangeResult?.ChangeRequestStatus === 4)
     displayStatusLabel = "Rejected";
 
+  const hotelName =
+    booking?.hotelName ||
+    booking?.bookingSnapshot?.hotelName ||
+    booking?.raw?.HotelName ||
+    booking?.bookedHotelDetails?.GetBookingDetailResult?.HotelName ||
+    booking?.bookedHotelDetails?.HotelName ||
+    booking?.tboHotelDetails?.hotelName ||
+    booking?.hotelRequest?.selectedHotel?.hotelName ||
+    "Hotel";
+
   // ── Already cancelled ──
   if (isCancelled || cancelRequest) {
     return (
       <div className="flex flex-col gap-[1px] bg-[#EAE4D9]">
         {/* Summary header */}
         <div className="bg-white p-[16px_24px] flex justify-between items-center">
-          <span className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
-            Overall Cancellation Summary
-          </span>
+          <div>
+            <span className="text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94] block mb-1">
+              Overall Cancellation Summary
+            </span>
+            <span className="text-[14px] font-bold text-[#1A1714]">
+              {hotelName}
+            </span>
+          </div>
           <span className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5341A] bg-[#FDF1EE] border border-[#F0C4BA] px-[10px] py-[3px]">
             <span className="w-[6px] h-[6px] rounded-full bg-[#B5341A] animate-pulse" />
             {displayStatusLabel}

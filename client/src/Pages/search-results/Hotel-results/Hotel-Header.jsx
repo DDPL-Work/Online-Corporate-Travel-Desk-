@@ -337,6 +337,8 @@ const Header = ({ onSearch }) => {
                 options={currentCities}
                 displayKey="cityName"
                 valueKey="cityCode"
+                displayValue={form.cityName}
+                allowGroupAll={true}
                 onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
                 onChange={(item) =>
                   setForm({
