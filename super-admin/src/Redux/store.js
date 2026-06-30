@@ -1,0 +1,41 @@
+import { configureStore } from "@reduxjs/toolkit";
+import authReducer from "./Slice/authSlice.js";
+// import ssoAuthReducer from "./Slice/ssoAuthSlice.js";
+import dashboardReducer from "./Slice/dashboardSlice.js";
+import profileReducer from "./Slice/profileSlice";
+import corporateOnboardingReducer from "./Slice/corporateOnboardingSlice.js";
+import corporateListReducer from "./Slice/corporateListSlice.js";
+import corporateAdminReducer from "./Slice/corporateAdminSlice.js";
+import walletReducer from "./Slice/walletSlice.js";
+import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
+import tboBalanceReducer from "./Slice/tboBalanceSlice";
+import corporateRelatedReducer from "./Slice/corporate.related.slice.js"
+import postpaidReducer from "./Slice/postpaidSlice";
+import reissueReducer from "./Slice/reissueSlice";
+import blogReducer from "./Slice/blog.slice.js";
+import markupReducer from "./Slice/markup.slice.js";
+import serviceFeeLedgerReducer from "./Slice/serviceFeeLedgerSlice.js";
+import contactReducer from "./Slice/contact.slice.js";
+
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    // ssoAuth: ssoAuthReducer,
+    dashboard: dashboardReducer,
+    profile: profileReducer,
+    corporateRelated: corporateRelatedReducer,
+    postpaid: postpaidReducer,
+    corporateList: corporateListReducer,
+    corporateOnboarding: corporateOnboardingReducer,
+    corporateAdmin: corporateAdminReducer,
+    wallet: walletReducer,
+    walletRechargeLogs: walletRechargeLogsReducer,
+    tboBalance: tboBalanceReducer,
+    reissue: reissueReducer,
+
+    blogs: blogReducer,
+    markup: markupReducer,
+    serviceFeeLedger: serviceFeeLedgerReducer,
+    contact: contactReducer,
+  },
+});

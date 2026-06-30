@@ -1,0 +1,90 @@
+// store.js
+
+
+import { configureStore } from "@reduxjs/toolkit";
+import authReducer from "./Slice/authSlice.js";
+// import ssoAuthReducer from "./Slice/ssoAuthSlice.js";
+import dashboardReducer from "./Slice/dashboardSlice.js";
+import profileReducer from "./Slice/profileSlice";
+import corporateOnboardingReducer from "./Slice/registrationSlice.js";
+import corporateListReducer from "./Slice/corporateListSlice.js";
+import employeeActionReducer from "./Slice/employeeActionSlice.js";
+import documentReducer from "./Slice/documentSlice.js";
+import corporateAdminReducer from "./Slice/corporateAdminSlice.js";
+import corporateProjectReducer from "./Slice/project.slice.js";
+import managerReducer from "./Slice/manager.slice.js";
+import walletReducer from "./Slice/walletSlice.js";
+import flightReducer from "./Slice/flightSearchSlice.js";
+import flightReducerRT from "./Slice/flightSearchSliceRT.js";
+import flightReducerMC from "./Slice/flightSearchSlice.MC.js";
+import walletRechargeLogsReducer from "./Slice/walletRechargeLogsSlice";
+import tboBalanceReducer from "./Slice/tboBalanceSlice";
+import approvalReducer from "./Slice/approval.slice.js";
+import bookingReducer from "./Slice/booking.slice.js";
+import employeeReducer from "./Slice/employeeActionSlice.js";
+import corporateSuperAdminReducer from "./Slice/corporateSuperAdmin.slice.js";
+import postpaidReducer from "./Slice/postpaidSlice.js";
+import amendmentReducer from "./Slice/amendmentSlice.js";
+//hotel
+import hotelReducer from "./Slice/hotelSlice.js";
+import hotelBookingReducer from "./Slice/hotelBooking.slice";
+import hotelAmendmentReducer from "./Slice/hotelAmendment.slice.js";
+
+
+import adminBookingReducer from "./Slice/travelAdmin.slice.js";
+import ssrPolicyReducer from "./Slice/ssrPolicy.slice.js";
+import landingPageReducer from "./Slice/landingPageSlice.js";
+import reissueReducer from "./Slice/reissueSlice.js";
+import blogReducer from "./Slice/blog.slice.js";
+import layoutReducer from "./Slice/layoutSlice.js";
+
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    // ssoAuth: ssoAuthReducer,
+    dashboard: dashboardReducer,
+    profile: profileReducer,
+    corporateList: corporateListReducer,
+    corporateOnboarding: corporateOnboardingReducer,
+
+    employeeAction: employeeActionReducer,
+    documents: documentReducer,
+
+    corporateAdmin: corporateAdminReducer,
+    
+    corporateProject: corporateProjectReducer,
+    manager: managerReducer,
+
+    wallet: walletReducer,
+    walletRechargeLogs: walletRechargeLogsReducer,
+    postpaid: postpaidReducer,
+
+    tboBalance: tboBalanceReducer,
+    employee: employeeReducer,
+    corporateSuperAdmin: corporateSuperAdminReducer,
+    approvals: approvalReducer,
+
+    adminBooking: adminBookingReducer,
+
+    //Flight Reducers
+    flights: flightReducer,
+    flightsRT: flightReducerRT,
+    flightsMC: flightReducerMC,
+    bookings: bookingReducer,
+    amendment: amendmentReducer,
+
+    //Hotel
+    hotel: hotelReducer,
+    hotelBookings: hotelBookingReducer,
+    hotelAmendment: hotelAmendmentReducer,
+
+    // SSR Policy
+    ssrPolicy: ssrPolicyReducer,
+
+    // Landing Page & Branding
+    landingPage: landingPageReducer,
+    reissue: reissueReducer,
+    blogs: blogReducer,
+    layout: layoutReducer,
+  },
+});

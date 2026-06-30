@@ -1,0 +1,343 @@
+name: Health Check
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "*/10 0-16 * * 1-5"
+    - cron: "*/30 17-23 * * 1-5"
+    - cron: "*/30 * * * 0,6"
+  workflow_dispatch:
+    inputs:
+      notify-on-success:
+        description: "Send notification on success"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  APP_PATH: /var/www/Online-Corporate-Travel-Desk-
+  SSH_USER: deploy
+  SERVER1_IP: ${{ secrets.SERVER1_IP }}
+  SERVER2_IP: ${{ secrets.SERVER2_IP }}
+  DOMAINS: "traveamer.com api.traveamer.com admin.traveamer.com"
+
+concurrency:
+  group: health-check
+  cancel-in-progress: false
+
+jobs:
+  api-health:
+    name: API Health
+    runs-on: ubuntu-latest
+    outputs:
+      server1_ok: ${{ steps.check-server1.outputs.healthy }}
+      server2_ok: ${{ steps.check-server2.outputs.healthy }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+
+      - name: Check Server 1 API
+        id: check-server1
+        run: |
+          SSH_OK=$(ssh -o ConnectTimeout=10 \
+            "${{ secrets.SSH_USER }}@${{ secrets.SERVER1_IP }}" \
+            "echo OK" 2>/dev/null || echo "FAIL")
+
+          RESPONSE=$(curl -s --max-time 10 \
+            "http://${{ secrets.SERVER1_IP }}:5000/health" 2>/dev/null || echo "UNREACHABLE")
+
+          VALID=$(echo "${RESPONSE}" | jq -e 'select(.status == "OK" and .env == "production")' >/dev/null 2>&1 && echo "VALID" || echo "INVALID")
+
+          if [ "$SSH_OK" = "OK" ] && [ "$VALID" = "VALID" ]; then
+            echo "healthy=true" >> $GITHUB_OUTPUT
+            echo "Server 1: SSH OK, Health VALID"
+          else
+            echo "healthy=false" >> $GITHUB_OUTPUT
+            echo "Server 1: SSH=${SSH_OK}, Health=${VALID}, Response=${RESPONSE}"
+          fi
+
+      - name: Check Server 2 API
+        id: check-server2
+        run: |
+          SSH_OK=$(ssh -o ConnectTimeout=10 \
+            "${{ secrets.SSH_USER }}@${{ secrets.SERVER2_IP }}" \
+            "echo OK" 2>/dev/null || echo "FAIL")
+
+          RESPONSE=$(curl -s --max-time 10 \
+            "http://${{ secrets.SERVER2_IP }}:5000/health" 2>/dev/null || echo "UNREACHABLE")
+
+          VALID=$(echo "${RESPONSE}" | jq -e 'select(.status == "OK" and .env == "production")' >/dev/null 2>&1 && echo "VALID" || echo "INVALID")
+
+          if [ "$SSH_OK" = "OK" ] && [ "$VALID" = "VALID" ]; then
+            echo "healthy=true" >> $GITHUB_OUTPUT
+            echo "Server 2: SSH OK, Health VALID"
+          else
+            echo "healthy=false" >> $GITHUB_OUTPUT
+            echo "Server 2: SSH=${SSH_OK}, Health=${VALID}, Response=${RESPONSE}"
+          fi
+
+  pm2-health:
+    name: PM2 Process Health
+    runs-on: ubuntu-latest
+    outputs:
+      overall: ${{ steps.check.outputs.overall }}
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+
+      - name: Check PM2 Status
+        id: check
+        env:
+          SERVER1_IP: ${{ secrets.SERVER1_IP }}
+          SERVER2_IP: ${{ secrets.SERVER2_IP }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          overall=true
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            echo "Checking PM2 on $ip..."
+            PM2_STATUS=$(ssh "$SSH_USER@$ip" \
+              'pm2 jlist 2>/dev/null | jq -r ".[] | [.name, .pm2_env.status, (.pm2_env.restart_time|tostring), (.monit.memory|tostring), (.monit.cpu|tostring)] | @tsv"' 2>/dev/null || echo "CONNECTION_ERROR")
+
+            if [ "$PM2_STATUS" = "CONNECTION_ERROR" ]; then
+              echo "Cannot connect to $ip"
+              overall=false
+              continue
+            fi
+            while IFS=$'\t' read -r proc status restarts mem cpu; do
+              if [ "$status" != "online" ]; then
+                echo "$proc: $status (NOT ONLINE)"
+                overall=false
+              else
+                MEM_MB=$((mem / 1024 / 1024))
+                echo "$proc: $status | restarts: $restarts | mem: ${MEM_MB}MB | cpu: ${cpu}%"
+              fi
+            done <<< "$PM2_STATUS"
+          done
+          echo "overall=$overall" >> $GITHUB_OUTPUT
+
+  nginx-health:
+    name: Nginx Health
+    runs-on: ubuntu-latest
+    outputs:
+      overall: ${{ steps.check.outputs.overall }}
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+
+      - name: Check Nginx
+        id: check
+        env:
+          SERVER1_IP: ${{ secrets.SERVER1_IP }}
+          SERVER2_IP: ${{ secrets.SERVER2_IP }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          overall=true
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            NGINX_STATUS=$(ssh "$SSH_USER@$ip" "systemctl is-active nginx 2>/dev/null || echo 'FAIL'")
+            if [ "$NGINX_STATUS" = "active" ]; then
+              echo "Nginx active on $ip"
+            else
+              echo "Nginx $NGINX_STATUS on $ip"
+              overall=false
+            fi
+          done
+          echo "overall=$overall" >> $GITHUB_OUTPUT
+
+  ssl-health:
+    name: SSL Expiry Check
+    runs-on: ubuntu-latest
+    outputs:
+      expiring: ${{ steps.check.outputs.expiring }}
+    steps:
+      - name: Check SSL Expiry
+        id: check
+        env:
+          DOMAINS: ${{ env.DOMAINS }}
+        run: |
+          expiring=false
+          for domain in $DOMAINS; do
+            echo "Checking SSL for $domain..."
+            EXPIRY_DATE=$(echo | openssl s_client -servername "$domain" -connect "${domain}:443" 2>/dev/null | \
+              openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || echo "FAILED")
+            if [ "$EXPIRY_DATE" = "FAILED" ]; then
+              echo "Cannot retrieve SSL certificate for $domain"
+              expiring=true
+              continue
+            fi
+            EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s 2>/dev/null)
+            NOW_EPOCH=$(date +%s)
+            DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+            if [ "$DAYS_LEFT" -le 14 ]; then
+              echo "$domain: ${DAYS_LEFT} days (EXPIRING SOON)"
+              expiring=true
+            elif [ "$DAYS_LEFT" -le 30 ]; then
+              echo "$domain: ${DAYS_LEFT} days (renew soon)"
+            else
+              echo "$domain: ${DAYS_LEFT} days"
+            fi
+          done
+          echo "expiring=$expiring" >> $GITHUB_OUTPUT
+
+  system-resources:
+    name: System Resources
+    runs-on: ubuntu-latest
+    outputs:
+      critical: ${{ steps.check.outputs.critical }}
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER1_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER2_IP }} >> ~/.ssh/known_hosts
+
+      - name: Check Resources
+        id: check
+        env:
+          SERVER1_IP: ${{ secrets.SERVER1_IP }}
+          SERVER2_IP: ${{ secrets.SERVER2_IP }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          APP_PATH: ${{ env.APP_PATH }}
+        run: |
+          critical=false
+          for ip in "$SERVER1_IP" "$SERVER2_IP"; do
+            RESULT=$(ssh "$SSH_USER@$ip" "
+              DISK=\$(df -h '$APP_PATH' 2>/dev/null | tail -1 | awk '{print \$5}' | sed 's/%//')
+              MEM=\$(free -m 2>/dev/null | awk '/^Mem:/ {printf \"%.0f\", \$3/\$2 * 100}')
+              LOAD=\$(uptime | awk -F'load average:' '{print \$2}' | cut -d, -f1 | xargs)
+              echo \"DISK=\${DISK}|MEM=\${MEM}|LOAD=\${LOAD}\"
+            " 2>/dev/null || echo "CONNECTION_ERROR")
+
+            if [ "$RESULT" = "CONNECTION_ERROR" ]; then continue; fi
+
+            DISK=$(echo "$RESULT" | grep -oP 'DISK=\K[0-9.]+')
+            MEM=$(echo "$RESULT" | grep -oP 'MEM=\K[0-9.]+')
+            LOAD=$(echo "$RESULT" | grep -oP 'LOAD=\K[0-9.]+')
+
+            if [ "$DISK" -gt 90 ]; then
+              echo "DISK: ${DISK}% (CRITICAL > 90%)"
+              critical=true
+            elif [ "$DISK" -gt 80 ]; then
+              echo "DISK: ${DISK}% (warning > 80%)"
+            else
+              echo "DISK: ${DISK}%"
+            fi
+            if [ "$MEM" -gt 90 ]; then
+              echo "MEM: ${MEM}% (CRITICAL > 90%)"
+              critical=true
+            elif [ "$MEM" -gt 80 ]; then
+              echo "MEM: ${MEM}% (warning > 80%)"
+            else
+              echo "MEM: ${MEM}%"
+            fi
+            echo "Load: ${LOAD}"
+          done
+          echo "critical=$critical" >> $GITHUB_OUTPUT
+
+  aggregate:
+    name: Health Summary
+    runs-on: ubuntu-latest
+    needs: [api-health, pm2-health, nginx-health, ssl-health, system-resources]
+    if: ${{ always() }}
+    steps:
+      - name: Build Status Summary
+        id: summary
+        run: |
+          ALL_OK=true
+          REPORT=""
+          if [ "${{ needs.api-health.outputs.server1_ok }}" = "true" ] && \
+             [ "${{ needs.api-health.outputs.server2_ok }}" = "true" ]; then
+            REPORT="${REPORT}✓ API: Both servers healthy\n"
+          else
+            REPORT="${REPORT}✗ API: One or both servers unhealthy\n"
+            ALL_OK=false
+          fi
+          if [ "${{ needs.pm2-health.outputs.overall }}" = "true" ]; then
+            REPORT="${REPORT}✓ PM2: All processes online\n"
+          else
+            REPORT="${REPORT}✗ PM2: Some processes unhealthy\n"
+            ALL_OK=false
+          fi
+          if [ "${{ needs.nginx-health.outputs.overall }}" = "true" ]; then
+            REPORT="${REPORT}✓ Nginx: Active on both servers\n"
+          else
+            REPORT="${REPORT}✗ Nginx: Issue detected\n"
+            ALL_OK=false
+          fi
+          if [ "${{ needs.ssl-health.outputs.expiring }}" = "true" ]; then
+            REPORT="${REPORT}⚠ SSL: Certificate(s) expiring soon\n"
+          else
+            REPORT="${REPORT}✓ SSL: Certificates valid\n"
+          fi
+          if [ "${{ needs.system-resources.outputs.critical }}" = "true" ]; then
+            REPORT="${REPORT}✗ Resources: Critical threshold breached\n"
+            ALL_OK=false
+          else
+            REPORT="${REPORT}✓ Resources: All within limits\n"
+          fi
+          echo "all_ok=$ALL_OK" >> $GITHUB_OUTPUT
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send Slack Alert on Failure
+        if: ${{ steps.summary.outputs.all_ok == 'false' || needs.ssl-health.outputs.expiring == 'true' }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
+          REPORT="${{ steps.summary.outputs.report }}"
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"#d00000\",
+                \"blocks\": [
+                  {\"type\": \"header\", \"text\": {\"type\": \"plain_text\", \"text\": \"🚨 Production Health Alert\"}},
+                  {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"\`\`\`${REPORT}\`\`\`\"}},
+                  {\"type\": \"context\", \"elements\": [{\"type\": \"mrkdwn\", \"text\": \"<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>\"}]}
+                ]
+              }]
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send Success Summary
+        if: ${{ steps.summary.outputs.all_ok == 'true' && github.event.inputs.notify-on-success == 'true' }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "Slack webhook not configured — skipping notification."
+            exit 0
+          fi
+
+          REPORT="${{ steps.summary.outputs.report }}"
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [{
+                \"color\": \"#36a64f\",
+                \"blocks\": [{\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"✅ Production Health Summary\n\`\`\`${REPORT}\`\`\`\"}}]
+              }]
+            }" "$SLACK_WEBHOOK_URL"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

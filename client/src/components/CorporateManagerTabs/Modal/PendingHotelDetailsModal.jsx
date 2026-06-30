@@ -1,0 +1,2222 @@
+import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import api from "../../../API/axios";
+import { FiSearch } from "react-icons/fi";
+import { FaHotel, FaPlane } from "react-icons/fa";
+import {
+  FiX,
+  FiHome,
+  FiMapPin,
+  FiCoffee,
+  FiCalendar,
+  FiDollarSign,
+  FiShield,
+  FiUser,
+  FiInfo,
+  FiTag,
+  FiGlobe,
+  FiCheckCircle,
+  FiXCircle,
+  FiClock,
+  FiKey,
+  FiPackage,
+  FiBriefcase,
+  FiStar,
+  FiMoon,
+  FiAlertCircle,
+  FiMail,
+  FiChevronLeft,
+  FiChevronRight,
+} from "react-icons/fi";
+import {
+  formatDate,
+  formatDateTime,
+  formatDateWithYear,
+} from "../../../utils/formatter";
+import { InfoBadge, SectionLabel } from "../Shared/CommonComponents";
+import { FareRulesAccordion } from "../../../Pages/Booking-Flow/Flight-Booking/CommonComponents";
+import { processFareRulesData } from "../../../utils/fareRulesParser";
+
+// ─────────────────────────────────────────────
+// SHARED HELPERS
+// ─────────────────────────────────────────────
+
+const formatPaxDob = (pax) => formatDateWithYear(pax?.dateOfBirth || pax?.dob);
+const formatPaxPhone = (pax) =>
+  pax?.phoneWithCode ? `+${pax.phoneWithCode}` : "N/A";
+const formatPaxEmail = (pax) => pax?.email || "N/A";
+const formatNationality = (pax) => pax?.nationality || "N/A";
+const formatGender = (pax) => pax?.gender || "N/A";
+
+const calcAge = (pax) => {
+  const dobStr = pax?.dateOfBirth || pax?.dob;
+  if (!dobStr) return "N/A";
+  const dob = new Date(dobStr);
+  if (Number.isNaN(dob.getTime())) return "N/A";
+  const diff = Date.now() - dob.getTime();
+  const age = new Date(diff).getUTCFullYear() - 1970;
+  return `${age} yrs`;
+};
+
+const getMealDesc = (desc) => {
+  const d = String(desc || "");
+  if (d === "1") return "Included (Fare Includes Meal)";
+  if (d === "2") return "Direct (Added while ticketing)";
+  if (d === "3") return "Imported (Added while importing)";
+  return d;
+};
+
+const getBaggageDesc = (desc) => {
+  const d = String(desc || "");
+  if (d === "0") return "NotSet";
+  if (d === "1") return "Included";
+  if (d === "2") return "Direct (Purchase)";
+  if (d === "3") return "Imported";
+  if (d === "4") return "UpGrade";
+  if (d === "5") return "ImportedUpgrade";
+  return d;
+};
+
+const ActionModal = ({ isOpen, onClose, onConfirm, action, type }) => {
+  const [comments, setComments] = useState("");
+  
+  useEffect(() => {
+    if (isOpen) {
+      setComments("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+  const isApprove = action === "approve";
+  
+  return (
+    <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-white/60 backdrop-blur-sm rounded-3xl">
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-300 border border-slate-200">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">
+            {isApprove ? "Approve Request" : "Reject Request"}
+          </h2>
+          <button onClick={onClose} className="p-2 bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
+            <FiX size={18} />
+          </button>
+        </div>
+        {!isApprove && (
+          <div className="mb-6">
+            <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+              Comments (Required)
+            </label>
+            <textarea
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              className="w-full h-24 p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+              placeholder="Enter reason for rejecting..."
+            />
+          </div>
+        )}
+        {isApprove && (
+          <div className="mb-6">
+            <p className="text-sm text-slate-600 font-medium">
+              Are you sure you want to approve this request? This action will proceed with the booking workflow.
+            </p>
+          </div>
+        )}
+        <div className="flex gap-3 justify-end">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(comments)}
+            disabled={!isApprove && !comments.trim()}
+            className={`px-5 py-2.5 rounded-xl font-bold text-white transition-colors flex items-center gap-2 ${
+              !isApprove && !comments.trim() ? "opacity-50 cursor-not-allowed" : ""
+            } ${isApprove ? "bg-[#22C55E] hover:bg-emerald-600" : "bg-red-500 hover:bg-red-600"}`}
+          >
+            {isApprove ? <FiCheckCircle size={16} /> : <FiXCircle size={16} />}
+            Confirm {isApprove ? "Approval" : "Rejection"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const resolveApproverDetails = (booking) => {
+  if (booking?.approverName === "Auto Approve") {
+    return {
+      name: "Auto Approved",
+      email: "",
+      role: "System",
+    };
+  }
+
+  const approver =
+    booking?.approverId ||
+    booking?.approvedBy ||
+    booking?.approvedByDetails ||
+    {};
+  const first =
+    approver?.name?.firstName ||
+    approver?.firstName ||
+    booking?.approverName ||
+    "";
+  const last =
+    approver?.name?.lastName ||
+    approver?.lastName ||
+    booking?.approverLastName ||
+    "";
+  const name = `${first} ${last}`.trim() || "Not assigned";
+
+  return {
+    name,
+    email: approver?.email || booking?.approverEmail || "",
+    role: approver?.role || booking?.approverRole || "manager",
+  };
+};
+
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const calculateLayover = (arrival, departure) => {
+  if (!arrival || !departure) return null;
+  const diff = new Date(departure) - new Date(arrival);
+  if (diff <= 0) return null;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}h ${minutes}m`;
+};
+
+const TravellerField = ({ icon, label, value }) => (
+  <div className="min-w-0">
+    <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-0.5 truncate">
+      {icon} {label}
+    </p>
+    <p className="text-xs font-semibold text-slate-700 truncate">
+      {value || "—"}
+    </p>
+  </div>
+);
+
+const TimelineItem = ({ title, time, status, description, active }) => (
+  <div className="flex gap-4 relative">
+    <div className="flex flex-col items-center">
+      <div
+        className={`w-3.5 h-3.5 rounded-full border-2 z-10 ${status === "completed"
+            ? "bg-emerald-500 border-emerald-100"
+            : active
+              ? "bg-amber-400 border-amber-100 animate-pulse"
+              : "bg-slate-200 border-slate-100"
+          }`}
+      />
+    </div>
+    <div className="-mt-1 pb-6">
+      <p
+        className={`text-xs font-black ${active ? "text-slate-900" : "text-slate-500"}`}
+      >
+        {title}
+      </p>
+      <p className="text-[10px] text-indigo-600 font-mono font-bold mt-0.5">
+        {time}
+      </p>
+      {description && (
+        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+          {description}
+        </p>
+      )}
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────
+// TRANSFER APPROVER MODAL
+// ─────────────────────────────────────────────
+
+const TransferApproverModal = ({ isOpen, onClose, onTransfer, bookingType }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [remark, setRemark] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedApprover, setSelectedApprover] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setSearchResults([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const { data } = await api.get("/travel-admin/all-employees");
+        const users = data.employees || [];
+        const filtered = users.filter(
+          (u) =>
+            u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.name?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.name?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setSearchResults(filtered);
+        setDropdownOpen(true);
+      } catch (err) {
+        console.error("Failed to fetch employees", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  if (!isOpen) return null;
+
+  const handleSelect = (user) => {
+    setSelectedApprover(user);
+    setSearchTerm(user.email);
+    setDropdownOpen(false);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setSelectedApprover(null);
+  };
+
+  const handleSubmit = () => {
+    if (selectedApprover) {
+      if (onTransfer) {
+        onTransfer(selectedApprover._id, remark, bookingType);
+      } else {
+        console.log("Transfer requested:", { approver: selectedApprover, remark, bookingType });
+      }
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+        <div className="bg-gradient-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center">
+          <h2 className="text-lg font-black tracking-tight uppercase">Transfer Approver</h2>
+          <button
+            onClick={onClose}
+            className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400"
+          >
+            <FiX size={22} />
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="space-y-2 relative" ref={wrapperRef}>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Select Approver Email
+            </label>
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by name or email..."
+                className="w-full pl-10 pr-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700"
+              />
+            </div>
+            {dropdownOpen && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {searchResults.map((user) => (
+                  <div
+                    key={user._id}
+                    onClick={() => handleSelect(user)}
+                    className="px-4 py-3 hover:bg-[#FAF8F4] cursor-pointer border-b border-[#EAE4D9] last:border-b-0"
+                  >
+                    <p className="text-sm font-black text-[#1A1714]">
+                      {user.name?.firstName} {user.name?.lastName}
+                    </p>
+                    <p className="text-xs font-medium text-slate-500">{user.email}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {dropdownOpen && searchTerm && searchResults.length === 0 && !isSearching && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-[#EAE4D9] rounded-xl shadow-lg px-4 py-3">
+                <p className="text-sm font-medium text-slate-500">No users found.</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Remark
+            </label>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              placeholder="Add a remark for the transfer..."
+              rows={3}
+              className="w-full px-4 py-3 bg-[#FAF8F4] border border-[#EAE4D9] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B5862A]/50 transition-all font-medium text-slate-700 resize-none"
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-[#EAE4D9] bg-slate-50 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 border border-[#EAE4D9] text-slate-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedApprover}
+            className={`px-5 py-2 bg-[#B5862A] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!selectedApprover ? "opacity-50 cursor-not-allowed shadow-none" : "hover:bg-[#966b1e] shadow-amber-100"}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ─────────────────────────────────────────────
+// HOTEL MODAL
+// ─────────────────────────────────────────────
+
+export const PendingHotelDetailsModal = ({
+  booking,
+  onClose,
+  onApprove,
+  onReject,
+  onTransfer,
+  isVerified = true,
+  isDiscarded = false,
+}) => {
+  const [activeTab, setActiveTab] = useState("details");
+  const tabsRef = useRef(null);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const handleConfirmAction = (comments) => {
+    if (actionModal.action === "approve") {
+      onApprove(booking._id, "hotel", "approve", comments);
+    } else {
+      onReject(booking._id, "hotel", "reject", comments);
+    }
+    setActionModal({ isOpen: false, action: null });
+  };
+
+  const scrollTabs = (direction) => {
+    if (tabsRef.current) {
+      const scrollAmount = 200;
+      tabsRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  if (!booking) return null;
+
+  const hotelRequest = booking.hotelRequest || {};
+  const bookSnap = booking.bookingSnapshot || {};
+  const travelers = booking.travellers || [];
+  const roomData = hotelRequest.selectedRoom || {};
+
+  const rawRooms = Array.isArray(roomData.rawRoomData)
+    ? roomData.rawRoomData
+    : roomData.rawRoomData
+      ? [roomData.rawRoomData]
+      : [];
+
+  // Group rooms by BookingCode or Name to avoid repetition
+  const groupedRooms = rawRooms.reduce((acc, room) => {
+    const key =
+      room.BookingCode ||
+      room.RoomTypeCode ||
+      (Array.isArray(room.Name) ? room.Name[0] : room.Name) ||
+      "Standard";
+
+    // TBO sometimes returns a single object representing multiple rooms (e.g. Name is an array)
+    const innerCount = Array.isArray(room.Name) ? room.Name.length : 1;
+
+    if (!acc[key]) {
+      acc[key] = { ...room, count: innerCount };
+    } else {
+      acc[key].count += innerCount;
+    }
+    return acc;
+  }, {});
+  const displayRooms = Object.values(groupedRooms);
+
+  const approver = resolveApproverDetails(booking);
+
+  // 💰 PRICE CALCULATION FALLBACK
+  const { totalAmount, baseFare, tax } = (() => {
+    // 1. Try pricingSnapshot first (most reliable)
+    let total =
+      booking.pricingSnapshot?.totalAmount || booking.bookingSnapshot?.amount;
+    let base = roomData.Price?.baseFare;
+    let tx = roomData.Price?.tax;
+
+    // 2. Try from selectedRoom directly if snapshot is missing
+    if (!total && roomData.totalFare) total = roomData.totalFare;
+    if (!tx && roomData.totalTax) tx = roomData.totalTax;
+
+    // 3. Sum from raw rooms if still missing
+    if (!total && rawRooms.length > 0) {
+      total = rawRooms.reduce(
+        (sum, r) => sum + (r.TotalFare || r.Price?.totalFare || 0),
+        0,
+      );
+    }
+
+    // 4. Calculate base if only total and tax are known
+    if ((!base || base === 0) && total && tx) {
+      base = total - tx;
+    } else if ((!base || base === 0) && total) {
+      base = total; // No tax breakdown available
+    }
+
+    return { totalAmount: total || 0, baseFare: base || 0, tax: tx || 0 };
+  })();
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
+        {/* Header */}
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
+              <FaHotel size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-tight uppercase">
+                Hotel Approval Request
+              </h2>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-widest">
+                Order ID: {booking.orderId || booking.bookingReference}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400"
+          >
+            <FiX size={22} />
+          </button>
+        </div>
+
+        {/* Sticky Action Bar */}
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
+            {booking.requestStatus === "approved" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 uppercase tracking-tighter">
+                <FiCheckCircle size={12} />
+                Approved
+              </div>
+            ) : booking.requestStatus === "rejected" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 rounded-full border border-red-100 uppercase tracking-tighter">
+                <FiXCircle size={12} />
+                Rejected
+              </div>
+            ) : booking.requestStatus === "manager_approved" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-600 rounded-full border border-amber-200 uppercase tracking-tighter font-black">
+                WAITING FOR TRAVEL ADMIN APPROVAL
+              </div>
+            ) : isDiscarded ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200 uppercase tracking-tighter font-black">
+                Expired
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100 uppercase tracking-tighter">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Pending Approval
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+              <FiClock className="text-slate-400" />
+              <span>{formatDateTime(booking.createdAt)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+              <FiBriefcase className="text-slate-400" />
+              <span>{booking.projectName || "Internal"}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isVerified &&
+              booking.requestStatus === "pending_approval" &&
+              !isDiscarded && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 animate-pulse">
+                  <FiAlertCircle size={14} className="text-amber-600" />
+                  <span className="text-[10px] font-black uppercase tracking-tight">
+                    Awaiting Admin Verification to Approve
+                  </span>
+                </div>
+              )}
+
+            {booking.requestStatus === "manager_approved" ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-200 italic">
+                <FiInfo size={14} className="text-amber-500" />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Awaiting Travel Admin Approval
+                </span>
+              </div>
+            ) : booking.requestStatus !== "pending_approval" ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 italic">
+                <FiInfo size={14} className="text-slate-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Request already {booking.requestStatus}
+                </span>
+              </div>
+            ) : isDiscarded ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200">
+                <FiAlertCircle size={14} className="text-slate-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Travel Date Passed · No Action Possible
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* {onTransfer && (
+                  <button
+                    onClick={() => setIsTransferModalOpen(true)}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 border border-amber-200 text-amber-700 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-amber-50"}`}
+                    title={!isVerified ? "Account pending verification" : ""}
+                  >
+                    Transfer Approver
+                  </button>
+                )} */}
+                <button
+                  onClick={() => setActionModal({ isOpen: true, action: "reject" })}
+                  disabled={!isVerified}
+                  className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-red-50"}`}
+                  title={!isVerified ? "Account pending verification" : ""}
+                >
+                  Reject Request
+                </button>
+                <button
+                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
+                  disabled={!isVerified}
+                  className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  title={!isVerified ? "Account pending verification" : ""}
+                >
+                  <FiCheckCircle size={14} />
+                  Approve & Proceed
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs Navigation */}
+        <div className="relative bg-white border-b border-slate-100 flex items-center shrink-0 group">
+          <button
+            onClick={() => scrollTabs("left")}
+            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-r border-slate-100 text-slate-400 hover:text-indigo-600 z-10 transition-colors"
+            aria-label="Scroll left"
+          >
+            <FiChevronLeft size={18} />
+          </button>
+
+          <div
+            ref={tabsRef}
+            className="flex-1 px-6 flex items-center gap-8 overflow-x-auto no-scrollbar scroll-smooth"
+          >
+            {[
+              { id: "details", label: "Hotel Details", icon: <FaHotel /> },
+              { id: "project", label: "Project", icon: <FiBriefcase /> },
+              {
+                id: "charges",
+                label: "Charges and rules",
+                icon: <FiDollarSign />,
+              },
+              { id: "passenger", label: "Passenger", icon: <FiUser /> },
+              { id: "history", label: "Booking History", icon: <FiClock /> },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${activeTab === tab.id
+                    ? "text-indigo-600"
+                    : "text-slate-400 hover:text-slate-600"
+                  }`}
+              >
+                <span
+                  className={
+                    activeTab === tab.id ? "text-indigo-600" : "text-slate-300"
+                  }
+                >
+                  {tab.icon}
+                </span>
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => scrollTabs("right")}
+            className="md:hidden flex items-center justify-center w-10 h-14 bg-white border-l border-slate-100 text-slate-400 hover:text-indigo-600 z-10 transition-colors"
+            aria-label="Scroll right"
+          >
+            <FiChevronRight size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-50/30">
+          <div className="max-w-7xl mx-auto">
+            {activeTab === "details" && (
+              <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Left Column */}
+                <div className="flex-1 space-y-6">
+                  {/* Hotel Snapshot */}
+                  <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col md:flex-row">
+                    <div className="w-full md:w-64 h-48 md:h-auto relative shrink-0">
+                      <img src={
+                        bookSnap.hotelImage ||
+                        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500"
+                      }
+                        alt={bookSnap.hotelName}
+                        className="w-full h-full object-cover" loading="eager" />
+                      <div className="absolute top-4 left-4">
+                        <span className="bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-white/20 shadow-xl">
+                          Confirmed Rate
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-6 flex-1 space-y-5">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tighter uppercase italic">
+                            {bookSnap.hotelName}
+                          </h3>
+                          <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-2 font-medium">
+                            <FiMapPin className="text-indigo-500" />{" "}
+                            {hotelRequest?.selectedHotel?.address || "N/A"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-0.5 text-amber-400 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                          {[...Array(5)].map((_, i) => (
+                            <FiStar
+                              key={i}
+                              size={12}
+                              fill={
+                                i <
+                                  (hotelRequest?.selectedHotel?.starRating || 4)
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-slate-50">
+                        <TravellerField
+                          icon={<FiCalendar />}
+                          label="Check-In"
+                          value={formatDate(bookSnap.checkInDate)}
+                        />
+                        <TravellerField
+                          icon={<FiCalendar />}
+                          label="Check-Out"
+                          value={formatDate(bookSnap.checkOutDate)}
+                        />
+                        <TravellerField
+                          icon={<FiMoon />}
+                          label="Nights"
+                          value={`${bookSnap.nights || 1} Night(s)`}
+                        />
+                        <TravellerField
+                          icon={<FiHome />}
+                          label="Rooms"
+                          value={`${bookSnap.roomCount || 1} Room(s)`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Rooms */}
+                  <div className="space-y-4">
+                    <SectionLabel
+                      icon={<FiKey />}
+                      title="Selected Accommodations"
+                    />
+                    {displayRooms.map((r, i) => (
+                      <div
+                        key={i}
+                        className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-5"
+                      >
+                        <div className="flex justify-between items-start border-b border-slate-50 pb-5">
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                                {r.Name?.[0] || "Standard Room"}
+                              </h4>
+                              {r.count > 1 && (
+                                <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-full border border-amber-200">
+                                  {r.count} ROOMS SELECTED
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 mt-2">
+                              <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full uppercase border border-indigo-100 flex items-center gap-1.5">
+                                <FiCoffee size={10} /> {r.MealType || "Room Only"}
+                              </span>
+                              {r.IsRefundable ? (
+                                <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full uppercase border border-emerald-100 flex items-center gap-1.5">
+                                  <FiCheckCircle size={10} /> Refundable
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-black bg-red-50 text-red-700 px-3 py-1 rounded-full uppercase border border-red-100 flex items-center gap-1.5">
+                                  <FiXCircle size={10} /> Non-Refundable
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {/* Per Night charge hidden as per request */}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                              Room Inclusions
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {(r.Inclusion || "Taxes Included")
+                                .split(",")
+                                .map((inc, j) => (
+                                  <span
+                                    key={j}
+                                    className="text-[10px] font-bold bg-slate-50 text-slate-600 px-3 py-1 rounded-lg border border-slate-100 shadow-sm"
+                                  >
+                                    {inc.trim()}
+                                  </span>
+                                ))}
+                            </div>
+                            {/* Exclusions */}
+                            {r.Exclusion && (
+                              <div className="mt-4">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                  Exclusions
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {r.Exclusion.split(",").map((exc, j) => (
+                                    <span
+                                      key={j}
+                                      className="text-[10px] font-bold bg-red-50 text-red-600 px-3 py-1 rounded-lg border border-red-100"
+                                    >
+                                      {exc.trim()}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-4">
+                            {/* Promotions */}
+                            {r.RoomPromotion && r.RoomPromotion.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                  Special Offer
+                                </p>
+                                <div className="bg-emerald-50 text-emerald-700 p-3 rounded-2xl border border-emerald-100 flex items-center gap-2">
+                                  <FiTag className="shrink-0" />
+                                  <p className="text-[11px] font-black leading-tight">
+                                    {r.RoomPromotion[0]}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Supplements */}
+                            {r.Supplements && r.Supplements.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                  Supplements
+                                </p>
+                                <div className="space-y-2">
+                                  {r.Supplements.map((sup, j) => (
+                                    <div
+                                      key={j}
+                                      className="bg-amber-50 text-amber-700 p-3 rounded-2xl border border-amber-100 flex items-center gap-2"
+                                    >
+                                      <FiPackage className="shrink-0" />
+                                      <p className="text-[10px] font-bold leading-tight">
+                                        {sup.Type} - ₹{sup.Price} (
+                                        {sup.ChargeType === "Fixed"
+                                          ? "Fixed"
+                                          : "Per Person"}
+                                        )
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="w-full lg:w-96 space-y-6">
+                  {/* Pricing Snapshot */}
+                  <div className="bg-linear-to-r from-[#003399] to-[#000d26] text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                    <SectionLabel icon={<FiDollarSign />} title="Fare Summary" />
+                    <div className="mt-6">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
+                      </p>
+                      <h4 className="text-4xl font-black text-[#C9A84C] tracking-tighter">
+                        ₹ {totalAmount.toLocaleString()}
+                      </h4>
+                    </div>
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+                  </div>
+
+                  <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-3">
+                      Quick Notes
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic">
+                      "Selected room is {rawRooms?.[0]?.IsRefundable ? 'refundable' : 'non-refundable'}. Please review the cancellation policy in the 'Charges' tab before approval."
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "project" && (
+              <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex-1 space-y-6">
+                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <SectionLabel icon={<FiBriefcase />} title="Project Context" />
+                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Project Name
+                        </p>
+                        <p className="text-base font-black text-slate-900 uppercase tracking-tighter">
+                          {booking.projectName || "Internal Business"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Project Client
+                        </p>
+                        <p className="text-base font-black text-slate-700 truncate uppercase">
+                          {booking.projectClient || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Project ID / Code
+                        </p>
+                        <p className="text-sm font-mono font-black text-slate-700 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 inline-block">
+                          {booking.projectId || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Assigned Approver
+                        </p>
+                        <p className="text-sm font-black text-slate-900 uppercase tracking-tighter">
+                          {approver.name}
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">
+                          {approver.email}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {booking.secondApprover && booking.secondApprover.email && (
+                    <div className="bg-white border border-amber-200 rounded-3xl p-8 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FiAlertCircle size={64} />
+                      </div>
+                      <SectionLabel icon={<FiUser />} title="Transferred Approver Details" />
+                      <div className="mt-8 flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 font-black text-2xl italic shadow-inner">
+                          {(booking.secondApprover.name || booking.secondApprover.email)[0].toUpperCase()}
+                        </div>
+                        <div className="relative z-10">
+                          <p className="text-xl font-black text-[#1A1714] uppercase tracking-tighter italic">
+                            {booking.secondApprover.name || booking.secondApprover.email.split('@')[0]}
+                          </p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">
+                            {booking.secondApprover.email}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-amber-200">
+                              Second Approver
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">
+                          Transfer Remark
+                        </p>
+                        <div className="bg-amber-50 p-6 rounded-4xl border border-amber-100 italic text-sm font-black text-amber-900 leading-relaxed shadow-inner">
+                          "{booking.secondApprover.transferRemark || booking.secondApprover.remark || "No remark provided"}"
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <SectionLabel icon={<FiUser />} title="Requested By" />
+                    <div className="mt-8 flex items-center gap-6">
+                      <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
+                        {
+                          (booking.requesterDetails?.name || booking.userId?.name?.firstName || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || "?")[0]
+                        }
+                      </div>
+                      <div>
+                        <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                          {booking.requesterDetails?.name || `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim() || `${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || ""} ${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.lastName || ""}`.trim() || "Unknown"}
+                        </p>
+                        <p className="text-xs font-bold text-slate-400 mt-1">
+                          {booking.requesterDetails?.email || booking.userId?.email || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.email || "No email"}
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
+                            Role: {booking.requesterDetails?.role || "Team Member"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-8 pt-8 border-t border-slate-50">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                        Reason for Travel
+                      </p>
+                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
+                        "
+                        {booking.purposeOfTravel || "Internal business requirement"}
+                        "
+                      </div>
+                    </div>
+                    {(booking.requestStatus === "rejected" || booking.status === "rejected" || booking.bookingStatus === "rejected") && (
+                      <div className="mt-8 pt-8 border-t border-slate-50">
+                        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 shadow-sm">
+                          <SectionLabel icon={<FiXCircle className="text-red-500" />} title="Rejection Details" />
+                          <div className="mt-8">
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {typeof booking.rejectedBy === 'string' ? booking.rejectedBy : (booking.rejectedBy?.name?.firstName ? `${booking.rejectedBy.name.firstName} ${booking.rejectedBy.name.lastName || ""}` : "System")}
+                            </p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                              {booking.rejectedDate ? formatDateTime(booking.rejectedDate) : (booking.rejectedAt ? formatDateTime(booking.rejectedAt) : "Unknown date")}
+                            </p>
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mt-6 mb-4">
+                              Reason for Rejection
+                            </p>
+                            <div className="bg-white p-6 rounded-[2rem] border border-red-100 italic text-sm font-black text-red-700 leading-relaxed shadow-inner">
+                              "{booking.approverComments || booking.reason || "No reason provided"}"
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "charges" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                  <SectionLabel icon={<FiShield />} title="Cancellation Policies" />
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {rawRooms?.[0]?.CancelPolicies?.map((policy, idx) => (
+                      <div
+                        key={idx}
+                        className="flex flex-col p-5 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group"
+                      >
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Effective Date
+                          </span>
+                          <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded uppercase">
+                            Window {idx + 1}
+                          </span>
+                        </div>
+                        <p className="text-sm font-black text-slate-700 uppercase mb-4">
+                          From {policy.FromDate.split(" ")[0]}
+                        </p>
+                        <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase">Charge</span>
+                          <span
+                            className={`text-base font-black ${policy.CancellationCharge === 0 ? "text-emerald-600" : "text-red-600"}`}
+                          >
+                            {policy.CancellationCharge === 0
+                              ? "FREE CANCELLATION"
+                              : `PENALTY: ₹${policy.CancellationCharge.toLocaleString()}`}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {!rawRooms?.[0]?.CancelPolicies?.length && (
+                      <div className="md:col-span-2 py-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                        <FiAlertCircle className="mx-auto text-slate-300 mb-3" size={32} />
+                        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No cancellation policy details available</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-8 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+                    <FiInfo className="text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                      Cancellation charges are subject to change based on the hotel's terms. The amounts shown are based on the latest data captured from the supplier.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "passenger" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-4">
+                  <SectionLabel
+                    icon={<FiUser />}
+                    title={`Passenger Information (${travelers.length})`}
+                  />
+                  <div className="grid grid-cols-1 gap-6">
+                    {travelers.map((pax, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm"
+                      >
+                        <div className="flex items-center gap-6">
+                          <div className="w-16 h-16 rounded-2xl bg-slate-900 text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
+                            {pax.firstName?.[0]}
+                            {pax.lastName?.[0]}
+                          </div>
+                          <div>
+                            <p className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {pax.title} {pax.firstName} {pax.lastName}
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                              <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-widest">
+                                {pax.paxType || "Adult"}
+                              </span>
+                              {pax.isLeadPassenger && (
+                                <span className="text-[10px] font-black bg-[#C9A84C] text-slate-900 px-3 py-1 rounded-full uppercase tracking-widest">
+                                  Lead Passenger
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 mt-10 pt-8 border-t border-slate-50">
+                          <TravellerField
+                            icon={<FiUser />}
+                            label="Gender"
+                            value={formatGender(pax)}
+                          />
+                          <TravellerField
+                            icon={<FiCalendar />}
+                            label="Date of Birth"
+                            value={formatPaxDob(pax)}
+                          />
+                          <TravellerField
+                            icon={<FiGlobe />}
+                            label="Nationality"
+                            value={formatNationality(pax)}
+                          />
+                          <TravellerField
+                            icon={<FiMail />}
+                            label="Email"
+                            value={formatPaxEmail(pax)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "history" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-sm max-w-2xl mx-auto">
+                  <SectionLabel icon={<FiClock />} title="Approval Request Timeline" />
+                  <div className="mt-12 relative">
+                    <div className="absolute left-[6.5px] top-2 bottom-2 w-[1px] bg-slate-100" />
+                    <TimelineItem
+                      title="Request Initiated"
+                      time={formatDateTime(booking.createdAt)}
+                      status="completed"
+                      description={`Travel request created by ${booking.requesterDetails?.name || booking.userId?.name?.firstName}`}
+                    />
+                    <TimelineItem
+                      title="Approval Workflow Assigned"
+                      time={formatDateTime(booking.createdAt)}
+                      status="completed"
+                      description={`Route assigned to ${approver.name} (${approver.role})`}
+                    />
+                    <TimelineItem
+                      title="Awaiting Review"
+                      time="Present"
+                      status="pending"
+                      active={true}
+                      description={`Currently pending with ${approver.name}. Awaiting final decision.`}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <ActionModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.action}
+          type="hotel"
+          onClose={() => setActionModal({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+        />
+      </div>
+      {/* <TransferApproverModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransfer={onTransfer}
+        bookingType="hotel"
+      /> */}
+    </div>,
+    document.body
+  );
+};
+
+// ─────────────────────────────────────────────
+// FLIGHT MODAL
+// ─────────────────────────────────────────────
+
+export const PendingFlightDetailsModal = ({
+  booking,
+  onClose,
+  onApprove,
+  onReject,
+  onTransfer,
+  isVerified = true,
+  isDiscarded = false,
+}) => {
+  const [activeTab, setActiveTab] = useState("details");
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState({ isOpen: false, action: null });
+
+  const handleConfirmAction = (comments) => {
+    if (actionModal.action === "approve") {
+      onApprove(booking._id, "flight", "approve", comments);
+    } else {
+      onReject(booking._id, "flight", "reject", comments);
+    }
+    setActionModal({ isOpen: false, action: null });
+  };
+
+  if (!booking) return null;
+
+  const flightRequest = booking.flightRequest || {};
+  const segments = flightRequest.segments || [];
+  const fareSnapshot = flightRequest.fareSnapshot || {};
+  const fareQuoteResult = flightRequest.fareQuote?.Response?.Results?.[0] || flightRequest.fareQuote?.Results?.[0] || {};
+  const fareBreakdown = fareQuoteResult.FareBreakdown || [];
+  const bookingItinerary = booking.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary || {};
+
+  const miniFareRules = (() => {
+    // Priority 0: From bookingResult if it's an approved/ticketed booking
+    const fromBooking = bookingItinerary.MiniFareRules;
+    if (fromBooking && fromBooking.length > 0) {
+      // Ensure it's always array-of-arrays so the render loop works
+      return Array.isArray(fromBooking[0]) ? fromBooking : [fromBooking];
+    }
+    // Priority 1: live fareQuote result (nested array-of-arrays)
+    const fromQuote = fareQuoteResult.MiniFareRules;
+    if (fromQuote && fromQuote.length > 0) return fromQuote;
+    // Priority 2: persisted fareSnapshot (also array-of-arrays)
+    const fromSnap = fareSnapshot.miniFareRules;
+    if (fromSnap && fromSnap.length > 0) {
+      // Ensure it's always array-of-arrays so the render loop works
+      return Array.isArray(fromSnap[0]) ? fromSnap : [fromSnap];
+    }
+    return [];
+  })();
+  const fareRules = bookingItinerary.FareRules || fareQuoteResult.FareRules || [];
+  const travelers = booking.travellers || [];
+  const bookSnap = booking.bookingSnapshot || {};
+  const approver = resolveApproverDetails(booking);
+  const pricingSnapshot = booking.pricingSnapshot || {};
+  const ssrSnap = flightRequest.ssrSnapshot || booking.ssrSnapshot || {};
+
+  const cabinLabel = {
+    1: "All",
+    2: "Economy",
+    3: "Premium Economy",
+    4: "Business",
+    5: "Premium Business",
+    6: "First Class",
+  };
+  const paxTypeLabel = { 1: "Adult", 2: "Child", 3: "Infant" };
+  const cabinDisplay =
+    bookSnap.cabinClass || cabinLabel[segments[0]?.cabinClass] || "Economy";
+
+  // 💰 PRICE FALLBACKS
+  const baseFare = fareSnapshot.baseFare ?? fareQuoteResult.Fare?.BaseFare ?? 0;
+  const totalTax = fareSnapshot.tax ?? fareQuoteResult.Fare?.Tax ?? 0;
+  const publishFare = fareQuoteResult.Fare?.PublishedFare ?? fareSnapshot.publishedFare ?? 0;
+  const displayTotal = pricingSnapshot.totalAmount || publishFare || 0;
+
+  const onwardSegments = segments.filter(
+    (s) => (s.journeyType || "onward") !== "return",
+  );
+  const returnSegments = segments.filter((s) => s.journeyType === "return");
+
+  // Flatten detailed segments from fareQuote for easy lookup
+  const allDetailedSegments = (fareQuoteResult.Segments || []).flat();
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const parsedFareRules = React.useMemo(() => {
+    let rules = flightRequest.fareRules?.data?.Response?.FareRules || flightRequest.fareRules?.Response?.FareRules || fareRules || [];
+    let quote = fareQuoteResult?.Results || fareQuoteResult || [];
+    return processFareRulesData(rules, quote);
+  }, [flightRequest.fareRules, fareRules, fareQuoteResult]);
+
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-4 overflow-hidden flex flex-col h-[92vh]">
+        {/* Header */}
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
+              <FaPlane size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-tight uppercase italic">
+                Flight Approval Request
+              </h2>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-widest">
+                Order ID: {booking.orderId || booking.bookingReference}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400"
+          >
+            <FiX size={22} />
+          </button>
+        </div>
+
+        {/* Sticky Action Bar */}
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-100 px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-4 text-[11px] font-black uppercase tracking-tighter">
+            {booking.requestStatus === "approved" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 uppercase tracking-tighter">
+                <FiCheckCircle size={12} />
+                Approved
+              </div>
+            ) : booking.requestStatus === "rejected" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 rounded-full border border-red-100 uppercase tracking-tighter">
+                <FiXCircle size={12} />
+                Rejected
+              </div>
+            ) : booking.requestStatus === "manager_approved" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-600 rounded-full border border-amber-200 uppercase tracking-tighter font-black">
+                WAITING FOR TRAVEL ADMIN APPROVAL
+              </div>
+            ) : isDiscarded ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full border border-slate-200 uppercase tracking-tighter font-black">
+                Expired
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100 uppercase tracking-tighter">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Pending Approval
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+              <FiClock className="text-slate-400" />
+              <span>Submitted: {formatDateTime(booking.createdAt)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-500 border-l border-slate-200 pl-4">
+              <FiBriefcase className="text-slate-400" />
+              <span>{booking.projectName || "Internal"}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isVerified &&
+              booking.requestStatus === "pending_approval" &&
+              !isDiscarded && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 animate-pulse">
+                  <FiAlertCircle size={14} className="text-amber-600" />
+                  <span className="text-[10px] font-black uppercase tracking-tight">
+                    Awaiting Admin Verification to Approve
+                  </span>
+                </div>
+              )}
+
+            {booking.requestStatus === "manager_approved" ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-200 italic">
+                <FiInfo size={14} className="text-amber-500" />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Awaiting Travel Admin Approval
+                </span>
+              </div>
+            ) : booking.requestStatus !== "pending_approval" ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 italic">
+                <FiInfo size={14} className="text-slate-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Request already {booking.requestStatus}
+                </span>
+              </div>
+            ) : isDiscarded ? (
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl border border-slate-200">
+                <FiAlertCircle size={14} className="text-slate-400" />
+                <span className="text-[11px] font-black uppercase tracking-tight">
+                  Travel Date Passed · No Action Possible
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* {onTransfer && (
+                  <button
+                    onClick={() => setIsTransferModalOpen(true)}
+                    disabled={!isVerified}
+                    className={`px-5 py-2 border border-amber-200 text-amber-700 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-amber-50"}`}
+                    title={!isVerified ? "Account pending verification" : ""}
+                  >
+                    Transfer Approver
+                  </button>
+                )} */}
+                <button
+                  onClick={() => setActionModal({ isOpen: true, action: "reject" })}
+                  disabled={!isVerified}
+                  className={`px-5 py-2 border border-red-100 text-red-600 font-black text-[11px] rounded-xl transition-all uppercase tracking-tight ${!isVerified ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200" : "hover:bg-red-50"}`}
+                  title={!isVerified ? "Account pending verification" : ""}
+                >
+                  Reject Request
+                </button>
+                <button
+                  onClick={() => setActionModal({ isOpen: true, action: "approve" })}
+                  disabled={!isVerified}
+                  className={`px-5 py-2 bg-[#22C55E] text-white font-black text-[11px] rounded-xl shadow-lg transition-all flex items-center gap-2 uppercase tracking-tight ${!isVerified ? "bg-slate-300 cursor-not-allowed shadow-none" : "hover:bg-emerald-600 shadow-emerald-100"}`}
+                  title={!isVerified ? "Account pending verification" : ""}
+                >
+                  <FiCheckCircle size={14} />
+                  Approve & Proceed
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs Navigation */}
+        <div className="bg-white px-6 border-b border-slate-100 flex items-center gap-8 shrink-0 overflow-x-auto no-scrollbar">
+          {[
+            { id: "details", label: "Flight Details", icon: <FaPlane /> },
+            { id: "project", label: "Project", icon: <FiBriefcase /> },
+            { id: "charges", label: "Charges and rules", icon: <FiDollarSign /> },
+            { id: "passenger", label: "Passenger", icon: <FiUser /> },
+            { id: "history", label: "Booking History", icon: <FiClock /> },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 py-4 text-[11px] font-black uppercase tracking-widest transition-all relative shrink-0 ${activeTab === tab.id
+                  ? "text-indigo-600"
+                  : "text-slate-400 hover:text-slate-600"
+                }`}
+            >
+              <span className={activeTab === tab.id ? "text-indigo-600" : "text-slate-300"}>
+                {tab.icon}
+              </span>
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth bg-slate-50/30">
+          <div className="max-w-7xl mx-auto">
+            {activeTab === "details" && (
+              <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Left Column */}
+                <div className="flex-1 space-y-6">
+                  {/* Itinerary */}
+                  <div className="space-y-4">
+                    <SectionLabel icon={<FaPlane />} title="Flight Itinerary" />
+                    {segments.map((seg, idx) => {
+                      const detailedSeg =
+                        allDetailedSegments.find(
+                          (ds) =>
+                            ds.Airline?.FlightNumber === seg.flightNumber &&
+                            ds.Origin?.Airport?.AirportCode ===
+                            seg.origin?.airportCode,
+                        ) || {};
+
+                      const origin = seg.origin || {};
+                      const destination = seg.destination || {};
+                      const originName =
+                        detailedSeg.Origin?.Airport?.AirportName ||
+                        origin.airportName ||
+                        origin.city;
+                      const destName =
+                        detailedSeg.Destination?.Airport?.AirportName ||
+                        destination.airportName ||
+                        destination.city;
+                      const supplierFareClass =
+                        detailedSeg.SupplierFareClass ||
+                        seg.supplierFareClass ||
+                        "N/A";
+
+                      const isRefundable =
+                        fareSnapshot.refundable ??
+                        fareQuoteResult?.IsRefundable ??
+                        false;
+                      const journeyKey =
+                        seg.journeyType === "return" ? "return" : "onward";
+                      const legLabel =
+                        journeyKey === "return"
+                          ? "Return Flight"
+                          : "Departure Flight";
+
+                      return (
+                        <React.Fragment key={idx}>
+                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
+                            <div className="flex items-center justify-between border-b border-slate-50 pb-5">
+                              <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase shadow-sm tracking-widest">
+                                  {legLabel}
+                                </span>
+                                <span className="text-sm font-black text-slate-800 tracking-tight uppercase italic">
+                                  {seg.airlineName} · {seg.airlineCode}
+                                  {seg.flightNumber} · {supplierFareClass}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
+                                  {cabinDisplay}
+                                </span>
+                                {isRefundable ? (
+                                  <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 uppercase tracking-widest flex items-center gap-1.5">
+                                    <FiCheckCircle size={10} /> Refundable
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-black bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 uppercase tracking-widest flex items-center gap-1.5">
+                                    <FiXCircle size={10} /> Non-Refundable
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-12 py-4">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-4xl font-black text-slate-900 tracking-tighter italic leading-none">
+                                  {origin.airportCode}
+                                </h4>
+                                <p className="text-[11px] font-black text-slate-800 mt-2 truncate uppercase tracking-tighter">
+                                  {originName}
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">
+                                  {origin.city}{" "}
+                                  {origin.terminal ? `· T${origin.terminal}` : ""}
+                                </p>
+                                <div className="mt-4">
+                                  <p className="text-xl font-black text-indigo-700 leading-none">
+                                    {formatTime(seg.departureDateTime)}
+                                  </p>
+                                  <p className="text-[11px] font-black text-slate-900 uppercase mt-1.5 italic">
+                                    {formatDate(seg.departureDateTime)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex-1 flex flex-col items-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                  {seg.durationMinutes
+                                    ? `${Math.floor(seg.durationMinutes / 60)}h ${seg.durationMinutes % 60}m`
+                                    : "—"}
+                                </p>
+                                <div className="w-full flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100 shrink-0" />
+                                  <div className="flex-1 border-t-2 border-dashed border-slate-200 relative">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                                      <FaPlane
+                                        className="text-indigo-600 rotate-90"
+                                        size={12}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="w-2 h-2 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100 shrink-0" />
+                                </div>
+                                <div className="mt-3">
+                                  <span
+                                    className="text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border"
+                                    style={{
+                                      color:
+                                        seg.fareClassification?.color || "#94a3b8",
+                                      borderColor: seg.fareClassification?.color
+                                        ? `${seg.fareClassification.color}60`
+                                        : "#e2e8f0",
+                                      backgroundColor: seg.fareClassification?.color
+                                        ? `${seg.fareClassification.color}10`
+                                        : "#f8fafc",
+                                    }}
+                                  >
+                                    {seg.fareClassification?.type ||
+                                      fareQuoteResult.ResultFareType ||
+                                      "Regular Fare"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex-1 min-w-0 text-right">
+                                <h4 className="text-4xl font-black text-slate-900 tracking-tighter italic leading-none">
+                                  {destination.airportCode}
+                                </h4>
+                                <p className="text-[11px] font-black text-slate-800 mt-2 truncate uppercase tracking-tighter">
+                                  {destName}
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">
+                                  {destination.city}{" "}
+                                  {destination.terminal
+                                    ? `· T${destination.terminal}`
+                                    : ""}
+                                </p>
+                                <div className="mt-4">
+                                  <p className="text-xl font-black text-indigo-700 leading-none">
+                                    {formatTime(seg.arrivalDateTime)}
+                                  </p>
+                                  <p className="text-[11px] font-black text-slate-900 uppercase mt-1.5 italic">
+                                    {formatDate(seg.arrivalDateTime)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-slate-50">
+                              <TravellerField
+                                icon={<FiPackage />}
+                                label="Check-In Baggage"
+                                value={seg.baggage?.checkIn}
+                              />
+                              <TravellerField
+                                icon={<FiPackage />}
+                                label="Cabin Baggage"
+                                value={seg.baggage?.cabin}
+                              />
+                              <TravellerField
+                                icon={<FiTag />}
+                                label="Supplier Fare Class"
+                                value={supplierFareClass}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Layover Indicator */}
+                          {idx < segments.length - 1 &&
+                            (seg.journeyType || "onward") ===
+                            (segments[idx + 1].journeyType || "onward") && (
+                              <div className="flex items-center gap-4 py-2 px-6">
+                                <div className="flex-1 border-t border-dashed border-slate-200" />
+                                <div className="flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full border border-amber-100 shadow-sm">
+                                  <FiClock
+                                    size={12}
+                                    className="animate-pulse text-amber-600"
+                                  />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">
+                                    Layover in {destination.city || "Connection"}:{" "}
+                                    {calculateLayover(
+                                      seg.arrivalDateTime,
+                                      segments[idx + 1].departureDateTime,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex-1 border-t border-dashed border-slate-200" />
+                              </div>
+                            )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  {/* SSR Details (Segment-wise Table) */}
+                  {(ssrSnap.seats?.length || 0) +
+                    (ssrSnap.meals?.length || 0) +
+                    (ssrSnap.baggage?.length || 0) >
+                    0 && (
+                      <div className="space-y-4">
+                        <SectionLabel
+                          icon={<FiTag />}
+                          title="Extra Add-ons (SSR Details)"
+                        />
+                        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                                  <th className="pb-4 text-left">Route</th>
+                                  <th className="pb-4 text-left">Seat Selection</th>
+                                  <th className="pb-4 text-left">Meal Selection</th>
+                                  <th className="pb-4 text-left">Extra Baggage</th>
+                                  <th className="pb-4 text-right">
+                                    Total Add-on Cost
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-50">
+                                {Array.from(
+                                  new Set([
+                                    ...(ssrSnap.seats || []).map(
+                                      (s) => s.segmentIndex,
+                                    ),
+                                    ...(ssrSnap.meals || []).map(
+                                      (m) => m.segmentIndex,
+                                    ),
+                                    ...(ssrSnap.baggage || []).map(
+                                      (b) => b.segmentIndex,
+                                    ),
+                                  ]),
+                                )
+                                  .sort((a, b) => a - b)
+                                  .map((segIdx) => {
+                                    const seg = segments[segIdx] || {};
+                                    const segSeats = (ssrSnap.seats || []).filter(
+                                      (s) => s.segmentIndex === segIdx,
+                                    );
+                                    const segMeals = (ssrSnap.meals || []).filter(
+                                      (m) => m.segmentIndex === segIdx,
+                                    );
+                                    const segBaggage = (ssrSnap.baggage || []).filter(
+                                      (b) => b.segmentIndex === segIdx,
+                                    );
+
+                                    const segTotal = [
+                                      ...segSeats,
+                                      ...segMeals,
+                                      ...segBaggage,
+                                    ].reduce(
+                                      (acc, curr) => acc + (curr.price || 0),
+                                      0,
+                                    );
+
+                                    return (
+                                      <tr
+                                        key={segIdx}
+                                        className="text-xs font-black text-slate-700 hover:bg-slate-50/50 transition-colors"
+                                      >
+                                        <td className="py-5 pr-4">
+                                          <div className="flex flex-col">
+                                            <span className="text-sm font-black text-slate-900 tracking-tighter italic">
+                                              {seg.origin?.airportCode || "???"} →{" "}
+                                              {seg.destination?.airportCode || "???"}
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className="py-5 pr-4">
+                                          {segSeats.length > 0 ? (
+                                            <div className="space-y-1">
+                                              {segSeats.map((s, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="flex items-center gap-2"
+                                                >
+                                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                                                    SEAT {s.seatNo}
+                                                  </span>
+                                                  <span className="text-[9px] text-slate-400">
+                                                    ₹{s.price || 0}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-300 italic">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-5 pr-4">
+                                          {segMeals.length > 0 ? (
+                                            <div className="space-y-2">
+                                              {segMeals.map((m, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="flex flex-col gap-0.5"
+                                                >
+                                                  <span className="text-[10px] font-black text-slate-800 leading-tight uppercase">
+                                                    {m.airlineDescription || m.code}
+                                                  </span>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-[8px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase">
+                                                      {getMealDesc(m.description)}
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400">
+                                                      ₹{m.price || 0}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-300 italic">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-5 pr-4">
+                                          {segBaggage.length > 0 ? (
+                                            <div className="space-y-1">
+                                              {segBaggage.map((b, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="flex flex-col gap-0.5"
+                                                >
+                                                  <span className="text-[10px] font-black text-slate-800 uppercase italic leading-tight">
+                                                    {b.weight} KG Extra
+                                                  </span>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-[8px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded uppercase">
+                                                      {getBaggageDesc(b.description)}
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400">
+                                                      ₹{b.price || 0}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-300 italic">
+                                              —
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-5 text-right font-mono text-sm text-slate-900">
+                                          ₹{segTotal.toLocaleString()}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t border-slate-100 bg-slate-50/30">
+                                  <td
+                                    colSpan={4}
+                                    className="py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest italic"
+                                  >
+                                    Combined SSR Total
+                                  </td>
+                                  <td className="py-4 text-right text-base font-black text-indigo-700 tracking-tighter">
+                                    ₹
+                                    {[
+                                      ...(ssrSnap.seats || []),
+                                      ...(ssrSnap.meals || []),
+                                      ...(ssrSnap.baggage || []),
+                                    ]
+                                      .reduce(
+                                        (acc, curr) => acc + (curr.price || 0),
+                                        0,
+                                      )
+                                      .toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+
+                          {/* SSR Legend Note */}
+                          <div className="mt-8 pt-6 border-t border-slate-50">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                              SSR Status Legend
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                                <p className="text-[9px] font-black text-indigo-600 uppercase mb-1">
+                                  Seats
+                                </p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
+                                  1: Included (Fare) <br />
+                                  2: Purchase (Extra)
+                                </p>
+                              </div>
+                              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                                <p className="text-[9px] font-black text-amber-600 uppercase mb-1">
+                                  Meals
+                                </p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
+                                  1: Included · 2: Direct <br />
+                                  3: Imported
+                                </p>
+                              </div>
+                              <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                                <p className="text-[9px] font-black text-purple-600 uppercase mb-1">
+                                  Baggage
+                                </p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed font-bold">
+                                  1: Included · 2: Direct <br />
+                                  5: ImportedUpgrade
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+
+                {/* Right Column */}
+                <div className="w-full lg:w-96 space-y-6">
+                  {/* Fare Breakdown */}
+                  <div className="bg-linear-to-r from-[#003399] to-[#000d26] text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+                    <SectionLabel
+                      icon={<FiDollarSign />}
+                      title="Fare Snapshot"
+                    />
+                    <div className="mt-8 relative">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">
+                        Total Paid <span className="font-normal text-slate-400/80 normal-case tracking-normal text-[9px] ml-1">(incl. all taxes and service fee)</span>
+                      </p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-slate-500 italic">
+                          INR
+                        </span>
+                        <h4 className="text-5xl font-black text-[#C9A84C] tracking-tighter italic tabular-nums">
+                          {Math.ceil(displayTotal)?.toLocaleString()}
+                        </h4>
+                      </div>
+                      <div className="mt-8 space-y-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-6">
+                        <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-tight">
+                          <span className="text-slate-400">SSR Add-ons</span>
+                          <span className="text-[#C9A84C]">
+                            ₹
+                            {[
+                              ...(ssrSnap.seats || []),
+                              ...(ssrSnap.meals || []),
+                              ...(ssrSnap.baggage || []),
+                            ]
+                              .reduce((acc, curr) => acc + (curr.price || 0), 0)
+                              .toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                          <span className="text-[10px] font-black text-slate-500 uppercase">Net Payable</span>
+                          <span className="text-xl font-black text-white italic tracking-tighter">
+                            ₹ {Math.ceil(displayTotal)?.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "project" && (
+              <div className="flex flex-col lg:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex-1 space-y-6">
+                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <SectionLabel icon={<FiBriefcase />} title="Project Context" />
+                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Project Name
+                        </p>
+                        <p className="text-base font-black text-slate-900 uppercase tracking-tighter">
+                          {booking.projectName || "Internal Business"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Project Client
+                        </p>
+                        <p className="text-base font-black text-slate-700 truncate uppercase">
+                          {booking.projectClient || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Project ID / Code
+                        </p>
+                        <p className="text-sm font-mono font-black text-slate-700 bg-slate-50 px-3 py-1 rounded-lg border border-slate-100 inline-block">
+                          {booking.projectId || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                          Assigned Approver
+                        </p>
+                        <p className="text-sm font-black text-slate-900 uppercase tracking-tighter">
+                          {approver.name}
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">
+                          {approver.email}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {booking.secondApprover && booking.secondApprover.email && (
+                    <div className="bg-white border border-amber-200 rounded-3xl p-8 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <FiAlertCircle size={64} />
+                      </div>
+                      <SectionLabel icon={<FiUser />} title="Transferred Approver Details" />
+                      <div className="mt-8 flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 font-black text-2xl italic shadow-inner">
+                          {booking.secondApprover.email[0].toUpperCase()}
+                        </div>
+                        <div className="relative z-10">
+                          <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                            {booking.secondApprover.name || booking.secondApprover.email.split('@')[0]}
+                          </p>
+                          <p className="text-xs font-bold text-slate-400 mt-1">
+                            {booking.secondApprover.email}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-amber-200">
+                              Second Approver
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-4">
+                          Transfer Remark
+                        </p>
+                        <div className="bg-amber-50 p-6 rounded-4xl border border-amber-100 italic text-sm font-black text-amber-900 leading-relaxed shadow-inner">
+                          "{booking.secondApprover.transferRemark || booking.secondApprover.remark || "No remark provided"}"
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <SectionLabel icon={<FiUser />} title="Requested By" />
+                    <div className="mt-8 flex items-center gap-6">
+                      <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl italic shadow-inner">
+                        {
+                          (booking.requesterDetails?.name || booking.userId?.name?.firstName || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || "?")[0]
+                        }
+                      </div>
+                      <div>
+                        <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                          {booking.requesterDetails?.name || `${booking.userId?.name?.firstName || ""} ${booking.userId?.name?.lastName || ""}`.trim() || `${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.firstName || ""} ${(travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.lastName || ""}`.trim() || "Unknown"}
+                        </p>
+                        <p className="text-xs font-bold text-slate-400 mt-1">
+                          {booking.requesterDetails?.email || booking.userId?.email || (travelers?.find(t => t.isLeadPassenger) || travelers?.[0])?.email || "No email"}
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest italic border border-indigo-100">
+                            Role: {booking.requesterDetails?.role || "Team Member"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-8 pt-8 border-t border-slate-50">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                        Reason for Travel
+                      </p>
+                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 italic text-sm font-black text-slate-700 leading-relaxed shadow-inner">
+                        "
+                        {booking.purposeOfTravel || "Internal business requirement"}
+                        "
+                      </div>
+                    </div>
+                    {(booking.requestStatus === "rejected" || booking.status === "rejected" || booking.bookingStatus === "rejected") && (
+                      <div className="mt-8 pt-8 border-t border-slate-50">
+                        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 shadow-sm">
+                          <SectionLabel icon={<FiXCircle className="text-red-500" />} title="Rejection Details" />
+                          <div className="mt-8">
+                            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {typeof booking.rejectedBy === 'string' ? booking.rejectedBy : (booking.rejectedBy?.name?.firstName ? `${booking.rejectedBy.name.firstName} ${booking.rejectedBy.name.lastName || ""}` : "System")}
+                            </p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1">
+                              {booking.rejectedDate ? formatDateTime(booking.rejectedDate) : (booking.rejectedAt ? formatDateTime(booking.rejectedAt) : "Unknown date")}
+                            </p>
+                            <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mt-6 mb-4">
+                              Reason for Rejection
+                            </p>
+                            <div className="bg-white p-6 rounded-[2rem] border border-red-100 italic text-sm font-black text-red-700 leading-relaxed shadow-inner">
+                              "{booking.approverComments || booking.reason || "No reason provided"}"
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "charges" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-6">
+                  <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                    <SectionLabel
+                      icon={<FiAlertCircle />}
+                      title="Cancellation & Date Change Rules"
+                    />
+                    <div className="mt-8">
+                      <FareRulesAccordion parsedRules={parsedFareRules} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "passenger" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-4">
+                  <SectionLabel
+                    icon={<FiUser />}
+                    title={`Passenger Information (${travelers.length})`}
+                  />
+                  <div className="grid grid-cols-1 gap-6">
+                    {travelers.map((pax, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm"
+                      >
+                        <div className="flex items-center gap-6">
+                          <div className="w-16 h-16 rounded-2xl bg-slate-900 text-[#C9A84C] flex items-center justify-center font-black text-2xl shadow-lg uppercase italic">
+                            {pax.firstName?.[0]}
+                            {pax.lastName?.[0]}
+                          </div>
+                          <div>
+                            <p className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">
+                              {pax.title} {pax.firstName} {pax.lastName}
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                              <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-widest">
+                                {pax.paxType || "Adult"}
+                              </span>
+                              {pax.isLeadPassenger && (
+                                <span className="text-[10px] font-black bg-[#C9A84C] text-slate-900 px-3 py-1 rounded-full uppercase tracking-widest">
+                                  Lead Passenger
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 mt-10 pt-8 border-t border-slate-50">
+                          <TravellerField
+                            icon={<FiUser />}
+                            label="Gender"
+                            value={formatGender(pax)}
+                          />
+                          <TravellerField
+                            icon={<FiCalendar />}
+                            label="Date of Birth"
+                            value={formatPaxDob(pax)}
+                          />
+                          <TravellerField
+                            icon={<FiGlobe />}
+                            label="Nationality"
+                            value={formatNationality(pax)}
+                          />
+                          <TravellerField
+                            icon={<FiMail />}
+                            label="Email"
+                            value={formatPaxEmail(pax)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "history" && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-sm max-w-2xl mx-auto">
+                  <SectionLabel icon={<FiClock />} title="Approval Request Timeline" />
+                  <div className="mt-12 relative">
+                    <div className="absolute left-[6.5px] top-2 bottom-2 w-[1px] bg-slate-100" />
+                    <TimelineItem
+                      title="Request Initiated"
+                      time={formatDateTime(booking.createdAt)}
+                      status="completed"
+                      description={`Travel request created by ${booking.requesterDetails?.name || booking.userId?.name?.firstName}`}
+                    />
+                    <TimelineItem
+                      title="Approval Workflow Assigned"
+                      time={formatDateTime(booking.createdAt)}
+                      status="completed"
+                      description={`Route assigned to ${approver.name} (${approver.role})`}
+                    />
+                    <TimelineItem
+                      title="Awaiting Review"
+                      time="Present"
+                      status="pending"
+                      active={true}
+                      description={`Currently pending with ${approver.name}. Awaiting final decision.`}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <ActionModal
+          isOpen={actionModal.isOpen}
+          action={actionModal.action}
+          type="flight"
+          onClose={() => setActionModal({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+        />
+      </div>
+      {/* <TransferApproverModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransfer={onTransfer}
+        bookingType="flight"
+      /> */}
+    </div>,
+    document.body
+  );
+};
+
+export default PendingHotelDetailsModal;

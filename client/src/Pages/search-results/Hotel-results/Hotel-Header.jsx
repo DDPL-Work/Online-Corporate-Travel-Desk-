@@ -1,0 +1,528 @@
+import React, { useEffect, useRef, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  searchHotels,
+  fetchCities,
+  fetchCountries,
+} from "../../../Redux/Actions/hotelThunks";
+import { setSearchPayload } from "../../../Redux/Slice/hotelSlice";
+import {
+  MdArrowBack,
+  MdLocationOn,
+  MdPerson,
+  MdSearch,
+  MdBed,
+} from "react-icons/md";
+import { FaGlobe } from "react-icons/fa";
+import {
+  CountrySelector,
+  SearchableSelect,
+} from "../../../components/hotel-search/HotelSearchSubComponents";
+import HotelGuestSelection from "../../../components/hotel-search/HotelGuestSelection";
+import CustomCalendar from "../../../components/CustomCalendar";
+import { BsCalendar4 } from "react-icons/bs";
+
+/* ─── Color Tokens ─── */
+const ORANGE = "#C9A84C";
+const DARK = "#000D26";
+const AZURE = "#1E293B";
+
+/* ─── Date Field ─── */
+const DateField = ({
+  label,
+  value,
+  onChange,
+  min,
+  open,
+  setOpen,
+  align = "left",
+}) => {
+  const fmt = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + "T00:00:00");
+    return {
+      day: d.getDate(),
+      month: d.toLocaleString("default", { month: "short" }),
+      year: String(d.getFullYear()).slice(2),
+      weekday: d.toLocaleString("default", { weekday: "short" }),
+    };
+  };
+  const f = fmt(value);
+  return (
+    <div className="relative w-full">
+      <div
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-3 cursor-pointer hover:bg-amber-50 transition-colors rounded-lg sm:rounded-xl bg-amber-50/40 border border-amber-100/60"
+      >
+        <BsCalendar4 className="shrink-0 text-sm sm:text-base" style={{ color: ORANGE }} />
+        <div className="flex flex-col flex-1 min-w-0">
+          <span
+            className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none whitespace-nowrap"
+            style={{ color: ORANGE }}
+          >
+            {label}
+          </span>
+          {f ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-baseline gap-1 mt-0.5 sm:mt-1">
+              <span className="text-base sm:text-lg lg:text-lg font-black text-gray-800 leading-none whitespace-nowrap">
+                {f.day}
+              </span>
+              <span className="text-[11px] sm:text-xs lg:text-xs font-bold text-gray-600 whitespace-nowrap">
+                {f.month} '{f.year}
+              </span>
+              <span className="text-[10px] lg:text-xs text-gray-400 hidden sm:inline-block whitespace-nowrap">{f.weekday}</span>
+            </div>
+          ) : (
+            <span className="text-xs sm:text-sm font-bold text-gray-400 mt-0.5 sm:mt-1">
+              Select date
+            </span>
+          )}
+        </div>
+      </div>
+      {open && (
+        <div
+          className={`absolute top-[calc(100%+8px)] z-[300] ${align === "right" ? "right-0" : "left-0"} w-[min(340px,90vw)]`}
+        >
+          <CustomCalendar
+            value={value}
+            minDate={min}
+            onChange={(val) => {
+              onChange(val);
+              setOpen(false);
+            }}
+            onClose={() => setOpen(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Divider = () => (
+  <div className="hidden md:block w-px self-stretch bg-gray-200 my-2 shrink-0" />
+);
+
+const Header = ({ onSearch }) => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { searchPayload, countries, citiesByCountry, loading } = useSelector(
+    (state) => state.hotel,
+  );
+  const { publicBranding } = useSelector((state) => state.landingPage);
+
+  useEffect(() => {
+    if (!countries || (Array.isArray(countries) && countries.length === 0)) {
+      dispatch(fetchCountries());
+    }
+  }, [dispatch, countries]);
+
+  const [form, setForm] = useState({
+    country: "IN",
+    cityCode: "",
+    cityName: "",
+    checkIn: "",
+    checkOut: "",
+    rooms: 1,
+    guestNationality: "IN",
+  });
+  const [roomConfigs, setRoomConfigs] = useState([
+    { adults: 2, children: 0, childrenAges: [] },
+  ]);
+  const [openCalendar, setOpenCalendar] = useState(null);
+  const [showGuestDropdown, setShowGuestDropdown] = useState(false);
+  const guestRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (guestRef.current && !guestRef.current.contains(e.target))
+        setShowGuestDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Sync form with searchPayload ONLY on initial mount or if cityCode changes externally
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (searchPayload && !hasSynced.current) {
+      const destCountry =
+        searchPayload.CountryCode ||
+        searchPayload.countryCode ||
+        searchPayload.GuestNationality ||
+        "IN";
+      const cityName = searchPayload.CityName || searchPayload.cityName || "";
+      const cityCode = searchPayload.CityCode || searchPayload.cityCode || "";
+
+      setForm({
+        country: destCountry,
+        guestNationality: searchPayload.GuestNationality || "IN",
+        cityCode: cityCode,
+        cityName: cityName,
+        checkIn: searchPayload.CheckIn || "",
+        checkOut: searchPayload.CheckOut || "",
+        rooms: searchPayload.NoOfRooms || 1,
+      });
+
+      if (searchPayload.PaxRooms) {
+        setRoomConfigs(
+          searchPayload.PaxRooms.map((r) => ({
+            adults:
+              r.Adults !== undefined
+                ? r.Adults
+                : r.adults !== undefined
+                  ? r.adults
+                  : 1,
+            children:
+              r.Children !== undefined
+                ? r.Children
+                : r.children !== undefined
+                  ? r.children
+                  : 0,
+            childrenAges: r.ChildrenAges || r.childrenAges || [],
+          })),
+        );
+      }
+
+      if (!citiesByCountry?.[destCountry]) {
+        dispatch(fetchCities(destCountry));
+      }
+      hasSynced.current = true;
+    }
+  }, [searchPayload, dispatch, citiesByCountry]);
+
+  const currentCities = citiesByCountry?.[form.country] || [];
+
+  useEffect(() => {
+    if (form.cityCode && currentCities.length > 0) {
+      const matched = currentCities.find((c) => c.cityCode === form.cityCode);
+      if (matched) setForm((prev) => ({ ...prev, cityName: matched.cityName }));
+    }
+  }, [form.cityCode, currentCities]);
+
+  useEffect(() => {
+    setRoomConfigs((prev) => {
+      const next = [...prev];
+      if (form.rooms > next.length) {
+        for (let i = next.length; i < form.rooms; i++)
+          next.push({ adults: 2, children: 0, childrenAges: [] });
+      } else if (form.rooms < next.length) next.length = form.rooms;
+      return next;
+    });
+  }, [form.rooms]);
+
+  const getFlagEmoji = (countryCode) => {
+    if (!countryCode) return "";
+    return countryCode
+      .toUpperCase()
+      .replace(/./g, (char) =>
+        String.fromCodePoint(127397 + char.charCodeAt()),
+      );
+  };
+
+  const countryArray =
+    countries?.data?.CountryList || countries?.data || countries || [];
+  const normalizedCountries = Array.isArray(countryArray)
+    ? countryArray.map((c) => {
+        const code = c.Code || c.code;
+        return { code, name: c.Name || c.name, flag: getFlagEmoji(code) };
+      })
+    : [];
+
+  const handleSearch = () => {
+    if (!form.cityCode || !form.checkIn || !form.checkOut) return;
+    const payload = {
+      CheckIn: form.checkIn,
+      CheckOut: form.checkOut,
+      CityCode: form.cityCode,
+      CityName: form.cityName,
+      CountryCode: form.country,
+      GuestNationality: form.guestNationality,
+      NoOfRooms: form.rooms,
+      PaxRooms: roomConfigs.map((r) => ({
+        Adults: r.adults,
+        Children: r.children,
+        ChildrenAges: (r.childrenAges || []).slice(0, r.children),
+      })),
+      IsDetailedResponse: true,
+      Filters: { Refundable: true, MealType: "All" },
+      ResponseTime: 23,
+    };
+    if (onSearch) onSearch();
+    dispatch(setSearchPayload(payload));
+  };
+
+  const totalGuests = roomConfigs.reduce(
+    (sum, r) => sum + r.adults + r.children,
+    0,
+  );
+  const rooms = form.rooms;
+  const nights =
+    form.checkIn && form.checkOut
+      ? Math.max(
+          0,
+          (new Date(form.checkOut) - new Date(form.checkIn)) /
+            (1000 * 60 * 60 * 24),
+        )
+      : 0;
+  const today = new Date().toISOString().split("T")[0];
+
+  return (
+    <header className="bg-[#000D26] shadow-lg relative z-[9000]">
+      <div className="container mx-auto px-2 sm:px-4 pt-1.5 sm:pt-3 pb-1.5 sm:pb-4">
+        {/* Top Actions Row */}
+        <div className="flex items-center justify-between mb-1 sm:mb-3">
+          <button
+            type="button"
+            onClick={() => {
+              navigate(`/travel`, { state: { activeTab: "hotel" } });
+            }}
+            className="flex items-center gap-1.5 text-[11px] sm:text-sm font-semibold text-white/60 hover:text-white transition leading-none"
+          >
+            <MdArrowBack /> <span className="hidden xs:inline">Back to Search</span><span className="xs:hidden">Back</span>
+          </button>
+        </div>
+        {/* Title row */}
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-3 flex-wrap">
+          <MdBed className="text-lg sm:text-2xl" style={{ color: ORANGE }} />
+          <span className="text-white font-black text-sm sm:text-lg">Hotels</span>
+          {form.cityName && (
+            <>
+              <span className="text-white/50 text-xs sm:text-sm">in</span>
+              <span className="text-white font-bold text-sm sm:text-base">{form.cityName}</span>
+            </>
+          )}
+          {nights > 0 && (
+            <span
+              className="text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 rounded-full"
+              style={{ background: ORANGE, color: DARK }}
+            >
+              {nights} Night{nights !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex flex-col lg:flex-row items-stretch bg-white rounded-xl sm:rounded-2xl overflow-visible shadow-2xl py-1 sm:py-3 lg:py-0 gap-y-1 sm:gap-y-2 lg:gap-y-0 lg:h-[72px]">
+          <div className="flex lg:contents">
+            <div className="flex-1 min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 lg:flex lg:items-center rounded-tl-xl sm:rounded-tl-2xl lg:rounded-tr-none lg:rounded-l-2xl">
+              <SearchableSelect
+                label="Country"
+                variant="minimal"
+                icon={<FaGlobe className="text-base sm:text-lg" style={{ color: ORANGE }} />}
+                value={form.country}
+                options={normalizedCountries}
+                displayKey="name"
+                valueKey="code"
+                showCodeInOptions={true}
+                onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
+                onChange={(item) => {
+                  setForm({ ...form, country: item.code, cityCode: "", cityName: "" });
+                  if (!citiesByCountry?.[item.code]) {
+                    dispatch(fetchCities(item.code));
+                  }
+                }}
+                placeholder="Select Country"
+              />
+            </div>
+            <div className="flex-[1.5] min-w-0 px-1.5 sm:px-2 lg:px-3 py-0.5 lg:py-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-amber-50/30 border-l lg:border-l-0 lg:flex lg:items-center rounded-tr-xl sm:rounded-tr-2xl lg:rounded-none">
+              <SearchableSelect
+                label="City / Area"
+                variant="minimal"
+                icon={
+                  <MdLocationOn className="text-base sm:text-lg" style={{ color: ORANGE }} />
+                }
+                value={form.cityCode}
+                options={currentCities}
+                displayKey="cityName"
+                valueKey="cityCode"
+                onOpen={() => { setOpenCalendar(null); setShowGuestDropdown(false); }}
+                onChange={(item) =>
+                  setForm({
+                    ...form,
+                    cityCode: item.cityCode,
+                    cityName: item.cityName,
+                  })
+                }
+                placeholder="Where are you going?"
+              />
+            </div>
+          </div>
+          <div className="flex items-stretch flex-1 lg:items-center">
+            <div className="flex-1 min-w-0 px-1 sm:px-2 lg:px-3 py-0 border-b lg:border-b-0 lg:border-r border-gray-100 lg:flex lg:items-center">
+              <DateField
+                label="Check-In"
+                value={form.checkIn}
+                min={today}
+                open={openCalendar === "checkIn"}
+                setOpen={(val) => { setOpenCalendar(val ? "checkIn" : null); if (val) setShowGuestDropdown(false); }}
+                onChange={(val) =>
+                  setForm({
+                    ...form,
+                    checkIn: val,
+                    checkOut:
+                      form.checkOut && form.checkOut <= val ? "" : form.checkOut,
+                  })
+                }
+              />
+            </div>
+            {nights > 0 && (
+              <div className="hidden lg:flex items-center justify-center px-1 shrink-0">
+                <span
+                  className="text-xs font-black px-2 py-1 rounded-full whitespace-nowrap border"
+                  style={{
+                    background: `${ORANGE}1A`,
+                    color: ORANGE,
+                    borderColor: `${ORANGE}50`,
+                  }}
+                >
+                  {nights}N
+                </span>
+              </div>
+            )}
+            <Divider />
+            <div className="flex-1 min-w-0 px-1 sm:px-2 lg:px-3 py-0 border-b lg:border-b-0 lg:border-r border-gray-100 lg:flex lg:items-center">
+              <DateField
+                label="Check-Out"
+                value={form.checkOut}
+                min={form.checkIn || today}
+                open={openCalendar === "checkOut"}
+                setOpen={(val) => { setOpenCalendar(val ? "checkOut" : null); if (val) setShowGuestDropdown(false); }}
+                align="right"
+                onChange={(val) => setForm({ ...form, checkOut: val })}
+              />
+            </div>
+          </div>
+          <Divider />
+          <div
+            className="flex-[1.3] min-w-0 relative px-1 sm:px-2 lg:px-3 py-0 border-b lg:border-b-0 border-gray-100 lg:flex lg:items-center"
+            ref={guestRef}
+          >
+            <button
+              type="button"
+              onClick={() => { setShowGuestDropdown((v) => !v); setOpenCalendar(null); }}
+              className="w-full h-full flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-3 lg:py-2 bg-amber-50/40 border border-amber-100/60 text-left transition-colors rounded-lg sm:rounded-xl cursor-pointer hover:bg-amber-50"
+            >
+              <MdPerson
+                className="shrink-0 text-base sm:text-lg"
+                style={{ color: ORANGE }}
+              />
+              <span className="flex flex-col flex-1 min-w-0">
+                <span
+                  className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest leading-none"
+                  style={{ color: ORANGE }}
+                >
+                  Guests &amp; Rooms
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-gray-800 mt-0.5 sm:mt-1 truncate">
+                  {totalGuests} Guest{totalGuests !== 1 ? "s" : ""}, {rooms}{" "}
+                  Room{rooms !== 1 ? "s" : ""}
+                </span>
+              </span>
+              <svg
+                className={`w-3 h-3 shrink-0 transition-transform ${showGuestDropdown ? "rotate-180" : ""}`}
+                style={{ color: ORANGE }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            {showGuestDropdown && (
+              <div className="absolute top-[calc(100%+0.5rem)] left-0 lg:left-auto lg:right-0 z-[300]">
+                <HotelGuestSelection
+                  rooms={form.rooms}
+                  setRooms={(val) => setForm({ ...form, rooms: val })}
+                  guestNationality={form.guestNationality}
+                  setGuestNationality={(val) =>
+                    setForm({ ...form, guestNationality: val })
+                  }
+                  roomConfigs={roomConfigs}
+                  setRoomConfigs={setRoomConfigs}
+                  normalizedCountries={normalizedCountries}
+                  onApply={() => setShowGuestDropdown(false)}
+                  CountrySelector={CountrySelector}
+                />
+              </div>
+            )}
+          </div>
+          <div className="px-1 sm:px-3 lg:px-4 flex items-center shrink-0 pt-1 lg:pt-0">
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={
+                loading?.search ||
+                !form.cityCode ||
+                !form.checkIn ||
+                !form.checkOut
+              }
+              className="flex w-full lg:w-auto items-center justify-center gap-2 px-5 sm:px-8 h-8 sm:h-12 font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all rounded-lg sm:rounded-xl cursor-pointer shadow-md active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: loading?.search ? AZURE : ORANGE,
+                color: loading?.search ? "#fff" : DARK,
+              }}
+            >
+              {loading?.search ? (
+                <>
+                  <svg
+                    className="animate-spin h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span>Searching...</span>
+                </>
+              ) : (
+                <>
+                  <MdSearch className="text-lg sm:text-xl group-hover:scale-110 transition-transform" />
+                  <span>Search Hotels</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Info strip */}
+        {(form.cityName || nights > 0) && (
+          <div className="hidden xs:flex items-center gap-2 sm:gap-4 mt-1 sm:mt-2 px-1 flex-wrap">
+            {form.cityName && (
+              <span className="text-white/50 text-[10px] sm:text-xs font-medium flex items-center gap-1">
+                <MdLocationOn className="text-xs" /> {form.cityName}
+              </span>
+            )}
+            {nights > 0 && (
+              <span className="text-white/50 text-[10px] sm:text-xs font-medium">
+                {nights} Night{nights !== 1 ? "s" : ""} · {form.rooms} Room
+                {form.rooms !== 1 ? "s" : ""} · {totalGuests} Guest
+                {totalGuests !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </header>
+  );
+};
+
+export default Header;

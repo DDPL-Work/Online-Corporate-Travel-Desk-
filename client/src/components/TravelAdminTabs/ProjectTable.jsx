@@ -1,0 +1,1274 @@
+import { useEffect, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import Swal from "sweetalert2";
+import { ToastWithTimer } from "../../utils/ToastConfirm";
+import {
+  fetchProjects,
+  deleteProject as deleteProjectAction,
+  getProjectFlightExpenses,
+  getProjectHotelExpenses,
+} from "../../Redux/Actions/project.thunk";
+import { fetchEmployees } from "../../Redux/Slice/employeeActionSlice";
+
+import {
+  HiMagnifyingGlass,
+  HiEye,
+  HiTrash,
+  HiTableCells,
+  HiUsers,
+  HiCurrencyRupee,
+  HiCalendarDays,
+  HiCalculator,
+  HiArrowLeft,
+  HiArrowRight,
+  HiDocumentText,
+  HiXMark,
+  HiChevronLeft,
+  HiChevronRight,
+} from "react-icons/hi2";
+import {
+  FiRefreshCw,
+  FiX,
+  FiSearch,
+  FiCalendar,
+  FiArrowRight,
+  FiClock,
+  FiList,
+  FiDownload,
+} from "react-icons/fi";
+import { FaPlane, FaHotel, FaClipboardList, FaRupeeSign } from "react-icons/fa";
+import {
+  LabeledField,
+  CustomDropdown,
+  StatCard,
+  IdCell,
+  Th,
+  StatusBadge,
+  SearchBar,
+  dateCls,
+} from "./Shared/CommonComponents";
+import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
+import { Pagination } from "./Shared/Pagination";
+import { C } from "../Shared/color";
+import { airlineLogo } from "../../utils/formatter";
+import useExcelExporter from "../../hooks/export/useExcelExporter";
+import {
+  adminProjectRegistryExportTemplate,
+  adminProjectBookingsExportTemplate,
+} from "../../templates/exportTemplates/clientExportTemplates";
+
+/* ─────────────────────────────────────────────────────────────── */
+/*  Helpers                                                        */
+/* ─────────────────────────────────────────────────────────────── */
+const AVATAR_PALETTES = [
+  { bg: "#00339910", text: "#003399" },
+  { bg: "#7C3AED10", text: "#7C3AED" },
+  { bg: "#2563EB10", text: "#2563EB" },
+  { bg: "#EA580C10", text: "#EA580C" },
+  { bg: "#05966910", text: "#059669" },
+  { bg: "#E11D4810", text: "#E11D48" },
+  { bg: "#D9770610", text: "#D97706" },
+  { bg: "#0891B210", text: "#0891B2" },
+];
+
+function getAvatar(str) {
+  const safeStr = String(str ?? "");
+  let h = 0;
+  for (const c of safeStr) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+  const p = AVATAR_PALETTES[h % AVATAR_PALETTES.length];
+  return p;
+}
+
+function initials(str) {
+  const safeStr = String(str ?? "").trim();
+  return safeStr
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+}
+
+function fmtDate(d) {
+  const date = d ? new Date(d) : null;
+  if (!date || Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+const RouteCell = ({ routes, airline }) => {
+  if (!routes || routes.length === 0)
+    return <span className="text-slate-400">No Route</span>;
+
+  const airlineCode = (airline?.airlineCode || "AI").toUpperCase();
+  const airlineName = airline?.airlineName || "Airline";
+  const logoUrl = airlineLogo(airlineCode);
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+        <img
+          src={logoUrl}
+          alt={airlineName}
+          className="w-full h-full object-contain"
+          loading="eager"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src =
+              "https://cdn-icons-png.flaticon.com/512/3114/3114883.png";
+          }}
+        />
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes[0].fromCode}
+          </span>
+          <FiArrowRight size={12} className="text-slate-400" />
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes.length > 1
+              ? routes[0].toCode
+              : routes[routes.length - 1].toCode}
+          </span>
+          {routes.length > 1 && (
+            <span className="bg-amber-50 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-100 ml-1">
+              RT
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+          <span className="capitalize">{routes[0].fromCity || "Origin"}</span>
+          <span>→</span>
+          <span className="capitalize">
+            {routes.length > 1
+              ? routes[0].toCity || "Turnaround"
+              : routes[routes.length - 1].toCity || "Dest"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+export default function ProjectsTable({ projects, setProjects }) {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const {
+    projects: storedProjects,
+    deleteLoading,
+    expenses,
+  } = useSelector((state) => state.corporateProject);
+  const { user } = useSelector((state) => state.auth);
+  const { employees } = useSelector((state) => state.employeeAction);
+
+  // Top-Level Tab Switcher: "directory" vs "bookings"
+  const [activeMainTab, setActiveMainTab] = useState("directory");
+
+  // Project selector state for Bookings tab
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+
+  // Booking Type selector: "all" vs "flight" vs "hotel"
+  const [bookingTypeFilter, setBookingTypeFilter] = useState("all");
+
+  // Selected Employee filter state for Bookings tab
+  const [selectedEmployeeEmail, setSelectedEmployeeEmail] = useState("all");
+
+  // Fetch employees list on load
+  useEffect(() => {
+    dispatch(fetchEmployees());
+  }, [dispatch]);
+
+  // Project Registry filters
+  const [search, setSearch] = useState("");
+  const [clientFilter, setClientFilter] = useState("All Clients");
+  const [localProjects, setLocalProjects] = useState([]);
+  const [selectedProjectForExpenses, setSelectedProjectForExpenses] =
+    useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  // Project Bookings filters & pagination
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingStartDate, setBookingStartDate] = useState("");
+  const [bookingEndDate, setBookingEndDate] = useState("");
+  const [bookingPage, setBookingPage] = useState(1);
+
+  const effectiveProjects = Array.isArray(projects) ? projects : localProjects;
+
+  useEffect(() => {
+    if (Array.isArray(storedProjects)) {
+      setLocalProjects(storedProjects);
+    }
+  }, [storedProjects]);
+
+  const authUser = user || JSON.parse(sessionStorage.getItem("user") || "null");
+  const corporateId =
+    authUser?.corporateId || authUser?.corporate?._id || authUser?._id;
+
+  const handleRefresh = async () => {
+    if (activeMainTab === "directory") {
+      if (corporateId) {
+        setIsSyncing(true);
+        await dispatch(fetchProjects(corporateId));
+        setTimeout(() => setIsSyncing(false), 500);
+      }
+    } else {
+      if (selectedProjectId) {
+        setIsSyncing(true);
+        await Promise.all([
+          dispatch(getProjectFlightExpenses(selectedProjectId)),
+          dispatch(getProjectHotelExpenses(selectedProjectId)),
+        ]);
+        setTimeout(() => setIsSyncing(false), 500);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (corporateId) dispatch(fetchProjects(corporateId));
+  }, [dispatch, corporateId]);
+
+  // Auto-select the first project code when switching to the Bookings tab
+  useEffect(() => {
+    if (activeMainTab === "bookings" && !selectedProjectId) {
+      setSelectedProjectId("all");
+    }
+  }, [activeMainTab, selectedProjectId]);
+
+  // Fetch flight and hotel expenses for selected project reactively
+  useEffect(() => {
+    if (selectedProjectId) {
+      dispatch(getProjectFlightExpenses(selectedProjectId));
+      dispatch(getProjectHotelExpenses(selectedProjectId));
+    }
+  }, [dispatch, selectedProjectId]);
+
+  const handleDeleteProject = async (project) => {
+    const projectId = project._id || project.id;
+    const result = await Swal.fire({
+      title: "Archive Project?",
+      text: "This record will be permanently purged from the registry.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Purge Record",
+      confirmButtonColor: "#E11D48",
+      cancelButtonText: "Keep Active",
+      reverseButtons: true,
+      customClass: { popup: "rounded-[2rem] p-8" },
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await dispatch(
+          deleteProjectAction({ id: projectId, corporateId }),
+        ).unwrap();
+        ToastWithTimer({ type: "success", message: "Record Purged" });
+        setLocalProjects((prev) =>
+          prev.filter((p) => (p._id || p.id) !== projectId),
+        );
+      } catch (err) {
+        ToastWithTimer({
+          type: "error",
+          message: err.message || "Operation Failed",
+        });
+      }
+    }
+  };
+
+  const clients = useMemo(() => {
+    const c = [
+      ...new Set(effectiveProjects.map((p) => p.clientName || p.client || "")),
+    ]
+      .filter(Boolean)
+      .sort();
+    return ["All Clients", ...c];
+  }, [effectiveProjects]);
+
+  const filtered = useMemo(() => {
+    return effectiveProjects.filter((p) => {
+      const q = search.toLowerCase();
+      const name = (p.projectName || p.name || "").toLowerCase();
+      const code = (p.projectCodeId || p.code || "").toLowerCase();
+      const client = (p.clientName || p.client || "").toLowerCase();
+      const matchQ =
+        !q || name.includes(q) || code.includes(q) || client.includes(q);
+      const matchC =
+        clientFilter === "All Clients" || client === clientFilter.toLowerCase();
+      return matchQ && matchC;
+    });
+  }, [effectiveProjects, search, clientFilter]);
+
+  const paginated = useMemo(() => {
+    return filtered.slice(
+      (currentPage - 1) * PAGE_SIZE,
+      currentPage * PAGE_SIZE,
+    );
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, clientFilter]);
+
+  // Project Selector Dropdown options mapping
+  const projectOptions = useMemo(() => {
+    const opts = [{ value: "all", label: "All Projects" }];
+    (effectiveProjects || []).forEach((p) => {
+      const id = p.projectCodeId || p.code || p.projectId || p.id || p._id;
+      const name = p.projectName || p.name || "Untitled";
+      opts.push({
+        value: id,
+        label: id,
+        subLabel: name,
+      });
+    });
+    return opts;
+  }, [effectiveProjects]);
+
+  // Employee Dropdown options mapping (no matter what roles they hold)
+  const employeeOptions = useMemo(() => {
+    const opts = [{ value: "all", label: "All Personnel" }];
+    (employees || []).forEach((e) => {
+      const name =
+        typeof e.name === "string"
+          ? e.name
+          : `${e.name?.firstName || ""} ${e.name?.lastName || ""}`.trim();
+      const email = e.email || "";
+      opts.push({
+        value: email.toLowerCase(),
+        label: name || email,
+        subLabel: email,
+      });
+    });
+    return opts;
+  }, [employees]);
+
+  // Format Project Flight Bookings
+  const formattedFlightBookings = useMemo(() => {
+    return (expenses?.flight || []).map((b) => {
+      const traveller = b.userId?.name
+        ? `${b.userId.name.firstName || ""} ${b.userId.name.lastName || ""}`.trim()
+        : `${b.travellers?.[0]?.firstName || "Staff"} ${b.travellers?.[0]?.lastName || "Member"}`.trim();
+
+      let status = b.executionStatus === "ticketed" ? "Confirmed" : "Pending";
+      if (b.executionStatus === "cancelled" || b.status === "cancelled" || b.cancelStatus === "cancelled") {
+        status = "Cancelled";
+      } else if (b.amendment) {
+        if (b.amendment.status === "requested" || b.amendment.status === "processed" || b.amendment.status === "completed") status = "Cancelled";
+      } else if (b.cancelStatus === "requested") {
+        status = "Cancelled";
+      }
+
+      const pnr = b.bookingResult?.pnr || "—";
+      const amount =
+        b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
+
+      const segments = b.flightRequest?.segments || [];
+      const onwardSegments = segments.filter((s) => s.journeyType === "onward");
+      const returnSegments = segments.filter((s) => s.journeyType === "return");
+
+      const buildLeg = (segs) => {
+        if (!segs.length) return null;
+        const first = segs[0];
+        const last = segs[segs.length - 1];
+        return {
+          fromCode: first?.origin?.code || first?.origin?.airportCode || "N/A",
+          toCode:
+            last?.destination?.code || last?.destination?.airportCode || "N/A",
+          fromCity: first?.origin?.city || "Unknown",
+          toCity: last?.destination?.city || "Unknown",
+        };
+      };
+
+      const routes = [];
+      if (onwardSegments.length > 0 || returnSegments.length > 0) {
+        const onwardLeg = buildLeg(onwardSegments);
+        const returnLeg = buildLeg(returnSegments);
+        if (onwardLeg) routes.push(onwardLeg);
+        if (returnLeg) routes.push(returnLeg);
+      } else if (segments.length > 0) {
+        const leg = buildLeg(segments);
+        if (leg) routes.push(leg);
+      }
+
+      const airline = segments[0]
+        ? {
+            airlineCode:
+              segments[0].airlineCode || segments[0].airline?.airlineCode,
+            airlineName:
+              segments[0].airlineName || segments[0].airline?.airlineName,
+          }
+        : null;
+
+      return {
+        ...b,
+        travellerName: traveller,
+        employeeId: b.userId?.email || b.travellers?.[0]?.email || "—",
+        status,
+        pnr,
+        amount,
+        bookedDate: b.createdAt,
+        routes,
+        airline,
+      };
+    });
+  }, [expenses?.flight]);
+
+  // Format Project Hotel Bookings
+  const formattedHotelBookings = useMemo(() => {
+    return (expenses?.hotel || []).map((b) => {
+      const guest = b.userId?.name
+        ? `${b.userId.name.firstName || ""} ${b.userId.name.lastName || ""}`.trim()
+        : "Staff Member";
+      let status = b.executionStatus === "voucher_generated" ? "Confirmed" : "Pending";
+      if (b.executionStatus === "cancelled" || b.status === "cancelled" || b.cancelStatus === "cancelled") {
+        status = "Cancelled";
+      } else if (b.amendment) {
+        if (b.amendment.status === "requested" || b.amendment.status === "processed" || b.amendment.status === "completed") status = "Cancelled";
+      } else if (b.cancelStatus === "requested") {
+        status = "Cancelled";
+      }
+      const amount =
+        b.pricingSnapshot?.totalAmount ?? b.bookingSnapshot?.amount ?? 0;
+
+      const hotelName =
+        b.bookingSnapshot?.hotelName ||
+        b.hotelRequest?.selectedHotel?.hotelName ||
+        "Unknown Hotel";
+      const city =
+        b.hotelRequest?.selectedHotel?.city ||
+        b.hotelRequest?.city ||
+        b.hotelRequest?.cityName ||
+        b.bookingSnapshot?.city ||
+        "—";
+
+      return {
+        ...b,
+        guestName: guest,
+        employeeId: b.userId?.email || "—",
+        status,
+        amount,
+        bookedDate: b.createdAt,
+        hotelName,
+        city,
+      };
+    });
+  }, [expenses?.hotel]);
+
+  // Merge Flight Bookings and Hotel Bookings into a Single Unified Table
+  const combinedBookings = useMemo(() => {
+    const list = [];
+
+    // Add flight bookings
+    (formattedFlightBookings || []).forEach((b) => {
+      list.push({
+        ...b,
+        bookingType: "flight",
+        key: `flight-${b._id || b.orderId}`,
+      });
+    });
+
+    // Add hotel bookings
+    (formattedHotelBookings || []).forEach((b) => {
+      list.push({
+        ...b,
+        bookingType: "hotel",
+        key: `hotel-${b._id || b.orderId}`,
+      });
+    });
+
+    // Sort by booked date descending (newest bookings first)
+    return list.sort((a, b) => {
+      const da = a.bookedDate ? new Date(a.bookedDate).getTime() : 0;
+      const db = b.bookedDate ? new Date(b.bookedDate).getTime() : 0;
+      return db - da;
+    });
+  }, [formattedFlightBookings, formattedHotelBookings]);
+
+  // Filter Combined Bookings by Search, Type, Employee & Date Window
+  const filteredBookings = useMemo(() => {
+    const q = bookingSearch.toLowerCase();
+
+    return combinedBookings.filter((b) => {
+      const booked = b.bookedDate
+        ? new Date(b.bookedDate).toISOString().slice(0, 10)
+        : "";
+
+      const typeMatch =
+        bookingTypeFilter === "all" || b.bookingType === bookingTypeFilter;
+
+      const employeeMatch =
+        selectedEmployeeEmail === "all" ||
+        (b.employeeId && b.employeeId.toLowerCase() === selectedEmployeeEmail);
+
+      const searchMatch =
+        !q ||
+        (b.bookingType === "flight"
+          ? b.travellerName?.toLowerCase().includes(q) ||
+            b.employeeId?.toLowerCase().includes(q) ||
+            b.pnr?.toLowerCase().includes(q) ||
+            b.orderId?.toLowerCase().includes(q)
+          : b.guestName?.toLowerCase().includes(q) ||
+            b.employeeId?.toLowerCase().includes(q) ||
+            b.hotelName?.toLowerCase().includes(q) ||
+            b.orderId?.toLowerCase().includes(q));
+
+      const dateMatch =
+        (!bookingStartDate || booked >= bookingStartDate) &&
+        (!bookingEndDate || booked <= bookingEndDate);
+
+      return typeMatch && employeeMatch && searchMatch && dateMatch;
+    });
+  }, [
+    combinedBookings,
+    bookingSearch,
+    bookingStartDate,
+    bookingEndDate,
+    bookingTypeFilter,
+    selectedEmployeeEmail,
+  ]);
+
+  const paginatedBookings = useMemo(() => {
+    return filteredBookings.slice(
+      (bookingPage - 1) * PAGE_SIZE,
+      bookingPage * PAGE_SIZE,
+    );
+  }, [filteredBookings, bookingPage]);
+
+  useEffect(() => {
+    setBookingPage(1);
+  }, [
+    bookingSearch,
+    bookingStartDate,
+    bookingEndDate,
+    bookingTypeFilter,
+    selectedProjectId,
+    selectedEmployeeEmail,
+  ]);
+
+  const bookingTotalSpend = useMemo(() => {
+    return filteredBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  }, [filteredBookings]);
+
+  const bookingTotalBookings = filteredBookings.length;
+
+  const { exportExcel, isExporting } = useExcelExporter();
+
+  const ledgerDateRange = useMemo(() => {
+    const fmt = (d) => {
+      if (!d || Number.isNaN(d.getTime())) return "—";
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    };
+
+    if (bookingStartDate || bookingEndDate) {
+      const start = bookingStartDate
+        ? fmt(new Date(bookingStartDate))
+        : "Beginning";
+      const end = bookingEndDate ? fmt(new Date(bookingEndDate)) : "Present";
+      return `${start} to ${end}`;
+    }
+
+    if (filteredBookings.length === 0) return "—";
+    const newest = new Date(filteredBookings[0].bookedDate);
+    const oldest = new Date(
+      filteredBookings[filteredBookings.length - 1].bookedDate,
+    );
+
+    const newStr = fmt(newest);
+    const oldStr = fmt(oldest);
+    if (newStr === "—" || oldStr === "—") return "—";
+    return newStr === oldStr ? newStr : `${oldStr} to ${newStr}`;
+  }, [filteredBookings, bookingStartDate, bookingEndDate]);
+
+  return (
+    <div
+      className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6"
+      style={{ background: C.offWhite }}
+    >
+      {/* Header Section */}
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+              >
+                <HiArrowLeft size={20} />
+              </button>
+              <button
+                onClick={handleRefresh}
+                className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${isSyncing || expenses?.loading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                disabled={isSyncing || expenses?.loading}
+              >
+                <div
+                  className={
+                    isSyncing || expenses?.loading ? "animate-spin" : ""
+                  }
+                >
+                  <FiRefreshCw size={20} />
+                </div>
+              </button>
+            </div>
+            <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+            <div className="flex items-center md:items-center gap-4 md:gap-5">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10">
+                <HiTableCells size={24} className="md:w-7 md:h-7" />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none uppercase">
+                  Projects
+                </h1>
+                <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">
+                  Manage and track project expenses
+                </p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/project-management")}
+            className="w-full md:w-auto justify-center group bg-[#C9A240] hover:bg-white text-[#000D26] px-6 md:px-8 py-3.5 md:py-4 rounded-2xl font-black text-[10px] md:text-[11px] uppercase tracking-widest shadow-2xl transition-all flex items-center gap-3"
+          >
+            Add Projects <HiTableCells size={16} className="w-3.5 h-3.5 md:w-4 md:h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-8">
+        {/* Top-Level Tab Switcher */}
+        <div className="flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit max-w-full overflow-x-auto">
+          <button
+            onClick={() => setActiveMainTab("directory")}
+            className={`px-6 md:px-8 py-3.5 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeMainTab === "directory" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+          >
+            <HiTableCells className="w-3 h-3 md:w-3.5 md:h-3.5" /> Projects
+          </button>
+          <button
+            onClick={() => setActiveMainTab("bookings")}
+            className={`px-6 md:px-8 py-3.5 rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${activeMainTab === "bookings" ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+          >
+            <FaClipboardList className="w-3 h-3 md:w-3.5 md:h-3.5" /> Bookings
+          </button>
+        </div>
+
+        {activeMainTab === "directory" ? (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <StatCard
+                label="Total Projects"
+                value={effectiveProjects.length}
+                Icon={HiTableCells}
+                borderCls="border-[#003399]"
+                iconBgCls="bg-[#003399]10"
+                iconColorCls="text-[#003399]"
+              />
+              <StatCard
+                label="Active Clients"
+                value={clients.length - 1}
+                Icon={HiUsers}
+                borderCls="border-violet-500"
+                iconBgCls="bg-violet-50"
+                iconColorCls="text-violet-600"
+              />
+              <StatCard
+                label="Last Updated"
+                value="Today"
+                Icon={FiCalendar}
+                borderCls="border-emerald-500"
+                iconBgCls="bg-emerald-50"
+                iconColorCls="text-emerald-600"
+              />
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-[2.5rem] border border-slate-200/60 p-8 shadow-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-end">
+                <div className="md:col-span-5">
+                  <LabeledField
+                    label={
+                      <>
+                        <HiMagnifyingGlass size={12} /> Search Directory
+                      </>
+                    }
+                  >
+                    <div className="relative group">
+                      <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#003399] transition-colors" />
+                      <input
+                        type="text"
+                        placeholder="Search by name, code or client..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-blue-900/5 focus:border-[#003399] transition-all"
+                      />
+                    </div>
+                  </LabeledField>
+                </div>
+                <div className="md:col-span-4">
+                  <LabeledField
+                    label={
+                      <>
+                        <HiUsers size={12} /> Filter by Client
+                      </>
+                    }
+                  >
+                    <CustomDropdown
+                      value={clientFilter}
+                      onChange={setClientFilter}
+                      options={clients}
+                    />
+                  </LabeledField>
+                </div>
+                <div className="md:col-span-3">
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setClientFilter("All Clients");
+                    }}
+                    className="w-full py-4 rounded-2xl font-black text-[11px] text-slate-400 border-2 border-slate-50 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all uppercase tracking-widest"
+                  >
+                    <FiX size={16} /> Reset Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Table */}
+            <ResponsiveDataTable
+              title="Projects"
+              subtitle={`${filtered.length} found`}
+              exportLabel="Export Excel"
+              exportLoading={isExporting}
+              exportDisabled={isExporting}
+              onExport={() =>
+                exportExcel({
+                  pageHeader: "Project Registry",
+                  statCards: [
+                    {
+                      label: "Total Projects",
+                      value: effectiveProjects.length,
+                    },
+                    { label: "Active Clients", value: clients.length - 1 },
+                    { label: "Last Updated", value: "Today" },
+                  ],
+                  appliedFilters: [
+                    { label: "Search", value: search || "None" },
+                    { label: "Client Entity", value: clientFilter },
+                  ],
+                  data: filtered,
+                  columns: adminProjectRegistryExportTemplate,
+                  filenamePrefix: "project_registry",
+                })
+              }
+              wrapperClass="!border-none !shadow-none"
+              pagination={
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filtered.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setCurrentPage}
+                />
+              }
+            >
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+                    <Th className="!px-8 !py-6">Project ID</Th>
+                    <Th className="!px-8 !py-6">Project Name</Th>
+                    <Th className="!px-8 !py-6">Client Name</Th>
+                    <Th className="!px-8 !py-6">Bookings</Th>
+                    <Th className="!px-8 !py-6">Added On</Th>
+                    <Th className="!px-8 !py-6 text-center">Actions</Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginated.map((p, i) => {
+                    const projectName = p.projectName || p.name || "Untitled";
+                    const projectCode = p.projectCodeId || p.code || "—";
+                    const clientName = p.clientName || p.client || "—";
+                    const createdAt = p.createdAt || p.addedOn;
+                    const av = getAvatar(projectName);
+                    return (
+                      <tr
+                        key={p._id || i}
+                        className="hover:bg-slate-100/50 transition-colors group"
+                      >
+                        <td className="!px-8 !py-6">
+                          <IdCell id={projectCode} />
+                        </td>
+                        <td className="!px-8 !py-6">
+                          <div className="flex items-center gap-4">
+                            <div
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 shadow-sm transition-transform group-hover:scale-110"
+                              style={{ backgroundColor: av.bg, color: av.text }}
+                            >
+                              {initials(projectName)}
+                            </div>
+                            <span className="text-sm font-black text-slate-800 tracking-tight">
+                              {projectName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="!px-8 !py-6">
+                          <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-[#003399] text-[10px] font-black uppercase tracking-widest rounded-lg border border-blue-100">
+                            {clientName}
+                          </span>
+                        </td>
+                        <td className="!px-8 !py-6">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100">
+                              {p.bookingCount || 0}
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              Active
+                            </span>
+                          </div>
+                        </td>
+                        <td className="!px-8 !py-6 text-[11px] font-bold text-slate-400 uppercase">
+                          {fmtDate(createdAt)}
+                        </td>
+                        <td className="!px-8 !py-6">
+                          <div className="flex items-center justify-center gap-3">
+                            <button
+                              title="View Expenses"
+                              onClick={() => {
+                                const pId =
+                                  p.projectCodeId ||
+                                  p.code ||
+                                  p.projectId ||
+                                  p.id ||
+                                  p._id;
+                                setSelectedProjectId(pId);
+                                setActiveMainTab("bookings");
+                              }}
+                              className="w-10 h-10 rounded-xl bg-[#003399]10 text-[#003399] flex items-center justify-center hover:bg-[#003399] hover:text-white transition-all shadow-sm"
+                            >
+                              <HiEye size={18} />
+                            </button>
+                            <button
+                              title="Delete Project"
+                              onClick={() => handleDeleteProject(p)}
+                              disabled={deleteLoading}
+                              className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-30"
+                            >
+                              <HiTrash size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </ResponsiveDataTable>
+          </>
+        ) : (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <StatCard
+                label="Selected Project Code"
+                value={
+                  selectedProjectId === "all"
+                    ? "All Projects"
+                    : selectedProjectId || "None"
+                }
+                Icon={FaClipboardList}
+                borderCls="border-[#000D26]"
+                iconBgCls="bg-slate-100"
+                iconColorCls="text-[#000D26]"
+              />
+              <StatCard
+                label="Total Amount"
+                value={`₹${bookingTotalSpend.toLocaleString()}`}
+                Icon={HiCurrencyRupee}
+                borderCls="border-violet-500"
+                iconBgCls="bg-violet-50"
+                iconColorCls="text-violet-600"
+              />
+              <StatCard
+                label="Ledger Timeline"
+                value={ledgerDateRange}
+                Icon={HiCalendarDays}
+                borderCls="border-emerald-500"
+                iconBgCls="bg-emerald-50"
+                iconColorCls="text-emerald-600"
+              />
+            </div>
+
+            <div
+              className="bg-white rounded-2xl p-6 border shadow-sm"
+              style={{ borderColor: C.border }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+                <LabeledField
+                  label={
+                    <>
+                      <HiTableCells size={10} /> Select Project
+                    </>
+                  }
+                  className="lg:col-span-2"
+                >
+                  <CustomDropdown
+                    value={selectedProjectId}
+                    onChange={setSelectedProjectId}
+                    options={projectOptions}
+                    placeholder="Choose Project..."
+                  />
+                </LabeledField>
+
+                <LabeledField
+                  label={
+                    <>
+                      <HiUsers size={10} /> Filter by Employee
+                    </>
+                  }
+                  className="lg:col-span-3"
+                >
+                  <CustomDropdown
+                    value={selectedEmployeeEmail}
+                    onChange={setSelectedEmployeeEmail}
+                    options={employeeOptions}
+                    placeholder="Select employee..."
+                  />
+                </LabeledField>
+
+                <LabeledField
+                  label={
+                    <>
+                      <HiMagnifyingGlass size={10} /> Search Bookings
+                    </>
+                  }
+                  className="lg:col-span-2"
+                >
+                  <SearchBar
+                    value={bookingSearch}
+                    onChange={setBookingSearch}
+                    placeholder="Search PNR, hotel, ID..."
+                  />
+                </LabeledField>
+
+                <LabeledField label="Date Range" className="lg:col-span-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={bookingStartDate}
+                      onChange={(e) => setBookingStartDate(e.target.value)}
+                      className={dateCls}
+                      style={{ borderColor: C.border }}
+                    />
+                    <span className="text-slate-300">to</span>
+                    <input
+                      type="date"
+                      value={bookingEndDate}
+                      onChange={(e) => setBookingEndDate(e.target.value)}
+                      className={dateCls}
+                      style={{ borderColor: C.border }}
+                    />
+                  </div>
+                </LabeledField>
+
+                <div className="flex items-end lg:col-span-2">
+                  <button
+                    onClick={() => {
+                      setBookingSearch("");
+                      setBookingStartDate("");
+                      setBookingEndDate("");
+                      setSelectedEmployeeEmail("all");
+                    }}
+                    className="w-full py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest"
+                    style={{
+                      background: C.white,
+                      borderColor: C.border,
+                      color: C.muted,
+                    }}
+                  >
+                    <FiX /> Reset Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Booking Type Filter Tabs (All, Flight, Hotel) */}
+            <div className="w-full md:w-auto">
+              {/* Mobile Dropdown */}
+              <div className="block md:hidden">
+                <CustomDropdown
+                  value={
+                    bookingTypeFilter === "all"
+                      ? "All Bookings"
+                      : bookingTypeFilter === "flight"
+                      ? "Flight Bookings"
+                      : "Hotel Bookings"
+                  }
+                  onChange={(val) => {
+                    setBookingTypeFilter(val);
+                    setBookingPage(1);
+                  }}
+                  options={[
+                    { label: "All Bookings", value: "all" },
+                    { label: "Flight Bookings", value: "flight" },
+                    { label: "Hotel Bookings", value: "hotel" },
+                  ]}
+                />
+              </div>
+
+              {/* Desktop Tabs */}
+              <div className="hidden md:flex gap-2 p-1.5 bg-white border border-slate-200/60 shadow-xl rounded-2xl w-fit">
+                {[
+                  ["all", "All Bookings", FaClipboardList],
+                  ["flight", "Flight Bookings", FaPlane],
+                  ["hotel", "Hotel Bookings", FaHotel],
+                ].map(([k, lbl, Icon]) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      setBookingTypeFilter(k);
+                      setBookingPage(1);
+                    }}
+                    className={`px-8 py-3.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2.5 transition-all whitespace-nowrap ${bookingTypeFilter === k ? "bg-[#000D26] text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    <Icon className="w-3.5 h-3.5" /> {lbl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Responsive DataTable */}
+            {expenses?.loading ? (
+              <div className="py-24 flex flex-col items-center justify-center bg-white rounded-[2.5rem] border border-slate-200/60 shadow-2xl">
+                <div className="w-16 h-16 border-[6px] border-slate-100 border-t-[#003399] rounded-full animate-spin mb-6" />
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  Loading Bookings...
+                </p>
+              </div>
+            ) : (
+              <ResponsiveDataTable
+                title={
+                  bookingTypeFilter === "all"
+                    ? "All Bookings"
+                    : bookingTypeFilter === "flight"
+                      ? "Flight Bookings"
+                      : "Hotel Bookings"
+                }
+                subtitle={`${filteredBookings.length} bookings found`}
+                exportLabel="Export Excel"
+                exportLoading={isExporting}
+                exportDisabled={isExporting}
+                onExport={() =>
+                  exportExcel({
+                    pageHeader:
+                      bookingTypeFilter === "all"
+                        ? "Combined Project Ledger"
+                        : bookingTypeFilter === "flight"
+                          ? "Project Flight Manifests"
+                          : "Project Hotel Manifests",
+                    statCards: [
+                      {
+                        label: "Selected Project",
+                        value:
+                          selectedProjectId === "all"
+                            ? "All Projects"
+                            : selectedProjectId || "None",
+                      },
+                      {
+                        label: "Total Amount",
+                        value: `₹${bookingTotalSpend.toLocaleString()}`,
+                      },
+                      { label: "Ledger Timeline", value: ledgerDateRange },
+                    ],
+                    appliedFilters: [
+                      {
+                        label: "Personnel Filter",
+                        value: selectedEmployeeEmail,
+                      },
+                      {
+                        label: "Search Manifest",
+                        value: bookingSearch || "None",
+                      },
+                      {
+                        label: "Booking Window",
+                        value: `${bookingStartDate || "Any"} to ${bookingEndDate || "Any"}`,
+                      },
+                      { label: "Type", value: bookingTypeFilter },
+                    ],
+                    data: filteredBookings,
+                    columns: adminProjectBookingsExportTemplate,
+                    filenamePrefix: "project_bookings",
+                  })
+                }
+                wrapperClass="!border-none !shadow-none"
+                pagination={
+                  <Pagination
+                    currentPage={bookingPage}
+                    totalItems={filteredBookings.length}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setBookingPage}
+                  />
+                }
+              >
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+                      <Th className="!px-6 !py-5">Type</Th>
+                      <Th className="!px-6 !py-5">Request ID</Th>
+                      <Th className="!px-6 !py-5">Employee</Th>
+                      <Th className="!px-6 !py-5">Details</Th>
+                      <Th className="!px-6 !py-5">Email</Th>
+                      <Th className="!px-6 !py-5">Added On</Th>
+                      <Th className="!px-6 !py-5">Status</Th>
+                      <Th className="!px-6 !py-5">Amount</Th>
+                      <Th className="!px-6 !py-5 !text-center">Action</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedBookings.length > 0 ? (
+                      paginatedBookings.map((b, i) => {
+                        const isFlight = b.bookingType === "flight";
+                        const name = isFlight ? b.travellerName : b.guestName;
+                        const purpose = isFlight
+                          ? b.flightRequest?.purposeOfTravel ||
+                            "Business Flight"
+                          : b.hotelRequest?.purposeOfTravel || "Business Stay";
+                        const path = isFlight
+                          ? `/employee-flight-booking/${b._id}`
+                          : `/employee-hotel-booking/${b._id}`;
+
+                        return (
+                          <tr
+                            key={b.key}
+                            className="hover:bg-slate-100 transition-colors"
+                            style={{
+                              background: i % 2 === 0 ? C.white : C.lightGray,
+                            }}
+                          >
+                            <td className="!px-6 !py-5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight ${
+                                  isFlight
+                                    ? "bg-blue-50 text-[#003399] border border-blue-100"
+                                    : "bg-amber-50 text-[#D97706] border border-amber-100"
+                                }`}
+                              >
+                                {isFlight ? (
+                                  <FaPlane size={10} />
+                                ) : (
+                                  <FaHotel size={10} />
+                                )}
+                                {b.bookingType}
+                              </span>
+                            </td>
+                            <td className="!px-6 !py-5">
+                              <IdCell id={b.orderId} />
+                            </td>
+                            <td className="!px-6 !py-5">
+                              <p
+                                className="text-xs font-black"
+                                style={{ color: C.navy }}
+                              >
+                                {name}
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide truncate max-w-[120px]">
+                                {purpose}
+                              </p>
+                            </td>
+                            <td className="!px-6 !py-5">
+                              {isFlight ? (
+                                <RouteCell
+                                  routes={b.routes}
+                                  airline={b.airline}
+                                />
+                              ) : (
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden text-[#D97706]">
+                                    <FaHotel size={18} />
+                                  </div>
+                                  <div className="flex flex-col gap-0.5">
+                                    <p className="text-[13px] font-black text-slate-800 tracking-tight line-clamp-1">
+                                      {b.hotelName}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                      {b.city}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                            <td className="!px-6 !py-5">
+                              <span
+                                className="text-[11px] font-bold font-mono px-2 py-1 rounded"
+                                style={{
+                                  background: C.offWhite,
+                                  color: C.navy,
+                                }}
+                              >
+                                {b.employeeId}
+                              </span>
+                            </td>
+                            <td className="!px-6 !py-5 text-[11px] font-bold text-slate-500 uppercase">
+                              {new Date(b.bookedDate).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                            </td>
+                            <td className="!px-6 !py-5">
+                              <StatusBadge status={b.status} />
+                            </td>
+                            <td
+                              className="!px-6 !py-5 font-black text-xs"
+                              style={{ color: C.navy }}
+                            >
+                              ₹{b.amount.toLocaleString()}
+                            </td>
+                            <td className="!px-6 !py-5 !text-center">
+                              <button
+                                onClick={() => navigate(path, { state: { isCancelled: b.status === "Cancelled", fromProjectExpenditure: true } })}
+                                className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                              >
+                                <FiArrowRight
+                                  size={18}
+                                  className="text-[#E7C695] group-hover:text-[#000d26] transition-colors"
+                                />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={9} className="!px-6 !py-20 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                              <FiSearch size={32} />
+                            </div>
+                            <p className="text-sm font-bold text-slate-400">
+                              No bookings found for this project.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </ResponsiveDataTable>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

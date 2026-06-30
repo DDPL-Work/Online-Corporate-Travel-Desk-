@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Boarding Pass — Traveamer</title>
+    <style>
+      {{{inlineCss}}}
+    </style>
+    <link rel="stylesheet" href="ticket.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- ============================================================
+       TOP HEADER
+  ============================================================ -->
+    <header class="top-ticket-header">
+      <div class="top-ticket-header__meta">
+        <span class="top-ticket-header__date">Ticketed Date: {{ticketedDate}}</span>
+        <div class="top-ticket-header__type-group">
+          <span class="top-ticket-header__type">{{ticketTypeTitle}}</span>
+          <span class="top-ticket-header__badge">{{journeyTypeLabel}}</span>
+        </div>
+      </div>
+      <div class="top-ticket-header__main">
+        <div class="partner-branding">
+          <img
+            src="{{traveamerLogo}}"
+            alt="Traveamer"
+            class="partner-logo-svg"
+          />
+          <div class="partner-contact-mini">
+            <span>📞 +91 8793353355</span>
+            <span>✉️ contact@traveamer.com</span>
+          </div>
+        </div>
+        <div class="airline-branding">
+          <div class="airline-info">
+            {{#if airlineLogo}}
+            <img
+              src="{{airlineLogo}}"
+              alt="{{airlineName}}"
+              class="airline-logo-img"
+            />
+            {{/if}}
+            <span class="airline-full-name">{{airlineName}}</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============================================================
+       PASSENGERS LOOP
+       Node.js: passengers.map((passenger, idx) => { ... })
+  ============================================================ -->
+
+    <article class="bp-card" aria-label="Boarding Pass">
+    {{#each segments}}
+
+      <!-- ============================================================
+         SPLIT-PANEL HEADER (Navy Card)
+    ============================================================ -->
+
+      <div class="segment" aria-label="Flight Segment">
+        <div class="segment__route">
+          <div class="segment__airline-strip">
+            <div class="segment__airline-left">
+              {{#if airlineLogo}}
+              <img
+                src="{{airlineLogo}}"
+                alt="{{airlineName}}"
+                class="airline-logo-img"
+              />
+              {{/if}}
+              <span class="flight-number-gold">{{flightNumber}}</span>
+            </div>
+            <div class="segment__pnr-right">
+              {{#if journeyType}}
+              <span class="journey-badge-gold">{{journeyType}}</span>
+              {{/if}}
+              <span class="pnr-label-gold">PNR</span>
+              <span class="pnr-value-gold">{{segmentPNR}}</span>
+            </div>
+          </div>
+          <div class="segment__airport segment__airport--dep">
+            <div class="segment__city">{{originCity}}</div>
+            <div class="segment__iata">{{originCode}}</div>
+            <div class="segment__airport-name">{{originAirport}}</div>
+            <div class="segment__time">{{departureTime}}</div>
+            <div class="segment__date">{{departureDate}}</div>
+            <div class="segment__terminal-gate">
+              {{#if originTerminal}}<span class="terminal-badge"
+                >Terminal {{originTerminal}}</span
+              >{{/if}} {{#if originGate}}<span class="gate-badge"
+                >Gate {{originGate}}</span
+              >{{/if}}
+            </div>
+          </div>
+
+          <div class="segment__route-visual">
+            <div class="segment__duration">
+              <span class="duration-label">Duration</span>
+              <span class="duration-value">{{duration}}</span>
+            </div>
+            <div class="segment__route-line">
+              <div class="route-dot route-dot--left"></div>
+              <div class="route-line-track">
+                <div class="route-plane-icon">✈</div>
+              </div>
+              <div class="route-dot route-dot--right"></div>
+            </div>
+            <div class="segment__stop-label">
+              {{#if isNonStop}}Non-Stop{{/if}}
+            </div>
+          </div>
+
+          <div class="segment__airport segment__airport--arr">
+            <div class="segment__city">{{destinationCity}}</div>
+            <div class="segment__iata">{{destinationCode}}</div>
+            <div class="segment__airport-name">{{destinationAirport}}</div>
+            <div class="segment__time">{{arrivalTime}}</div>
+            <div class="segment__date">{{arrivalDate}}</div>
+            <div class="segment__terminal-gate">
+              {{#if destinationTerminal}}<span class="terminal-badge"
+                >Terminal {{destinationTerminal}}</span
+              >{{/if}}
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /.segment -->
+
+      {{#if layover}}
+      <div class="layover-indicator">
+        <div class="layover-indicator__line"></div>
+        <div class="layover-indicator__badge">
+          <span class="layover-indicator__icon">⏱</span>
+          <span class="layover-indicator__text">Layover: {{layover}}</span>
+        </div>
+        <div class="layover-indicator__line"></div>
+      </div>
+      {{/if}}
+
+      {{#if isLastOfJourneyType}}
+      <!-- ── CONSOLIDATED FLIGHT DETAILS (Shown after leg or at end) ── -->
+      <div class="consolidated-details">
+        <div class="segment-meta-row">
+        <div class="meta-info-banner">
+          <div class="meta-item">
+            <div class="meta-content">
+              <span class="meta-label">Cabin Class</span>
+              <span class="meta-value">{{cabinClass}}</span>
+            </div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-content">
+              <span class="meta-label">Fare Type</span>
+              <span class="meta-value">{{fareType}}</span>
+            </div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-icon">🧳</div>
+            <div class="meta-content">
+              <span class="meta-label">Check-in Baggage</span>
+              <span class="meta-value">{{checkInBaggage}}</span>
+            </div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-icon">👜</div>
+            <div class="meta-content">
+              <span class="meta-label">Cabin Baggage</span>
+              <span class="meta-value">{{cabinBaggage}}</span>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+      {{/if}}
+    {{/each}}
+
+    <!-- ── CONSOLIDATED PASSENGER BLOCKS (Always at end) ── -->
+    <div class="barcode-section">
+      {{#each travellers}}
+      <div class="passenger-barcode-unit">
+        <div class="pax-grid-row">
+          <div class="pax-data-cell">
+            <span class="pax-label">👤 Name</span>
+            <span class="pax-value bold">{{title}} {{name}}</span>
+          </div>
+          <div class="pax-data-cell pax-ticket-cell">
+            <span class="pax-label">🎫 Ticket Details</span>
+            <div class="ticket-split">
+              {{#if onwardTicket}}
+              <div class="ticket-sub">
+                <span class="sub-label">ONWARD:</span>
+                <span class="pax-value bold"><span class="id-box">{{onwardTicket.id}}</span> / {{onwardTicket.no}}</span>
+              </div>
+              {{/if}}
+              {{#if returnTicket}}
+              <div class="ticket-sub">
+                <span class="sub-label">RETURN:</span>
+                <span class="pax-value bold"><span class="id-box">{{returnTicket.id}}</span> / {{returnTicket.no}}</span>
+              </div>
+              {{/if}}
+              {{#unless onwardTicket}}
+                {{#unless returnTicket}}
+                <span class="pax-value bold">{{ticketNumber}}</span>
+                {{/unless}}
+              {{/unless}}
+            </div>
+          </div>
+          <div class="pax-data-cell">
+            <span class="pax-label">📧 Email</span>
+            <span class="pax-value small-text"
+              >{{#if email}}{{email}}{{else}}—{{/if}}</span
+            >
+          </div>
+          <div class="pax-data-cell">
+            <span class="pax-label">📱 Phone</span>
+            <span class="pax-value"
+              >{{#if phone}}{{phone}}{{else}}—{{/if}}</span
+            >
+          </div>
+        </div>
+
+        <div class="pax-grid-row pax-grid-row--service">
+          <div class="pax-service-group">
+            {{#each segmentServices}}
+            <div class="pax-segment-details">
+              <span class="pax-mini-label">{{route}}</span>
+              <div class="pax-data-cell">
+                <span class="pax-label">💺 Seat</span>
+                <span class="pax-value highlight bold">{{seat}}</span>
+              </div>
+              <div class="pax-data-cell">
+                <span class="pax-label">🍽️ Meal</span>
+                <span class="pax-value">{{meal}}</span>
+              </div>
+              <div class="pax-data-cell">
+                <span class="pax-label">🧳 Add-on Bag</span>
+                {{#if hasAddOn}}
+                <span class="pax-value highlight">{{addOnBaggage}}</span>
+                {{else}}
+                <span class="pax-value muted-text">{{addOnBaggage}}</span>
+                {{/if}}
+              </div>
+              <div class="pax-data-cell">
+                <span class="pax-label">🔔 Special Services</span>
+                {{#if (eq specialServices "N/A")}}
+                <span class="pax-value muted-text">{{specialServices}}</span>
+                {{else}}
+                <span class="pax-value highlight bold" style="color: var(--amber);">{{specialServices}}</span>
+                {{/if}}
+              </div>
+            </div>
+            {{/each}}
+          </div>
+
+          <div class="pax-barcode-group">
+            {{#if onwardBarcodeBase64}}
+            <div class="barcode-display minimal">
+              <span class="barcode-text">ONWARD BARCODE — {{name}}</span>
+              <img class="barcode-main-img" src="{{onwardBarcodeBase64}}" alt="Onward Barcode" />
+            </div>
+            {{/if}}
+            
+            {{#if returnBarcodeBase64}}
+            <div class="barcode-display minimal">
+              <span class="barcode-text">RETURN BARCODE — {{name}}</span>
+              <img class="barcode-main-img" src="{{returnBarcodeBase64}}" alt="Return Barcode" />
+            </div>
+            {{/if}}
+
+            {{#unless onwardBarcodeBase64}}
+              {{#unless returnBarcodeBase64}}
+                {{#if barcodeBase64}}
+                <div class="barcode-display minimal">
+                  <span class="barcode-text">PASSENGER BARCODE — {{name}}</span>
+                  <img class="barcode-main-img" src="{{barcodeBase64}}" alt="Barcode" />
+                </div>
+                {{/if}}
+              {{/unless}}
+            {{/unless}}
+          </div>
+        </div>
+      </div>
+      {{#unless @last}}
+      <div class="passenger-divider"></div>
+      {{/unless}} 
+      {{/each}}
+    </div>
+    </article>
+
+    <!-- ── GLOBAL FARE SUMMARY ── -->
+    <section class="global-fare-summary">
+      <div class="fare-summary-card">
+        <div class="fare-summary-grid">
+          <div class="fare-summary-item highlight">
+            <span class="label">Total Amount</span>
+            <span class="value">{{totalFare}}</span>
+          </div>
+          <div class="fare-summary-item">
+            <span class="label">Currency</span>
+            <span class="value">{{currency}}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+       DANGEROUS GOODS / RESTRICTIONS BANNER
+  ============================================================ -->
+    <section class="restrictions-section">
+      <img
+        class="restrictions-section__img"
+        src="{{rulesImg}}"
+        alt="Dangerous goods and restricted articles — Not Allowed"
+      />
+    </section>
+
+    <!-- ============================================================
+       TRAVEL RULES SECTION
+  ============================================================ -->
+    <section class="travel-rules">
+      <div class="travel-rules__header">
+        <div class="travel-rules__header-left">
+          <span class="travel-rules__header-plane">✈</span>
+          <div>
+            <h2 class="travel-rules__title">
+              Important Travel Rules &amp; Guidelines
+            </h2>
+            <span class="travel-rules__sub"
+              >Please read carefully before travelling — traveamer.com</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="travel-rules__grid">
+        <div class="rule-card">
+          <div class="rule-card__icon-wrap">
+            <span class="rule-card__icon">🪪</span>
+          </div>
+          <div class="rule-card__body">
+            <div class="rule-card__title">Valid ID &amp; Documents</div>
+            <ul class="rule-card__list">
+              <li>
+                Carry a valid government-issued photo ID (Passport / Aadhaar /
+                Voter ID / Driving Licence) matching your ticket name
+                <strong>exactly</strong>.
+              </li>
+              <li>
+                International passengers must carry a valid passport with
+                <strong>minimum 6 months validity</strong> beyond the travel
+                date.
+              </li>
+              <li>
+                Visa documents must be obtained prior to travel. Traveamer is
+                not responsible for denied boarding due to visa issues.
+              </li>
+              <li>
+                Children under 12 must travel with an adult; carry birth
+                certificate if requested by airline or immigration.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-card__icon-wrap">
+            <span class="rule-card__icon">⏰</span>
+          </div>
+          <div class="rule-card__body">
+            <div class="rule-card__title">
+              Check-in &amp; Boarding Timelines
+            </div>
+            <ul class="rule-card__list">
+              <li>
+                <strong>International flights:</strong> Arrive at airport at
+                least <strong>3 hours</strong> before departure. Check-in closes
+                60 minutes prior to departure.
+              </li>
+              <li>
+                <strong>Domestic flights:</strong> Arrive at airport at least
+                <strong>2 hours</strong> before departure. Check-in closes 45
+                minutes prior to departure.
+              </li>
+              <li>
+                Web check-in opens 24–48 hours before departure and closes 2
+                hours before scheduled departure.
+              </li>
+              <li>
+                Boarding gate closes <strong>20 minutes</strong> before
+                scheduled departure. Late arrivals may be denied boarding
+                without refund.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-card__icon-wrap">
+            <span class="rule-card__icon">♿</span>
+          </div>
+          <div class="rule-card__body">
+            <div class="rule-card__title">Special Assistance &amp; Medical</div>
+            <ul class="rule-card__list">
+              <li>
+                Passengers requiring wheelchair assistance or special meals must
+                inform the airline at least <strong>48 hours</strong> before
+                departure.
+              </li>
+              <li>
+                Pregnant passengers beyond <strong>28 weeks</strong> must carry
+                a medical fitness certificate. Most airlines restrict travel
+                beyond 36 weeks.
+              </li>
+              <li>
+                Unaccompanied minors (ages 5–12) must be pre-registered with the
+                airline. Additional service fee applies.
+              </li>
+              <li>
+                Notify the airline in advance for carriage of medical equipment,
+                oxygen cylinders, or mobility aids.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="rule-card">
+          <div class="rule-card__icon-wrap">
+            <span class="rule-card__icon">🔒</span>
+          </div>
+          <div class="rule-card__body">
+            <div class="rule-card__title">Airport Security Guidelines</div>
+            <ul class="rule-card__list">
+              <li>
+                All passengers and hand baggage are subject to security
+                screening. Cooperate fully with security personnel at all times.
+              </li>
+              <li>
+                Remove laptops, tablets, and large electronics from bags at the
+                X-ray security checkpoint.
+              </li>
+              <li>
+                Footwear may need to be removed during screening at some
+                airports. Wear easily removable shoes for convenience.
+              </li>
+              <li>
+                Making false statements or jokes about security threats is a
+                <strong>criminal offence</strong> punishable by law.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- /.travel-rules__grid -->
+    </section>
+    <!-- ============================================================
+       AIRSEWA BANNER
+  ============================================================ -->
+    <section class="airsewa-banner">
+      <img
+        class="airsewa-banner__img"
+        src="{{airSevaImg}}"
+        alt="AirSewa — Grievance Redressal Portal"
+      />
+      <div class="airsewa-banner__text">
+        <strong>AirSewa</strong> — Submit grievances &amp; seek information on
+        air travel in India.<br />
+        Visit
+        <a href="https://airsewa.gov.in" target="_blank" class="mono"
+          >airsewa.gov.in</a
+        >
+        or scan the QR code on the banner.
+      </div>
+    </section>
+
+    <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+    <footer class="doc-footer">
+      <div class="doc-footer__inner">
+        <div class="doc-footer__col">
+          <div class="footer-logos">
+            <img src="{{traveamerLogo}}" alt="Traveamer" class="footer-logo-img" />
+            <img src="{{iataLogo}}" alt="IATA" class="footer-logo-img iata-fix" />
+          </div>
+          <div class="footer-contact-info">
+            Support: +91 8793353355 &nbsp;&nbsp; contact@traveamer.com
+          </div>
+        </div>
+        <div class="doc-footer__col doc-footer__col--center">
+          <p>
+            This is an Electronic Ticket issued by Traveamer.com. Please carry a
+            valid government-issued photo ID matching the name on this ticket.
+            This document is computer-generated and does not require a
+            signature.
+          </p>
+        </div>
+        <div class="doc-footer__col doc-footer__col--right">
+          <span class="label">Generated</span><br />
+          <!-- Node.js: new Date().toLocaleString('en-IN') -->
+          <span class="mono">{{generatedAt}}</span>
+        </div>
+      </div>
+      <div class="doc-footer__legal">
+        Carriage and other services provided by the carrier are subject to
+        conditions of carriage, which are hereby incorporated by reference.
+        These conditions may be obtained from the issuing carrier. Traveamer.com
+        acts solely as a booking intermediary and is not the carrier.
+      </div>
+    </footer>
+  </body>
+</html>
