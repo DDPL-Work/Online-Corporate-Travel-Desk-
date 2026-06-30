@@ -48,6 +48,24 @@ class ReissuePenaltyResolver {
     return fallbackVal;
   }
 
+  resolveReferenceFare(booking = {}, reissueRequest = {}) {
+    const snapshot =
+      reissueRequest?.lastTicketedSnapshot ||
+      reissueRequest?.financialLedger?.lastTicketedSnapshot ||
+      reissueRequest?.activeTicketSnapshot ||
+      booking?.lastTicketedSnapshot ||
+      {};
+
+    return Number(
+      snapshot?.fare?.totalFare ||
+        snapshot?.fareSnapshot?.offeredFare ||
+        reissueRequest?.financialLedger?.currentTicketValue ||
+        reissueRequest?.financialLedger?.originalTicketAmount ||
+        booking?.pricingSnapshot?.totalAmount ||
+        0,
+    );
+  }
+
   /**
    * Helper 1: Extract from TicketReissue API response (from confirmation phase).
    */
@@ -120,14 +138,22 @@ class ReissuePenaltyResolver {
    * Helper 3: Extract from MiniFareRules (ChangeFee, ReissueCharges, RescheduleFee, AmendmentFee).
    */
   extractFromMiniFareRules(reissueRequest, normalizedQuote) {
+    const referenceFare = this.resolveReferenceFare(null, reissueRequest);
     // 1. Check parsed miniFareRules in request or normalizedQuote
     const parsedRules = normalizedQuote?.miniFareRules || reissueRequest?.miniFareRules;
     if (parsedRules && Array.isArray(parsedRules.reissueRules)) {
-      // Find the maximum reissue penalty listed in reissue rules
       let maxVal = 0;
       for (const rule of parsedRules.reissueRules) {
-        if (rule.amount > 0) {
-          maxVal = Math.max(maxVal, rule.amount);
+        const amount = Number(rule?.amount || 0);
+        const percentage = Number(rule?.percentage || 0);
+        const computed =
+          amount > 0
+            ? amount
+            : percentage > 0 && referenceFare > 0
+              ? Number(((referenceFare * percentage) / 100).toFixed(2))
+              : 0;
+        if (computed > 0) {
+          maxVal = Math.max(maxVal, computed);
         }
       }
       if (maxVal > 0) return maxVal;
@@ -147,6 +173,11 @@ class ReissuePenaltyResolver {
               return val;
             }
           }
+          const text = item?.Details || item?.Detail || item?.Description || "";
+          const percentMatch = String(text).match(/(\d+(?:\.\d+)?)\s*%/i);
+          if (percentMatch && referenceFare > 0) {
+            return Number(((referenceFare * Number(percentMatch[1])) / 100).toFixed(2));
+          }
         }
       } else if (typeof rawMini === "object") {
         for (const key of keysToCheck) {
@@ -154,6 +185,11 @@ class ReissuePenaltyResolver {
           if (Number.isFinite(val) && val > 0) {
             return val;
           }
+        }
+        const text = rawMini?.Details || rawMini?.Detail || rawMini?.Description || "";
+        const percentMatch = String(text).match(/(\d+(?:\.\d+)?)\s*%/i);
+        if (percentMatch && referenceFare > 0) {
+          return Number(((referenceFare * Number(percentMatch[1])) / 100).toFixed(2));
         }
       }
     }

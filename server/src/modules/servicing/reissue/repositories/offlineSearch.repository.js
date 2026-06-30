@@ -1,5 +1,4 @@
-const { getConnections } = require("../../../../config/redisConnections");
-const redis = getConnections().general;
+const redis = require("../../../../config/redis");
 const logger = require("../../../../utils/logger");
 
 const CACHE_KEY_PREFIX = "offline_reissue_search:";

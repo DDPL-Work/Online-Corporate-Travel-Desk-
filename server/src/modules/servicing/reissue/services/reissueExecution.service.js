@@ -88,8 +88,10 @@ class ReissueExecutionService {
         "servicing.reissue.currentRequestId": reissueRequest._id,
         "servicing.reissue.status": "REISSUED",
         "servicing.reissue.reissuedBookingId": newBookingId,
-        "servicing.reissue.originalBookingId": reissueRequest.originalBookingId,
-        "servicing.reissue.originalPnr": reissueRequest.originalPnr,
+        "servicing.reissue.originalBookingId":
+          reissueRequest?.bookingLineage?.originalBookingId || reissueRequest.originalBookingId,
+        "servicing.reissue.originalPnr":
+          reissueRequest?.bookingLineage?.originalPnr || reissueRequest.originalPnr,
         "servicing.reissue.activeBookingId": newBookingId,
         "servicing.reissue.activePnr": newPnr,
         "amendment.type": "FULL_REISSUE",

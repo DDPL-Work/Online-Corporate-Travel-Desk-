@@ -443,7 +443,7 @@ export default function ReissueOpsDetailModal({
                                   Departure Flight
                                 </span>
                                 <span className="text-xs font-black italic text-[#1A1714] uppercase tracking-tighter">
-                                  {selectedFlight?.airlineName || selectedFlight?.airlineCode || (typeof activeRequest?.airline === 'object' ? activeRequest.airline?.code || activeRequest.airline?.name : activeRequest?.airline) || "Airline"} - {selectedFlight?.flightNumber || ""} - {activeRequest?.preferredJourney?.pricingSnapshot?.matchedRule?.Type === 1 ? "SAVER" : "REGULAR"}
+                                  {selectedFlight?.airlineName || selectedFlight?.airlineCode || activeRequest?.airline || "Airline"} - {selectedFlight?.flightNumber || ""} - {activeRequest?.preferredJourney?.pricingSnapshot?.matchedRule?.Type === 1 ? "SAVER" : "REGULAR"}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
@@ -460,10 +460,10 @@ export default function ReissueOpsDetailModal({
                               {/* Origin */}
                               <div className="flex flex-col">
                                 <h4 className="text-4xl font-black italic text-[#1A1714] uppercase leading-none tracking-tighter">
-                                  {originSegments?.origin?.code || originSegments?.origin}
+                                  {originSegments?.origin}
                                 </h4>
-                                <p className="text-[10px] font-black text-[#1A1714] uppercase tracking-widest mt-2">{originSegments?.originAirport?.name || originSegments?.originAirport || originSegments?.origin?.name || originSegments?.origin?.code || originSegments?.origin}</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase">{originSegments?.originCity?.name || originSegments?.originCity || originSegments?.origin?.city || originSegments?.origin?.code || originSegments?.origin}</p>
+                                <p className="text-[10px] font-black text-[#1A1714] uppercase tracking-widest mt-2">{originSegments?.originAirport || originSegments?.origin}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase">{originSegments?.originCity || originSegments?.origin}</p>
                                 <div className="mt-4">
                                   <p className="text-lg font-black text-[#B5862A] leading-none">{formatTimeOnly(originSegments?.departureTime || originSegments?.departureDate)}</p>
                                   <p className="text-[10px] font-black italic text-[#1A1714] uppercase tracking-tighter mt-1">{formatDateOnly(originSegments?.departureTime || originSegments?.departureDate)}</p>
@@ -490,10 +490,10 @@ export default function ReissueOpsDetailModal({
                               {/* Destination */}
                               <div className="flex flex-col text-right items-end">
                                 <h4 className="text-4xl font-black italic text-[#1A1714] uppercase leading-none tracking-tighter">
-                                  {destSegments?.destination?.code || destSegments?.destination}
+                                  {destSegments?.destination}
                                 </h4>
-                                <p className="text-[10px] font-black text-[#1A1714] uppercase tracking-widest mt-2">{destSegments?.destinationAirport?.name || destSegments?.destinationAirport || destSegments?.destination?.name || destSegments?.destination?.code || destSegments?.destination}</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase">{destSegments?.destinationCity?.name || destSegments?.destinationCity || destSegments?.destination?.city || destSegments?.destination?.code || destSegments?.destination}</p>
+                                <p className="text-[10px] font-black text-[#1A1714] uppercase tracking-widest mt-2">{destSegments?.destinationAirport || destSegments?.destination}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase">{destSegments?.destinationCity || destSegments?.destination}</p>
                                 <div className="mt-4 text-right">
                                   <p className="text-lg font-black text-[#B5862A] leading-none">{formatTimeOnly(destSegments?.arrivalTime || destSegments?.arrivalDate)}</p>
                                   <p className="text-[10px] font-black italic text-[#1A1714] uppercase tracking-tighter mt-1">{formatDateOnly(destSegments?.arrivalTime || destSegments?.arrivalDate)}</p>

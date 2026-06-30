@@ -1,5 +1,6 @@
 const ApiError = require("../../../../utils/ApiError");
 const reissueFinancialLedgerService = require("../../../../services/reissue/reissueFinancialLedger.service");
+const { parseMiniFareRules } = require("../utils/miniFareRuleParser");
 
 const PRICING_VERSION = "offline-reissue-v1";
 
@@ -118,6 +119,37 @@ const collectRuleGroups = (node, path = "root", groups = []) => {
 };
 
 const extractReissueCharge = ({ fareRuleResponse, oldFare }) => {
+  const parsedMiniFareRules = parseMiniFareRules(fareRuleResponse);
+  const parsedRulePenalty = parsedMiniFareRules.reissueRules.reduce((maxPenalty, rule) => {
+    const amount = Number(rule?.amount || 0);
+    const percentage = Number(rule?.percentage || 0);
+    const computedAmount =
+      amount > 0
+        ? amount
+        : percentage > 0 && oldFare > 0
+          ? Number(((oldFare * percentage) / 100).toFixed(2))
+          : 0;
+    return computedAmount > maxPenalty ? computedAmount : maxPenalty;
+  }, 0);
+
+  if (parsedRulePenalty > 0) {
+    return {
+      reissueCharge: roundCurrency(parsedRulePenalty) || 0,
+      source: "MiniFareRules.parsed",
+      matchedRule: parsedMiniFareRules.reissueRules.find((rule) => {
+        const amount = Number(rule?.amount || 0);
+        const percentage = Number(rule?.percentage || 0);
+        const computedAmount =
+          amount > 0
+            ? amount
+            : percentage > 0 && oldFare > 0
+              ? Number(((oldFare * percentage) / 100).toFixed(2))
+              : 0;
+        return computedAmount === parsedRulePenalty;
+      }) || null,
+    };
+  }
+
   const ruleGroups = collectRuleGroups(fareRuleResponse);
   const candidates = [];
 

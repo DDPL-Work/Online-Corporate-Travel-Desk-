@@ -1,5 +1,6 @@
 export const REISSUE_STATUS_OPTIONS = [
   "ALL",
+  "PENDING_ASSIGNMENT",
   "RAISED",
   "ASSIGNED",
   "IN_PROGRESS",
@@ -49,6 +50,7 @@ export const formatMoney = (value, currency = "INR") =>
 
 export const getStatusTone = (status) => {
   switch (status) {
+    case "PENDING_ASSIGNMENT":
     case "RAISED":
       return "bg-amber-50 text-amber-700 border-amber-200";
     case "ASSIGNED":
@@ -61,6 +63,7 @@ export const getStatusTone = (status) => {
       return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "FAILED":
     case "REJECTED":
+    case "CANCELLED":
       return "bg-rose-50 text-rose-700 border-rose-200";
     default:
       return "bg-slate-50 text-slate-700 border-slate-200";
@@ -78,6 +81,8 @@ export const getJourneyLabel = (flight = {}) => {
 
 export const getAllowedOpsTransitions = (status) => {
   switch (status) {
+    case "PENDING_ASSIGNMENT":
+      return ["ASSIGNED", "FAILED", "CANCELLED"];
     case "RAISED":
       return ["ASSIGNED", "REJECTED", "FAILED"];
     case "ASSIGNED":
@@ -93,6 +98,7 @@ export const getAllowedOpsTransitions = (status) => {
       return [];
     case "FAILED":
       return ["IN_PROGRESS"];
+    case "CANCELLED":
     default:
       return [];
   }

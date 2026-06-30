@@ -9,17 +9,60 @@ router.use(verifyToken);
 
 /**
  * ================================
+ * CANCELLATION & REISSUE APPROVAL ROUTES
+ * MUST be BEFORE /:id parameter routes to avoid CastError
+ * ================================
+ */
+
+// ✅ Travel Admin: Get pending cancellation & reissue approvals
+router.get(
+  "/cancellation-reissue",
+  authorizeRoles("travel-admin"),
+  approvalController.getAllCancellationReissueApprovals
+);
+
+// ✅ Manager: Get pending cancellation & reissue requests
+router.get(
+  "/manager/cancellation-reissue",
+  authorizeRoles("manager"),
+  approvalController.getManagerCancellationReissueRequests
+);
+
+// ✅ Configured Approver: Get pending requests (only TRAVEL_ADMIN_APPROVER stage)
+router.get(
+  "/configured-approver/cancellation-reissue",
+  authorizeRoles("travel-admin", "manager", "corporate-super-admin", "employee"),
+  approvalController.getConfiguredApproverRequests
+);
+
+// ✅ Approve cancellation/reissue (Manager → Travel Admin → Executed)
+router.post(
+  "/cancellation-reissue/:modelType/:id/approve",
+  authorizeRoles("travel-admin", "manager", "employee"),
+  approvalController.approveCancellationReissueRequest
+);
+
+// ✅ Reject cancellation/reissue
+router.post(
+  "/cancellation-reissue/:modelType/:id/reject",
+  authorizeRoles("travel-admin", "manager", "employee"),
+  approvalController.rejectCancellationReissueRequest
+);
+
+// ✅ Transfer cancellation/reissue (Travel Admin only)
+router.post(
+  "/cancellation-reissue/:modelType/:id/transfer",
+  authorizeRoles("travel-admin"),
+  approvalController.transferCancellationReissueRequest
+);
+
+/**
+ * ================================
  * ADMIN (CORPORATE) APPROVAL FLOW
  * ================================
  */
 
-/**
- * ================================
- * FLIGHT APPROVAL FLOW
- * ================================
- */
-
-// ✅ Get all approval requests (ALL employees under same corporate/domain)
+// ✅ Get all approval requests
 router.get(
   '/',
   authorizeRoles('travel-admin'),
@@ -29,7 +72,7 @@ router.get(
 // ✅ Check for pending transferred requests
 router.get(
   '/second-approver/check',
-  authorizeRoles('finance_team'),
+  authorizeRoles('travel-admin', 'manager', 'corporate-super-admin', 'finance_team','employee'),
   approvalController.checkSecondApproverPending
 );
 
@@ -46,34 +89,26 @@ router.get(
   approvalController.getApproval
 );
 
-// ✅ Approve booking request (ADMIN/MANAGER/SECOND APPROVER)
+// ✅ Approve booking request
 router.post(
   '/:id/approve',
   authorizeRoles('travel-admin', 'manager', 'employee'),
   approvalController.approveRequest
 );
 
-// ✅ Validate booking request (ADMIN/MANAGER/SECOND APPROVER)
-router.post(
-  '/:id/validate',
-  authorizeRoles('travel-admin', 'manager', 'employee'),
-  approvalController.validateFlightApproval
-);
-
-// ✅ Reject booking request (ADMIN/MANAGER/SECOND APPROVER)
+// ✅ Reject booking request
 router.post(
   '/:id/reject',
   authorizeRoles('travel-admin', 'manager', 'employee'),
   approvalController.rejectRequest
 );
 
-// ✅ Transfer booking request (ADMIN ONLY)
+// ✅ Transfer booking request
 router.post(
   '/:id/transfer',
   authorizeRoles('travel-admin'),
   approvalController.transferRequest
 );
-
 
 /**
  * ================================
@@ -92,13 +127,6 @@ router.post(
   "/hotel/:id/approve",
   authorizeRoles("travel-admin", "manager", "employee"),
   approvalController.approveHotelRequest
-);
-
-// ✅ Validate HOTEL request
-router.post(
-  "/hotel/:id/validate",
-  authorizeRoles("travel-admin", "manager", "employee"),
-  approvalController.validateHotelApproval
 );
 
 // ✅ Reject HOTEL request

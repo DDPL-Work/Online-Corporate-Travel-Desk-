@@ -4,6 +4,93 @@ const {
   normalizeSsrSnapshot,
   roundCurrency,
 } = require("../../modules/servicing/reissue/utils/ssrSnapshot.util");
+const { classifySsrFinancials } = require("./reissueSSRFinancial.service");
+
+function buildLastTicketedSnapshot({
+  request = {},
+  booking = {},
+  ssrSnapshot = null,
+  fare = null,
+  bookingIdOverride = null,
+} = {}) {
+  const activeSnapshot =
+    request?.lastTicketedSnapshot ||
+    request?.financialLedger?.lastTicketedSnapshot ||
+    request?.activeTicketSnapshot ||
+    booking?.lastTicketedSnapshot ||
+    booking?.activeTicketSnapshot ||
+    {};
+  const ticketData =
+    request?.ticketData ||
+    activeSnapshot?.ticketData ||
+    booking?.ticketData ||
+    booking?.originalBookingSnapshot?.ticketData ||
+    null;
+  const providerReferences =
+    request?.bookingSnapshot?.providerReferences ||
+    request?.onlineReissueContext?.providerReferences ||
+    activeSnapshot?.providerReferences ||
+    booking?.bookingSnapshot?.providerReferences ||
+    booking?.providerReferences ||
+    booking?.originalBookingSnapshot?.providerReferences ||
+    null;
+
+  const normalizedSsr = normalizeSsrSnapshot(
+    ssrSnapshot || activeSnapshot?.ssrSnapshot || activeSnapshot?.ssr || {},
+    activeSnapshot?.segments || booking?.flightRequest?.segments || [],
+  );
+  const resolvedFare = roundCurrency(
+    fare ??
+      activeSnapshot?.fare?.totalFare ??
+      activeSnapshot?.fareSnapshot?.offeredFare ??
+      activeSnapshot?.fareSnapshot?.publishedFare ??
+      booking?.pricingSnapshot?.totalAmount ??
+      0,
+  );
+
+  return {
+    fare: {
+      totalFare: resolvedFare,
+      baseFare: roundCurrency(
+        activeSnapshot?.fare?.baseFare ??
+          activeSnapshot?.fareSnapshot?.baseFare ??
+          booking?.flightRequest?.fareSnapshot?.baseFare ??
+          0,
+      ),
+      taxes: roundCurrency(
+        activeSnapshot?.fare?.taxes ??
+          (resolvedFare -
+            Number(
+              activeSnapshot?.fare?.baseFare ??
+                activeSnapshot?.fareSnapshot?.baseFare ??
+                booking?.flightRequest?.fareSnapshot?.baseFare ??
+                0,
+            )) ??
+          0,
+      ),
+    },
+    ssr: normalizedSsr,
+    segments: activeSnapshot?.segments || booking?.flightRequest?.segments || [],
+    baggage: normalizedSsr.baggage,
+    meals: normalizedSsr.meals,
+    seats: normalizedSsr.seats,
+    bookingId:
+      bookingIdOverride ||
+      request?.newBookingId ||
+      activeSnapshot?.sourceBookingId?.toString?.() ||
+      request?.bookingId?.toString?.() ||
+      booking?._id?.toString?.() ||
+      null,
+    ticketNumber:
+      providerReferences?.ticketNumbers?.[0] ||
+      activeSnapshot?.ticketNumber ||
+      activeSnapshot?.providerReferences?.ticketNumbers?.[0] ||
+      null,
+    providerReferences,
+    ticketData,
+    capturedAt: new Date(),
+  };
+}
 
 function extractOriginalAmounts(booking = {}) {
   const originalTicketAmount = Number(
@@ -50,6 +137,7 @@ function extractOriginalAmounts(booking = {}) {
 
 function initializeLedger(booking = {}) {
   const amounts = extractOriginalAmounts(booking);
+  const initialSnapshot = buildLastTicketedSnapshot({ booking });
 
   return {
     originalTicketAmount: amounts.originalTicketAmount,
@@ -72,6 +160,14 @@ function initializeLedger(booking = {}) {
     currentTicketValue: amounts.originalTicketAmount,
     currentSSRValue: amounts.originalSSR,
     currentTotalValue: amounts.originalTotalPaid,
+    lastTicketedSnapshot: initialSnapshot,
+    ssrFinancials: {
+      refundableSSR: amounts.originalSSR,
+      nonRefundableSSR: 0,
+      previousSSR: amounts.originalSSR,
+      newSSR: amounts.originalSSR,
+      ssrDelta: 0,
+    },
   };
 }
 
@@ -103,26 +199,43 @@ async function getLedgerForBooking(booking) {
 
 function resolvePreviousSnapshot(request = {}, booking = {}) {
   const ledger = request.financialLedger || initializeLedger(booking);
+  const lastTicketedSnapshot =
+    ledger.lastTicketedSnapshot || request.lastTicketedSnapshot || buildLastTicketedSnapshot({ request, booking });
   const lastCycle =
     Array.isArray(request.pricingHistory) && request.pricingHistory.length
       ? request.pricingHistory[request.pricingHistory.length - 1]
       : null;
 
   const previousFare = roundCurrency(
-    lastCycle?.newFare ?? ledger.currentTicketValue ?? ledger.originalTicketAmount ?? 0,
+    lastTicketedSnapshot?.fare?.totalFare ??
+      lastCycle?.newFare ??
+      ledger.currentTicketValue ??
+      ledger.originalTicketAmount ??
+      0,
   );
   const previousSSR = roundCurrency(
-    lastCycle?.newSSR ?? ledger.currentSSRValue ?? ledger.originalSSR ?? 0,
+    lastTicketedSnapshot?.ssr?.totalSSRAmount ??
+      lastCycle?.newSSR ??
+      ledger.currentSSRValue ??
+      ledger.originalSSR ??
+      0,
   );
 
   return {
     previousFare,
     previousSSR,
-    previousTotalPaid: roundCurrency(previousFare + previousSSR),
+    previousTotalPaid: previousFare,
+    lastTicketedSnapshot,
   };
 }
 
 function resolveOldSsrSnapshot(request = {}, booking = {}) {
+  if (request?.financialLedger?.lastTicketedSnapshot?.ssr) {
+    return request.financialLedger.lastTicketedSnapshot.ssr;
+  }
+  if (request?.lastTicketedSnapshot?.ssr) {
+    return request.lastTicketedSnapshot.ssr;
+  }
   if (request?.activeTicketSnapshot?.ssrSnapshot || request?.activeTicketSnapshot?.ssr) {
     return request.activeTicketSnapshot.ssrSnapshot || request.activeTicketSnapshot.ssr;
   }
@@ -151,9 +264,11 @@ function calculateCumulativeReissueAmount({
   selectedSSR = null,
   supplierReissueCharge = 0,
   booking = {},
+  previousTicketedSnapshot = null,
+  currentTicketedSnapshot = null,
 }) {
   const ledger = request.financialLedger || initializeLedger(booking);
-  const { previousFare, previousSSR, previousTotalPaid } = resolvePreviousSnapshot(
+  const { previousFare, previousSSR, previousTotalPaid, lastTicketedSnapshot } = resolvePreviousSnapshot(
     request,
     booking,
   );
@@ -173,23 +288,46 @@ function calculateCumulativeReissueAmount({
   const newTaxes = Math.max(0, roundCurrency(newFare - newBaseFare));
 
   const normalizedSelectedSsr = normalizeSelectedSsr(request, booking, selectedSSR);
-  const oldSsrSnapshot = normalizeSsrSnapshot(
-    resolveOldSsrSnapshot(request, booking),
-    request?.activeTicketSnapshot?.segments || booking?.flightRequest?.segments || [],
-  );
-  const { reconcileSSRs } = require("./reissueSSRReconciliation.service");
-  const reconciliation = reconcileSSRs(oldSsrSnapshot, normalizedSelectedSsr);
+  const previousSnapshot =
+    previousTicketedSnapshot ||
+    lastTicketedSnapshot ||
+    buildLastTicketedSnapshot({ request, booking });
+  const comparisonSegments =
+    previousSnapshot?.segments || request?.activeTicketSnapshot?.segments || booking?.flightRequest?.segments || [];
+  const ssrFinancials = classifySsrFinancials({
+    previousSnapshot: previousSnapshot?.ssr || resolveOldSsrSnapshot(request, booking),
+    nextSnapshot: normalizedSelectedSsr,
+    request,
+    booking,
+    segments: comparisonSegments,
+  });
 
   const airlinePenalty = roundCurrency(supplierReissueCharge || 0);
   const newSSR = roundCurrency(normalizedSelectedSsr.totalSSRAmount || 0);
+  const refundablePreviousSSR = roundCurrency(ssrFinancials.refundableSSR || 0);
+  const nonRefundablePreviousSSR = roundCurrency(ssrFinancials.nonRefundableSSR || 0);
   const grossNewAmount = roundCurrency(newFare + newSSR + airlinePenalty);
-  const netDelta = roundCurrency(grossNewAmount - previousTotalPaid);
+  const reusablePreviousValue = roundCurrency(previousFare + refundablePreviousSSR);
+  const netDelta = roundCurrency(grossNewAmount - reusablePreviousValue);
 
   const additionalCollection = netDelta > 0 ? netDelta : 0;
   const refundAmount = netDelta < 0 ? Math.abs(netDelta) : 0;
+  const nextTicketedSnapshot =
+    currentTicketedSnapshot ||
+    buildLastTicketedSnapshot({
+      request,
+      booking,
+      ssrSnapshot: normalizedSelectedSsr,
+      fare: newFare,
+      bookingIdOverride:
+        request?.newBookingId ||
+        request?.activeTicketSnapshot?.sourceBookingId?.toString?.() ||
+        booking?._id?.toString?.() ||
+        null,
+    });
 
   return {
-    alreadyPaid: previousTotalPaid,
+    alreadyPaid: reusablePreviousValue,
     previousFare,
     previousSSR,
     newFare,
@@ -205,10 +343,12 @@ function calculateCumulativeReissueAmount({
     newSeatSSR: roundCurrency(normalizedSelectedSsr.totalSeatAmount || 0),
     newMealSSR: roundCurrency(normalizedSelectedSsr.totalMealAmount || 0),
     newBaggageSSR: roundCurrency(normalizedSelectedSsr.totalBaggageAmount || 0),
-    reusableSSRValue: roundCurrency(reconciliation.reusableSSRValue || 0),
-    refundSSRValue: roundCurrency(reconciliation.refundSSRValue || 0),
-    additionalSSRValue: roundCurrency(reconciliation.additionalSSRValue || 0),
-    reusableValue: previousTotalPaid,
+    refundablePreviousSSR,
+    nonRefundablePreviousSSR,
+    reusableSSRValue: refundablePreviousSSR,
+    refundSSRValue: refundablePreviousSSR,
+    additionalSSRValue: roundCurrency(Math.max(newSSR - refundablePreviousSSR, 0)),
+    reusableValue: reusablePreviousValue,
     netPayable: netDelta,
     netCollection: additionalCollection,
     seatsList: normalizedSelectedSsr.seats,
@@ -219,6 +359,9 @@ function calculateCumulativeReissueAmount({
     currentSSRValue: newSSR,
     currentTotalValue: roundCurrency(newFare + newSSR),
     ledgerSnapshot: ledger,
+    ssrFinancials,
+    previousTicketedSnapshot: previousSnapshot,
+    currentTicketedSnapshot: nextTicketedSnapshot,
   };
 }
 
@@ -310,11 +453,15 @@ function applyReissueCycle(request, calculation) {
     currentTicketValue: calculation.currentTicketValue,
     currentSSRValue: calculation.currentSSRValue,
     currentTotalValue: calculation.currentTotalValue,
+    lastTicketedSnapshot: calculation.currentTicketedSnapshot,
+    ssrFinancials: calculation.ssrFinancials,
   };
 
   request.reissueCharges = request.financialLedger.cumulativeReissueCharges;
   request.fareDifference = roundCurrency(calculation.newFare - previousFare);
   request.totalAdjustment = calculation.additionalCollection;
+  request.lastTicketedSnapshot = calculation.currentTicketedSnapshot;
+  request.ssrFinancials = calculation.ssrFinancials;
 
   logger.info("REISSUE_LEDGER_UPDATED", {
     requestId: request?.reissueId || request?.requestId || request?._id?.toString?.() || null,
@@ -328,6 +475,8 @@ function applyReissueCycle(request, calculation) {
     refundAmount: calculation.refundAmount,
     currentTicketValue: calculation.currentTicketValue,
     currentSSRValue: calculation.currentSSRValue,
+    refundablePreviousSSR: calculation.refundablePreviousSSR,
+    nonRefundablePreviousSSR: calculation.nonRefundablePreviousSSR,
   });
 
   if (calculation.refundAmount > 0) {
@@ -341,6 +490,7 @@ function applyReissueCycle(request, calculation) {
 }
 
 module.exports = {
+  buildLastTicketedSnapshot,
   extractOriginalAmounts,
   initializeLedger,
   getLedgerForBooking,

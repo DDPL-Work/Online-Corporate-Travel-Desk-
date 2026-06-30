@@ -1,6 +1,5 @@
 const crypto = require("crypto");
-const { getConnections } = require("../../../../config/redisConnections");
-const redis = getConnections().general;
+const redis = require("../../../../config/redis");
 
 class ReissueLockService {
   async acquire(reissueId, ttlMs = 30000) {

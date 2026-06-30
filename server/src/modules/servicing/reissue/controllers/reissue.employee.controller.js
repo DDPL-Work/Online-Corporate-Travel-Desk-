@@ -5,6 +5,36 @@ const { toReissueDto } = require("../transformers/reissue.dto");
 const { toOfflineReissueDto } = require("../transformers/offlineReissue.dto");
 const { REISSUE_STATUSES } = require("../constants/reissue.constants");
 
+const STATUS_PRIORITY = {
+  ASSIGNED: 120,
+  IN_PROGRESS: 115,
+  WAITING_AIRLINE: 110,
+  PROCESSING: 105,
+  BILLING_RESERVED: 100,
+  QUOTE_RECEIVED: 95,
+  SEARCH_COMPLETED: 90,
+  CREATED: 85,
+  OFFLINE_REQUIRED: 80,
+  TICKET_GENERATED: 70,
+  COMPLETED: 60,
+  FAILED: 20,
+  REJECTED: 15,
+  CANCELLED: 10,
+};
+
+const getLifecycleRank = (item = {}) => STATUS_PRIORITY[item?.status] || 0;
+const getGeneration = (item = {}) => Number(item?.bookingLineage?.reissueGeneration || 0);
+const getUpdatedAt = (item = {}) => new Date(item?.updatedAt || item?.createdAt || 0).getTime();
+const getRequestIdentity = (item = {}) =>
+  item?.bookingLineage?.originalBookingId ||
+  item?.bookingLineage?.originalMongoBookingId ||
+  item?.originalPnr ||
+  item?.displayInfo?.pnr ||
+  item?.bookingId?.toString?.() ||
+  item?.bookingId ||
+  item?.id ||
+  item?._id;
+
 /**
  * GET /api/v1/reissue/eligibility/:bookingId
  * Frontend calls this to determine online vs offline eligibility dynamically.
@@ -23,20 +53,25 @@ exports.checkEligibility = asyncHandler(async (req, res) => {
         message: result.message,
         mode: result.mode,
         support: result.support,
+        supplierSupport: result.supplierSupport || result.support,
         reasons: result.reasons,
+        shouldCreateOfflineRequest: false,
       }, result.message),
     );
   }
 
   res.status(200).json(
-    new ApiResponse(200, {
-      success: true,
-      code: result.code,
-      message: result.message,
-      mode: result.mode,
-      support: result.support,
-      supplier: result.supplier,
-    }, result.message),
+      new ApiResponse(200, {
+        success: true,
+        code: result.code,
+        message: result.message,
+        mode: result.mode,
+        support: result.support,
+        supplierSupport: result.supplierSupport || result.support,
+        supplier: result.supplier,
+        reasons: result.reasons || [],
+        shouldCreateOfflineRequest: false,
+      }, result.message),
   );
 });
 
@@ -50,44 +85,46 @@ exports.search = asyncHandler(async (req, res) => {
     payload: req.body,
   });
 
-  // CRITICAL: If eligibility failed, return ONLINE_REISSUE_NOT_SUPPORTED
-  if (request.status === REISSUE_STATUSES.FAILED) {
-    const errorCode = request.metadata?.errorCode || "ONLINE_REISSUE_NOT_SUPPORTED";
-    const reasons = request.timeline
-      ?.filter((t) => t.status === REISSUE_STATUSES.FAILED)
-      .map((t) => t.description)
-      .filter(Boolean);
+  if (request.transient === true && request.status === REISSUE_STATUSES.FAILED) {
+    const errorCode = request.code || request.metadata?.errorCode || "ONLINE_REISSUE_NOT_SUPPORTED";
+    const reasons = request.reasons || [];
 
     return res.status(200).json(
       new ApiResponse(200, {
         success: false,
         code: errorCode,
-        message: "This booking does not support online reissue. Please raise offline request.",
-        reissueRequestId: request._id,
+        message:
+          request.message ||
+          "This booking does not support online reissue. Please raise offline request.",
+        reissueRequestId: null,
         reasons,
         supplierSupport: request.supplierSupport,
+        shouldCreateOfflineRequest: false,
       }, "Online reissue not supported"),
     );
   }
 
   // ── OFFLINE_REQUIRED: provider routed to offline (sandbox / PNR restriction / fare rules) ──
-  if (request.status === REISSUE_STATUSES.OFFLINE_REQUIRED) {
-    const offlineCode =
-      request.metadata?.errorCode ||
-      "TBO_SANDBOX_REISSUE_UNSUPPORTED";
+  if (request.transient === true && request.status === REISSUE_STATUSES.OFFLINE_REQUIRED) {
+    const offlineCode = request.code || request.metadata?.errorCode || "TBO_SANDBOX_REISSUE_UNSUPPORTED";
+    const reasons = request.reasons || [];
 
     return res.status(200).json(
       new ApiResponse(200, {
         success: false,
         code: offlineCode,
-        message: "Online reissue is currently unavailable for this booking/airline.",
+        message:
+          request.message ||
+          "Online reissue is currently unavailable for this booking/airline.",
         providerMessage:
           "TBO sandbox or airline does not support online reissue for this PNR.",
         fallbackAvailable: true,
         mode: "OFFLINE",
         status: request.status,
-        reissueId: request.reissueId,
-        reissueRequestId: request._id,
+        reissueId: null,
+        reissueRequestId: null,
+        reasons,
+        shouldCreateOfflineRequest: false,
       }, "Offline reissue required"),
     );
   }
@@ -103,6 +140,7 @@ exports.search = asyncHandler(async (req, res) => {
         flightOptions: request.supplierResponse?.searchResponse?.Response?.Results || [],
         miniFareRules: request.miniFareRules || [],
         supplierReissueSupported: request.supplierSupport?.onlineReissue || false,
+        shouldCreateOfflineRequest: false,
       }, "Reissue search completed"),
     );
   }
@@ -182,6 +220,11 @@ exports.getCompanyRequests = asyncHandler(async (req, res) => {
   } else {
     onlineQuery.status = { $nin: EXCLUDED_ONLINE_STATUSES };
   }
+  onlineQuery.$or = [
+    { "creationSource.type": "USER_SUBMITTED" },
+    { creationSource: { $exists: false } },
+    { "creationSource.type": { $exists: false } },
+  ];
 
   const offlineQuery = { corporateId };
   if (query.status) offlineQuery.status = query.status;
@@ -197,34 +240,27 @@ exports.getCompanyRequests = asyncHandler(async (req, res) => {
   const onlineDtos  = (onlineRes.data  || []).map(toReissueDto);
   const offlineDtos = (offlineRes.data || []).map(toOfflineReissueDto);
 
-  const combined = [...onlineDtos, ...offlineDtos].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-  );
+  const combined = [...onlineDtos, ...offlineDtos].sort((left, right) => {
+    const generationDiff = getGeneration(right) - getGeneration(left);
+    if (generationDiff !== 0) return generationDiff;
+
+    const lifecycleDiff = getLifecycleRank(right) - getLifecycleRank(left);
+    if (lifecycleDiff !== 0) return lifecycleDiff;
+
+    return getUpdatedAt(right) - getUpdatedAt(left);
+  });
 
   // ── CRITICAL FIX: Deduplicate records for the same PNR or Request ID ──
   // Since the combined list is sorted by createdAt desc, the first record we see
   // for any PNR is the most recent (highest priority) and should be kept.
-  const seenPnrs = new Set();
-  const seenRequestIds = new Set();
+  const seenKeys = new Set();
   const deduped = [];
 
   for (const item of combined) {
-    const pnr = (item.displayInfo?.pnr || item.pnr || "").trim().toUpperCase();
-    const reqId = (item.requestId || item.id || item._id || "").toString().trim();
-    
-    let isDuplicate = false;
-    if (pnr && pnr !== "N/A" && seenPnrs.has(pnr)) {
-      isDuplicate = true;
-    }
-    if (reqId && seenRequestIds.has(reqId)) {
-      isDuplicate = true;
-    }
-
-    if (!isDuplicate) {
-      if (pnr && pnr !== "N/A") seenPnrs.add(pnr);
-      if (reqId) seenRequestIds.add(reqId);
-      deduped.push(item);
-    }
+    const identity = String(getRequestIdentity(item) || "").trim();
+    if (!identity || seenKeys.has(identity)) continue;
+    seenKeys.add(identity);
+    deduped.push(item);
   }
 
   // ── CRITICAL FIX: Use real aggregate totals for pagination ──

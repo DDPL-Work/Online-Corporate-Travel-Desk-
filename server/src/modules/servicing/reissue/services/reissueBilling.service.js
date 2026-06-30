@@ -54,7 +54,6 @@ class ReissueBillingService {
               balanceBefore: before,
               balanceAfter: corporate.walletBalance,
               description: `Reserved for reissue ${reissueRequest.reissueId}`,
-              operationType: "Flight-Reissue",
               reference: reissueRequest.reissueId,
               bookingId: reissueRequest.bookingId,
               processedBy: actorId || null,
@@ -90,7 +89,6 @@ class ReissueBillingService {
               bookingDate: new Date(),
               travelDate: reissueRequest.newJourney?.departureDate || new Date(),
               description: `Reserved postpaid exposure for reissue ${reissueRequest.reissueId}`,
-              operationType: "Flight-Reissue",
               status: "pending",
               metadata: {
                 reservationId,
@@ -201,7 +199,6 @@ class ReissueBillingService {
               balanceBefore: before,
               balanceAfter: corporate.walletBalance,
               description: `Released reissue reservation ${reissueRequest.reissueId}`,
-              operationType: "Flight-Reissue",
               reference: reissueRequest.reissueId,
               bookingId: reissueRequest.bookingId,
               status: "completed",

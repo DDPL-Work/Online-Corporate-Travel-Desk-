@@ -32,6 +32,54 @@ import {
 import useExcelExporter from "../../services/export/useExcelExporter";
 import { reissueRequestsExportTemplate } from "../../templates/exportTemplates/superAdminExportTemplates";
 
+const REQUEST_STATUS_PRIORITY = {
+  PENDING_ASSIGNMENT: 125,
+  ASSIGNED: 120,
+  IN_PROGRESS: 115,
+  WAITING_AIRLINE: 110,
+  PROCESSING: 105,
+  BILLING_RESERVED: 100,
+  QUOTE_RECEIVED: 95,
+  SEARCH_COMPLETED: 90,
+  CREATED: 85,
+  OFFLINE_REQUIRED: 80,
+  TICKET_GENERATED: 70,
+  COMPLETED: 60,
+  FAILED: 20,
+  REJECTED: 15,
+  CANCELLED: 10,
+};
+
+const dedupeLatestActionableRequests = (items = []) => {
+  const sorted = [...items].sort((left, right) => {
+    const generationDiff =
+      Number(right?.bookingLineage?.reissueGeneration || 0) -
+      Number(left?.bookingLineage?.reissueGeneration || 0);
+    if (generationDiff !== 0) return generationDiff;
+
+    const statusDiff =
+      (REQUEST_STATUS_PRIORITY[right?.status] || 0) -
+      (REQUEST_STATUS_PRIORITY[left?.status] || 0);
+    if (statusDiff !== 0) return statusDiff;
+
+    return new Date(right?.updatedAt || right?.createdAt || 0) - new Date(left?.updatedAt || left?.createdAt || 0);
+  });
+
+  const seen = new Set();
+  return sorted.filter((item) => {
+    const key =
+      item?.bookingLineage?.originalBookingId ||
+      item?.bookingLineage?.originalMongoBookingId ||
+      item?.originalPnr ||
+      item?.displayInfo?.pnr ||
+      item?.bookingId ||
+      item?.id;
+    if (!key || seen.has(String(key))) return false;
+    seen.add(String(key));
+    return true;
+  });
+};
+
 function readToken() {
   const token = sessionStorage.getItem("token");
   if (!token) return {};
@@ -69,7 +117,7 @@ export default function AllReissueRequests() {
   const currentRole = token.role || token.userRole || "super-admin";
   const currentUserId = token.id || token._id || null;
   const canReassign = ["super-admin", "master-admin", "ops-admin"].includes(currentRole);
-  const { requests, loading, pagination, error } = useSelector((state) => state.reissue);
+  const { requests, loading, pagination, error, analytics } = useSelector((state) => state.reissue);
 
   const [status, setStatus] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -130,9 +178,10 @@ export default function AllReissueRequests() {
   }, [error]);
 
   const filteredRequests = useMemo(() => {
+    const dedupedRequests = dedupeLatestActionableRequests(requests);
     const term = search.trim().toLowerCase();
-    if (!term) return requests;
-    return requests.filter((request) =>
+    if (!term) return dedupedRequests;
+    return dedupedRequests.filter((request) =>
       [
         request.requestId,
         request.bookingId,
@@ -147,8 +196,24 @@ export default function AllReissueRequests() {
     );
   }, [requests, search]);
 
+  const unassignedRequests = useMemo(
+    () =>
+      filteredRequests.filter(
+        (request) =>
+          request.assignmentStatus === "UNASSIGNED" ||
+          request.status === "PENDING_ASSIGNMENT",
+      ),
+    [filteredRequests],
+  );
+
   const stats = useMemo(() => {
     const total = pagination?.total || requests.length;
+    const pendingAssignment =
+      analytics?.pendingAssignmentCount ??
+      requests.filter((request) =>
+        request.assignmentStatus === "UNASSIGNED" ||
+        request.status === "PENDING_ASSIGNMENT",
+      ).length;
     const processing = requests.filter((request) =>
       ["ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(request.status),
     ).length;
@@ -260,10 +325,10 @@ export default function AllReissueRequests() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tight leading-none">
-                  Flight Change Requests
+                  Offline Reissue Management
                 </h1>
                 <p className="text-[10px] mt-2 font-bold uppercase tracking-[2px] opacity-60">
-                  Manage and assign flight change requests
+                  Operations workspace for assignment & SLA tracking
                 </p>
               </div>
             </div>
@@ -275,25 +340,25 @@ export default function AllReissueRequests() {
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard
-            label="Total Requests"
+            label="Open Requests"
             value={stats.total}
             icon={FiBarChart2}
             borderColor="border-b-[#003399]"
           />
           <StatCard
-            label="In Progress"
+            label="Processing"
             value={stats.processing}
             icon={FiSend}
             borderColor="border-b-amber-500"
           />
           <StatCard
-            label="Ready"
+            label="Ticket Ready"
             value={stats.completed}
             icon={FiDownload}
             borderColor="border-b-emerald-500"
           />
           <StatCard
-            label="Late"
+            label="Overdue"
             value={stats.overdue}
             icon={FiAlertCircle}
             borderColor="border-b-rose-500"
@@ -343,7 +408,7 @@ export default function AllReissueRequests() {
             {/* Agent */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Assigned To
+                Assigned Agent
               </label>
               <select
                 value={assignedTo}
@@ -410,7 +475,7 @@ export default function AllReissueRequests() {
                   : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
               }`}
             >
-              Missed Deadline
+              SLA Breach
             </button>
             
             {/* Airline (inline) */}
@@ -431,7 +496,7 @@ export default function AllReissueRequests() {
           <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50">
             <div>
               <h2 className="font-black text-slate-700 uppercase tracking-tighter text-lg">
-                Flight Changes
+                Reissue Queue
               </h2>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                 {stats.total} records found
@@ -478,15 +543,15 @@ export default function AllReissueRequests() {
                 <col style={{ width: "14%" }} /> {/* Passenger */}
                 <col style={{ width: "14%" }} /> {/* Preferred Flight */}
                 <col style={{ width: "10%" }} /> {/* Status */}
-                <col style={{ width: "13%" }} /> {/* Assigned To */}
-                <col style={{ width: "11%" }} /> {/* Deadline */}
-                <col style={{ width: "13%" }} /> {/* New Ticket */}
+                <col style={{ width: "13%" }} /> {/* Assigned Agent */}
+                <col style={{ width: "11%" }} /> {/* SLA */}
+                <col style={{ width: "13%" }} /> {/* Reissued Ticket */}
                 <col style={{ width: "11%" }} /> {/* Updated */}
                 <col style={{ width: "4%" }} />  {/* Action */}
               </colgroup>
               <thead>
                 <tr className="bg-gradient-to-r from-[#001a66] to-[#000d26]">
-                  {["Request", "Traveler", "New Flight", "Status", "Assigned To", "Deadline", "New Ticket", "Updated", ""].map((heading, i) => (
+                  {["Request", "Passenger", "Preferred Flight", "Status", "Assigned Agent", "SLA", "Reissued Ticket", "Updated", ""].map((heading, i) => (
                     <th
                       key={i}
                       className="px-4 xl:px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-300 whitespace-nowrap"
@@ -502,7 +567,7 @@ export default function AllReissueRequests() {
                     <td colSpan="9" className="px-4 py-20 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <FiRefreshCw size={28} className="animate-spin text-[#003399]" />
-                        <p className="text-sm font-bold uppercase tracking-widest">Loading flight changes...</p>
+                        <p className="text-sm font-bold uppercase tracking-widest">Loading offline reissue queue...</p>
                       </div>
                     </td>
                   </tr>
@@ -514,7 +579,7 @@ export default function AllReissueRequests() {
                           <FiRepeat size={28} />
                         </div>
                         <div>
-                          <p className="text-sm font-black text-slate-700">No flight change requests found</p>
+                          <p className="text-sm font-black text-slate-700">No offline reissue requests found</p>
                           <p className="text-xs text-slate-400 mt-1">Try changing the filters.</p>
                         </div>
                       </div>
@@ -545,7 +610,7 @@ export default function AllReissueRequests() {
                           {getJourneyLabel(request.selectedFlight || request.preferredJourney)}
                         </p>
                         <p className="mt-1 text-[10px] font-bold uppercase text-slate-400 truncate">
-                          {request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || (typeof request.airline === 'object' ? request.airline?.code || request.airline?.name : request.airline) || "Airline pending"}
+                          {request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || request.airline || "Airline pending"}
                           {request.selectedFlight?.flightNumber ? ` • ${request.selectedFlight.flightNumber}` : ""}
                         </p>
                       </td>
@@ -588,7 +653,7 @@ export default function AllReissueRequests() {
                         >
                           {request.generatedTicketUrl || request.revisedTicketUrl
                             ? "Ready to download"
-                            : "Waiting for new ticket"}
+                            : "Awaiting generation"}
                         </p>
                       </td>
                       <td className="px-4 xl:px-5 py-4 align-middle">

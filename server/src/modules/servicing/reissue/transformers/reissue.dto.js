@@ -12,6 +12,8 @@ function toReissueDto(doc) {
   if (!doc) return null;
   const item = doc.toObject ? doc.toObject() : doc;
   const activeTicketSnapshot = item.activeTicketSnapshot || null;
+  const lastTicketedSnapshot =
+    item.lastTicketedSnapshot || item.financialLedger?.lastTicketedSnapshot || null;
 
   const populatedUser =
     item.userId && typeof item.userId === "object" && item.userId.email
@@ -91,9 +93,14 @@ function toReissueDto(doc) {
       "Economy",
     journeyType: item.newJourney?.journeyType || item.oldJourney?.journeyType || "One Way",
     oldFare: item.oldJourney?.totalFare || 0,
-    newFare: item.newJourney?.totalFare || activeTicketSnapshot?.fareSnapshot?.offeredFare || 0,
+    newFare:
+      item.normalizedPricing?.newFlightBase ||
+      item.newJourney?.totalFare ||
+      lastTicketedSnapshot?.fare?.totalFare ||
+      activeTicketSnapshot?.fareSnapshot?.offeredFare ||
+      0,
     fareDifference: item.fareDifference || 0,
-    reissueCharge: item.reissueCharges || 0,
+    reissueCharge: item.normalizedPricing?.reissuePenalty || item.reissueCharges || 0,
     refundEstimate: item.normalizedPricing?.refundDue || 0,
     totalEstimate: item.totalAdjustment || 0,
     currency: item.newJourney?.currency || item.oldJourney?.currency || "INR",
@@ -102,6 +109,7 @@ function toReissueDto(doc) {
   return {
     _type: "ONLINE",
     id: item._id,
+    _id: item._id,
     reissueId: item.reissueId,
     bookingId: item.bookingId,
     originalBookingId: item.originalBookingId,
@@ -123,6 +131,7 @@ function toReissueDto(doc) {
     mode: item.mode,
     status: item.status,
     reissueType: item.reissueType,
+    creationSource: item.creationSource || null,
     supplierSupport: item.supplierSupport,
     oldJourney: item.oldJourney,
     newJourney: item.newJourney,
@@ -130,6 +139,9 @@ function toReissueDto(doc) {
     reissueCharges: item.reissueCharges,
     totalAdjustment: item.totalAdjustment,
     activeTicketSnapshot,
+    bookingLineage: item.bookingLineage || null,
+    lastTicketedSnapshot,
+    ssrFinancials: item.ssrFinancials || item.financialLedger?.ssrFinancials || null,
     billingMode: item.billingMode,
     billingReservation: item.billingReservation,
     walletAdjustment: item.walletAdjustment,

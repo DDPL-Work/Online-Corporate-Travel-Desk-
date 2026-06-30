@@ -1,5 +1,6 @@
 function validateNdcRequirements({ travellers = [], newJourney = {} }) {
   const errors = [];
+  const validTitles = new Set(["MR", "MRS", "MS", "MISS", "MASTER"]);
 
   travellers.forEach((traveller, index) => {
     const label = `traveller[${index}]`;
@@ -9,8 +10,15 @@ function validateNdcRequirements({ travellers = [], newJourney = {} }) {
     if (!traveller?.email) {
       errors.push(`${label}: email is mandatory for NDC reissue`);
     }
+    if (!traveller?.phoneWithCode && !traveller?.cellCountryCode) {
+      errors.push(`${label}: CellCountryCode is mandatory for NDC reissue`);
+    }
     if (!traveller?.nationality) {
       errors.push(`${label}: country code / nationality is mandatory for NDC reissue`);
+    }
+    const title = String(traveller?.title || "").trim().toUpperCase();
+    if (!title || !validTitles.has(title)) {
+      errors.push(`${label}: valid title is mandatory for NDC reissue`);
     }
     const fullName = `${traveller?.firstName || ""}${traveller?.lastName || ""}`;
     if (fullName.includes(".")) {

@@ -14,9 +14,13 @@ exports.create = asyncHandler(async (req, res) => {
     actor: req.user,
     payload: req.body,
   });
+  const message =
+    request?.status === "PENDING_ASSIGNMENT"
+      ? "Reissue request submitted successfully and awaiting OPS assignment."
+      : "Offline reissue request created and assigned successfully.";
 
   res.status(201).json(
-    new ApiResponse(201, toOfflineReissueDto(request), "Offline reissue request created"),
+    new ApiResponse(201, toOfflineReissueDto(request), message),
   );
 });
 
@@ -71,6 +75,12 @@ exports.listAdmin = asyncHandler(async (req, res) => {
   const ADMIN_ROLES = ["super-admin", "master-admin", "ops-admin"];
   if (req.opsMember && !ADMIN_ROLES.includes(req.user?.role)) {
     query.assignedOpsMember = new mongoose.Types.ObjectId(req.user.id);
+  }
+
+  // Only restrict to EXECUTED when ops member is browsing ALL requests
+  // (not filtered to their own assigned queue)
+  if (req.user?.role === "ops-member" && !query.assignedOpsMember) {
+    query.approvalStage = "EXECUTED";
   }
 
   const result = await offlineReissueWorkflowService.listAdmin({

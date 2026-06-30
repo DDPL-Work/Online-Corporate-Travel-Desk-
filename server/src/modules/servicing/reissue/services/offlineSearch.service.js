@@ -93,6 +93,29 @@ const extractAirportCode = (value) => {
   return null;
 };
 
+const extractAirportName = (value) => {
+  if (!value || typeof value !== "object") return null;
+  return (
+    value?.Airport?.AirportName ||
+    value?.Airport?.Name ||
+    value?.AirportName ||
+    value?.Name ||
+    value?.airportName ||
+    value?.name ||
+    null
+  );
+};
+
+const extractTerminal = (value) => {
+  if (!value || typeof value !== "object") return null;
+  return (
+    value?.Airport?.Terminal ||
+    value?.Terminal ||
+    value?.terminal ||
+    null
+  );
+};
+
 const extractResultSegments = (result) => {
   const rawSegments = [];
   const collectSegments = (value) => {
@@ -115,6 +138,10 @@ const extractResultSegments = (result) => {
     .map((segment) => {
       const origin = extractAirportCode(segment?.Origin || segment?.origin || segment?.OriginAirport);
       const destination = extractAirportCode(segment?.Destination || segment?.destination || segment?.DestinationAirport);
+      const originAirportName = extractAirportName(segment?.Origin || segment?.origin || segment?.OriginAirport);
+      const destinationAirportName = extractAirportName(segment?.Destination || segment?.destination || segment?.DestinationAirport);
+      const departureTerminal = extractTerminal(segment?.Origin || segment?.origin || segment?.OriginAirport);
+      const arrivalTerminal = extractTerminal(segment?.Destination || segment?.destination || segment?.DestinationAirport);
       // TBO FlightSearch response stores timings inside the nested Origin/Destination objects:
       //   segment.Origin.DepTime    (e.g. "2026-05-20T08:45:00")
       //   segment.Destination.ArrTime (e.g. "2026-05-20T10:35:00")
@@ -181,8 +208,12 @@ const extractResultSegments = (result) => {
 
       if (!origin || !destination) return null;
       return {
-        origin: originDetails,
-        destination: destinationDetails,
+        origin,
+        destination,
+        originAirportName,
+        destinationAirportName,
+        departureTerminal,
+        arrivalTerminal,
         departureTime,
         arrivalTime,
         flightNumber,
@@ -193,6 +224,23 @@ const extractResultSegments = (result) => {
         availableSeats,
         stops,
         duration: Number.isFinite(duration) && duration > 0 ? duration : null,
+        cabinClass: segment?.CabinClass || segment?.CabinClassName || segment?.cabinClass || null,
+        fareFamily:
+          segment?.SupplierFareClass ||
+          segment?.FareClass ||
+          segment?.fareClass ||
+          result?.SupplierFareClass ||
+          result?.ResultFareType ||
+          result?.FareClassification?.Type ||
+          null,
+        baggage:
+          segment?.Baggage ||
+          segment?.CabinBaggage ||
+          segment?.IncludedBaggage ||
+          segment?.baggage ||
+          null,
+        mealInfo: segment?.Meal || segment?.MealInfo || segment?.mealInfo || null,
+        seatInfo: segment?.Seat || segment?.SeatInfo || segment?.seatInfo || null,
       };
     })
     .filter(Boolean);
@@ -348,8 +396,10 @@ const normalizeSearchResults = async (searchResponse, booking) => {
   const traceId = searchResponse?.Response?.TraceId || searchResponse?.TraceId || null;
   const normalizedResults = rawResults.map((result, index) => {
     const segments = extractResultSegments(result);
-    const origin = segments[0]?.origin?.code || segments[0]?.origin || null;
-    const destination = segments[segments.length - 1]?.destination?.code || segments[segments.length - 1]?.destination || null;
+    const origin = segments[0]?.origin || null;
+    const destination = segments[segments.length - 1]?.destination || null;
+    const firstSegment = segments[0] || {};
+    const lastSegment = segments[segments.length - 1] || firstSegment;
     // Primary: pull from normalised segment data (already fixed to read TBO nested fields)
     // Fallback: try top-level result fields and TBO nested Origin/Destination
     const departureTime =
@@ -380,6 +430,10 @@ const normalizeSearchResults = async (searchResponse, booking) => {
       resultIndex: result?.ResultIndex || result?.resultIndex || index,
       origin,
       destination,
+      originAirportName: firstSegment.originAirportName || null,
+      destinationAirportName: lastSegment.destinationAirportName || null,
+      departureTerminal: firstSegment.departureTerminal || null,
+      arrivalTerminal: lastSegment.arrivalTerminal || null,
       airlineCode,
       airlineName,
       flightNumber,
@@ -390,6 +444,19 @@ const normalizeSearchResults = async (searchResponse, booking) => {
       fare,
       offeredFare: fare,
       cabinClass: result?.CabinClass || result?.CabinClassName || result?.FlightCabinClass || null,
+      fareFamily:
+        result?.SupplierFareClass ||
+        result?.ResultFareType ||
+        result?.FareClassification?.Type ||
+        firstSegment.fareFamily ||
+        null,
+      baggage: firstSegment.baggage || result?.Baggage || result?.CabinBaggage || null,
+      mealInfo: firstSegment.mealInfo || result?.Meal || result?.MealInfo || null,
+      seatInfo:
+        firstSegment.seatInfo ||
+        result?.Seat ||
+        result?.SeatInfo ||
+        (result?.NoOfSeatAvailable != null ? `${result.NoOfSeatAvailable} seat(s) available` : null),
       segments,
       fareDifference: fareDifferenceEstimate,
       fareDifferenceEstimate,

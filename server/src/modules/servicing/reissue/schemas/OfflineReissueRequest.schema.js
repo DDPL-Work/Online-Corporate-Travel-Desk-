@@ -37,6 +37,20 @@ const auditLogSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const creationSourceSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["USER_SUBMITTED", "AUTO_GENERATED"],
+      default: "USER_SUBMITTED",
+    },
+    trigger: { type: String, default: null },
+    createdBy: { type: String, default: null },
+    workflow: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 const offlineReissueRequestSchema = new mongoose.Schema(
   {
     requestId: {
@@ -111,12 +125,80 @@ const offlineReissueRequestSchema = new mongoose.Schema(
       default: [],
     },
     remarks: String,
+    /* ================= UNIFIED APPROVAL FIELDS ================= */
+
+    approvalStage: {
+      type: String,
+      enum: ["MANAGER", "TRAVEL_ADMIN", "TRAVEL_ADMIN_APPROVER", "EXECUTED"],
+      index: true,
+    },
+
+    requestStatus: {
+      type: String,
+      enum: ["PENDING_MANAGER_APPROVAL", "PENDING_TRAVEL_ADMIN_APPROVAL", "PENDING_ADMIN_APPROVAL", "approved", "rejected", "transferred"],
+      index: true,
+    },
+
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travelAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
+    travadminApprover: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      email: String,
+      name: String,
+      role: String,
+      transferRemark: String,
+      transferredAt: Date,
+    },
+
+    approvalAudit: [
+      {
+        action: { type: String, required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        role: String,
+        timestamp: { type: Date, default: Date.now },
+        remarks: String,
+      },
+    ],
+
+    creationSource: {
+      type: creationSourceSchema,
+      default: () => ({
+        type: "USER_SUBMITTED",
+        trigger: null,
+        createdBy: null,
+        workflow: null,
+      }),
+    },
     status: {
       type: String,
       enum: Object.values(OFFLINE_STATUSES),
       required: true,
-      default: OFFLINE_STATUSES.RAISED,
+      default: OFFLINE_STATUSES.PENDING_ASSIGNMENT,
       index: true,
+    },
+    assignmentStatus: {
+      type: String,
+      enum: ["UNASSIGNED", "ASSIGNED"],
+      default: "UNASSIGNED",
+      index: true,
+    },
+    autoAssignmentAttempted: {
+      type: Boolean,
+      default: false,
+    },
+    assignmentFailureReason: {
+      type: String,
+      default: null,
     },
     assignedOpsMember: {
       type: mongoose.Schema.Types.ObjectId,
@@ -223,6 +305,18 @@ const offlineReissueRequestSchema = new mongoose.Schema(
         default: null,
       },
     },
+    bookingLineage: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    lastTicketedSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    ssrFinancials: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     financialLedger: {
       originalTicketAmount: { type: Number, default: 0 },
       originalSSR: { type: Number, default: 0 },
@@ -244,6 +338,8 @@ const offlineReissueRequestSchema = new mongoose.Schema(
       currentTicketValue: { type: Number, default: 0 },
       currentSSRValue: { type: Number, default: 0 },
       currentTotalValue: { type: Number, default: 0 },
+      lastTicketedSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+      ssrFinancials: { type: mongoose.Schema.Types.Mixed, default: null },
     },
     pricingHistory: [
       {
@@ -322,6 +418,7 @@ const offlineReissueRequestSchema = new mongoose.Schema(
 offlineReissueRequestSchema.index({ corporateId: 1, status: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ employeeId: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ assignedOpsMember: 1, status: 1, createdAt: -1 });
+offlineReissueRequestSchema.index({ assignmentStatus: 1, status: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ bookingId: 1, createdAt: -1 });
 offlineReissueRequestSchema.index({ status: 1, overdue: 1, breached: 1, slaDeadline: 1 });
 offlineReissueRequestSchema.index({ originalPnr: 1, status: 1, createdAt: -1 });

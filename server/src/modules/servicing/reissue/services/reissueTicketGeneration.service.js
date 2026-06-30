@@ -132,6 +132,7 @@ class ReissueTicketGenerationService {
 
   buildSyntheticBooking({ originalBooking, request, selectedFlight, pricingSnapshot }) {
     const travellers = this.buildTravellers(originalBooking);
+    const activePnr = request.newPnr || request.originalPnr || request.pnr || null;
     const tboSegments = this.buildTboSegments(selectedFlight);
     const rawSegmentSnapshot = tboSegments.map((segment, index) => ({
       origin: segment.Origin.Airport.AirportCode,
@@ -193,6 +194,40 @@ class ReissueTicketGenerationService {
     }
 
     const totalSSR = seatSSR + mealSSR + baggageSSR;
+    const providerReferences =
+      originalBooking?.bookingSnapshot?.providerReferences ||
+      originalBooking?.originalBookingSnapshot?.providerReferences ||
+      {};
+    const fallbackTicketNumbers = Array.isArray(providerReferences?.ticketNumbers)
+      ? providerReferences.ticketNumbers
+      : [];
+    const originalSnapshotPassengers = Array.isArray(originalBooking?.originalBookingSnapshot?.passengers)
+      ? originalBooking.originalBookingSnapshot.passengers
+      : [];
+    const syntheticPassengers = travellers.map((traveller, index) => {
+      const snapshotPassenger = originalSnapshotPassengers[index] || {};
+      const ticketNumber =
+        snapshotPassenger?.ticketNumber ||
+        fallbackTicketNumbers[index] ||
+        fallbackTicketNumbers[0] ||
+        null;
+      const ticketId = snapshotPassenger?.ticketId || null;
+
+      return {
+        FirstName: traveller.firstName,
+        LastName: traveller.lastName,
+        Title: traveller.title,
+        PaxType: traveller.paxType,
+        Ticket:
+          ticketNumber || ticketId
+            ? {
+                TicketId: ticketId,
+                TicketNumber: ticketNumber,
+              }
+            : null,
+        Ssr: [],
+      };
+    });
 
     const syntheticBooking = {
       bookingReference:
@@ -218,20 +253,33 @@ class ReissueTicketGenerationService {
         cabinClass:
           selectedFlight?.cabinClass || originalBooking?.bookingSnapshot?.cabinClass || "Economy",
         amount: newFare + totalSSR,
+        providerReferences,
       },
       pricingSnapshot: {
         totalAmount: newFare + totalSSR,
         baseAmount: baseFare,
         taxes: tax,
       },
+      originalBookingSnapshot: originalBooking?.originalBookingSnapshot || null,
+      ticketData:
+        originalBooking?.ticketData ||
+        originalBooking?.bookingResult?.ticketData ||
+        originalBooking?.originalBookingSnapshot?.ticketData ||
+        null,
       bookingResult: {
-        onwardPNR: request.originalPnr || request.pnr,
-        pnr: request.originalPnr || request.pnr,
+        onwardPNR: activePnr,
+        pnr: activePnr,
+        ticketData:
+          originalBooking?.bookingResult?.ticketData ||
+          originalBooking?.ticketData ||
+          originalBooking?.originalBookingSnapshot?.ticketData ||
+          null,
         providerResponse: {
           Response: {
             Response: {
               FlightItinerary: {
-                TBOConfNo: request.originalPnr || request.pnr,
+                TBOConfNo: activePnr,
+                PNR: activePnr,
                 Segments: tboSegments,
                 Fare: {
                   BaseFare: baseFare,
@@ -242,11 +290,7 @@ class ReissueTicketGenerationService {
                   TotalMealCharges: mealSSR,
                   TotalBaggageCharges: baggageSSR,
                 },
-                Passenger: [
-                  {
-                    Ssr: [],
-                  },
-                ],
+                Passenger: syntheticPassengers,
               },
             },
           },
@@ -256,13 +300,16 @@ class ReissueTicketGenerationService {
         isReissued: true,
         headerTitle: "REISSUED E-TICKET",
         originalPnr: request.originalPnr || request.pnr,
+        activePnr,
+        ticketNumbers: fallbackTicketNumbers,
+        providerReferences,
         generatedAt: new Date(),
         reissueReferenceId: request.requestId,
       },
     };
 
     syntheticBooking.activeTicketSnapshot = buildActiveTicketSnapshotFromState(syntheticBooking, {
-      pnrOverride: request.originalPnr || request.pnr || null,
+      pnrOverride: activePnr,
       ssrSnapshotOverride: normalizedSsrSnapshot,
       segmentsOverride: rawSegmentSnapshot,
     });
