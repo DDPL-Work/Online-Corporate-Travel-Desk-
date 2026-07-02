@@ -86,6 +86,7 @@ const hotelBookingRequestSchema = new mongoose.Schema(
     approverEmail: String,
     approverName: String,
     approverRole: String,
+    isAutoApproval: Boolean,
 
     /* ================= REQUESTER DETAILS ================= */
     requesterDetails: {
@@ -348,6 +349,30 @@ const hotelBookingRequestSchema = new mongoose.Schema(
       lastCheckedAt: Date,
 
       providerResponse: mongoose.Schema.Types.Mixed,
+
+      // Approval flow fields
+      actionPayload: mongoose.Schema.Types.Mixed,
+      managerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+      travelAdminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+      managerStatus: {
+        type: String,
+        enum: ["pending", "approved", "rejected", "not_required"],
+        default: "not_required",
+      },
+      adminStatus: {
+        type: String,
+        enum: ["pending", "approved", "rejected", "not_required"],
+        default: "not_required",
+      },
+      overallStatus: {
+        type: String,
+        enum: ["not_requested", "pending", "approved", "rejected", "completed", "failed"],
+        default: "not_requested",
+        index: true,
+      },
+      requesterComments: String,
+      managerComments: String,
+      adminComments: String,
     },
   },
   { timestamps: true },

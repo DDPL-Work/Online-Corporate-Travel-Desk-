@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FiClock, FiSearch, FiChevronDown } from "react-icons/fi";
 import { C } from "../../Shared/color";
+import { airlineLogo } from "../../../utils/formatter";
+import { FiArrowRight } from "react-icons/fi";
 
 export const IdCell = ({ id }) => (
   <span className="font-mono text-[11px] px-2 py-0.5 rounded tracking-wide" style={{ background: C.offWhite, color: C.navy }}>
@@ -40,6 +42,48 @@ export const dateCls =
   "w-full px-3 py-2 border rounded-lg text-[13px] bg-white outline-none transition-colors";
 
   // ── shared small components ───────────────────────────────────────────────────
+
+export const RouteCell = ({ routes, airline }) => {
+  if (!routes || routes.length === 0) return <span className="text-slate-400 text-xs">No Route</span>;
+  
+  const airlineCode = (airline?.airlineCode || "AI").toUpperCase();
+  const airlineName = airline?.airlineName || "Airline";
+  const logoUrl = airlineLogo(airlineCode);
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm overflow-hidden shrink-0">
+        <img src={logoUrl} 
+          alt={airlineName} 
+          className="w-full h-full object-contain"
+          loading="eager" onError={(e) => { 
+            e.target.onerror = null;
+            e.target.src = "https://cdn-icons-png.flaticon.com/512/3114/3114883.png"; 
+          }} 
+        />
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes[0].fromCode}
+          </span>
+          <FiArrowRight size={12} className="text-slate-400" />
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-tight">
+            {routes.length > 1 ? routes[0].toCode : routes[routes.length - 1].toCode}
+          </span>
+          {routes.length > 1 && (
+            <span className="bg-amber-50 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-100 ml-1">RT</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+          <span className="capitalize">{routes[0].fromCity || "Origin"}</span>
+          <span>→</span>
+          <span className="capitalize">{routes.length > 1 ? (routes[0].toCity || "Turnaround") : (routes[routes.length - 1].toCity || "Dest")}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const statusStyles = {
   Confirmed: { background: `${C.emerald}10`, color: C.emerald, boxShadow: `0 0 0 1px ${C.emerald}30` },

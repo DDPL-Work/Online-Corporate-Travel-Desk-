@@ -21,6 +21,7 @@ import Pagination from "../Shared/Pagination";
 import ReissueOpsDetailModal from "../reissue/ReissueOpsDetailModal";
 import { fetchReissueRequests } from "../../Redux/Actions/reissueThunks";
 import { listOpsMembers } from "../../API/opsAPI";
+import { airlineLogo } from "../../utils/formatter";
 import {
   REISSUE_STATUS_OPTIONS,
   formatDate,
@@ -472,21 +473,10 @@ export default function AllReissueRequests() {
 
           {/* Table Body */}
           <div ref={tableScrollRef} className="w-full overflow-x-auto min-h-[420px]">
-            <table className="min-w-[1250px] w-full table-fixed text-left border-collapse">
-              <colgroup>
-                <col style={{ width: "10%" }} /> {/* Request */}
-                <col style={{ width: "14%" }} /> {/* Passenger */}
-                <col style={{ width: "14%" }} /> {/* Preferred Flight */}
-                <col style={{ width: "10%" }} /> {/* Status */}
-                <col style={{ width: "13%" }} /> {/* Assigned To */}
-                <col style={{ width: "11%" }} /> {/* Deadline */}
-                <col style={{ width: "13%" }} /> {/* New Ticket */}
-                <col style={{ width: "11%" }} /> {/* Updated */}
-                <col style={{ width: "4%" }} />  {/* Action */}
-              </colgroup>
+            <table className="w-full min-w-max table-auto text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#001a66] to-[#000d26]">
-                  {["Request", "Traveler", "New Flight", "Status", "Assigned To", "Deadline", "New Ticket", "Updated", ""].map((heading, i) => (
+                  {["Request ID", "Order ID", "Corporate / Traveller", "Flight with route", "Assigned To", "Deadline", "Status", "Last Updated", "New Ticket", "Action"].map((heading, i) => (
                     <th
                       key={i}
                       className="px-4 xl:px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-300 whitespace-nowrap"
@@ -529,40 +519,60 @@ export default function AllReissueRequests() {
                       }`}
                     >
                       <td className="px-4 xl:px-5 py-4 align-middle">
-                        <p className="font-mono text-[11px] font-black text-[#003399] truncate">{request.requestId}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase">Booking {request.bookingId}</p>
-                      </td>
-                      <td className="px-4 xl:px-5 py-4 align-middle min-w-0">
-                        <p className="text-[12px] font-bold text-slate-800 truncate">
-                          {request.metadata?.employeeName || "Passenger"}
-                        </p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 truncate">
-                          {request.metadata?.employeeEmail || "Email not captured"}
-                        </p>
-                      </td>
-                      <td className="px-4 xl:px-5 py-4 align-middle min-w-0">
-                        <p className="text-[12px] font-bold text-slate-800 truncate">
-                          {getJourneyLabel(request.selectedFlight || request.preferredJourney)}
-                        </p>
-                        <p className="mt-1 text-[10px] font-bold uppercase text-slate-400 truncate">
-                          {request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || (typeof request.airline === 'object' ? request.airline?.code || request.airline?.name : request.airline) || "Airline pending"}
-                          {request.selectedFlight?.flightNumber ? ` • ${request.selectedFlight.flightNumber}` : ""}
-                        </p>
+                        <p className="font-mono text-[11px] font-black text-[#003399] break-all">{request.requestId}</p>
                       </td>
                       <td className="px-4 xl:px-5 py-4 align-middle">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${getStatusTone(
-                            request.status
-                          )}`}
-                        >
-                          {prettifyLabel(request.status)}
-                        </span>
+                        <p className="font-mono text-[11px] font-bold text-slate-600 break-all">{request.metadata?.orderId || request.originalBookingId || request.bookingId}</p>
+                        {request.displayInfo?.pnr && <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase break-all">PNR: {request.displayInfo.pnr}</p>}
                       </td>
                       <td className="px-4 xl:px-5 py-4 align-middle min-w-0">
-                        <p className="text-[12px] font-bold text-slate-800 truncate">
+                        {request.displayInfo?.corporateName && (
+                          <p className="text-[11px] font-black text-[#C9A84C] uppercase tracking-wider mb-0.5 break-words">
+                            {request.displayInfo.corporateName}
+                          </p>
+                        )}
+                        <p className="text-[12px] font-bold text-slate-800 break-words">
+                          {request.metadata?.employeeName || request.displayInfo?.userName || "Passenger"}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-bold text-slate-400 break-words">
+                          {request.metadata?.employeeEmail || request.displayInfo?.userEmail || "Email not captured"}
+                        </p>
+                      </td>
+                      <td className="px-4 xl:px-5 py-4 align-middle min-w-0">
+                        {(() => {
+                          const airlineCode = request.selectedFlight?.airlineCode || request.preferredJourney?.airlineCode || (typeof request.airline === 'object' ? request.airline?.code || request.airline?.name : request.airline) || null;
+                          const flightNum = request.selectedFlight?.flightNumber || request.preferredJourney?.flightNumber || "";
+                          
+                          return (
+                            <div className="flex items-center gap-3">
+                              {airlineCode && airlineCode !== "Airline pending" && (
+                                <div>
+                                  <img 
+                                    src={airlineLogo(airlineCode)} 
+                                    alt={airlineCode}
+                                    className="w-5 h-5 object-contain"
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-[12px] font-bold text-slate-800 break-words">
+                                  {request.displayInfo?.route || getJourneyLabel(request.selectedFlight || request.preferredJourney)}
+                                </p>
+                                <p className="mt-1 text-[10px] font-bold uppercase text-slate-400 break-words">
+                                  {airlineCode || "Airline pending"}
+                                  {flightNum ? ` • ${flightNum}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 xl:px-5 py-4 align-middle min-w-0">
+                        <p className="text-[12px] font-bold text-slate-800 break-words">
                           {request.assignedTo?.name || "Auto round robin"}
                         </p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase truncate">
+                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase break-words">
                           {request.assignedAt ? `Assigned ${formatDate(request.assignedAt)}` : "Assignment pending"}
                         </p>
                       </td>
@@ -579,21 +589,32 @@ export default function AllReissueRequests() {
                         </p>
                       </td>
                       <td className="px-4 xl:px-5 py-4 align-middle">
-                        <p
-                          className={`text-[11px] font-black uppercase tracking-wider ${
-                            request.generatedTicketUrl || request.revisedTicketUrl
-                              ? "text-emerald-600"
-                              : "text-slate-400"
-                          }`}
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${getStatusTone(
+                            request.status
+                          )}`}
                         >
-                          {request.generatedTicketUrl || request.revisedTicketUrl
-                            ? "Ready to download"
-                            : "Waiting for new ticket"}
+                          {prettifyLabel(request.status)}
+                        </span>
+                      </td>
+                      <td className="px-4 xl:px-5 py-4 align-middle">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">
+                          {formatDateTime(request.updatedAt)}
                         </p>
                       </td>
                       <td className="px-4 xl:px-5 py-4 align-middle">
-                        <p className="text-[12px] font-bold text-slate-500 whitespace-nowrap">{formatDate(request.updatedAt)}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase">{formatDateTime(request.updatedAt)}</p>
+                        {request.revisedTicket?.fileUrl || request.uploadedTicket?.fileUrl ? (
+                          <a
+                            href={request.revisedTicket?.fileUrl || request.uploadedTicket?.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#003399] hover:text-[#001a66] hover:underline whitespace-nowrap"
+                          >
+                            <FiFileText size={12} /> View New Ticket
+                          </a>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 italic whitespace-nowrap">No ticket yet</span>
+                        )}
                       </td>
                       <td className="px-3 py-4 align-middle text-center">
                         <button

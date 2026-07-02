@@ -24,6 +24,7 @@ import {
   previewReissueQuote,
   searchOfflineReissueOptions,
 } from "../../Redux/Actions/reissueThunks";
+import CustomDatePicker from "../Shared/CustomDatePicker";
 import {
   clearEligibility,
   clearOfflineSearchState,
@@ -242,21 +243,26 @@ const extractRuleMessages = (rules) => {
     .slice(0, 4);
 };
 
-function StepBadge({ active, complete, label, number }) {
+function StepBadge({ active, complete, label, number, isFirst, isLast }) {
   return (
-    <div className="flex items-center gap-2">
-      <span
-        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+    <div className="relative flex flex-col items-center flex-1 text-center">
+      {!isFirst && (
+        <div className={`absolute top-3 w-full right-[50%] h-0.5 ${complete || active ? "bg-[#003399]" : "bg-slate-200"}`} />
+      )}
+      
+      <div
+        className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
           complete
-            ? "bg-emerald-600 text-white"
+            ? "bg-[#003399] border-[#003399] text-white"
             : active
-              ? "bg-[#0A4D68] text-white"
-              : "bg-slate-100 text-slate-500"
+              ? "bg-white border-[#003399] text-[#003399] shadow-[0_0_0_3px_rgba(0,51,153,0.1)]"
+              : "bg-white border-slate-200 text-slate-400"
         }`}
       >
-        {complete ? <FiCheckCircle size={14} /> : number}
-      </span>
-      <span className={`text-xs font-bold uppercase tracking-[0.18em] ${active ? "text-slate-900" : "text-slate-400"}`}>
+        {complete ? <FiCheckCircle size={12} /> : <span className="text-[10px] font-black">{number}</span>}
+      </div>
+      
+      <span className={`mt-2 text-[10px] font-bold uppercase tracking-[0.18em] ${active ? "text-[#003399]" : complete ? "text-slate-700" : "text-slate-400"}`}>
         {label}
       </span>
     </div>
@@ -265,7 +271,7 @@ function StepBadge({ active, complete, label, number }) {
 
 function PricingRow({ label, value, strong = false }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex items-center justify-between gap-2 text-xs">
       <span className={strong ? "font-semibold text-slate-800" : "text-slate-500"}>
         {label}
       </span>
@@ -285,14 +291,14 @@ function PricingAdjustmentRow({ label, rawAmount, currency, helpText, forcePosit
   const colour = isNeg ? "text-rose-600" : isPos ? "text-emerald-700" : "text-slate-500";
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 text-sm">
+      <div className="flex items-start justify-between gap-2 text-xs">
         <span className="text-slate-500 leading-snug">{label}</span>
         <span className={`font-semibold shrink-0 ${colour}`}>
           {prefix}{formatMoney(Math.abs(amt), currency)}
         </span>
       </div>
       {helpText && (
-        <p className="mt-0.5 text-[10px] leading-tight text-slate-400">{helpText}</p>
+        <p className="text-[9px] leading-tight text-slate-400">{helpText}</p>
       )}
     </div>
   );
@@ -301,7 +307,7 @@ function PricingAdjustmentRow({ label, rawAmount, currency, helpText, forcePosit
 /** Section divider with label for the new sectioned pricing layout. */
 function PricingSection({ label }) {
   return (
-    <p className="pt-2 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
+    <p className="pt-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
   );
 }
 
@@ -317,93 +323,147 @@ function FlightOptionCard({
   const depTime = hasTimings ? formatFlightTime(option.departureTime) : PLACEHOLDER;
   const arrTime = hasTimings ? formatFlightTime(option.arrivalTime) : PLACEHOLDER;
   const travelDate = hasTimings ? formatDate(option.departureTime) : formatDate(option.departureDate);
+  const departureDateStr = hasTimings ? formatDate(option.departureTime) : travelDate;
+  const arrivalDateStr = hasTimings ? formatDate(option.arrivalTime) : travelDate;
+
+  const firstSeg = option.segments?.[0];
+  const lastSeg = option.segments?.[option.segments.length - 1] || firstSeg;
+
+  const originCity = option.originCity || firstSeg?.origin?.city;
+  const originAirportName = option.originAirportName || firstSeg?.origin?.name;
+  const originTerminal = option.originTerminal || firstSeg?.origin?.terminal;
+
+  const destCity = option.destinationCity || lastSeg?.destination?.city;
+  const destAirportName = option.destinationAirportName || lastSeg?.destination?.name;
+  const destTerminal = option.destinationTerminal || lastSeg?.destination?.terminal;
+
+  const supplier = option.supplier || firstSeg?.supplierFareClass;
+  const fareClass = option.fareClass || firstSeg?.fareClass;
+  const cabinClass = option.cabin || option.cabinClass;
+
+  const layoversList = option.layovers || (
+    option.segments?.length > 1
+      ? option.segments.slice(0, -1).map(s => s.destination?.code || s.destination?.name || s.destination)
+      : []
+  );
 
   return (
     <div
-      className={`rounded-3xl border p-5 shadow-sm transition ${
+      className={`rounded-2xl border p-4 shadow-sm transition ${
         selected
-          ? "border-[#0A4D68] bg-[#f4fbff] shadow-[0_18px_50px_rgba(10,77,104,0.12)]"
+          ? "border-[#003399] bg-[#f4fbff] shadow-[0_18px_50px_rgba(0,51,153,0.12)]"
           : "border-slate-200 bg-white hover:border-slate-300"
       }`}
     >
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         {/* LEFT — Flight identity + schedule */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-4">
-            <img src={airlineLogo(option.airlineCode)}
-              alt={option.airlineCode || "Airline"}
-              className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain p-2" loading="eager" />
-            <div className="min-w-0 flex-1">
-              {/* Airline + badges row */}
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-base font-black text-slate-900">
-                  {option.airlineName || option.airlineCode || "Airline"}
-                </p>
-                {option.isNdc && (
-                  <span className="rounded-full bg-gradient-to-r from-violet-600 to-purple-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white">
-                    NDC
+          {/* Top row: Airline & Pills */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img src={airlineLogo(option.airlineCode)}
+                alt={option.airlineCode || "Airline"}
+                className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-1.5 shadow-sm" loading="eager" />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <p className="text-base font-bold text-slate-800">
+                    {option.airlineName || option.airlineCode || "Airline"}
+                  </p>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-emerald-600">
+                    Confirmed
                   </span>
-                )}
-                {option.lowSeatWarning && (
-                  <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-rose-700">
-                    Only {option.noOfSeatAvailable} left
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-sm font-semibold text-slate-500">
-                {option.airlineCode || PLACEHOLDER}{option.flightNumber ? ` · ${option.flightNumber}` : ""}
-              </p>
-
-              {/* Main schedule block */}
-              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div className="flex items-center gap-3">
-                  {/* Origin */}
-                  <div className="text-center">
-                    <p className="text-2xl font-black text-slate-900">{depTime}</p>
-                    <p className="mt-0.5 text-sm font-bold text-slate-600">{option.origin || PLACEHOLDER}</p>
-                  </div>
-                  {/* Arrow + duration */}
-                  <div className="flex flex-1 flex-col items-center gap-1">
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      {option.duration || ""}
-                    </p>
-                    <div className="flex w-full items-center gap-1">
-                      <div className="h-px flex-1 bg-slate-300" />
-                      <span className="text-slate-400">✈</span>
-                      <div className="h-px flex-1 bg-slate-300" />
-                    </div>
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      {formatStops(option.stops)}
-                    </p>
-                  </div>
-                  {/* Destination */}
-                  <div className="text-center">
-                    <p className="text-2xl font-black text-slate-900">{arrTime}</p>
-                    <p className="mt-0.5 text-sm font-bold text-slate-600">{option.destination || PLACEHOLDER}</p>
-                  </div>
+                  {option.isNdc && (
+                    <span className="rounded-full bg-gradient-to-r from-violet-600 to-purple-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white">
+                      NDC
+                    </span>
+                  )}
                 </div>
-                {travelDate && travelDate !== PLACEHOLDER && (
-                  <p className="mt-2 text-center text-xs font-medium text-slate-400">{travelDate}</p>
-                )}
+                <p className="text-[13px] font-medium text-slate-500">
+                  {option.airlineCode || PLACEHOLDER}{option.flightNumber ? `-${option.flightNumber}` : ""}
+                </p>
               </div>
+            </div>
 
-              {/* Cabin / baggage tags */}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                  {option.cabin || "Economy"}
+            {/* Top Right Pills */}
+            <div className="flex flex-wrap items-center gap-2">
+              {cabinClass && (
+                <span className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold uppercase text-slate-700 shadow-sm">
+                  <span className="text-amber-500">💺</span> {cabinClass}
                 </span>
-                {option.baggage && option.baggage !== PLACEHOLDER && (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                    Bag: {option.baggage}
-                  </span>
-                )}
+              )}
+              {option.noOfSeatAvailable && (
+                <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold uppercase text-amber-700 shadow-sm">
+                  <span className="text-amber-600">🪑</span> {option.noOfSeatAvailable} SEATS LEFT
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Main schedule block */}
+          <div className="mt-6 flex items-start gap-4">
+            {/* Origin */}
+            <div className="flex w-36 shrink-0 flex-col gap-0.5">
+              <p className="text-2xl font-black text-slate-900">{depTime}</p>
+              <p className="text-[13px] font-bold text-amber-600">
+                {departureDateStr && departureDateStr !== PLACEHOLDER ? departureDateStr : travelDate}
+              </p>
+              <p className="mt-1 text-sm font-bold text-slate-800">
+                {originCity || option.origin || PLACEHOLDER}, India
+              </p>
+              {originAirportName && (
+                <p className="text-xs font-medium text-slate-500">({originAirportName})</p>
+              )}
+              {originTerminal && (
+                <div className="mt-1.5 inline-flex w-fit items-center rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-slate-500">
+                  T-{originTerminal.replace(/[^0-9]/g, "") || originTerminal}
+                </div>
+              )}
+            </div>
+
+            {/* Arrow + duration */}
+            <div className="flex flex-1 flex-col items-center justify-center pt-2">
+              <div className="relative flex w-full max-w-[200px] items-center">
+                <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-amber-200 to-transparent" />
+                <div className="absolute left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 shadow-sm">
+                  <span className="rotate-90 text-[14px] text-amber-500 leading-none" style={{ transform: "rotate(90deg) translateY(-1px)" }}>✈</span>
+                </div>
               </div>
+              <p className="mt-3 text-[12px] font-bold text-slate-500">
+                {option.duration || ""}
+              </p>
+              <span className={`mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${option.stops === 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                {formatStops(option.stops)}
+              </span>
+              {(layoversList && layoversList.length > 0) && (
+                <p className="mt-1 text-[10px] font-medium text-amber-600">
+                  Layover: {Array.isArray(layoversList) ? layoversList.map(l => l?.airportCode || l).join(", ") : layoversList}
+                </p>
+              )}
+            </div>
+
+            {/* Destination */}
+            <div className="flex w-36 shrink-0 flex-col items-end gap-0.5 text-right">
+              <p className="text-2xl font-black text-slate-900">{arrTime}</p>
+              <p className="text-[13px] font-bold text-amber-600">
+                {arrivalDateStr && arrivalDateStr !== PLACEHOLDER ? arrivalDateStr : travelDate}
+              </p>
+              <p className="mt-1 text-sm font-bold text-slate-800">
+                {destCity || option.destination || PLACEHOLDER}, India
+              </p>
+              {destAirportName && (
+                <p className="text-xs font-medium text-slate-500">({destAirportName})</p>
+              )}
+              {destTerminal && (
+                <div className="mt-1.5 inline-flex w-fit items-center rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-slate-500">
+                  T-{destTerminal.replace(/[^0-9]/g, "") || destTerminal}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* RIGHT — Pricing panel (airline-grade sectioned breakdown) */}
-        <div className="w-full rounded-3xl border border-slate-100 bg-slate-50 p-4 xl:max-w-[320px]">
+        <div className="w-full rounded-xl border border-slate-100 bg-slate-50 p-3 lg:max-w-[300px] shrink-0 flex flex-col justify-between">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">
             {mode === "ONLINE" ? "Online Reissue Estimate" : "Offline Reissue Estimate"}
           </p>
@@ -415,15 +475,15 @@ function FlightOptionCard({
             const netSettlement  = flightAdj + penalty;
             const isRefund       = netSettlement < 0;
             return (
-              <div className="mt-3 space-y-1">
+              <div className="mt-2 space-y-1">
                 {/* ── Section 1: Original Ticket Value ── */}
                 <PricingSection label="Original Ticket Value" />
                 <PricingRow label="Previously Paid" value={formatMoney(previouslyPaid, option.currency)} />
-                <div className="my-2 border-t border-slate-200" />
+                <div className="my-1 border-t border-slate-200" />
                 {/* ── Section 2: New Itinerary Cost ── */}
                 <PricingSection label="New Itinerary Cost" />
                 <PricingRow label="New Flight Fare" value={formatMoney(newFlightFare, option.currency)} />
-                <div className="my-2 border-t border-slate-200" />
+                <div className="my-1 border-t border-slate-200" />
                 {/* ── Section 3: Reissue Adjustments ── */}
                 <PricingSection label="Reissue Adjustments" />
                 <PricingAdjustmentRow
@@ -442,18 +502,18 @@ function FlightOptionCard({
                   />
                 )}
                 {/* ── Section 4: Final Settlement ── */}
-                <div className="mt-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                    {isRefund ? "Refund Due" : "Net Additional Collection"}
+                <div className="mt-2 rounded-xl bg-white px-3 py-2 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    {isRefund ? "Refund Amount" : "Need to Pay"}
                   </p>
-                  <p className={`mt-2 text-2xl font-black ${isRefund ? "text-emerald-600" : "text-slate-900"}`}>
+                  <p className={`mt-1 text-lg font-black ${isRefund ? "text-emerald-600" : "text-slate-900"}`}>
                     {formatMoney(Math.abs(netSettlement), option.currency)}
                   </p>
                 </div>
               </div>
             );
           })()}
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={onToggleDetails}
@@ -467,8 +527,8 @@ function FlightOptionCard({
               onClick={onSelect}
               className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
                 selected
-                  ? "bg-[#0A4D68] text-white"
-                  : "border border-[#0A4D68] text-[#0A4D68] hover:bg-[#eef8fc]"
+                  ? "bg-[#003399] text-white"
+                  : "border border-[#003399] text-[#003399] hover:bg-[#eef8fc]"
               }`}
             >
               {selected ? "✓ Selected" : "Select Flight"}
@@ -534,7 +594,7 @@ function FlightOptionCard({
 function ProcessingState({ label }) {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef8fc] text-[#0A4D68]">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#eef8fc] text-[#003399]">
         <FiLoader size={28} className="animate-spin" />
       </div>
       <div>
@@ -578,6 +638,13 @@ export default function ReissueModal({ booking, onClose }) {
   const [quoteSnapshot, setQuoteSnapshot] = useState(null);
   const [processingLabel, setProcessingLabel] = useState("Processing reissue...");
   const [successSnapshot, setSuccessSnapshot] = useState(null);
+
+  const travelDateISO =
+    booking?.bookingSnapshot?.sectors?.[0]?.departureTime ||
+    booking?.bookingResult?.sectors?.[0]?.departureTime ||
+    booking?.journeyDate ||
+    new Date().toISOString();
+  const minTravelDate = travelDateISO.split("T")[0];
 
   const segments = Array.isArray(booking?.flightRequest?.segments)
     ? booking.flightRequest.segments
@@ -645,7 +712,7 @@ export default function ReissueModal({ booking, onClose }) {
       currency: quoteSnapshot?.billingReservation?.metadata?.currency || "INR",
       fareDifference: quoteSnapshot.fareDifference || 0,
       reissueCharge: quoteSnapshot.reissueCharges || 0,
-      totalCollection: quoteSnapshot.totalAdjustment || 0,
+              totalCollection: quoteSnapshot.totalAdjustment || 0,
     };
   }, [quoteSnapshot]);
 
@@ -662,7 +729,20 @@ export default function ReissueModal({ booking, onClose }) {
             ? 4
             : currentStep === STEP.PROCESSING
               ? 5
-              : 6;
+              : currentStep === STEP.SUCCESS
+                ? 6
+                : 1;
+
+  const offlineStepIndex =
+    currentStep === STEP.FORM
+      ? 1
+      : currentStep === STEP.SEARCH_RESULTS
+        ? 2
+        : currentStep === STEP.PROCESSING
+          ? 3
+          : currentStep === STEP.SUCCESS
+            ? 4
+            : 1;
 
   const handleOnlineSearch = async (event) => {
     event?.preventDefault?.();
@@ -878,8 +958,8 @@ export default function ReissueModal({ booking, onClose }) {
     const currency = summary?.currency || selectedOption.currency || "INR";
 
     return (
-      <div className="rounded-3xl border border-[#0A4D68]/20 bg-[linear-gradient(180deg,#f8fdff_0%,#eef8fc_100%)] p-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#0A4D68]">
+      <div className="rounded-3xl border border-[#003399]/20 bg-[linear-gradient(180deg,#f8fdff_0%,#eef8fc_100%)] p-4">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#003399]">
           Selected Flight
         </p>
         <p className="mt-3 text-lg font-black text-slate-900">
@@ -906,12 +986,12 @@ export default function ReissueModal({ booking, onClose }) {
               {/* Section 1 */}
               <PricingSection label="Original Ticket Value" />
               <PricingRow label="Previously Paid" value={formatMoney(previouslyPaid, currency)} />
-              <div className="my-2 border-t border-[#0A4D68]/10" />
+              <div className="my-2 border-t border-[#003399]/10" />
               {/* Section 2 */}
               <PricingSection label="New Itinerary Cost" />
               <PricingRow label="New Flight Fare" value={formatMoney(newFlightFare, currency)} />
               {newSSR > 0 && <PricingRow label="New SSR Total" value={formatMoney(newSSR, currency)} />}
-              <div className="my-2 border-t border-[#0A4D68]/10" />
+              <div className="my-2 border-t border-[#003399]/10" />
               {/* Section 3 */}
               <PricingSection label="Reissue Adjustments" />
               <PricingAdjustmentRow
@@ -934,7 +1014,7 @@ export default function ReissueModal({ booking, onClose }) {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
                   {isRefund ? "Refund Due" : "Net Additional Collection"}
                 </p>
-                <p className={`mt-2 text-2xl font-black ${isRefund ? "text-emerald-600" : "text-[#0A4D68]"}`}>
+                <p className={`mt-2 text-2xl font-black ${isRefund ? "text-emerald-600" : "text-[#003399]"}`}>
                   {formatMoney(Math.abs(netSettlement), currency)}
                 </p>
               </div>
@@ -1021,8 +1101,8 @@ export default function ReissueModal({ booking, onClose }) {
 
   const renderConfirmationStep = () => (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-[#0A4D68]/15 bg-[linear-gradient(180deg,#f8fdff_0%,#f1f8fb_100%)] p-5">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0A4D68]">
+      <div className="rounded-3xl border border-[#003399]/15 bg-[linear-gradient(180deg,#f8fdff_0%,#f1f8fb_100%)] p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#003399]">
           Confirmation Summary
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1098,41 +1178,56 @@ export default function ReissueModal({ booking, onClose }) {
     [STEP.SEARCH_RESULTS, STEP.FARE_QUOTE, STEP.CONFIRMATION].includes(currentStep);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-      <div className="mx-auto flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
-          <div>
-            <h2 className="text-xl font-black text-slate-900">{modalTitle}</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {booking?.bookingReference || booking?.orderId || booking?._id}
-            </p>
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 bg-[#1A1C20]/60 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white rounded-4xl shadow-2xl w-full max-w-6xl my-2 overflow-hidden flex flex-col max-h-[96vh]">
+        <div className="bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-4 text-white flex justify-between items-center shrink-0 shadow-lg relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#C9A84C]/20 rounded-lg text-[#C9A84C]">
+              <FiRefreshCw size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black tracking-tight uppercase">
+                {modalTitle}
+              </h2>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-widest">
+                Order ID: {booking?.bookingReference || booking?.orderId || booking?._id}
+              </p>
+            </div>
           </div>
           <button
-            type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+            className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-400"
           >
-            <FiX size={18} />
+            <FiX size={22} />
           </button>
         </div>
 
-        {!showOfflineFlow && (
-          <div className="border-b border-slate-100 bg-slate-50 px-5 py-4 sm:px-6">
-            <div className="flex flex-wrap gap-4">
-              <StepBadge number="1" label="Form" active={onlineStepIndex === 1} complete={onlineStepIndex > 1} />
-              <StepBadge number="2" label="Search" active={onlineStepIndex === 2} complete={onlineStepIndex > 2} />
-              <StepBadge number="3" label="Quote" active={onlineStepIndex === 3} complete={onlineStepIndex > 3} />
-              <StepBadge number="4" label="Confirm" active={onlineStepIndex === 4} complete={onlineStepIndex > 4} />
-              <StepBadge number="5" label="Process" active={onlineStepIndex === 5} complete={onlineStepIndex > 5} />
-              <StepBadge number="6" label="Success" active={onlineStepIndex === 6} complete={false} />
+        {showOfflineFlow ? (
+          <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-6 sm:px-10 shrink-0 overflow-hidden">
+            <div className="flex w-full items-start justify-between">
+              <StepBadge number="1" label="Select Date" active={offlineStepIndex === 1} complete={offlineStepIndex > 1} isFirst={true} />
+              <StepBadge number="2" label="Search Flights" active={offlineStepIndex === 2} complete={offlineStepIndex > 2} />
+              <StepBadge number="3" label="Submit Request" active={offlineStepIndex === 3} complete={offlineStepIndex > 3} />
+              <StepBadge number="4" label="Success" active={offlineStepIndex === 4} complete={false} isLast={true} />
+            </div>
+          </div>
+        ) : (
+          <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-6 sm:px-10 shrink-0 overflow-hidden">
+            <div className="flex w-full items-start justify-between">
+              <StepBadge number="1" label="Select Date" active={onlineStepIndex === 1} complete={onlineStepIndex > 1} isFirst={true} />
+              <StepBadge number="2" label="Search Flights" active={onlineStepIndex === 2} complete={onlineStepIndex > 2} />
+              <StepBadge number="3" label="Fare Quote" active={onlineStepIndex === 3} complete={onlineStepIndex > 3} />
+              <StepBadge number="4" label="Confirm & Pay" active={onlineStepIndex === 4} complete={onlineStepIndex > 4} />
+              <StepBadge number="5" label="Submit Request" active={onlineStepIndex === 5} complete={onlineStepIndex > 5} />
+              <StepBadge number="6" label="Success" active={onlineStepIndex === 6} complete={false} isLast={true} />
             </div>
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+        <div className="flex-1 overflow-y-auto bg-slate-50/50 p-6 space-y-6 custom-scrollbar">
           {eligibilityLoading && (
             <div className="flex flex-col items-center justify-center gap-3 py-20">
-              <FiLoader size={28} className="animate-spin text-[#0A4D68]" />
+              <FiLoader size={28} className="animate-spin text-[#003399]" />
               <p className="text-sm font-medium text-slate-500">
                 Checking reissue eligibility for this booking...
               </p>
@@ -1191,39 +1286,37 @@ export default function ReissueModal({ booking, onClose }) {
                   {[STEP.FORM, STEP.SEARCH_RESULTS].includes(currentStep) && (
                     <>
                       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-                        <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div>
-                              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                              <label className="mb-2 block text-xs font-bold text-slate-500 uppercase tracking-widest">
                                 {showOfflineFlow ? "Preferred Travel Date" : "New Departure Date"}
                               </label>
-                              <input
-                                type="date"
+                              <CustomDatePicker
                                 value={departureDate}
-                                min={new Date().toISOString().split("T")[0]}
-                                onChange={(event) => setDepartureDate(event.target.value)}
-                                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]"
+                                minDate={minTravelDate}
+                                onChange={(val) => setDepartureDate(val || "")}
+                                placeholder="Select departure date"
                               />
                             </div>
 
                             {isRoundTrip && (
                               <div>
-                                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                <label className="mb-2 block text-xs font-bold text-slate-500 uppercase tracking-widest">
                                   {showOfflineFlow ? "Preferred Return Date" : "New Return Date"}
                                 </label>
-                                <input
-                                  type="date"
+                                <CustomDatePicker
                                   value={returnDate}
-                                  min={departureDate || new Date().toISOString().split("T")[0]}
-                                  onChange={(event) => setReturnDate(event.target.value)}
-                                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]"
+                                  minDate={departureDate || minTravelDate}
+                                  onChange={(val) => setReturnDate(val || "")}
+                                  placeholder="Select return date"
                                 />
                               </div>
                             )}
                           </div>
 
                           <div className="mt-4">
-                            <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            <label className="mb-2 block text-xs font-bold text-slate-500 uppercase tracking-widest">
                               Remarks
                             </label>
                             <textarea
@@ -1231,7 +1324,7 @@ export default function ReissueModal({ booking, onClose }) {
                               onChange={(event) => setRemarks(event.target.value)}
                               rows={4}
                               placeholder="Add servicing notes or schedule flexibility for the reissue team"
-                              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A4D68] focus:ring-1 focus:ring-[#0A4D68]"
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#003399]/20 focus:border-[#003399] transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
                             />
                           </div>
                         </div>
@@ -1349,7 +1442,7 @@ export default function ReissueModal({ booking, onClose }) {
         </div>
 
         {eligibility && !eligibilityLoading && !eligibilityError && (
-          <div className="border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+          <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6 shrink-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-500">
                 {currentStep === STEP.SUCCESS
@@ -1368,7 +1461,7 @@ export default function ReissueModal({ booking, onClose }) {
                         current === STEP.FARE_QUOTE ? STEP.SEARCH_RESULTS : STEP.FARE_QUOTE,
                       )
                     }
-                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
                   >
                     <FiArrowLeft size={15} />
                     Back
@@ -1379,7 +1472,7 @@ export default function ReissueModal({ booking, onClose }) {
                   <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    className="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
                   >
                     {currentStep === STEP.SUCCESS ? "Close" : "Cancel"}
                   </button>
@@ -1391,7 +1484,7 @@ export default function ReissueModal({ booking, onClose }) {
                       type="button"
                       onClick={() => handleOfflineSearch(1)}
                       disabled={offlineSearchLoading || !canSearch}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0A4D68] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#08394d] disabled:opacity-50"
+                      className="inline-flex items-center gap-2 bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-2.5 rounded-xl font-bold text-white shadow-md hover:shadow-lg hover:opacity-90 transition-all disabled:opacity-50"
                     >
                       {offlineSearchLoading ? <FiLoader className="animate-spin" /> : <FiRefreshCw size={15} />}
                       Search Flights
@@ -1401,7 +1494,7 @@ export default function ReissueModal({ booking, onClose }) {
                       type="button"
                       onClick={handleOnlineSearch}
                       disabled={createLoading || !canSearch}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#0A4D68] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#08394d] disabled:opacity-50"
+                      className="inline-flex items-center gap-2 bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-2.5 rounded-xl font-bold text-white shadow-md hover:shadow-lg hover:opacity-90 transition-all disabled:opacity-50"
                     >
                       {createLoading ? <FiLoader className="animate-spin" /> : <FiRefreshCw size={15} />}
                       Search Reissue Options
@@ -1414,7 +1507,7 @@ export default function ReissueModal({ booking, onClose }) {
                     type="button"
                     onClick={submitOfflineRequest}
                     disabled={offlineCreateLoading || !selectedOption}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0A4D68] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#08394d] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-2.5 rounded-xl font-bold text-white shadow-md hover:shadow-lg hover:opacity-90 transition-all disabled:opacity-50"
                   >
                     {offlineCreateLoading ? <FiLoader className="animate-spin" /> : <FiSend size={15} />}
                     Submit Reissue Request
@@ -1426,7 +1519,7 @@ export default function ReissueModal({ booking, onClose }) {
                     type="button"
                     onClick={handlePreviewQuote}
                     disabled={quoteLoading || !selectedOption}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0A4D68] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#08394d] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-2.5 rounded-xl font-bold text-white shadow-md hover:shadow-lg hover:opacity-90 transition-all disabled:opacity-50"
                   >
                     {quoteLoading ? <FiLoader className="animate-spin" /> : <FiFileText size={15} />}
                     Get Fare Quote
@@ -1437,7 +1530,7 @@ export default function ReissueModal({ booking, onClose }) {
                   <button
                     type="button"
                     onClick={() => setCurrentStep(STEP.CONFIRMATION)}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#0A4D68] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#08394d]"
+                    className="inline-flex items-center gap-2 bg-linear-to-r from-[#003399] to-[#000d26] px-6 py-2.5 rounded-xl font-bold text-white shadow-md hover:shadow-lg hover:opacity-90 transition-all"
                   >
                     Continue to Confirmation
                   </button>
@@ -1448,7 +1541,7 @@ export default function ReissueModal({ booking, onClose }) {
                     type="button"
                     onClick={handleConfirmOnlineReissue}
                     disabled={confirmLoading}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
                   >
                     {confirmLoading ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={15} />}
                     Confirm Reissue

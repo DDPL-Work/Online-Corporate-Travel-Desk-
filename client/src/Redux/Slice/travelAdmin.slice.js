@@ -16,6 +16,7 @@ import {
   promoteEmployeeToFinanceAdmin,
   getEmployeeExpensesAdmin,
   getFinanceTeamAdmin,
+  fetchCorporateCancellationQueries,
 } from "../Actions/travelAdmin.thunks";
 
 const initialState = {
@@ -26,6 +27,10 @@ const initialState = {
   allEmployees: [],
   financeTeam: [],
   employeeExpenses: {},
+  
+  queries: [],
+  queriesLoading: false,
+  queriesError: null,
 
   loadingFlights: false,
   loadingHotels: false,
@@ -301,6 +306,20 @@ const adminBookingSlice = createSlice({
       .addCase(getFinanceTeamAdmin.rejected, (state, action) => {
         state.loadingFinanceTeam = false;
         state.errorFinanceTeam = action.payload;
+      })
+
+      // CANCELLATION QUERIES
+      .addCase(fetchCorporateCancellationQueries.pending, (state) => {
+        state.queriesLoading = true;
+        state.queriesError = null;
+      })
+      .addCase(fetchCorporateCancellationQueries.fulfilled, (state, action) => {
+        state.queriesLoading = false;
+        state.queries = action.payload || [];
+      })
+      .addCase(fetchCorporateCancellationQueries.rejected, (state, action) => {
+        state.queriesLoading = false;
+        state.queriesError = action.payload;
       });
   },
 });

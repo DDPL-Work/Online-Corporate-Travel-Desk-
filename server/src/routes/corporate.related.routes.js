@@ -110,6 +110,22 @@ router.get(
   corporateController.fetchCancellationQueryById
 );
 
+// Get eligible ops members for cancellation assignment
+router.get(
+  "/cancellations/eligible-ops",
+  authorizeRoles("super-admin", "ops-member", "travel-admin"),
+  requireOpsPermission("Cancellation Management"),
+  corporateController.getEligibleOpsMembersForCancellations
+);
+
+// Assign cancellation query
+router.put(
+  "/cancellation-queries/:id/assign",
+  authorizeRoles("super-admin", "ops-member", "travel-admin"),
+  requireOpsPermission("Cancellation Management"),
+  corporateController.assignCancellationQuery
+);
+
 // --------------------------------------------------
 // SUPER ADMIN : REVENUE
 // --------------------------------------------------
@@ -227,6 +243,13 @@ router.patch(
   authorizeRoles("super-admin", "ops-member"),
   requireOpsPermission("Corporate Management"),
   corporateController.toggleCorporateStatus,
+);
+
+router.get(
+  "/cancellations/query/:bookingId",
+  verifyToken,
+  requireOpsPermission("Cancellation Management"),
+  corporateController.fetchCancellationQueryById
 );
 
 module.exports = router;

@@ -165,6 +165,11 @@ export default function Sidebar({ isOpen, onClose }) {
             icon: <FaClock />,
           },
           {
+            to: "/pending-cancellations",
+            label: "Pending Cancellations",
+            icon: <FaClock />,
+          },
+          {
             to: "/my-reissued?scope=company",
             label: "Reissue Requests",
             icon: <FaExchangeAlt />,
@@ -329,6 +334,11 @@ export default function Sidebar({ isOpen, onClose }) {
           {
             to: "/manager/pending-requests",
             label: "Pending Requests",
+            icon: <FaClock />,
+          },
+          {
+            to: "/manager/pending-cancellations",
+            label: "Pending Cancellations",
             icon: <FaClock />,
           },
           {

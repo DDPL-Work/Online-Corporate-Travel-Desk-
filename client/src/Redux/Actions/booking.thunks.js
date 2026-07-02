@@ -222,3 +222,17 @@ export const downloadTicketPdf = createAsyncThunk(
     }
   },
 );
+
+export const fetchMyCancellationQueries = createAsyncThunk(
+  "booking/fetchMyCancellationQueries",
+  async (params, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/bookings/my/cancellation-queries", { params });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch my queries"
+      );
+    }
+  }
+);

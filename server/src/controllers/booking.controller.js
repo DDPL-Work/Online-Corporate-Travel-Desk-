@@ -295,46 +295,8 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Valid FareQuote is required");
   }
 
-  /* ================= SERVICE FEE CALCULATION ================= */
-  let serviceFeeDetails = null;
-  if (bookingType === "flight" && flightRequest) {
-    const isIndia = (code) => {
-      if (!code) return false;
-      const c = code.toLowerCase();
-      return c === "in" || c === "ind" || c === "india";
-    };
-
-    const segments = flightRequest.segments || [];
-    const isDomesticFlight = segments.length > 0 && segments.every(seg => 
-      isIndia(seg.origin?.countryCode || seg.origin?.country) && 
-      isIndia(seg.destination?.countryCode || seg.destination?.country)
-    );
-
-    let cabinClassCode = segments[0]?.cabinClass;
-    if (cabinClassCode == null) {
-      try {
-        cabinClassCode = flightRequest.fareQuote?.Results?.[0]?.Segments?.[0]?.[0]?.CabinClass 
-                         || flightRequest.fareQuote?.onward?.Response?.Results?.Segments?.[0]?.[0]?.CabinClass
-                         || 2;
-      } catch (e) {
-        cabinClassCode = 2; // Default Economy
-      }
-    }
-    
-    const serviceFeePayload = {
-      productType: "Flight",
-      operation: "Book",
-      tripType: isDomesticFlight ? "Domestic" : "International",
-      cabinClass: cabinClassCode,
-      baseFare: Number(pricingSnapshot.totalAmount)
-    };
-
-    serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
-    if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
-      pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + serviceFeeDetails.feeAmount;
-      pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
-    }
-  }
+  /* ================= NO SERVICE FEE AT REQUEST CREATION ================= */
+  // Service fee will be calculated and deducted only when the flight is actually booked (e.g. executed).
 
   /* ================= BALANCE CHECK REMOVED FOR APPROVAL REQUEST ================= */
 
@@ -527,10 +489,11 @@ exports.createBookingRequest = asyncHandler(async (req, res) => {
     projectId,
     projectName,
     projectClient,
-    approverId,
-    approverEmail,
-    approverName: finalApproverName,
-    approverRole,
+    approverId: isAutoApproveIntent ? undefined : approverId,
+    approverEmail: isAutoApproveIntent ? undefined : approverEmail,
+    approverName: isAutoApproveIntent ? undefined : finalApproverName,
+    approverRole: isAutoApproveIntent ? undefined : approverRole,
+    isAutoApproval: isAutoApproveIntent ? true : false,
     requesterDetails,
     travellers,
     flightRequest:
@@ -825,7 +788,7 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   let totalServiceFee = 0;
   if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
     totalServiceFee = serviceFeeDetails.feeAmount;
-    pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + totalServiceFee;
+    // Removed: pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount) + totalServiceFee;
     pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
   }
 
@@ -983,7 +946,6 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
   // 1. Travel Admin Exception (if intent is auto-approve)
   if (isAutoApproveIntent && user.role === "travel-admin") {
     requestStatus = "approved";
-    finalApproverName = "Auto Approve (Travel Admin)";
     finalApprovedAt = new Date();
     logger.info("✅ SSR Policy: Auto-approving for Travel Admin", {
       email: user.email,
@@ -1037,10 +999,11 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
     projectId,
     projectName,
     projectClient,
-    approverId,
-    approverEmail,
-    approverName: finalApproverName,
-    approverRole,
+    approverId: isAutoApproveIntent ? undefined : approverId,
+    approverEmail: isAutoApproveIntent ? undefined : approverEmail,
+    approverName: isAutoApproveIntent ? undefined : finalApproverName,
+    approverRole: isAutoApproveIntent ? undefined : approverRole,
+    isAutoApproval: isAutoApproveIntent ? true : false,
     requesterDetails,
     travellers,
     flightRequest:
@@ -1226,7 +1189,8 @@ exports.instantFlightBooking = asyncHandler(async (req, res) => {
         });
       });
 
-      if (bookingRequest.pricingSnapshot?.serviceFeeDetails) {
+      // Always calculate and apply service fee on successful booking
+      if (true) {
         try {
           await serviceFeeService.applyServiceFee(
             corporate._id,
@@ -2210,7 +2174,16 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
   }
 
   const env = process.env.TBO_ENV || "live";
-  const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+  let requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+  
+  // Ensure backward compatibility: if service fee was bundled, separate it now
+  if (booking.pricingSnapshot?.serviceFeeDetails?.feeAmount) {
+    const fee = booking.pricingSnapshot.serviceFeeDetails.feeAmount;
+    if (requiredAmount > fee && (requiredAmount % 1 !== 0 || requiredAmount > 1000)) {
+      requiredAmount -= fee;
+      booking.pricingSnapshot.totalAmount = requiredAmount; // Prevent double deduction
+    }
+  }
 
   const balance = await getAgencyBalance(env);
 
@@ -2241,8 +2214,7 @@ exports.executeApprovedFlightBooking = asyncHandler(async (req, res) => {
 
   if (
     orchestrationResult.status === "SUCCESS" &&
-    !orchestrationResult.idempotent &&
-    booking.pricingSnapshot?.serviceFeeDetails
+    !orchestrationResult.idempotent
   ) {
     try {
       const serviceFeeService = require("../services/serviceFee.service");
@@ -2924,6 +2896,67 @@ exports.getProjectFlightExpenses = asyncHandler(async (req, res) => {
     );
 });
 
+/**
+ * ============================================================
+ * ✈️ MY CANCELLATION QUERIES
+ * ============================================================
+ */
+exports.getMyCancellationQueries = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(403).json(new ApiResponse(403, null, "User ID missing."));
+    }
+
+    const { status, bookingReference, page = 1, limit = 50 } = req.query;
+
+    const query = {
+      "amendment.type": "OFFLINE_CANCELLATION",
+      "amendment.changeRequestId": { $exists: true, $ne: null },
+      userId
+    };
+
+    if (status) query["amendment.status"] = status;
+    if (bookingReference) {
+      query["bookingResult.pnr"] = { $regex: bookingReference, $options: "i" };
+    }
+
+    const queries = await BookingRequest.find(query)
+      .populate("userId", "name email")
+      .populate("corporateId", "corporateName")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .lean();
+
+    const formattedQueries = queries.map(q => ({
+      ...q,
+      queryId: q.amendment?.changeRequestId || q._id,
+      status: q.amendment?.status || "OPEN",
+      priority: q.amendment?.priority || "MEDIUM",
+      requestedAt: q.amendment?.requestedAt || q.createdAt,
+      reason: q.cancellation?.reason || q.amendment?.remarks || q.amendment?.requesterComments,
+      corporate: {
+        employeeName: q.userId?.name ? `${q.userId.name.firstName} ${q.userId.name.lastName}` : "Unknown",
+        employeeEmail: q.userId?.email,
+        employeeId: q.userId?._id
+      }
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "My cancellation queries fetched successfully",
+      data: formattedQueries
+    });
+  } catch (error) {
+    console.error("Error fetching my cancellation queries:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch my cancellation queries"
+    });
+  }
+};
+
 module.exports = {
   createBookingRequest: exports.createBookingRequest,
   instantFlightBooking: exports.instantFlightBooking,
@@ -2940,4 +2973,5 @@ module.exports = {
   getBooking: exports.getBooking,
   cancelBooking: exports.cancelBooking,
   getProjectFlightExpenses: exports.getProjectFlightExpenses,
+  getMyCancellationQueries: exports.getMyCancellationQueries,
 };

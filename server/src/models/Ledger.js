@@ -14,8 +14,12 @@ const ledgerSchema = new mongoose.Schema({
   userId: { // 👈 WHO BOOKED
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    index: true // Removed required: true
+  },
+
+  processedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
 
   bookingId: {
@@ -31,10 +35,12 @@ const ledgerSchema = new mongoose.Schema({
   },
 
   bookingReference: String, // 👈 VERY IMPORTANT (PNR / Ref ID)
+  
+  reference: String, // orderId
 
   type: {
     type: String,
-    enum: ['booking', 'payment', 'refund', 'adjustment'],
+    enum: ['booking', 'payment', 'refund', 'adjustment', 'service_fee_deduction'],
     required: true,
     index: true
   },
@@ -46,8 +52,7 @@ const ledgerSchema = new mongoose.Schema({
 
   transactionType: { // 👈 DEBIT / CREDIT (CRITICAL)
     type: String,
-    enum: ['debit', 'credit'],
-    required: true
+    enum: ['debit', 'credit'] // Removed required: true
   },
 
   bookingDate: Date, // 👈 flight booking date
@@ -67,7 +72,7 @@ const ledgerSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'billed', 'paid', 'cancelled'],
+    enum: ['pending', 'billed', 'paid', 'cancelled', 'completed'],
     default: 'pending',
     index: true
   },

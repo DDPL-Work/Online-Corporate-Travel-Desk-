@@ -25,6 +25,7 @@ import employeeReducer from "./Slice/employeeActionSlice.js";
 import corporateSuperAdminReducer from "./Slice/corporateSuperAdmin.slice.js";
 import postpaidReducer from "./Slice/postpaidSlice.js";
 import amendmentReducer from "./Slice/amendmentSlice.js";
+import amendmentRequestReducer from "./Slice/amendmentRequest.slice.js";
 //hotel
 import hotelReducer from "./Slice/hotelSlice.js";
 import hotelBookingReducer from "./Slice/hotelBooking.slice";
@@ -72,6 +73,7 @@ export const store = configureStore({
     flightsMC: flightReducerMC,
     bookings: bookingReducer,
     amendment: amendmentReducer,
+    amendmentRequest: amendmentRequestReducer,
 
     //Hotel
     hotel: hotelReducer,

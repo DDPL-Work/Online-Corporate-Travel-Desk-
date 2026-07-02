@@ -41,6 +41,7 @@ router.get("/hotels/:id", adminBookingCtrl.getHotelBookingByIdAdmin);
 
 router.post('/review', adminBookingCtrl.reviewManagerRequest);
 router.post('/all/managers', adminBookingCtrl.getManagerRequests);
+router.get('/cancellation-queries', adminBookingCtrl.getAllCorporateCancellationQueries);
 
 
 

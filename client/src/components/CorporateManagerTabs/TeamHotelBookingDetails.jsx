@@ -1148,27 +1148,31 @@ function BookingHistory({ booking }) {
     },
   ];
 
-  if (isCancelled) {
-    const isCompleted =
-      booking.executionStatus === "cancelled" ||
-      booking.amendment?.status === "completed";
+  const isAmendmentCancellation = booking.amendment && ["fullCancellation", "partialCancellation"].includes(booking.amendment.type);
+  const isCancellationCompleted = ["cancelled", "failed"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation || (isAmendmentCancellation && booking.amendment.status === "completed");
 
+  if (isAmendmentCancellation) {
     steps.push({
-      label: isCompleted ? "Cancelled" : "Cancellation Requested",
+      label: "Cancellation Requested",
+      date: booking.amendment.requestedAt || booking.updatedAt,
+      desc: `Hotel booking cancellation initiated for manager/admin approval. ${booking.amendment.remarks ? `Reason: ${booking.amendment.remarks}` : ""}`,
+      icon: <FiClock size={14} className="text-[#B5862A]" />,
+      active: true,
+    });
+  }
+
+  if (isCancellationCompleted) {
+    steps.push({
+      label: "Cancelled",
       date:
         booking.cancelledAt ||
         booking.cancellation?.cancelledAt ||
-        booking.amendment?.requestedAt ||
+        booking.amendment?.updatedAt ||
         booking.updatedAt,
-      desc: `Hotel booking cancellation ${isCompleted ? "processed" : "requested"}. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : booking.amendment?.remarks ? `Reason: ${booking.amendment.remarks}` : ""}`,
-      icon: (
-        <FiXCircle
-          size={14}
-          className={isCompleted ? "text-[#B5341A]" : "text-[#8A6200]"}
-        />
-      ),
+      desc: `Hotel booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
+      icon: <FiXCircle size={14} className="text-[#B5341A]" />,
       active: true,
-      isError: isCompleted,
+      isError: true,
     });
   }
 

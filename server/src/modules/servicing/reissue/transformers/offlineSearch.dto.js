@@ -58,6 +58,11 @@ function toOfflineSearchDto({ searchId, results = [], total = 0, page = 1, limit
         supplierFareClass: seg.supplierFareClass,
         availableSeats: seg.availableSeats,
         stops: seg.stops,
+        baggage: seg.baggage,
+        cabinBaggage: seg.cabinBaggage,
+        cabinClass: seg.cabinClass,
+        craft: seg.craft,
+        isRefundable: seg.isRefundable,
       })),
     })),
     pagination: {

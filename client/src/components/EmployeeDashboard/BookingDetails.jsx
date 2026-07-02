@@ -53,6 +53,10 @@ import {
   fetchOfflineReissueRequestByBooking,
   createReissueRequest,
 } from "../../Redux/Actions/reissueThunks";
+import {
+  sendRequestToManager,
+  sendRequestToAdmin,
+} from "../../Redux/Actions/amendmentRequest.thunks";
 import { resetAmendmentState } from "../../Redux/Slice/amendmentSlice";
 import { clearEligibility } from "../../Redux/Slice/reissueSlice";
 import {
@@ -569,7 +573,12 @@ function PaymentStatusCard({
   isConfirmed,
   isTravelAdmin,
 }) {
-  const isCancelled = ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase()) || !!booking?.cancellation || !!booking?.amendment?.requestedAt;
+  const isCancelled =
+    ["cancelled", "cancel_requested"].includes(
+      booking?.executionStatus?.toLowerCase(),
+    ) ||
+    !!booking?.cancellation ||
+    !!booking?.amendment?.requestedAt;
 
   const items = [
     {
@@ -624,10 +633,10 @@ function PaymentStatusCard({
               item.isError
                 ? "text-[#B5341A]"
                 : item.ok === true
-                ? "text-[#2C7A4B]"
-                : item.ok === false
-                  ? "text-[#8A6200]"
-                  : "text-[#1A1714]"
+                  ? "text-[#2C7A4B]"
+                  : item.ok === false
+                    ? "text-[#8A6200]"
+                    : "text-[#1A1714]"
             }`}
           >
             <span
@@ -635,10 +644,10 @@ function PaymentStatusCard({
                 item.isError
                   ? "text-[#B5341A]"
                   : item.ok === true
-                  ? "text-[#2C7A4B]"
-                  : item.ok === false
-                    ? "text-[#8A6200]"
-                    : "text-[#A89F94]"
+                    ? "text-[#2C7A4B]"
+                    : item.ok === false
+                      ? "text-[#8A6200]"
+                      : "text-[#A89F94]"
               }
             >
               {item.icon}
@@ -959,7 +968,11 @@ const getTicketDate = (b) => {
 /* ────────────────────────────────────────────────────────────── */
 function BookingHistory({ booking, reissueRequest }) {
   const isCancelled =
-    ["cancelled", "cancel_requested"].includes(booking.executionStatus?.toLowerCase()) || !!booking.cancellation || !!booking.amendment?.requestedAt;
+    ["cancelled", "cancel_requested"].includes(
+      booking.executionStatus?.toLowerCase(),
+    ) ||
+    !!booking.cancellation ||
+    !!booking.amendment?.requestedAt;
 
   const isTicketed =
     booking.executionStatus === "ticketed" ||
@@ -1012,15 +1025,55 @@ function BookingHistory({ booking, reissueRequest }) {
     },
   ];
 
-  if (isCancelled) {
+  const isAmendmentCancellation =
+    booking.amendment &&
+    [
+      "fullCancellation",
+      "partialCancellation",
+      "OFFLINE_CANCELLATION",
+    ].includes(booking.amendment.type);
+  const isCancellationCompleted =
+    booking.executionStatus?.toLowerCase() === "cancelled" ||
+    !!booking.cancellation ||
+    (isAmendmentCancellation &&
+      ["completed", "RESOLVED"].includes(booking.amendment.status));
+
+  let requestedDate = booking.amendment?.requestedAt || booking.updatedAt;
+  let resolvedDate =
+    booking.cancelledAt ||
+    booking.cancellation?.cancelledAt ||
+    booking.amendment?.response?.resolvedAt ||
+    booking.amendment?.raw?.resolvedAt ||
+    booking.amendment?.updatedAt ||
+    booking.updatedAt;
+
+  if (booking.amendmentHistory && Array.isArray(booking.amendmentHistory)) {
+    const reqHistory = booking.amendmentHistory.find(
+      (h) => h.status === "requested" && h.type === "OFFLINE_CANCELLATION",
+    );
+    if (reqHistory) requestedDate = reqHistory.createdAt;
+
+    const resHistory = booking.amendmentHistory.find(
+      (h) => h.status === "RESOLVED" && h.type === "OFFLINE_CANCELLATION",
+    );
+    if (resHistory) resolvedDate = resHistory.createdAt;
+  }
+
+  if (isAmendmentCancellation) {
+    steps.push({
+      label: "Cancellation Requested",
+      date: requestedDate,
+      desc: `Cancellation request submitted. ${booking.amendment?.remarks || booking.amendment?.requesterComments ? `Reason: ${booking.amendment?.remarks || booking.amendment?.requesterComments}` : ""}`,
+      icon: <FiClock size={14} className="text-[#B5862A]" />,
+      active: true,
+    });
+  }
+
+  if (isCancellationCompleted) {
     steps.push({
       label: "Cancelled",
-      date:
-        booking.amendment?.requestedAt ||
-        booking.cancelledAt ||
-        booking.cancellation?.cancelledAt ||
-        booking.updatedAt,
-      desc: `Booking cancelled. ${booking.cancellation?.reason || booking.amendment?.remarks ? `Reason: ${booking.cancellation?.reason || booking.amendment?.remarks}` : ""}`,
+      date: resolvedDate,
+      desc: `Booking cancelled. ${booking.cancellation?.opsRemark || booking.amendment?.response?.message || booking.amendment?.raw?.message ? `Ops Remark: ${booking.cancellation?.opsRemark || booking.amendment?.response?.message || booking.amendment?.raw?.message}` : ""}`,
       icon: <FiXCircle size={14} className="text-[#B5341A]" />,
       active: true,
       isError: true,
@@ -1670,19 +1723,26 @@ export default function BookingDetails() {
     bookingAmendmentStatus === "requested" ||
     bookingAmendmentStatus === "in_progress";
 
+  const isAmendmentCancellationRequest = [
+    "fullCancellation",
+    "partialCancellation",
+  ].includes(booking?.amendment?.type);
+
   const isReissued =
     booking?.executionStatus?.toLowerCase() === "reissued" ||
     (bookingOfflineRequest &&
       ["COMPLETED", "TICKET_GENERATED"].includes(
         bookingOfflineRequest.status,
       )) ||
-    (bookingAmendmentStatus === "completed" && !isCancelled);
+    (bookingAmendmentStatus === "completed" &&
+      !isCancelled &&
+      !isAmendmentCancellationRequest);
   const isReissuePending =
     (bookingOfflineRequest &&
       ["RAISED", "ASSIGNED", "IN_PROGRESS", "WAITING_AIRLINE"].includes(
         bookingOfflineRequest.status,
       )) ||
-    (isAmendmentPending && !isCancelled);
+    (isAmendmentPending && !isCancelled && !isAmendmentCancellationRequest);
   const hasReissue = isReissued || isReissuePending;
 
   const departureTime = allSegments?.[0]?.departureDateTime;
@@ -1692,6 +1752,13 @@ export default function BookingDetails() {
     executionStatus === "ticketed" &&
     !isCancelled &&
     !isTravelPassed;
+
+  const hasActiveCancellationRequest =
+    booking?.amendment &&
+    ["fullCancellation", "partialCancellation"].includes(
+      booking.amendment.type,
+    ) &&
+    ["requested", "in_progress"].includes(booking.amendment.status);
 
   // Fare summary calculations (simplified)
   let baseFare = 0,
@@ -1757,7 +1824,8 @@ export default function BookingDetails() {
                     }
                     className="flex items-center gap-[6px] text-[10px] font-semibold tracking-[0.1em] uppercase text-[#B5862A] border border-[#B5862A] px-[12px] py-1 hover:bg-[#B5862A] hover:text-[#FAF8F4] transition-colors"
                   >
-                    <FiDownload size={11} /> <span className="hidden sm:inline">Download Ticket</span>
+                    <FiDownload size={11} />{" "}
+                    <span className="hidden sm:inline">Download Ticket</span>
                   </button>
                 </div>
               )}
@@ -1779,21 +1847,31 @@ export default function BookingDetails() {
                 {activeTab === "charges_rules" && "Charges and rules"}
                 {activeTab === "passengers" && "Passengers"}
                 {activeTab === "upsell_options" && "Upsell Options"}
-                {activeTab === "amendment" && (isCancelled ? "Cancellation Details" : isAmendmentPending ? "Cancellation Request" : bookingAmendmentStatus && bookingAmendmentStatus !== "not_requested" ? "Amendment Status" : "Cancellation")}
+                {activeTab === "amendment" &&
+                  (isCancelled
+                    ? "Cancellation Details"
+                    : isAmendmentPending
+                      ? "Cancellation Request"
+                      : bookingAmendmentStatus &&
+                          bookingAmendmentStatus !== "not_requested"
+                        ? "Amendment Status"
+                        : "Cancellation")}
                 {activeTab === "history" && "Booking Life Cycle"}
               </span>
               <FiChevronDown
                 size={16}
-                className={`text-[#B5862A] transition-transform duration-300 ${mobileMenuOpen ? 'rotate-180' : ''}`}
+                className={`text-[#B5862A] transition-transform duration-300 ${mobileMenuOpen ? "rotate-180" : ""}`}
               />
             </button>
           </div>
 
           {/* Desktop Tabs / Mobile Dropdown Content */}
-          <div className={`
+          <div
+            className={`
             md:flex items-center gap-6 overflow-x-auto w-full
-            ${mobileMenuOpen ? 'flex flex-col absolute top-full left-0 right-0 bg-white border border-[#EAE4D9] shadow-lg z-50 p-2' : 'hidden'}
-          `}>
+            ${mobileMenuOpen ? "flex flex-col absolute top-full left-0 right-0 bg-white border border-[#EAE4D9] shadow-lg z-50 p-2" : "hidden"}
+          `}
+          >
             {[
               { id: "flight_details", label: "Flight Details" },
               { id: "project", label: "Project Details" },
@@ -1823,7 +1901,7 @@ export default function BookingDetails() {
                 }}
                 className={`
                   text-sm font-bold tracking-wide transition-colors whitespace-nowrap relative
-                  ${mobileMenuOpen ? 'w-full text-left px-4 py-3 border-b border-[#EAE4D9] last:border-0' : 'pb-3'}
+                  ${mobileMenuOpen ? "w-full text-left px-4 py-3 border-b border-[#EAE4D9] last:border-0" : "pb-3"}
                   ${
                     activeTab === tab.id
                       ? "text-[#1A1714] bg-[#FAF8F4] md:bg-transparent"
@@ -2180,24 +2258,25 @@ export default function BookingDetails() {
                           resolvedOnwardPax[idx]?.Ticket?.TicketNumber || null;
                         const returnTicket =
                           resolvedReturnPax[idx]?.Ticket?.TicketNumber || null;
-                        
+
                         const paxId = resolvedOnwardPax[idx]?.PaxId;
-                        const paxCancelInfo =
-                          Array.isArray(booking?.amendment?.response)
-                            ? booking?.amendment?.response.find((res) =>
-                                res?.response?.Response?.TicketCRInfo?.some(
-                                  (info) =>
-                                    info?.PaxId?.toString() ===
-                                    paxId?.toString(),
-                                ),
-                              )
-                            : booking?.amendment?.response?.Response?.TicketCRInfo?.some(
+                        const paxCancelInfo = Array.isArray(
+                          booking?.amendment?.response,
+                        )
+                          ? booking?.amendment?.response.find((res) =>
+                              res?.response?.Response?.TicketCRInfo?.some(
                                 (info) =>
                                   info?.PaxId?.toString() === paxId?.toString(),
-                              ) || booking?.amendment?.raw?.Response?.TicketCRInfo?.some(
-                                (info) =>
-                                  info?.PaxId?.toString() === paxId?.toString(),
-                              );
+                              ),
+                            )
+                          : booking?.amendment?.response?.Response?.TicketCRInfo?.some(
+                              (info) =>
+                                info?.PaxId?.toString() === paxId?.toString(),
+                            ) ||
+                            booking?.amendment?.raw?.Response?.TicketCRInfo?.some(
+                              (info) =>
+                                info?.PaxId?.toString() === paxId?.toString(),
+                            );
                         const isPaxCancelled = paxCancelInfo || isCancelled;
 
                         return (
@@ -2364,6 +2443,7 @@ export default function BookingDetails() {
             <div className="space-y-8">
               {/* Cancellation / Amendment Response — shown when cancelled or amendment requested */}
               {!hasReissue &&
+                !hasActiveCancellationRequest &&
                 (isCancelled ||
                   (bookingAmendmentStatus &&
                     bookingAmendmentStatus !== "not_requested")) &&
@@ -2409,16 +2489,25 @@ export default function BookingDetails() {
 
                   if (Array.isArray(raw)) {
                     raw.forEach((item) => {
-                      const ticketInfos = item.response?.Response?.TicketCRInfo || [];
+                      const ticketInfos =
+                        item.response?.Response?.TicketCRInfo || [];
                       ticketInfos.forEach((info) => {
                         totalRefund += Number(info.RefundedAmount || 0);
                         totalCharge += Number(info.CancellationCharge || 0);
-                        if (info.CreditNoteNo && info.CreditNoteNo !== "—" && !creditNotes.includes(info.CreditNoteNo))
+                        if (
+                          info.CreditNoteNo &&
+                          info.CreditNoteNo !== "—" &&
+                          !creditNotes.includes(info.CreditNoteNo)
+                        )
                           creditNotes.push(info.CreditNoteNo);
-                        if (info.Remarks && info.Remarks !== "Successful" && !providerRemarks.includes(info.Remarks))
+                        if (
+                          info.Remarks &&
+                          info.Remarks !== "Successful" &&
+                          !providerRemarks.includes(info.Remarks)
+                        )
                           providerRemarks.push(info.Remarks);
                         sectorBreakdown.push({
-                          label: `${getSectorLabel(item.bookingId)}${info.PaxId ? ` (Pax ID: ${info.PaxId})` : (info.ChangeRequestId ? ` (Req: ${info.ChangeRequestId})` : '')}`,
+                          label: `${getSectorLabel(item.bookingId)}${info.PaxId ? ` (Pax ID: ${info.PaxId})` : info.ChangeRequestId ? ` (Req: ${info.ChangeRequestId})` : ""}`,
                           refund: info.RefundedAmount,
                           charge: info.CancellationCharge,
                           creditNote: info.CreditNoteNo,
@@ -2432,12 +2521,20 @@ export default function BookingDetails() {
                       ticketInfos.forEach((info) => {
                         totalRefund += Number(info.RefundedAmount || 0);
                         totalCharge += Number(info.CancellationCharge || 0);
-                        if (info.CreditNoteNo && info.CreditNoteNo !== "—" && !creditNotes.includes(info.CreditNoteNo))
+                        if (
+                          info.CreditNoteNo &&
+                          info.CreditNoteNo !== "—" &&
+                          !creditNotes.includes(info.CreditNoteNo)
+                        )
                           creditNotes.push(info.CreditNoteNo);
-                        if (info.Remarks && info.Remarks !== "Successful" && !providerRemarks.includes(info.Remarks))
+                        if (
+                          info.Remarks &&
+                          info.Remarks !== "Successful" &&
+                          !providerRemarks.includes(info.Remarks)
+                        )
                           providerRemarks.push(info.Remarks);
                         sectorBreakdown.push({
-                          label: `Booking Segment${info.PaxId ? ` (Pax ID: ${info.PaxId})` : (info.ChangeRequestId ? ` (Req: ${info.ChangeRequestId})` : '')}`,
+                          label: `Booking Segment${info.PaxId ? ` (Pax ID: ${info.PaxId})` : info.ChangeRequestId ? ` (Req: ${info.ChangeRequestId})` : ""}`,
                           refund: info.RefundedAmount,
                           charge: info.CancellationCharge,
                           creditNote: info.CreditNoteNo,
@@ -2446,18 +2543,44 @@ export default function BookingDetails() {
                       });
                     } else {
                       totalRefund = Number(
-                        booking.amendment?.refundedAmount || 0,
+                        raw?.refundAmount ||
+                          booking.amendment?.refundedAmount ||
+                          0,
                       );
                       totalCharge = Number(
-                        booking.amendment?.cancellationCharge || 0,
+                        raw?.cancellationCharge ||
+                          booking.amendment?.cancellationCharge ||
+                          0,
                       );
+                      if (
+                        raw?.creditNoteNo &&
+                        raw?.creditNoteNo !== "—" &&
+                        !creditNotes.includes(raw?.creditNoteNo)
+                      ) {
+                        creditNotes.push(raw?.creditNoteNo);
+                      }
+                      if (
+                        raw?.message &&
+                        raw?.message !== "Successful" &&
+                        !providerRemarks.includes(raw?.message)
+                      ) {
+                        providerRemarks.push(raw?.message);
+                      }
                     }
                   }
 
                   const displayRefund =
-                    totalRefund || booking.amendment?.refundedAmount || "_";
+                    totalRefund !== null &&
+                    totalRefund !== undefined &&
+                    !isNaN(totalRefund)
+                      ? totalRefund
+                      : (booking.amendment?.refundedAmount ?? "_");
                   const displayCharge =
-                    totalCharge || booking.amendment?.cancellationCharge || "_";
+                    totalCharge !== null &&
+                    totalCharge !== undefined &&
+                    !isNaN(totalCharge)
+                      ? totalCharge
+                      : (booking.amendment?.cancellationCharge ?? "_");
                   const displayCreditNote =
                     creditNotes.length > 0 ? creditNotes.join(", ") : "_";
                   const displayRemarks =
@@ -2638,80 +2761,141 @@ export default function BookingDetails() {
                       )}
 
                       {/* Passenger Cancellation Status */}
-                      {travellers.length > 0 && (isCancelled || (booking.amendment?.status && booking.amendment?.status !== "not_requested")) && (
+                      {travellers.length > 0 &&
+                        (isCancelled ||
+                          (booking.amendment?.status &&
+                            booking.amendment?.status !== "not_requested")) && (
                           <div className="p-6 border-b border-[#EAE4D9]">
-                            <h3 className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714] mb-4">Passenger Cancellation Status</h3>
+                            <h3 className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714] mb-4">
+                              Passenger Cancellation Status
+                            </h3>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-[#FAF8F4] border-b border-[#EAE4D9] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
-                                            <th className="px-4 py-3">Passenger</th>
-                                            <th className="px-4 py-3">Ticket No</th>
-                                            <th className="px-4 py-3">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#EAE4D9]">
-                                    {travellers.map((trav, idx) => {
-                                        const onwardPassengers = bookingResult?.onwardResponse?.Response?.Response?.FlightItinerary?.Passenger || [];
-                                        const returnPassengers = bookingResult?.returnResponse?.Response?.Response?.FlightItinerary?.Passenger || [];
-                                        const singleTripPassengers = bookingResult?.providerResponse?.Response?.Response?.FlightItinerary?.Passenger || [];
-                                        
-                                        const isRoundTripBooking = onwardPassengers.length > 0 || returnPassengers.length > 0;
-                                        const resolvedOnwardPax = isRoundTripBooking ? onwardPassengers : singleTripPassengers;
-                                        const resolvedReturnPax = isRoundTripBooking ? returnPassengers : [];
-                                        
-                                        const tickets = [];
-                                        
-                                        const onwardPaxInfo = resolvedOnwardPax[idx];
-                                        if (onwardPaxInfo) {
-                                            let status = onwardPaxInfo?.Ticket?.Status || "—";
-                                            if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
-                                                status = "CANCELLED";
-                                            }
-                                            tickets.push({ no: onwardPaxInfo?.Ticket?.TicketNumber || "—", status });
-                                        }
-                                        
-                                        const returnPaxInfo = resolvedReturnPax[idx];
-                                        if (returnPaxInfo) {
-                                            let status = returnPaxInfo?.Ticket?.Status || "—";
-                                            if ((isCancelled || ["cancelled", "cancel_requested"].includes(booking?.executionStatus?.toLowerCase())) && status === "OK") {
-                                                status = "CANCELLED";
-                                            }
-                                            const ticketNo = returnPaxInfo?.Ticket?.TicketNumber || "—";
-                                            if (ticketNo !== "—" && !tickets.find(t => t.no === ticketNo)) {
-                                                tickets.push({ no: ticketNo, status });
-                                            }
-                                        }
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-[#FAF8F4] border-b border-[#EAE4D9] text-[9px] font-semibold tracking-[0.15em] uppercase text-[#A89F94]">
+                                    <th className="px-4 py-3">Passenger</th>
+                                    <th className="px-4 py-3">Ticket No</th>
+                                    <th className="px-4 py-3">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#EAE4D9]">
+                                  {travellers.map((trav, idx) => {
+                                    const onwardPassengers =
+                                      bookingResult?.onwardResponse?.Response
+                                        ?.Response?.FlightItinerary
+                                        ?.Passenger || [];
+                                    const returnPassengers =
+                                      bookingResult?.returnResponse?.Response
+                                        ?.Response?.FlightItinerary
+                                        ?.Passenger || [];
+                                    const singleTripPassengers =
+                                      bookingResult?.providerResponse?.Response
+                                        ?.Response?.FlightItinerary
+                                        ?.Passenger || [];
 
-                                        if (tickets.length === 0) {
-                                            tickets.push({ no: "—", status: "—" });
-                                        }
-                                        
-                                        return (
-                                            <tr key={idx}>
-                                                <td className="px-4 py-3 text-[13px] font-semibold text-[#1A1714] align-top">{trav.title} {trav.firstName} {trav.lastName}</td>
-                                                <td className="px-4 py-3 text-[12px] text-[#7A7068] font-mono align-top">
-                                                    <div className="space-y-2">
-                                                        {tickets.map((t, i) => <div key={i}>{t.no}</div>)}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 align-top">
-                                                    <div className="space-y-2">
-                                                        {tickets.map((t, i) => (
-                                                            <div key={i}>
-                                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 ${t.status.toUpperCase() === 'CANCELLED' ? 'bg-[#FDF1EE] text-[#B5341A]' : 'bg-[#EDF7F2] text-[#2C7A4B]'}`}>{t.status}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    </tbody>
-                                </table>
+                                    const isRoundTripBooking =
+                                      onwardPassengers.length > 0 ||
+                                      returnPassengers.length > 0;
+                                    const resolvedOnwardPax = isRoundTripBooking
+                                      ? onwardPassengers
+                                      : singleTripPassengers;
+                                    const resolvedReturnPax = isRoundTripBooking
+                                      ? returnPassengers
+                                      : [];
+
+                                    const tickets = [];
+
+                                    const onwardPaxInfo =
+                                      resolvedOnwardPax[idx];
+                                    if (onwardPaxInfo) {
+                                      let status =
+                                        onwardPaxInfo?.Ticket?.Status || "—";
+                                      if (
+                                        (isCancelled ||
+                                          [
+                                            "cancelled",
+                                            "cancel_requested",
+                                          ].includes(
+                                            booking?.executionStatus?.toLowerCase(),
+                                          )) &&
+                                        status === "OK"
+                                      ) {
+                                        status = "CANCELLED";
+                                      }
+                                      tickets.push({
+                                        no:
+                                          onwardPaxInfo?.Ticket?.TicketNumber ||
+                                          "—",
+                                        status,
+                                      });
+                                    }
+
+                                    const returnPaxInfo =
+                                      resolvedReturnPax[idx];
+                                    if (returnPaxInfo) {
+                                      let status =
+                                        returnPaxInfo?.Ticket?.Status || "—";
+                                      if (
+                                        (isCancelled ||
+                                          [
+                                            "cancelled",
+                                            "cancel_requested",
+                                          ].includes(
+                                            booking?.executionStatus?.toLowerCase(),
+                                          )) &&
+                                        status === "OK"
+                                      ) {
+                                        status = "CANCELLED";
+                                      }
+                                      const ticketNo =
+                                        returnPaxInfo?.Ticket?.TicketNumber ||
+                                        "—";
+                                      if (
+                                        ticketNo !== "—" &&
+                                        !tickets.find((t) => t.no === ticketNo)
+                                      ) {
+                                        tickets.push({ no: ticketNo, status });
+                                      }
+                                    }
+
+                                    if (tickets.length === 0) {
+                                      tickets.push({ no: "—", status: "—" });
+                                    }
+
+                                    return (
+                                      <tr key={idx}>
+                                        <td className="px-4 py-3 text-[13px] font-semibold text-[#1A1714] align-top">
+                                          {trav.title} {trav.firstName}{" "}
+                                          {trav.lastName}
+                                        </td>
+                                        <td className="px-4 py-3 text-[12px] text-[#7A7068] font-mono align-top">
+                                          <div className="space-y-2">
+                                            {tickets.map((t, i) => (
+                                              <div key={i}>{t.no}</div>
+                                            ))}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 align-top">
+                                          <div className="space-y-2">
+                                            {tickets.map((t, i) => (
+                                              <div key={i}>
+                                                <span
+                                                  className={`text-[10px] font-bold uppercase px-2 py-1 ${t.status.toUpperCase() === "CANCELLED" ? "bg-[#FDF1EE] text-[#B5341A]" : "bg-[#EDF7F2] text-[#2C7A4B]"}`}
+                                                >
+                                                  {t.status}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
-                      )}
+                        )}
 
                       {/* Reissue action - hide if reissue is in progress or completed */}
                       {!hasReissue && !isCancelled && (
@@ -2777,6 +2961,22 @@ export default function BookingDetails() {
                     );
                   }
 
+                  if (hasActiveCancellationRequest) {
+                    return (
+                      <div className="bg-white border border-[#EAE4D9] p-8 text-center flex flex-col items-center">
+                        <FiClock size={24} className="text-[#B5862A] mb-3" />
+                        <p className="text-[14px] font-bold text-[#1A1714]">
+                          Cancellation Request Pending
+                        </p>
+                        <p className="text-[12px] text-[#7A7068] mt-2 max-w-md">
+                          Your cancellation request has been created and is
+                          waiting for Travel Admin action. You cannot perform
+                          any further actions on this booking.
+                        </p>
+                      </div>
+                    );
+                  }
+
                   return showCancellationChargesBtn ? (
                     <div className="bg-white border border-[#EAE4D9] p-6">
                       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -2789,37 +2989,40 @@ export default function BookingDetails() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
-                          {eligibilityLoading ? (
-                            <span className="flex items-center gap-1.5 px-4 py-[10px] bg-[#FAF8F4] text-[#A89F94] text-[11px] font-semibold tracking-[0.12em] uppercase">
-                              <FiLoader size={12} className="animate-spin" />{" "}
-                              Checking...
-                            </span>
-                          ) : bookingOfflineRequest ? (
-                            <button
-                              onClick={() =>
-                                navigate(
-                                  `/my-reissued?bookingId=${booking._id}`,
-                                )
-                              }
-                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
-                            >
-                              <FiEye size={12} /> View Reissue Status
-                            </button>
-                          ) : isOnlineEligible ? (
-                            <button
-                              onClick={() => setShowReissueModal(true)}
-                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
-                            >
-                              <FiRefreshCw size={12} /> Reissue Online
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setShowReissueModal(true)}
-                              className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
-                            >
-                              <FiFileText size={12} /> Raise Reissue Request
-                            </button>
-                          )}
+                          <>
+                            {eligibilityLoading ? (
+                              <span className="flex items-center gap-1.5 px-4 py-[10px] bg-[#FAF8F4] text-[#A89F94] text-[11px] font-semibold tracking-[0.12em] uppercase">
+                                <FiLoader size={12} className="animate-spin" />{" "}
+                                Checking...
+                              </span>
+                            ) : bookingOfflineRequest ? (
+                              <button
+                                onClick={() =>
+                                  navigate(
+                                    `/my-reissued?bookingId=${booking._id}`,
+                                  )
+                                }
+                                className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#1A1714] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-black transition"
+                              >
+                                <FiEye size={12} /> View Reissue Status
+                              </button>
+                            ) : isOnlineEligible ? (
+                              <button
+                                onClick={() => setShowReissueModal(true)}
+                                className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
+                              >
+                                <FiRefreshCw size={12} /> Reissue Online
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setShowReissueModal(true)}
+                                className="inline-flex items-center gap-2 px-5 py-[10px] bg-white border border-[#B5862A] text-[#B5862A] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition"
+                              >
+                                <FiFileText size={12} /> Raise Reissue Request
+                              </button>
+                            )}
+                          </>
+
                           <button
                             onClick={() => setShowCancellationModal(true)}
                             className="inline-flex items-center gap-2 px-5 py-[10px] bg-[#B5341A] text-white text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#8A2510] transition"
@@ -3131,42 +3334,72 @@ function CancellationModal({
     setStep("processing");
     setProcessingLabel("Submitting cancellation request…");
     try {
-      const res = await dispatch(
-        fullCancellation({
+      if (booking?.approverId) {
+        // Approval flow
+        const payload = {
           bookingId: booking._id,
-          remarks: remarksText || undefined,
-        }),
-      );
-      let changeRequestIds = [];
-      const responses = res.payload?.data || [];
-
-      if (responses.length > 0) {
-        changeRequestIds = responses
-          .map(
-            (item) =>
-              item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-              item?.response?.Response?.ChangeRequestId,
-          )
-          .filter(Boolean);
+          bookingType: "flight",
+          actionType: "fullCancellation",
+          actionPayload: {
+            bookingId: booking._id,
+            remarks: remarksText || undefined,
+          },
+          requesterComments: remarksText || "User requested full cancellation",
+        };
+        await dispatch(sendRequestToManager(payload)).unwrap();
+        await dispatch(sendRequestToAdmin(payload)).unwrap();
+        toast.success("Cancellation request submitted successfully");
       } else {
-        const singleId =
-          res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
-          res.payload?.Response?.ChangeRequestId;
-        if (singleId) changeRequestIds = [singleId];
-      }
+        // Direct TBO API hit (auto-approved)
+        const res = await dispatch(
+          fullCancellation({
+            bookingId: booking._id,
+            remarks: remarksText || undefined,
+          }),
+        );
+        let changeRequestIds = [];
+        const responses = res.payload?.data || [];
 
-      if (!changeRequestIds.length) {
-        throw new Error("No ChangeRequestId returned");
+        if (responses.length > 0) {
+          changeRequestIds = responses
+            .map(
+              (item) =>
+                item?.response?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+                item?.response?.Response?.ChangeRequestId,
+            )
+            .filter(Boolean);
+        } else {
+          const singleId =
+            res.payload?.Response?.TicketCRInfo?.[0]?.ChangeRequestId ||
+            res.payload?.Response?.ChangeRequestId;
+          if (singleId) changeRequestIds = [singleId];
+        }
+
+        if (!changeRequestIds.length) {
+          throw new Error("No ChangeRequestId returned");
+        }
+        toast.success("Cancellation successful");
       }
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
-      toast.success("Cancellation request submitted successfully");
       onClose();
       await dispatch(fetchMyBookingById(booking._id));
       navigate("/my-bookings");
     } catch (err) {
-      setChargesError(err?.message || "Cancellation failed. Please try again.");
+      let errorMsg = err?.message || "Cancellation failed. Please try again.";
+      if (
+        errorMsg.includes(
+          "Unable to process your request for ChangeRequestId",
+        ) ||
+        /contact your agent|sales representative|technical issue/i.test(
+          errorMsg,
+        )
+      ) {
+        errorMsg =
+          "This booking can't be online cancelled. Please raise a request for offline cancellation.";
+      }
+      setChargesError(errorMsg);
       setStep("error");
     }
   };
@@ -3187,24 +3420,54 @@ function CancellationModal({
     setStep("processing");
     setProcessingLabel("Submitting partial cancellation…");
     try {
-      const res = await dispatch(
-        partialCancellation({
+      if (booking?.approverId) {
+        const payload = {
           bookingId: booking._id,
-          segments: sectors,
-          remarks: remarksText || "User requested partial cancellation",
-        }),
-      );
-      if (res.error)
-        throw new Error(res.payload || "Partial cancellation failed");
+          bookingType: "flight",
+          actionType: "partialCancellation",
+          actionPayload: {
+            bookingId: booking._id,
+            segments: sectors,
+            remarks: remarksText || "User requested partial cancellation",
+          },
+          requesterComments:
+            remarksText || "User requested partial cancellation",
+        };
+        await dispatch(sendRequestToManager(payload)).unwrap();
+        await dispatch(sendRequestToAdmin(payload)).unwrap();
+        toast.success("Partial cancellation request submitted successfully");
+      } else {
+        const res = await dispatch(
+          partialCancellation({
+            bookingId: booking._id,
+            segments: sectors,
+            remarks: remarksText || "User requested partial cancellation",
+          }),
+        );
+        if (res.error)
+          throw new Error(res.payload || "Partial cancellation failed");
+        toast.success("Partial cancellation successful");
+      }
 
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       setShouldFetchCharges(false);
-      toast.success("Partial cancellation request submitted successfully");
       onClose();
       await dispatch(fetchMyBookingById(booking._id));
       navigate("/my-bookings");
     } catch (err) {
-      setChargesError(err?.message || "Partial cancellation failed.");
+      let errorMsg = err?.message || "Partial cancellation failed.";
+      if (
+        errorMsg.includes(
+          "Unable to process your request for ChangeRequestId",
+        ) ||
+        /contact your agent|sales representative|technical issue/i.test(
+          errorMsg,
+        )
+      ) {
+        errorMsg =
+          "This booking can't be online cancelled. Please raise a request for offline cancellation.";
+      }
+      setChargesError(errorMsg);
       setStep("error");
     }
   };
@@ -3246,12 +3509,40 @@ function CancellationModal({
       setStep("processing");
       setProcessingLabel("Creating cancellation query...");
 
+      const bookingSnapshotObj = {
+        journeyType: booking?.tripType,
+        travelDate: booking?.travelDate,
+        returnDate: booking?.returnDate,
+        totalFare: booking?.fare?.totalFare,
+        baseFare: booking?.fare?.baseFare,
+        taxes: booking?.fare?.taxes,
+        serviceFee: booking?.fare?.serviceFee,
+        airline:
+          typeof booking?.airline === "string"
+            ? booking.airline
+            : booking?.airline?.airlineName ||
+              booking?.airline?.airlineCode ||
+              "",
+        pnr: booking?.pnr,
+        sectors:
+          booking?.flightRequest?.segments?.map((seg) => ({
+            origin: seg?.origin?.airportCode,
+            destination: seg?.destination?.airportCode,
+            departureTime: seg?.departureDateTime,
+            arrivalTime: seg?.arrivalDateTime,
+            airline: seg?.airlineCode,
+            flightNumber: seg?.flightNumber,
+          })) || [],
+      };
+
       const payload = {
         bookingId: booking._id,
+        bookingReference: booking.bookingReference || booking.orderId,
         orderId: booking.orderId || booking.bookingReference,
         priority: queryPriority,
         remarks:
           queryRemarks || "User requested cancellation but charges API failed",
+        segments: bookingSnapshotObj.sectors,
         corporate: {
           companyId: booking?.companyId,
           companyName: booking?.companyName,
@@ -3259,26 +3550,7 @@ function CancellationModal({
           employeeName: booking?.user?.name,
           employeeEmail: booking?.user?.email,
         },
-        bookingSnapshot: {
-          journeyType: booking?.tripType,
-          travelDate: booking?.travelDate,
-          returnDate: booking?.returnDate,
-          totalFare: booking?.fare?.totalFare,
-          baseFare: booking?.fare?.baseFare,
-          taxes: booking?.fare?.taxes,
-          serviceFee: booking?.fare?.serviceFee,
-          airline: booking?.airline,
-          pnr: booking?.pnr,
-          sectors:
-            booking?.flightRequest?.segments?.map((seg) => ({
-              origin: seg?.origin?.airportCode,
-              destination: seg?.destination?.airportCode,
-              departureTime: seg?.departureDateTime,
-              arrivalTime: seg?.arrivalDateTime,
-              airline: seg?.airlineCode,
-              flightNumber: seg?.flightNumber,
-            })) || [],
-        },
+        bookingSnapshot: bookingSnapshotObj,
         passengers:
           booking?.travellers?.map((pax) => ({
             name: `${pax.title} ${pax.firstName} ${pax.lastName}`,
@@ -3368,22 +3640,35 @@ function CancellationModal({
 
           {step === "error" && (
             <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
-                <FiAlertTriangle size={24} className="text-red-400" />
+              <div className="w-14 h-14 rounded-2xl bg-[#FDF1EE] flex items-center justify-center border border-[#F0C4BA]">
+                <FiAlertTriangle size={24} className="text-[#B5341A]" />
               </div>
-              <div>
-                <p className="text-sm font-bold text-slate-800 mb-1">
-                  Something went wrong
+              <div className="px-6">
+                <p className="text-sm font-bold text-[#1A1714] mb-1 font-['DM_Sans']">
+                  Action Failed
                 </p>
-                <p className="text-xs text-slate-400">{chargesError}</p>
+                <p className="text-xs text-[#7A7068] font-['DM_Sans'] leading-relaxed">
+                  {chargesError}
+                </p>
               </div>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-4 mt-4 w-full px-8">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                  className="flex-1 py-[10px] bg-white border border-[#EAE4D9] text-[#7A7068] font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#FAF8F4] transition-colors"
                 >
                   Close
                 </button>
+                {chargesError.includes("offline cancellation") && (
+                  <button
+                    onClick={() => {
+                      setStep("charges");
+                      setShowQueryModal(true);
+                    }}
+                    className="flex-1 py-[10px] bg-[#1A1714] text-white border-none font-['DM_Sans'] text-[11px] font-semibold tracking-[0.12em] uppercase hover:bg-[#000000] transition-colors"
+                  >
+                    Raise Request
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -3788,9 +4073,25 @@ function CancelScreen({ booking, onClose }) {
     if (!confirm) return;
     try {
       setLoading(true);
-      const res = await dispatch(fullCancellation({ bookingId: booking._id }));
+      if (booking?.approverId) {
+        const payload = {
+          bookingId: booking._id,
+          bookingType: "flight",
+          actionType: "fullCancellation",
+          actionPayload: { bookingId: booking._id, remarks: undefined },
+          requesterComments: "User requested full cancellation",
+        };
+        await dispatch(sendRequestToManager(payload)).unwrap();
+        await dispatch(sendRequestToAdmin(payload)).unwrap();
+        toast.success("Cancellation request submitted successfully");
+      } else {
+        const res = await dispatch(
+          fullCancellation({ bookingId: booking._id }),
+        );
+        toast.success("Cancellation successful");
+      }
+
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
-      toast.success("Cancellation request submitted successfully");
       await dispatch(fetchMyBookingById(booking._id));
       navigate("/my-bookings");
       onClose();
@@ -3952,13 +4253,31 @@ function PartialCancelModal({ booking, onClose }) {
     }));
     try {
       setLoading(true);
-      await dispatch(
-        partialCancellation({
+
+      if (booking?.approverId) {
+        const payload = {
           bookingId: booking._id,
-          segments: sectors,
-          remarks,
-        }),
-      );
+          bookingType: "flight",
+          actionType: "partialCancellation",
+          actionPayload: {
+            bookingId: booking._id,
+            segments: sectors,
+            remarks,
+          },
+          requesterComments: remarks || "User requested partial cancellation",
+        };
+        await dispatch(sendRequestToManager(payload)).unwrap();
+        await dispatch(sendRequestToAdmin(payload)).unwrap();
+      } else {
+        await dispatch(
+          partialCancellation({
+            bookingId: booking._id,
+            segments: sectors,
+            remarks,
+          }),
+        );
+      }
+
       sessionStorage.setItem(`cancelRequested_${booking._id}`, "true");
       onClose();
       await dispatch(fetchMyBookingById(booking._id));

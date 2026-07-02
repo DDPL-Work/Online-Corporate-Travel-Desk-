@@ -53,6 +53,7 @@ import {
   sendHotelAmendment,
   getHotelAmendmentStatus,
 } from "../../Redux/Actions/hotelAmendment.thunks";
+import { sendRequestToManager, sendRequestToAdmin } from "../../Redux/Actions/amendmentRequest.thunks";
 
 /* ─────────────────────────────────────────────────────────────── */
 /*  Helpers                                                        */
@@ -968,15 +969,28 @@ function BookingHistory({ booking }) {
     },
   ];
 
-  if (isCancelled) {
+  const isAmendmentCancellation = booking.amendment && ["fullCancellation", "partialCancellation"].includes(booking.amendment.type);
+  const isCancellationCompleted = ["cancelled", "failed"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation || (isAmendmentCancellation && booking.amendment.status === "completed") || tboStatus === 3;
+
+  if (isAmendmentCancellation) {
     steps.push({
       label: "Cancellation Requested",
+      date: booking.amendment.requestedAt || booking.updatedAt,
+      desc: `Hotel booking cancellation initiated for manager/admin approval. ${booking.amendment.remarks ? `Reason: ${booking.amendment.remarks}` : ""}`,
+      icon: <FiClock size={14} className="text-[#B5862A]" />,
+      active: true,
+    });
+  }
+
+  if (isCancellationCompleted) {
+    steps.push({
+      label: "Cancelled",
       date:
-        booking.amendment?.requestedAt ||
         booking.cancelledAt ||
         booking.cancellation?.cancelledAt ||
+        booking.amendment?.updatedAt ||
         booking.updatedAt,
-      desc: `Hotel booking cancellation initiated. ${booking.amendment?.remarks ? `Reason: ${booking.amendment.remarks}` : (booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : "")}`,
+      desc: `Hotel booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
       icon: <FiXCircle size={14} className="text-[#B5341A]" />,
       active: true,
       isError: true,
@@ -1224,12 +1238,29 @@ function CancellationSection({
     if (!reason) return;
     setSubmitting(true);
     try {
-      const res = await dispatch(
-        sendHotelAmendment({
+      let res;
+      if (booking?.approverId) {
+        const payload = {
           bookingId: booking?._id || booking?.bookingId,
-          remarks: `${reason} - ${remarks}`,
-        }),
-      );
+          bookingType: "hotel",
+          actionType: "fullCancellation",
+          actionPayload: {
+            bookingId: booking?._id || booking?.bookingId,
+            remarks: `${reason} - ${remarks}`,
+          },
+          requesterComments: `${reason} - ${remarks}`,
+        };
+        res = await dispatch(sendRequestToManager(payload));
+        await dispatch(sendRequestToAdmin(payload));
+      } else {
+        res = await dispatch(
+          sendHotelAmendment({
+            bookingId: booking?._id || booking?.bookingId,
+            remarks: `${reason} - ${remarks}`,
+          }),
+        );
+      }
+
       if (res.meta.requestStatus === "fulfilled") {
         setShowForm(false);
         setIsSubmitted(true);

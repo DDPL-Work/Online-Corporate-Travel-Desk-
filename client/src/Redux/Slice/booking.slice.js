@@ -13,7 +13,7 @@ import {
   fetchApprovedFlightBookingStatus,
   manualTicketNonLcc,
   instantFlightBooking,
-  // ticketFlight,
+  fetchMyCancellationQueries,
 } from "../Actions/booking.thunks";
 
 const initialBookingLifecycle = {
@@ -211,6 +211,9 @@ const initialState = {
   actionLoading: false,
   error: null,
   errorCode: null,       // HTTP status code for UI differentiation (409, 500, etc.)
+  queries: [],
+  queriesLoading: false,
+  queriesError: null,
   revalidatedBookingContext: null,
   revalidatedBookingStatus: null,
   revalidationMeta: initialRevalidationMeta,
@@ -415,6 +418,20 @@ const bookingSlice = createSlice({
       .addCase(cancelBooking.rejected, (state, action) => {
         state.actionLoading = false;
         state.error = action.payload;
+      })
+
+      // MY CANCELLATION QUERIES
+      .addCase(fetchMyCancellationQueries.pending, (state) => {
+        state.queriesLoading = true;
+        state.queriesError = null;
+      })
+      .addCase(fetchMyCancellationQueries.fulfilled, (state, action) => {
+        state.queriesLoading = false;
+        state.queries = action.payload || [];
+      })
+      .addCase(fetchMyCancellationQueries.rejected, (state, action) => {
+        state.queriesLoading = false;
+        state.queriesError = action.payload;
       });
   },
 });

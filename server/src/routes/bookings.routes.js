@@ -23,6 +23,7 @@ router.get("/my-bookings", bookingsController.getMyBookings);
 router.get("/my-requests", bookingsController.getMyRequests);
 router.get("/my-booking/:id", bookingsController.getMyBookingById);
 router.get("/my-request/:id", bookingsController.getMyRequestById);
+router.get("/my/cancellation-queries", bookingsController.getMyCancellationQueries);
 
 // execute approved flight
 router.post(

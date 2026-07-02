@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Corporate = require("../models/Corporate");
 const WalletTransaction = require("../models/Wallet");
 const ServiceFeeLedger = require("../models/ServiceFeeLedger");
+const Ledger = require("../models/Ledger");
 const logger = require("../utils/logger");
 const ApiError = require("../utils/ApiError");
 
@@ -110,24 +111,43 @@ exports.applyServiceFee = async (corporateId, userId, bookingId, orderId, payloa
 
     const balanceAfter = corporate.walletBalance;
 
-    // 1. Create Wallet Transaction
-    await WalletTransaction.create(
-      [{
-        corporateId,
-        type: "service_fee_deduction",
-        amount: feeAmount,
-        balanceBefore,
-        balanceAfter,
-        description: `Service fee for ${payload.productType} ${payload.operation} (${payload.tripType})`,
-        operationType: `${payload.productType}-${payload.operation}`,
-        reference: orderId,
-        bookingId: bookingId,
-        bookingModel: payload.productType === "Hotel" ? "HotelBookingRequest" : "BookingRequest",
-        processedBy: userId,
-        status: "completed",
-      }],
-      { session }
-    );
+    if (corporate.classification === "prepaid") {
+      // 1. Create Wallet Transaction for Prepaid
+      await WalletTransaction.create(
+        [{
+          corporateId,
+          type: "service_fee_deduction",
+          amount: feeAmount,
+          balanceBefore,
+          balanceAfter,
+          description: `Service fee for ${payload.productType} ${payload.operation} (${payload.tripType})`,
+          operationType: `${payload.productType}-${payload.operation}`,
+          reference: orderId,
+          bookingId: bookingId,
+          bookingModel: payload.productType === "Hotel" ? "HotelBookingRequest" : "BookingRequest",
+          processedBy: userId,
+          status: "completed",
+        }],
+        { session }
+      );
+    } else if (corporate.classification === "postpaid") {
+      // 1. Create Ledger Transaction for Postpaid
+      await Ledger.create(
+        [{
+          corporateId,
+          type: "service_fee_deduction",
+          amount: feeAmount,
+          description: `Service fee for ${payload.productType} ${payload.operation} (${payload.tripType})`,
+          operationType: `${payload.productType}-${payload.operation}`,
+          reference: orderId,
+          bookingId: bookingId,
+          bookingModel: payload.productType === "Hotel" ? "HotelBookingRequest" : "BookingRequest",
+          processedBy: userId,
+          status: "billed",
+        }],
+        { session }
+      );
+    }
   }
 
   // 2. Create Service Fee Ledger

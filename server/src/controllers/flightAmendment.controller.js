@@ -78,7 +78,7 @@ const getTboBookingId = (booking) => getAllTboBookingIds(booking)[0] || null;
    🔎 HELPER: FETCH TICKET IDS FROM TBO IF MISSING
 ====================================================== */
 const tboService = require("../services/tektravels/flight.service");
-const CancellationQuery = require("../models/CancellationQuery");
+
 
 const fetchTicketIdsFromTbo = async (pnr) => {
   if (!pnr) return [];
@@ -347,6 +347,33 @@ else {
       console.error("Failed to deduct service fee for cancellation:", err.message);
     }
 
+    try {
+      const User = require("../models/User");
+      const { sendNotification } = require("../services/notificationDispatcher.service");
+      const emailService = require("../services/email.service");
+      const employee = await User.findById(booking.userId);
+      if (employee) {
+        sendNotification({
+          recipient: booking.userId,
+          recipientRole: "employee",
+          title: "Flight Full Cancellation Initiated",
+          message: `Full cancellation has been initiated for flight booking ${booking.orderId || booking.bookingReference}.`,
+          type: "amendment_flight",
+          relatedId: booking._id,
+          corporateId: booking.corporateId
+        });
+        if (employee.email) {
+          emailService.sendEmail({
+            to: employee.email,
+            subject: "Flight Full Cancellation Initiated",
+            html: `<p>Dear ${employee.name?.firstName || "Employee"},</p><p>A full cancellation has been successfully initiated for your flight booking <b>${booking.orderId || booking.bookingReference}</b>.</p>`
+          }).catch(e=>console.error(e));
+        }
+      }
+    } catch(err) {
+      console.error("Notification Error:", err.message);
+    }
+
     return res.json({
       success: true,
       isRoundTrip: bookingIds.length > 1,
@@ -585,6 +612,33 @@ exports.partialCancellation = async (req, res) => {
       console.error("Failed to deduct service fee for partial cancellation:", err.message);
     }
 
+    try {
+      const User = require("../models/User");
+      const { sendNotification } = require("../services/notificationDispatcher.service");
+      const emailService = require("../services/email.service");
+      const employee = await User.findById(booking.userId);
+      if (employee) {
+        sendNotification({
+          recipient: booking.userId,
+          recipientRole: "employee",
+          title: "Flight Partial Cancellation Initiated",
+          message: `Partial cancellation has been initiated for flight booking ${booking.orderId || booking.bookingReference}.`,
+          type: "amendment_flight",
+          relatedId: booking._id,
+          corporateId: booking.corporateId
+        });
+        if (employee.email) {
+          emailService.sendEmail({
+            to: employee.email,
+            subject: "Flight Partial Cancellation Initiated",
+            html: `<p>Dear ${employee.name?.firstName || "Employee"},</p><p>A partial cancellation has been successfully initiated for your flight booking <b>${booking.orderId || booking.bookingReference}</b>.</p>`
+          }).catch(e=>console.error(e));
+        }
+      }
+    } catch(err) {
+      console.error("Notification Error:", err.message);
+    }
+
     return res.json(result);
   } catch (error) {
     console.error("Partial Cancellation Error:", error.message);
@@ -682,6 +736,33 @@ exports.amendBooking = async (req, res) => {
       );
     } catch(err) {
       console.error("Failed to deduct service fee for Re-Issue:", err.message);
+    }
+
+    try {
+      const User = require("../models/User");
+      const { sendNotification } = require("../services/notificationDispatcher.service");
+      const emailService = require("../services/email.service");
+      const employee = await User.findById(booking.userId);
+      if (employee) {
+        sendNotification({
+          recipient: booking.userId,
+          recipientRole: "employee",
+          title: "Flight Reissue Initiated",
+          message: `A reissue/amendment has been initiated for flight booking ${booking.orderId || booking.bookingReference}.`,
+          type: "amendment_flight",
+          relatedId: booking._id,
+          corporateId: booking.corporateId
+        });
+        if (employee.email) {
+          emailService.sendEmail({
+            to: employee.email,
+            subject: "Flight Reissue Initiated",
+            html: `<p>Dear ${employee.name?.firstName || "Employee"},</p><p>A reissue/amendment has been successfully initiated for your flight booking <b>${booking.orderId || booking.bookingReference}</b>.</p>`
+          }).catch(e=>console.error(e));
+        }
+      }
+    } catch(err) {
+      console.error("Notification Error:", err.message);
     }
 
     return res.json(result);
@@ -818,6 +899,7 @@ exports.createCancellationQuery = async (req, res) => {
       bookingId,
       bookingReference,
       remarks,
+      priority,
       segments,
       corporate,
       bookingSnapshot,
@@ -891,42 +973,93 @@ exports.createCancellationQuery = async (req, res) => {
     }
 
     /* ─────────────────────────────
-       🔥 GENERATE QUERY ID
+       🔥 UPDATE BOOKING REQUEST
     ───────────────────────────── */
-    const count = await CancellationQuery.countDocuments();
+    const booking = await BookingRequest.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
 
-    const queryId = `CQ-${new Date().getFullYear()}-${String(
-      count + 1,
-    ).padStart(5, "0")}`;
+    const queryId = `CQ-${new Date().getFullYear()}-${String(Math.floor(10000 + Math.random() * 90000))}`;
 
     /* ─────────────────────────────
-       🔥 CREATE QUERY
+       🔥 AUTO-ASSIGNMENT (Weighted Round-Robin)
     ───────────────────────────── */
-    const query = await CancellationQuery.create({
-      bookingId,
-      bookingReference,
-      queryId,
-      remarks,
+    const OpsMember = require("../models/OpsMember");
+    const eligibleMembers = await OpsMember.find({
+      status: "Active",
+      permissions: { $in: ["Cancellation Management"] },
+      autoAssignmentEnabled: true,
+      availabilityStatus: "AVAILABLE",
+      $expr: { $lt: ["$currentActiveAssignments", "$maxConcurrentAssignments"] }
+    }).sort({
+      currentWorkload: 1, // Sort by least workload first (weight)
+      lastAssignedAt: 1   // Tie-breaker: oldest assignment (round-robin)
+    }).limit(1);
 
-      passengers,
-      corporate,
-      bookingSnapshot,
-      segments,
+    const assignedMember = eligibleMembers[0];
+    
+    const updateSet = {
+      executionStatus: "cancel_requested",
+      "amendment.type": "OFFLINE_CANCELLATION",
+      "amendment.status": "requested",
+      "amendment.overallStatus": "pending",
+      "amendment.changeRequestId": queryId,
+      "amendment.priority": String(priority || "high").toLowerCase(),
+      "amendment.requesterComments": remarks,
+      "amendment.actionPayload": {
+        passengers,
+        corporate,
+        bookingSnapshot,
+        segments,
+      }
+    };
 
-      user: {
-        id: req.user?._id,
-        name: req.user?.name,
-        email: req.user?.email,
-      },
+    const newLogs = [{
+      type: "OFFLINE_CANCELLATION",
+      changeRequestId: queryId,
+      status: "requested",
+      createdAt: new Date(),
+    }];
 
-      logs: [
-        {
-          action: "CREATED",
-          by: "USER",
-          message: "Cancellation query created",
+    if (assignedMember) {
+      updateSet["amendment.assignedTo"] = assignedMember._id;
+      updateSet["amendment.assignedAt"] = new Date();
+
+      newLogs.push({
+        type: "ASSIGNMENT",
+        status: "ASSIGNED",
+        response: {
+          action: `Query Auto-Assigned to ${assignedMember.name}`,
+          message: `System assigned to ${assignedMember.name} (${assignedMember.role})`,
+          by: "System",
         },
-      ],
-    });
+        createdAt: new Date(),
+      });
+
+      // Update the Ops Member stats
+      await OpsMember.findByIdAndUpdate(assignedMember._id, {
+        $inc: { 
+          currentActiveAssignments: 1,
+          currentWorkload: 10 // cancellation weight
+        },
+        $set: {
+          lastAssignedAt: new Date(),
+          lastAssignmentType: "CANCELLATION"
+        }
+      });
+    }
+
+    const updatedBooking = await BookingRequest.findByIdAndUpdate(
+      bookingId,
+      {
+        $set: updateSet,
+        $push: {
+          amendmentHistory: { $each: newLogs }
+        }
+      },
+      { new: true }
+    );
 
     /* ─────────────────────────────
        ✅ SUCCESS RESPONSE
@@ -934,7 +1067,7 @@ exports.createCancellationQuery = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Cancellation query created successfully",
-      data: query,
+      data: updatedBooking,
     });
   } catch (error) {
     console.error("❌ createCancellationQuery:", error);

@@ -1259,15 +1259,54 @@ function BookingHistory({ booking }) {
       icon: <FiTag size={14} />,
       active: isTicketed,
     },
-    {
-      label: "Cancellation",
-      date: booking.cancelledAt || (isCancelled ? booking.updatedAt : null),
-      desc: isCancelled ? "Booking has been cancelled" : "No cancellation requested",
-      icon: <FiXCircle size={14} />,
-      active: isCancelled,
-      isLast: true,
-    },
+    // We will dynamically add Cancellation and Cancellation Requested steps
   ];
+
+  const isAmendmentCancellation = booking.amendment && ["fullCancellation", "partialCancellation", "OFFLINE_CANCELLATION"].includes(booking.amendment.type);
+  const isOfflineCancelReq = booking.executionStatus === "cancel_requested" || booking.queryType === "OFFLINE_CANCELLATION";
+  
+  const isCancellationCompleted = ["cancelled", "failed"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation || (isAmendmentCancellation && ["completed", "RESOLVED"].includes(booking.amendment.status));
+
+  let requestedDate = booking.amendment?.requestedAt || booking.updatedAt;
+  let resolvedDate = booking.cancelledAt || booking.cancellation?.cancelledAt || booking.amendment?.response?.resolvedAt || booking.amendment?.raw?.resolvedAt || booking.amendment?.updatedAt || booking.updatedAt;
+
+  if (booking.amendmentHistory && Array.isArray(booking.amendmentHistory)) {
+    const reqHistory = booking.amendmentHistory.find(h => h.status === 'requested' && h.type === 'OFFLINE_CANCELLATION');
+    if (reqHistory) requestedDate = reqHistory.createdAt;
+    
+    const resHistory = booking.amendmentHistory.find(h => h.status === 'RESOLVED' && h.type === 'OFFLINE_CANCELLATION');
+    if (resHistory) resolvedDate = resHistory.createdAt;
+  }
+
+  if (isAmendmentCancellation || isOfflineCancelReq) {
+    steps.push({
+      label: "Cancellation Requested",
+      date: requestedDate,
+      desc: `Cancellation request submitted. ${booking.amendment?.remarks ? `Reason: ${booking.amendment.remarks}` : ""}`,
+      icon: <FiClock size={14} />,
+      active: true,
+    });
+  }
+
+  if (isCancellationCompleted) {
+    steps.push({
+      label: "Cancelled",
+      date: resolvedDate,
+      desc: `Booking has been cancelled. ${booking.cancellation?.reason || booking.amendment?.response?.message ? `Reason: ${booking.cancellation?.reason || booking.amendment?.response?.message}` : ""}`,
+      icon: <FiXCircle size={14} />,
+      active: true,
+      isLast: true,
+    });
+  } else if (!isAmendmentCancellation && !isOfflineCancelReq) {
+    steps.push({
+      label: "Cancellation",
+      date: null,
+      desc: "No cancellation executed",
+      icon: <FiXCircle size={14} />,
+      active: false,
+      isLast: true,
+    });
+  }
 
   const hasOnlineReissue = 
     (booking.amendment && booking.amendment.type === "AMENDMENT") ||
@@ -1393,8 +1432,10 @@ export default function FlightBookingDetails() {
 
   const isOnlineReissue = booking?.amendment?.type === "AMENDMENT";
   const isAmendmentPending = bookingAmendmentStatus === "requested" || bookingAmendmentStatus === "in_progress";
-  const isReissued = booking?.executionStatus?.toLowerCase() === "reissued" || (bookingAmendmentStatus === "completed" && (!isCancelled || isOnlineReissue));
-  const isReissuePending = isAmendmentPending && (!isCancelled || isOnlineReissue);
+  const isAmendmentCancellationRequest = ["fullCancellation", "partialCancellation"].includes(booking?.amendment?.type);
+  
+  const isReissued = booking?.executionStatus?.toLowerCase() === "reissued" || (bookingAmendmentStatus === "completed" && (!isCancelled || isOnlineReissue) && !isAmendmentCancellationRequest);
+  const isReissuePending = isAmendmentPending && (!isCancelled || isOnlineReissue) && !isAmendmentCancellationRequest;
   const hasReissue = isReissued || isReissuePending || isOnlineReissue;
 
   useEffect(() => {
@@ -2025,22 +2066,34 @@ export default function FlightBookingDetails() {
                   });
                 } else {
                   const info = raw?.Response?.TicketCRInfo?.[0];
-                  totalRefund = Number(
-                    info?.RefundedAmount || booking.amendment?.refundedAmount || 0,
-                  );
-                  totalCharge = Number(
-                    info?.CancellationCharge ||
-                      booking.amendment?.cancellationCharge ||
-                      0,
-                  );
-                  if (info?.CreditNoteNo) creditNotes.push(info.CreditNoteNo);
-                  if (info?.Remarks) providerRemarks.push(info.Remarks);
+                  
+                  const refAmt = raw?.refundAmount ?? info?.RefundedAmount ?? booking.amendment?.refundedAmount ?? booking.cancellation?.refundAmount ?? booking.refundAmount;
+                  totalRefund = refAmt != null && refAmt !== "" ? Number(refAmt) : null;
+
+                  const chgAmt = raw?.cancellationCharge ?? info?.CancellationCharge ?? booking.amendment?.cancellationCharge ?? booking.cancellation?.cancellationCharge ?? booking.cancellationCharge;
+                  totalCharge = chgAmt != null && chgAmt !== "" ? Number(chgAmt) : null;
+
+                  if (info?.CreditNoteNo) {
+                    creditNotes.push(info.CreditNoteNo);
+                  } else if (raw?.creditNoteNo && raw?.creditNoteNo !== "—") {
+                    creditNotes.push(raw.creditNoteNo);
+                  }
+                  
+                  if (info?.Remarks) {
+                    providerRemarks.push(info.Remarks);
+                  } else if (raw?.message && raw?.message !== "Successful") {
+                    providerRemarks.push(raw.message);
+                  }
                 }
 
                 const displayRefund =
-                  totalRefund || booking.amendment?.refundedAmount || "—";
+                  (totalRefund !== null && totalRefund !== undefined && !isNaN(totalRefund)) 
+                    ? totalRefund 
+                    : "—";
                 const displayCharge =
-                  totalCharge || booking.amendment?.cancellationCharge || "—";
+                  (totalCharge !== null && totalCharge !== undefined && !isNaN(totalCharge)) 
+                    ? totalCharge 
+                    : "—";
                 const displayCreditNote =
                   creditNotes.length > 0 ? creditNotes.join(", ") : "—";
                 const displayRemarks =
@@ -2048,7 +2101,7 @@ export default function FlightBookingDetails() {
                     ? providerRemarks.join(" | ")
                     : Array.isArray(raw)
                       ? "Successful"
-                      : "";
+                      : (booking.cancellation?.opsRemark || booking.amendment?.response?.message || booking.amendment?.raw?.message || "");
 
                 return (
                   <div className="space-y-6">
@@ -2590,6 +2643,7 @@ function CancellationModal({ booking, onClose, onSuccess }) {
 
       const payload = {
         bookingId: booking._id,
+        bookingReference: booking.bookingReference || booking.orderId,
         orderId: booking.orderId || booking.bookingReference,
         priority: queryPriority,
         remarks: queryRemarks || "User requested cancellation but charges API failed",
@@ -2652,23 +2706,27 @@ function CancellationModal({ booking, onClose, onSuccess }) {
     }
   };
 
+  if (step === "reissue") {
+    return <ReissueModal booking={booking} onClose={onClose} />;
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={step !== "processing" ? onClose : undefined}
       />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <span className="bg-red-50 rounded-xl p-2">
-              <FiXCircle size={16} className="text-red-500" />
+      <div className="relative bg-white border border-[#EAE4D9] w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between px-8 py-6 border-b border-[#EAE4D9]">
+          <div className="flex items-center gap-4">
+            <span className="bg-[#FDF1EE] border border-[#F0C4BA] p-2">
+              <FiXCircle size={18} className="text-[#B5341A]" />
             </span>
             <div>
-              <h2 className="text-base font-black text-slate-900">
+              <p className="text-[12px] font-semibold tracking-[0.15em] uppercase text-[#1A1714]">
                 {step === "reissue" ? "Reissue Flight" : "Cancellation"}
-              </h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
+              </p>
+              <p className="text-[10px] text-[#A89F94] mt-1 uppercase tracking-widest font-mono">
                 Order ID · {booking.orderId || booking.bookingReference}
               </p>
             </div>
@@ -2676,46 +2734,48 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           {step !== "processing" && (
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition"
+              className="text-[#A89F94] hover:text-[#1A1714] transition"
             >
-              <FiX size={15} className="text-slate-500" />
+              <FiX size={20} />
             </button>
           )}
         </div>
 
-        <div className="px-6 py-5">
+        <div className="p-8">
           {step === "loading" && (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-red-400 animate-spin" />
-              <p className="text-sm text-slate-400 font-medium">
-                Fetching cancellation charges…
+            <div className="flex flex-col items-center gap-4 py-12">
+              <div className="w-8 h-8 border-2 border-[#EAE4D9] border-t-[#B5862A] rounded-full animate-spin" />
+              <p className="text-[10px] font-bold text-[#A89F94] uppercase tracking-widest">
+                Fetching real-time charges…
               </p>
             </div>
           )}
 
           {step === "processing" && (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <div className="w-10 h-10 rounded-full border-[3px] border-slate-200 border-t-indigo-400 animate-spin" />
-              <p className="text-sm text-slate-500 font-medium text-center">
+            <div className="flex flex-col items-center gap-4 py-12">
+              <div className="w-8 h-8 border-2 border-[#EAE4D9] border-t-[#2C7A4B] rounded-full animate-spin" />
+              <p className="text-[10px] font-bold text-[#1A1714] uppercase tracking-widest">
                 {processingLabel}
               </p>
-              <p className="text-xs text-slate-400">Please do not close this window</p>
+              <p className="text-[10px] text-[#A89F94] italic">
+                Please do not close this window
+              </p>
             </div>
           )}
 
           {step === "error" && (
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
-                <FiAlertTriangle size={24} className="text-red-400" />
+            <div className="flex flex-col items-center gap-4 py-10 text-center">
+              <div className="w-12 h-12 bg-[#FDF1EE] border border-[#F0C4BA] flex items-center justify-center">
+                <FiAlertTriangle size={24} className="text-[#B5341A]" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-800 mb-1">Something went wrong</p>
-                <p className="text-xs text-slate-400">{chargesError}</p>
+                <p className="text-[12px] font-bold text-[#B5341A] tracking-wider uppercase mb-2">Error Processing Request</p>
+                <p className="text-[11px] text-[#A89F94]">{chargesError}</p>
               </div>
-              <div className="flex gap-2 mt-2">
+              <div className="mt-4">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+                  className="px-6 py-2 border border-[#EAE4D9] text-[11px] font-bold text-[#1A1714] uppercase tracking-widest hover:bg-[#FAF8F4] transition"
                 >
                   Close
                 </button>
@@ -2724,59 +2784,60 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           )}
 
           {step === "charges" && (
-            <div className="space-y-5">
-              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
+            <div className="space-y-6">
+              <div className="bg-[#FAF8F4] border border-[#EAE4D9] p-6 space-y-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1714] flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-slate-400" />
                   Cancellation Charges
                 </p>
                 {cancellationCharge != null ? (
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-amber-800 font-medium">Airline Fee</span>
-                    <span className="text-lg font-black text-amber-900">₹{cancellationCharge}</span>
+                    <span className="text-[9px] text-[#A89F94] font-bold uppercase tracking-widest">Airline Fee</span>
+                    <span className="text-[14px] font-semibold text-[#B5341A]">₹{cancellationCharge}</span>
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-600 italic">Fetching real-time charges from airline...</p>
+                  <p className="text-[10px] text-[#B5862A] italic">Fetching real-time charges from airline...</p>
                 )}
                 {refundedAmount != null && (
-                  <div className="flex justify-between items-center pt-2 border-t border-amber-200">
-                    <span className="text-sm text-amber-800 font-medium">Estimated Refund</span>
-                    <span className="text-lg font-black text-emerald-700">₹{refundedAmount}</span>
+                  <div className="flex justify-between items-center pt-3 border-t border-[#EAE4D9]">
+                    <span className="text-[9px] text-[#A89F94] font-bold uppercase tracking-widest">Estimated Refund</span>
+                    <span className="text-[14px] font-semibold text-[#2C7A4B]">₹{refundedAmount}</span>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Action</p>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-4">
+                <p className="text-[9px] font-bold text-[#A89F94] uppercase tracking-widest">Select Action</p>
+                <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => setStep("full-confirm")}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-red-100 bg-red-50/50 hover:bg-red-50 transition"
+                    className="flex flex-col items-center gap-3 p-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] hover:border-[#B5341A] transition group"
                   >
-                    <FiXCircle className="text-red-500" size={20} />
-                    <span className="text-xs font-bold text-red-700">Full Cancel</span>
+                    <FiXCircle className="text-[#A89F94] group-hover:text-[#B5341A]" size={20} />
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-[#1A1714]">Full Cancel</span>
                   </button>
                   {hasReturn && (
                     <button
                       onClick={() => setStep("partial-select")}
-                      className="flex flex-col items-center gap-2 p-4 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-amber-50 transition"
+                      className="flex flex-col items-center gap-3 p-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] hover:border-[#B5862A] transition group"
                     >
-                      <FiAlertCircle className="text-amber-500" size={20} />
-                      <span className="text-xs font-bold text-amber-700">Partial Cancel</span>
+                      <FiAlertCircle className="text-[#A89F94] group-hover:text-[#B5862A]" size={20} />
+                      <span className="text-[10px] font-bold tracking-widest uppercase text-[#1A1714]">Partial Cancel</span>
                     </button>
                   )}
                   <button
                     onClick={() => setStep("reissue")}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 hover:bg-indigo-50 transition"
+                    className="flex flex-col items-center gap-3 p-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] hover:border-[#2C7A4B] transition group"
                   >
-                    <FiRefreshCw className="text-indigo-500" size={20} />
-                    <span className="text-xs font-bold text-indigo-700">Reissue</span>
+                    <FiRefreshCw className="text-[#A89F94] group-hover:text-[#2C7A4B]" size={20} />
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-[#1A1714]">Reissue</span>
                   </button>
                   <button
                     onClick={() => setShowQueryModal(true)}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition"
+                    className="flex flex-col items-center gap-3 p-6 border border-[#EAE4D9] hover:bg-[#FAF8F4] hover:border-[#1A1714] transition group"
                   >
-                    <FiMessageSquare className="text-slate-500" size={20} />
-                    <span className="text-xs font-bold text-slate-700">Raise Query</span>
+                    <FiMessageSquare className="text-[#A89F94] group-hover:text-[#1A1714]" size={20} />
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-[#1A1714]">Raise Query</span>
                   </button>
                 </div>
               </div>
@@ -2784,29 +2845,29 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           )}
 
           {step === "full-confirm" && (
-            <div className="space-y-4">
-              <div className="p-4 bg-red-50 rounded-xl border border-red-100">
-                <p className="text-sm text-red-700 font-medium">
+            <div className="space-y-6">
+              <div className="p-4 bg-[#FDF1EE] border border-[#F0C4BA]">
+                <p className="text-[12px] text-[#B5341A] font-semibold">
                   Are you sure you want to cancel the entire booking? This action cannot be undone.
                 </p>
               </div>
               <textarea
                 placeholder="Remarks (optional)..."
-                className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500"
+                className="w-full p-4 border border-[#EAE4D9] bg-white text-[12px] outline-none focus:border-[#B5862A] transition"
                 rows={3}
                 value={remarksText}
                 onChange={(e) => setRemarksText(e.target.value)}
               />
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   onClick={() => setStep("charges")}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl"
+                  className="flex-1 py-3 border border-[#EAE4D9] text-[#1A1714] font-semibold text-[11px] tracking-widest uppercase hover:bg-[#FAF8F4] transition"
                 >
                   Back
                 </button>
                 <button
                   onClick={handleFullCancel}
-                  className="flex-1 py-3 bg-red-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-red-200"
+                  className="flex-1 py-3 bg-[#B5341A] text-white font-semibold text-[11px] tracking-widest uppercase hover:bg-[#8A2510] transition"
                 >
                   Confirm Full Cancel
                 </button>
@@ -2815,38 +2876,38 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           )}
 
           {step === "partial-select" && (
-            <div className="space-y-4">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Select Journey to Cancel</p>
-              <div className="grid gap-3">
-                <label className={`relative flex items-center justify-between p-4 rounded-xl border cursor-pointer transition ${selectedJourney === "onward" ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:bg-slate-50"}`}>
+            <div className="space-y-6">
+              <p className="text-[9px] font-bold text-[#A89F94] uppercase tracking-widest">Select Journey to Cancel</p>
+              <div className="grid gap-4">
+                <label className={`relative flex items-center justify-between p-4 border cursor-pointer transition ${selectedJourney === "onward" ? "border-[#B5862A] bg-[#FAF8F4]" : "border-[#EAE4D9] hover:bg-[#FAF8F4]"}`}>
                   <input
                     type="radio"
                     name="pj"
                     className="absolute opacity-0"
                     onChange={() => setSelectedJourney("onward")}
                   />
-                  <span className="text-sm font-bold text-slate-700">Onward: {sectorLabel(onwardSegs)}</span>
-                  {selectedJourney === "onward" && <FiCheckCircle className="text-amber-500" />}
+                  <span className="text-[12px] font-semibold text-[#1A1714]">Onward: {sectorLabel(onwardSegs)}</span>
+                  {selectedJourney === "onward" && <FiCheckCircle className="text-[#B5862A]" />}
                 </label>
                 {hasReturn && (
-                  <label className={`relative flex items-center justify-between p-4 rounded-xl border cursor-pointer transition ${selectedJourney === "return" ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:bg-slate-50"}`}>
+                  <label className={`relative flex items-center justify-between p-4 border cursor-pointer transition ${selectedJourney === "return" ? "border-[#B5862A] bg-[#FAF8F4]" : "border-[#EAE4D9] hover:bg-[#FAF8F4]"}`}>
                     <input
                       type="radio"
                       name="pj"
                       className="absolute opacity-0"
                       onChange={() => setSelectedJourney("return")}
                     />
-                    <span className="text-sm font-bold text-slate-700">Return: {sectorLabel(returnSegs)}</span>
-                    {selectedJourney === "return" && <FiCheckCircle className="text-amber-500" />}
+                    <span className="text-[12px] font-semibold text-[#1A1714]">Return: {sectorLabel(returnSegs)}</span>
+                    {selectedJourney === "return" && <FiCheckCircle className="text-[#B5862A]" />}
                   </label>
                 )}
               </div>
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => setStep("charges")} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl">Back</button>
+              <div className="flex gap-4 mt-6">
+                <button onClick={() => setStep("charges")} className="flex-1 py-3 border border-[#EAE4D9] text-[#1A1714] font-semibold text-[11px] tracking-widest uppercase hover:bg-[#FAF8F4] transition">Back</button>
                 <button
                   disabled={!selectedJourney}
                   onClick={() => setStep("partial-confirm")}
-                  className="flex-1 py-3 bg-amber-500 text-white font-bold text-sm rounded-xl disabled:opacity-50"
+                  className="flex-1 py-3 bg-[#1A1714] text-white font-semibold text-[11px] tracking-widest uppercase hover:bg-[#333] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue
                 </button>
@@ -2855,103 +2916,64 @@ function CancellationModal({ booking, onClose, onSuccess }) {
           )}
 
           {step === "partial-confirm" && (
-            <div className="space-y-4">
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <p className="text-sm text-amber-700 font-medium">
+            <div className="space-y-6">
+              <div className="p-4 bg-[#FAF8F4] border border-[#EAE4D9]">
+                <p className="text-[12px] text-[#1A1714] font-semibold">
                   Confirm cancellation for {selectedJourney} journey ({selectedJourney === "onward" ? sectorLabel(onwardSegs) : sectorLabel(returnSegs)}).
                 </p>
               </div>
               <textarea
                 placeholder="Remarks (optional)..."
-                className="w-full p-3 border border-slate-200 rounded-xl text-sm"
+                className="w-full p-4 border border-[#EAE4D9] bg-white text-[12px] outline-none focus:border-[#B5862A] transition"
                 rows={3}
                 value={remarksText}
                 onChange={(e) => setRemarksText(e.target.value)}
               />
-              <div className="flex gap-3">
-                <button onClick={() => setStep("partial-select")} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl">Back</button>
-                <button onClick={handlePartialCancel} className="flex-1 py-3 bg-amber-500 text-white font-bold text-sm rounded-xl">Confirm Partial Cancel</button>
+              <div className="flex gap-4">
+                <button onClick={() => setStep("partial-select")} className="flex-1 py-3 border border-[#EAE4D9] text-[#1A1714] font-semibold text-[11px] tracking-widest uppercase hover:bg-[#FAF8F4] transition">Back</button>
+                <button onClick={handlePartialCancel} className="flex-1 py-3 bg-[#B5341A] text-white font-semibold text-[11px] tracking-widest uppercase hover:bg-[#8A2510] transition">Confirm Partial Cancel</button>
               </div>
             </div>
           )}
 
-          {step === "reissue" && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">New Travel Date</p>
-                <input
-                  type="date"
-                  className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                  value={reissueDate}
-                  min={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setReissueDate(e.target.value)}
-                />
-              </div>
-              {hasReturn && (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">New Return Date</p>
-                  <input
-                    type="date"
-                    className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                    value={returnReissueDate}
-                    min={reissueDate || new Date().toISOString().split("T")[0]}
-                    onChange={(e) => setReturnReissueDate(e.target.value)}
-                  />
-                </div>
-              )}
-              <textarea
-                placeholder="Reason for reissue..."
-                className="w-full p-3 border border-slate-200 rounded-xl text-sm"
-                rows={3}
-                value={remarksText}
-                onChange={(e) => setRemarksText(e.target.value)}
-              />
-              <div className="flex gap-3">
-                <button onClick={() => setStep("charges")} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl">Back</button>
-                <button
-                  disabled={!reissueDate || (hasReturn && !returnReissueDate)}
-                  onClick={handleReissue}
-                  className="flex-1 py-3 bg-indigo-500 text-white font-bold text-sm rounded-xl disabled:opacity-50"
-                >
-                  Submit Reissue
-                </button>
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
 
       {showQueryModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowQueryModal(false)} />
-          <div className="relative bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl">
-            <h2 className="text-2xl font-black text-slate-900 mb-2">Raise Support Query</h2>
-            <p className="text-sm text-slate-500 mb-8">Our support team will manually process your cancellation request.</p>
-            <div className="mb-6">
-              <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Priority</p>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowQueryModal(false)} />
+          <div className="relative bg-white border border-[#EAE4D9] w-full max-w-md shadow-2xl p-8">
+            <h2 className="text-[16px] font-semibold text-[#1A1714] mb-2 font-serif">Raise Support Query</h2>
+            <p className="text-[12px] text-[#A89F94] mb-8">Our support team will manually process your request.</p>
+            
+            <div className="mb-6 space-y-2">
+              <p className="text-[9px] font-bold text-[#A89F94] uppercase tracking-widest">Priority</p>
               <select
                 value={queryPriority}
                 onChange={(e) => setQueryPriority(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold"
+                className="w-full p-4 border border-[#EAE4D9] bg-white text-[12px] outline-none focus:border-[#B5862A] transition"
               >
                 <option value="LOW">Low</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>
               </select>
             </div>
-            <div className="mb-8">
-              <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Remarks</p>
+            
+            <div className="mb-8 space-y-2">
+              <p className="text-[9px] font-bold text-[#A89F94] uppercase tracking-widest">Remarks</p>
               <textarea
                 rows={4}
                 value={queryRemarks}
                 onChange={(e) => setQueryRemarks(e.target.value)}
                 placeholder="Describe your request details..."
-                className="w-full border border-slate-200 rounded-xl p-4 text-sm"
+                className="w-full p-4 border border-[#EAE4D9] bg-white text-[12px] outline-none focus:border-[#B5862A] transition"
               />
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowQueryModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl">Cancel</button>
-              <button onClick={handleRaiseQuery} className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl shadow-slate-200">Submit Request</button>
+            
+            <div className="flex gap-4">
+              <button onClick={() => setShowQueryModal(false)} className="flex-1 py-3 border border-[#EAE4D9] text-[#1A1714] font-semibold text-[11px] tracking-widest uppercase hover:bg-[#FAF8F4] transition">Cancel</button>
+              <button onClick={handleRaiseQuery} className="flex-1 py-3 bg-[#1A1714] text-white font-semibold text-[11px] tracking-widest uppercase hover:bg-[#333] transition">Submit Request</button>
             </div>
           </div>
         </div>

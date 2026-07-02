@@ -141,28 +141,8 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
   if (!travellers?.length)
     throw new ApiError(400, "At least one guest required");
 
-  // ── SERVICE FEE CALCULATION ──
-  const b = req.body;
-  const cCode = (b.CountryCode || b.countryCode || b.country || b.CountryName || b.countryName || hotelRequest?.countryCode || hotelRequest?.selectedHotel?.country || hotelRequest?.preBookResponse?.HotelResult?.[0]?.CountryCode || hotelRequest?.hotelDetails?.CountryCode || hotelRequest?.hotelDetails?.CountryName || "in").toLowerCase();
-  const isDomesticHotel = ["in", "ind", "india"].includes(cCode);
-  const sRating = b.StarRating || b.starRating || hotelRequest?.selectedHotel?.starRating || hotelRequest?.selectedHotel?.StarRating || hotelRequest?.preBookResponse?.HotelResult?.[0]?.StarRating || hotelRequest?.starRating || hotelRequest?.hotelDetails?.StarRating || 1; // Default to 1 if unknown, though better to pass it.
-
-  const serviceFeePayload = {
-    productType: "Hotel",
-    operation: "Book",
-    tripType: isDomesticHotel ? "Domestic" : "International",
-    starRating: Number(sRating),
-    roomCount: hotelRequest?.noOfRooms || hotelRequest?.roomGuests?.length || hotelRequest?.roomDetails?.length || 1,
-    baseFare: Number(pricingSnapshot?.totalAmount || 0)
-  };
-
-  const serviceFeeDetails = serviceFeeService.calculateServiceFee(corporate, serviceFeePayload);
-  let totalServiceFee = 0;
-  if (serviceFeeDetails && serviceFeeDetails.feeAmount > 0) {
-    totalServiceFee = serviceFeeDetails.feeAmount;
-    pricingSnapshot.totalAmount = Number(pricingSnapshot.totalAmount || 0) + totalServiceFee;
-    pricingSnapshot.serviceFeeDetails = serviceFeeDetails;
-  }
+  /* ================= NO SERVICE FEE AT REQUEST CREATION ================= */
+  // Service fee will be calculated and deducted only when the hotel is actually booked
 
   // ── BALANCE CHECK START ──
   const env = process.env.TBO_ENV || "live";
@@ -345,10 +325,11 @@ exports.instantHotelBooking = asyncHandler(async (req, res) => {
     projectName,
     projectId,
     projectClient,
-    approverId,
-    approverEmail,
-    approverName: finalApproverName,
-    approverRole,
+    approverId: isAutoApproveIntent ? undefined : approverId,
+    approverEmail: isAutoApproveIntent ? undefined : approverEmail,
+    approverName: isAutoApproveIntent ? undefined : finalApproverName,
+    approverRole: isAutoApproveIntent ? undefined : approverRole,
+    isAutoApproval: isAutoApproveIntent ? true : false,
     approvedAt: finalApprovedAt,
     requesterDetails,
     gstDetails: {
@@ -876,10 +857,11 @@ exports.createHotelBookingRequest = asyncHandler(async (req, res) => {
     projectName,
     projectId,
     projectClient,
-    approverId,
-    approverEmail,
-    approverName: finalApproverName,
-    approverRole,
+    approverId: isAutoApproveIntent ? undefined : approverId,
+    approverEmail: isAutoApproveIntent ? undefined : approverEmail,
+    approverName: isAutoApproveIntent ? undefined : finalApproverName,
+    approverRole: isAutoApproveIntent ? undefined : approverRole,
+    isAutoApproval: isAutoApproveIntent ? true : false,
     approvedAt: finalApprovedAt,
     requesterDetails,
 
@@ -1092,7 +1074,16 @@ exports.executeApprovedHotelBooking = asyncHandler(async (req, res) => {
 
   const env = process.env.TBO_ENV || "live";
   // const env = "dummy";
-  const requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+  let requiredAmount = Number(booking.pricingSnapshot?.totalAmount || 0);
+
+  // Ensure backward compatibility: if service fee was bundled, separate it now
+  if (booking.pricingSnapshot?.serviceFeeDetails?.feeAmount) {
+    const fee = booking.pricingSnapshot.serviceFeeDetails.feeAmount;
+    if (requiredAmount > fee) {
+      requiredAmount -= fee;
+      booking.pricingSnapshot.totalAmount = requiredAmount; // Prevent double deduction
+    }
+  }
 
   const { getAgencyBalance } = require("../services/tboBalance.service");
   const balance = await getAgencyBalance(env);

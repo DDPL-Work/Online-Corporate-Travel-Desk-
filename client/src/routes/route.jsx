@@ -68,6 +68,8 @@ import PastTripsForManager from "../components/CorporateManagerTabs/PastTrips";
 import BookingsDashboardForManager from "../components/CorporateManagerTabs/TotalBookings";
 import CancelledBookingsForManager from "../components/CorporateManagerTabs/CancelledBookings";
 import UpcomingTripsForManager from "../components/CorporateManagerTabs/UpcomingTrips";
+import PendingCancellationRequestsForManager from "../components/CorporateManagerTabs/PendingCancellationRequests";
+import PendingCancellationRequestsForAdmin from "../components/TravelAdminTabs/PendingCancellationRequests";
 import EmployeeManagement from "../components/TravelAdminTabs/EmployeeManagement";
 import MidSizeBusiness from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 import InternalTravelDeskLanding from "../Pages/Landing/CompanySpecific/InternalTravelDeskLanding";
@@ -90,6 +92,7 @@ import CompanyLandingPage from "../Pages/Landing/CompanySpecific/CompanyLandingP
 import BlogList from "../Pages/Landing/Blog/BlogList";
 import BlogDetails from "../Pages/Landing/Blog/BlogDetails";
 import Traveamer from "../Pages/Landing/Traveamer/Traveamer";
+import MyOfflineCancellationQueries from "../components/EmployeeDashboard/MyOfflineCancellationQueries";
 // import MidSizeLanding from "../Pages/Landing/WhoIt'sFor/MidSizeBusiness";
 
 const HomeRedirect = () => {
@@ -153,6 +156,7 @@ export const appRouter = createBrowserRouter([
                 element: <CancelledBookings />,
               },
               { path: "/pending-requests", element: <PendingTravelRequests /> },
+              { path: "/pending-cancellations", element: <PendingCancellationRequestsForAdmin /> },
               {
                 path: "/approved-requests",
                 element: <ApprovedTravelRequests />,
@@ -217,6 +221,10 @@ export const appRouter = createBrowserRouter([
                 element: <PendingTravelRequestsForManager />,
               },
               {
+                path: "/manager/pending-cancellations",
+                element: <PendingCancellationRequestsForManager />,
+              },
+              {
                 path: "/manager/approved-requests",
                 element: <ApprovedTravelRequestsForManager />,
               },
@@ -277,7 +285,7 @@ export const appRouter = createBrowserRouter([
               { path: "/my-reissue/:id", element: <LegacyReissueDetailPage /> },
               {
                 path: "/my-offline-cancellations",
-                element: <OfflineCancellationQueries />,
+                element: <MyOfflineCancellationQueries />,
               },
               { path: "/my-upcoming-trips", element: <MyUpcomingTrips /> },
               { path: "/my-past-trips", element: <MyPastTrips /> },

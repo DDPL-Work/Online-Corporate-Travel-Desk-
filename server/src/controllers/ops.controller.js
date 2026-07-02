@@ -213,17 +213,13 @@ exports.updateOpsStatus = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, member, `OPS team member is now ${status}`));
 });
 
-// @desc    Delete OPS member (Soft Delete)
+// @desc    Delete OPS member (Hard Delete)
 // @route   DELETE /ops/delete/:id
 // @access  Super Admin
 exports.deleteOpsMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const member = await OpsMember.findByIdAndUpdate(
-    id,
-    { isDeleted: true, status: "Inactive" },
-    { new: true }
-  );
+  const member = await OpsMember.findByIdAndDelete(id);
 
   if (!member) {
     throw new ApiError(404, "OPS team member not found");
@@ -231,7 +227,7 @@ exports.deleteOpsMember = asyncHandler(async (req, res) => {
 
   await cache.del(`user:ops-member:${member._id}`);
 
-  res.status(200).json(new ApiResponse(200, null, "OPS team member deleted successfully"));
+  res.status(200).json(new ApiResponse(200, null, "OPS team member permanently deleted successfully"));
 });
 
 // @desc    Reset OPS member password

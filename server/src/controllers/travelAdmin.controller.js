@@ -1137,3 +1137,64 @@ exports.getFinanceTeamMembers = async (req, res) => {
     });
   }
 };
+
+/**
+ * ============================================================
+ * ✈️ CANCELLATION QUERIES (CORPORATE WISE)
+ * ============================================================
+ */
+exports.getAllCorporateCancellationQueries = async (req, res) => {
+  try {
+    const corporateId = req.user?.corporateId;
+    if (!corporateId) {
+      return res.status(403).json(new ApiResponse(403, null, "Corporate ID missing."));
+    }
+
+    const { status, bookingReference, page = 1, limit = 50 } = req.query;
+
+    const query = {
+      "amendment.type": "OFFLINE_CANCELLATION",
+      "amendment.changeRequestId": { $exists: true, $ne: null },
+      corporateId
+    };
+
+    if (status) query["amendment.status"] = status;
+    if (bookingReference) {
+      query["bookingResult.pnr"] = { $regex: bookingReference, $options: "i" };
+    }
+
+    const queries = await BookingRequest.find(query)
+      .populate("userId", "name email")
+      .populate("corporateId", "corporateName")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .lean();
+
+    const formattedQueries = queries.map(q => ({
+      ...q,
+      queryId: q.amendment?.changeRequestId || q._id,
+      status: q.amendment?.status || "OPEN",
+      priority: q.amendment?.priority || "MEDIUM",
+      requestedAt: q.amendment?.requestedAt || q.createdAt,
+      reason: q.cancellation?.reason || q.amendment?.remarks || q.amendment?.requesterComments,
+      corporate: {
+        employeeName: q.userId?.name ? `${q.userId.name.firstName} ${q.userId.name.lastName}` : "Unknown",
+        employeeEmail: q.userId?.email,
+        employeeId: q.userId?._id
+      }
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Corporate cancellation queries fetched successfully",
+      data: formattedQueries
+    });
+  } catch (error) {
+    console.error("Error fetching corporate cancellation queries:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch corporate cancellation queries"
+    });
+  }
+};

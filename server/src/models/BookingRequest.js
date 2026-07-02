@@ -86,6 +86,7 @@ const bookingRequestSchema = new mongoose.Schema(
     approverEmail: String,
     approverName: String,
     approverRole: String,
+    isAutoApproval: Boolean,
 
     /* ================= REQUESTER DETAILS ================= */
     requesterDetails: {
@@ -365,7 +366,7 @@ const bookingRequestSchema = new mongoose.Schema(
 
     amendment: {
       type: {
-        type: String, // FULL_CANCEL / PARTIAL_CANCEL / AMENDMENT / RELEASE_PNR
+        type: String, // FULL_CANCEL / PARTIAL_CANCEL / AMENDMENT / RELEASE_PNR / REISSUE
       },
       changeRequestId: String,
       status: {
@@ -373,6 +374,38 @@ const bookingRequestSchema = new mongoose.Schema(
         default: null,
       },
       response: mongoose.Schema.Types.Mixed,
+      assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "OpsMember", index: true },
+      assignedAt: Date,
+      
+      
+      // Approval flow fields
+      actionPayload: mongoose.Schema.Types.Mixed,
+      managerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+      travelAdminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+      managerStatus: {
+        type: String,
+        enum: ["pending", "approved", "rejected", "not_required"],
+        default: "not_required",
+      },
+      adminStatus: {
+        type: String,
+        enum: ["pending", "approved", "rejected", "not_required"],
+        default: "not_required",
+      },
+      overallStatus: {
+        type: String,
+        enum: ["not_requested", "pending", "approved", "rejected", "completed", "failed"],
+        default: "not_requested",
+        index: true,
+      },
+      requesterComments: String,
+      managerComments: String,
+      adminComments: String,
+      priority: {
+        type: String,
+        enum: ["low", "medium", "high", "critical"],
+        default: "medium",
+      },
     },
 
     amendmentHistory: [

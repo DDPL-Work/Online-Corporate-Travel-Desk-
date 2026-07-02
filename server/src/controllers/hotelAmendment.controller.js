@@ -114,6 +114,33 @@ exports.amendHotelBooking = async (req, res) => {
       console.error("Failed to deduct service fee for Hotel Cancellation:", err.message);
     }
 
+    try {
+      const User = require("../models/User");
+      const { sendNotification } = require("../services/notificationDispatcher.service");
+      const emailService = require("../services/email.service");
+      const employee = await User.findById(booking.userId);
+      if (employee) {
+        sendNotification({
+          recipient: booking.userId,
+          recipientRole: "employee",
+          title: "Hotel Amendment Initiated",
+          message: `Hotel amendment/cancellation has been initiated for booking ${booking.orderId || booking.bookingReference}.`,
+          type: "amendment_hotel",
+          relatedId: booking._id,
+          corporateId: booking.corporateId
+        });
+        if (employee.email) {
+          emailService.sendEmail({
+            to: employee.email,
+            subject: "Hotel Amendment Initiated",
+            html: `<p>Dear ${employee.name?.firstName || "Employee"},</p><p>A hotel amendment/cancellation has been successfully initiated for your booking <b>${booking.orderId || booking.bookingReference}</b>.</p>`
+          }).catch(e=>console.error(e));
+        }
+      }
+    } catch(err) {
+      console.error("Notification Error:", err.message);
+    }
+
     res.json({
       success: true,
       message: "Amendment request sent successfully",

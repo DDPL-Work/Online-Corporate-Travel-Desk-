@@ -119,8 +119,8 @@ function HotelSearchResults() {
     filterMeta,
   } = useSelector((state) => state.hotel);
 
-  const initialPayloadRef = useRef(location.state?.searchPayload);
-  const searchPayload = reduxSearchPayload || initialPayloadRef.current;
+  const initialPayload = useMemo(() => location.state?.searchPayload, [location.state]);
+  const searchPayload = reduxSearchPayload || initialPayload;
 
   const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS }));
   const [searchText, setSearchText] = useState("");
@@ -156,7 +156,7 @@ function HotelSearchResults() {
     if (apiBase && apiBase.startsWith("http")) {
       try {
         API_URL = new URL(apiBase).origin;
-      } catch (e) {
+      } catch {
         console.warn("Invalid VITE_API_BASE_URL for socket parsing");
       }
     }
@@ -202,7 +202,7 @@ function HotelSearchResults() {
   }, [dispatch, searchId]); // Removed 'status' dependency so it doesn't prematurely disconnect
   // ---------------------------------
 
-  const availablePriceRange = filterMeta?.priceRange || { min: 0, max: 0 };
+
 
   const baseSearchPayload = useMemo(() => {
     if (!searchPayload) return null;
@@ -251,7 +251,6 @@ function HotelSearchResults() {
         : null;
 
       const nights = cheapestRoom?.DayRates?.[0]?.length || 1;
-      const noOfRooms = searchPayload?.NoOfRooms || 1;
       const finalPrice = cheapestRoom?.TotalFare || 0;
       const perNight = cheapestRoom?.DayRates?.[0]?.[0]?.BasePrice || 0;
       const inclusions =
@@ -386,7 +385,7 @@ function HotelSearchResults() {
   }, [hotels, traceId, searchText, filters, sortOrder, selectedLocation]);
 
   const isInitialLoading = (loading?.search || status === "processing") && (hotels?.length || 0) === 0;
-  const isLoadingMore = loading?.loadMore;
+
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">

@@ -302,7 +302,7 @@ class OpsAssignmentService {
   getModelForRequestType(requestType) {
     const modelMap = {
       reissue: require("../../../../models/FlightReissueRequest"),
-      cancellation: require("../../../../models/CancellationQuery"),
+      cancellation: require("../../../../models/BookingRequest"),
       // Add other models as needed
     };
 

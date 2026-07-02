@@ -13,6 +13,7 @@ import ReturnFlightList from "./ReturnFlight/ReturnFlightList";
 import { searchFlights } from "../../../Redux/Actions/flight.thunks";
 import { searchFlightsMC } from "../../../Redux/Actions/flight.thunks.MC";
 import SearchLoadingModal from "../../../components/common/SearchLoadingModal";
+import NoResultsFound from "../../../components/common/NoResultsFound";
 import ReturnInternationalFlightCard from "./ReturnFlight/ReturnInternationalFlightCard";
 import ResearchableFlightHeader from "./ResearchableFlightHeader";
 import Swal from "sweetalert2";
@@ -1092,8 +1093,8 @@ export default function FlightSearchResults() {
 
   if (!loading && flights.length === 0 && !location.state?.searchPayload) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500">
-        No flights available
+      <div className="min-h-screen flex flex-col mt-40">
+        <NoResultsFound title="No flights available" />
       </div>
     );
   }
@@ -1380,9 +1381,15 @@ export default function FlightSearchResults() {
 
           {/* RESULTS */}
           <section className={`lg:col-span-9 space-y-4 ${Number(journeyType) === 2 && !isInternationalReturnGrouped ? 'pb-32' : 'pb-10'}`}>
-            {!loading && noFlightsAfterFilters && (
-              <div className="bg-white p-6 rounded-lg text-center text-gray-500">
-                No flights match your filters
+            {!loading && flights.length === 0 && (
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <NoResultsFound title="No flights found for your search" />
+              </div>
+            )}
+
+            {!loading && flights.length > 0 && noFlightsAfterFilters && (
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <NoResultsFound title="No flights match your filters" />
               </div>
             )}
 

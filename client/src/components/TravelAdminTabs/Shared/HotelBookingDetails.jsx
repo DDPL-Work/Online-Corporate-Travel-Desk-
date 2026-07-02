@@ -134,19 +134,29 @@ function BookingHistory({ booking }) {
       icon: <FiTag size={14} />,
       active: isConfirmed,
     },
-    {
-      label: "Cancellation",
-      date: booking.cancelledAt || booking?.amendment?.requestedAt || (isCancelled ? booking.updatedAt : null),
-      desc: isCancelled ? (
-        <div>
-          <div>Booking has been cancelled</div>
-        </div>
-      ) : "No cancellation requested",
-      icon: <FiXCircle size={14} />,
-      active: isCancelled,
-      isLast: true,
-    },
+    // We will dynamically add Cancellation and Cancellation Requested steps
   ];
+
+  const isCancellationCompleted = ["cancelled", "failed"].includes((booking.executionStatus || "").toLowerCase()) || !!booking.cancellation || (isAmendmentCancellation && booking.amendment.status === "completed") || tboStatus === "Cancelled";
+
+  if (isAmendmentCancellation) {
+    steps.push({
+      label: "Cancellation Requested",
+      date: booking.amendment.requestedAt || booking.updatedAt,
+      desc: `Cancellation request submitted for manager/admin approval. ${booking.amendment.remarks ? `Reason: ${booking.amendment.remarks}` : ""}`,
+      icon: <FiClock size={14} />,
+      active: true,
+    });
+  }
+
+  steps.push({
+    label: "Cancellation",
+    date: booking.cancelledAt || booking.cancellation?.cancelledAt || booking.amendment?.updatedAt || (isCancellationCompleted ? booking.updatedAt : null),
+    desc: isCancellationCompleted ? `Booking has been cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}` : "No cancellation executed",
+    icon: <FiXCircle size={14} />,
+    active: isCancellationCompleted,
+    isLast: true,
+  });
 
   const formatDate = (d) =>
     new Date(d).toLocaleDateString("en-GB", {

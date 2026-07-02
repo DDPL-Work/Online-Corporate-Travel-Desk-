@@ -26,16 +26,12 @@ import {
 } from "../../Redux/Actions/corporate.related.thunks";
 import Pagination from "../Shared/Pagination";
 import TableActionBar from "../Shared/TableActionBar";
-import {
-  FlightBookingModal,
-  HotelBookingModal,
-} from "../Shared/BookingRequestDetailsModal";
 import useExcelExporter from "../../services/export/useExcelExporter";
 import {
   flightCancellationQueriesExportTemplate,
-  hotelCancellationQueriesExportTemplate,
 } from "../../templates/exportTemplates/superAdminExportTemplates";
 import QueryDetailModal from "../Modals/QueryDetailModal";
+import { airlineLogo } from "../../utils/formatter";
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -559,14 +555,15 @@ function CancellationQueryTab() {
                 <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
                   {[
                     "Query ID",
-                    "Type",
+                    "Order ID",
                     "Company / Employee",
-                    "Details",
+                    "Airline Details",
+                    "PNR",
                     "Travel Date",
-                    "Total Fare",
                     "Priority",
                     "Status",
                     "Requested On",
+                    "Total Fare",
                     "Actions",
                   ].map((h) => (
                     <th
@@ -629,11 +626,9 @@ function QueryRow({ query, fmt, onView }) {
         {query.queryId || query._id || "—"}
       </td>
       <td className="px-5 py-4">
-        {isHotel ? (
-          <span className="flex items-center gap-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase w-max"><FaHotel size={12}/> Hotel</span>
-        ) : (
-          <span className="flex items-center gap-1.5 text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase w-max"><FaPlane size={12}/> Flight</span>
-        )}
+        <span className="font-mono text-[12px] font-bold text-slate-700">
+          {query.orderId || "—"}
+        </span>
       </td>
       <td className="px-5 py-4">
         <div className="flex flex-col">
@@ -641,19 +636,38 @@ function QueryRow({ query, fmt, onView }) {
             {query.corporate?.companyName || "—"}
           </span>
           <span className="text-[11px] text-slate-400">
-            {query.user?.email || query.corporate?.employeeEmail || "—"}
+            {query.corporate?.employeeEmail || query.user?.email || "—"}
           </span>
         </div>
       </td>
       <td className="px-5 py-4">
-        <div className="flex flex-col">
-          <span className="text-[12px] font-semibold text-slate-700 truncate max-w-[150px]" title={isHotel ? query.bookingSnapshot?.hotelName : (query.bookingSnapshot?.sectors?.[0]?.airline + " / " + query.bookingSnapshot?.sectors?.[0]?.flightNumber)}>
-            {isHotel ? query.bookingSnapshot?.hotelName : (query.bookingSnapshot?.sectors?.[0]?.airline + " / " + query.bookingSnapshot?.sectors?.[0]?.flightNumber || "—")}
-          </span>
-          <span className="font-mono text-[10px] text-slate-400">
-            {isHotel ? query.bookingSnapshot?.roomType : (query.bookingSnapshot?.pnr || "—")}
-          </span>
+        <div className="flex items-center gap-2">
+          {!isHotel && (
+            <img
+              src={airlineLogo(query.bookingSnapshot?.airlineCode || query.bookingSnapshot?.airline)}
+              alt="Airline Logo"
+              className="w-7 h-7 rounded-md object-contain bg-slate-50 border border-slate-100 flex-shrink-0"
+              onError={(e) => {
+                e.target.style.display = "none";
+              }}
+            />
+          )}
+          <div className="flex flex-col">
+            <span className="text-[12px] font-semibold text-slate-700 truncate max-w-[150px]" title={isHotel ? query.bookingSnapshot?.hotelName : (query.bookingSnapshot?.sectors?.[0]?.airline + " / " + query.bookingSnapshot?.sectors?.[0]?.flightNumber)}>
+              {isHotel ? query.bookingSnapshot?.hotelName : (query.bookingSnapshot?.sectors?.[0]?.airline)}
+            </span>
+            <span className="font-mono text-[10px] text-slate-400">
+              {isHotel 
+                ? query.bookingSnapshot?.roomType 
+                : query.bookingSnapshot?.sectors?.length
+                  ? `${query.bookingSnapshot.sectors[0].origin} → ${query.bookingSnapshot.sectors[query.bookingSnapshot.sectors.length - 1].destination}`
+                  : "—"}
+            </span>
+          </div>
         </div>
+      </td>
+      <td className="px-5 py-4 font-mono text-[11px] text-slate-700 font-bold whitespace-nowrap">
+        {query.bookingSnapshot?.pnr || "—"}
       </td>
       <td className="px-5 py-4 text-[12px] text-slate-600 whitespace-nowrap">
         {isHotel ? (
@@ -664,11 +678,6 @@ function QueryRow({ query, fmt, onView }) {
         ) : (
           fmt(query.bookingSnapshot?.sectors?.[0]?.departureTime)
         )}
-      </td>
-      <td className="px-5 py-4 font-bold text-slate-800 text-[12px] whitespace-nowrap">
-        {query.bookingSnapshot?.totalFare != null
-          ? `₹${Number(query.bookingSnapshot.totalFare).toLocaleString()}`
-          : "—"}
       </td>
       <td className="px-5 py-4">
         <span
@@ -687,6 +696,11 @@ function QueryRow({ query, fmt, onView }) {
       </td>
       <td className="px-5 py-4 text-[11px] text-slate-500 whitespace-nowrap">
         {fmt(query.requestedAt)}
+      </td>
+      <td className="px-5 py-4 font-bold text-slate-800 text-[12px] whitespace-nowrap">
+        {query.bookingSnapshot?.totalFare != null
+          ? `₹${Number(query.bookingSnapshot.totalFare).toLocaleString()}`
+          : "—"}
       </td>
       <td className="px-5 py-4">
         <button

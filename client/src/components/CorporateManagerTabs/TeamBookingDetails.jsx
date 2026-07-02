@@ -1008,16 +1008,29 @@ function BookingHistory({ booking }) {
     },
   ];
 
-  if (isCancelled) {
+  const isAmendmentCancellation = booking.amendment && ["fullCancellation", "partialCancellation"].includes(booking.amendment.type);
+  const isCancellationCompleted = booking.executionStatus === "cancelled" || !!booking.cancellation || (isAmendmentCancellation && booking.amendment.status === "completed");
+
+  if (isAmendmentCancellation) {
+    steps.push({
+      label: "Cancellation Requested",
+      date: booking.amendment.requestedAt || booking.updatedAt,
+      desc: `Cancellation request submitted for manager/admin approval. ${booking.amendment.remarks ? `Reason: ${booking.amendment.remarks}` : ""}`,
+      icon: <FiClock size={14} className="text-[#B5862A]" />,
+      active: true,
+    });
+  }
+
+  if (isCancellationCompleted) {
     steps.push({
       label: "Cancelled",
       date:
         booking.cancelledAt ||
         booking.cancellation?.cancelledAt ||
-        booking.amendment?.requestedAt ||
+        booking.amendment?.updatedAt ||
         booking.updatedAt,
-      desc: `Booking cancelled. ${booking.cancellation?.reason || booking.amendment?.remarks ? `Reason: ${booking.cancellation?.reason || booking.amendment?.remarks}` : ""}`,
-      icon: <FiXCircle size={14} className="text-red-500" />,
+      desc: `Booking cancelled. ${booking.cancellation?.reason ? `Reason: ${booking.cancellation.reason}` : ""}`,
+      icon: <FiXCircle size={14} className="text-[#B5341A]" />,
       active: true,
       isError: true,
     });
@@ -1633,6 +1646,8 @@ export default function TeamBookingDetails() {
     executionStatus === "ticketed" &&
     !isCancelled &&
     !isTravelPassed;
+
+  const hasActiveCancellationRequest = booking?.amendment && ["fullCancellation", "partialCancellation"].includes(booking.amendment.type) && booking.amendment.status !== "rejected";
 
   // Fare summary calculations (simplified)
   let baseFare = 0,
@@ -2665,34 +2680,38 @@ export default function TeamBookingDetails() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {eligibilityLoading ? (
-                          <span className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 text-slate-400 rounded-lg text-sm font-semibold">
-                            <FiLoader size={14} className="animate-spin" />{" "}
-                            Checking...
-                          </span>
-                        ) : bookingOfflineRequest ? (
-                          <button
-                            onClick={() =>
-                              navigate(`/my-reissued?bookingId=${booking._id}`)
-                            }
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition"
-                          >
-                            <FiEye size={14} /> View Reissue Status
-                          </button>
-                        ) : isOnlineEligible ? (
-                          <button
-                            onClick={() => setShowReissueModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition"
-                          >
-                            <FiRefreshCw size={14} /> Reissue Online
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setShowReissueModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-100 transition"
-                          >
-                            <FiFileText size={14} /> Raise Reissue Request
-                          </button>
+                        {!hasActiveCancellationRequest && (
+                          <>
+                            {eligibilityLoading ? (
+                              <span className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 text-slate-400 rounded-lg text-sm font-semibold">
+                                <FiLoader size={14} className="animate-spin" />{" "}
+                                Checking...
+                              </span>
+                            ) : bookingOfflineRequest ? (
+                              <button
+                                onClick={() =>
+                                  navigate(`/my-reissued?bookingId=${booking._id}`)
+                                }
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition"
+                              >
+                                <FiEye size={14} /> View Reissue Status
+                              </button>
+                            ) : isOnlineEligible ? (
+                              <button
+                                onClick={() => setShowReissueModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition"
+                              >
+                                <FiRefreshCw size={14} /> Reissue Online
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setShowReissueModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-100 transition"
+                              >
+                                <FiFileText size={14} /> Raise Reissue Request
+                              </button>
+                            )}
+                          </>
                         )}
                         <button
                           onClick={() => setShowCancellationModal(true)}

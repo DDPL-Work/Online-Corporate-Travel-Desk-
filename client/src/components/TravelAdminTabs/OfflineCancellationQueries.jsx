@@ -1,248 +1,82 @@
-// client\src\components\TravelAdminTabs\OfflineCancellationQueries.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchCancellationQueries } from "../../Redux/Actions/amendmentThunks";
+import { useNavigate } from "react-router-dom";
+import { fetchCorporateCancellationQueries, getAllEmployeesAdmin } from "../../Redux/Actions/travelAdmin.thunks";
 import {
   FiSearch,
-  FiFilter,
   FiRefreshCw,
   FiClock,
   FiCheckCircle,
   FiXCircle,
   FiAlertCircle,
   FiInbox,
-  FiCalendar,
-  FiUser,
-  FiTag,
-  FiHash,
   FiX,
   FiArrowRight,
-  FiActivity,
+  FiUser,
+  FiGlobe,
+  FiCalendar
 } from "react-icons/fi";
-import { StatCard, IdCell, Th, LabeledField } from "./Shared/CommonComponents";
+import {
+  StatCard,
+  IdCell,
+  Th,
+  LabeledField,
+  SearchBar,
+  CustomDropdown,
+  RouteCell
+} from "./Shared/CommonComponents";
 import ResponsiveDataTable from "./Shared/ResponsiveDataTable";
-import CancellationQueryDetailsPage from "./CancellationQueryDetailsPage";
+import { Pagination } from "./Shared/Pagination";
+
 import { C } from "../Shared/color";
 import useExcelExporter from "../../hooks/export/useExcelExporter";
 import { adminOfflineCancellationQueriesExportTemplate } from "../../templates/exportTemplates/clientExportTemplates";
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*                                  HELPERS                                   */
-/* ────────────────────────────────────────────────────────────────────────── */
-
-const StatusBadge = ({ status }) => {
+const StatusBadgeLocal = ({ status }) => {
   const map = {
-    OPEN: {
-      label: "Open",
-      bg: "#EFF6FF",
-      text: "#1E40AF",
-      border: "#BFDBFE",
-      icon: <FiClock size={11} />,
-    },
-    IN_PROGRESS: {
-      label: "In Progress",
-      bg: "#FFFBEB",
-      text: "#92400E",
-      border: "#FDE68A",
-      icon: <FiRefreshCw size={11} className="animate-spin" />,
-    },
-    RESOLVED: {
-      label: "Resolved",
-      bg: "#ECFDF5",
-      text: "#065F46",
-      border: "#A7F3D0",
-      icon: <FiCheckCircle size={11} />,
-    },
-    REJECTED: {
-      label: "Rejected",
-      bg: "#FEF2F2",
-      text: "#991B1B",
-      border: "#FECACA",
-      icon: <FiXCircle size={11} />,
-    },
+    OPEN: { bg: "#EFF6FF", text: "#1E40AF", border: "#BFDBFE" },
+    IN_PROGRESS: { bg: "#FFFBEB", text: "#92400E", border: "#FDE68A" },
+    RESOLVED: { bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0" },
+    REJECTED: { bg: "#FEF2F2", text: "#991B1B", border: "#FECACA" },
   };
   const s = map[status?.toUpperCase()] || map.OPEN;
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black border shadow-sm uppercase tracking-wider"
+      className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm"
       style={{ background: s.bg, color: s.text, borderColor: s.border }}
     >
-      {s.icon}
-      {s.label}
+      {status || "OPEN"}
     </span>
   );
 };
 
-const PriorityBadge = ({ priority }) => {
-  const map = {
-    HIGH: { bg: "#FEF2F2", text: "#991B1B" },
-    MEDIUM: { bg: "#FFFBEB", text: "#92400E" },
-    LOW: { bg: "#F8FAFC", text: "#64748B" },
-  };
-  const s = map[priority?.toUpperCase()] || map.LOW;
-  return (
-    <span
-      className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest"
-      style={{ background: s.bg, color: s.text }}
-    >
-      {priority || "MEDIUM"}
-    </span>
-  );
-};
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*                                CARD VIEW                                   */
-/* ────────────────────────────────────────────────────────────────────────── */
-const QueryCard = ({ query, onViewDetails }) => {
-  const requestedAt = query.requestedAt
-    ? new Date(query.requestedAt).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "—";
-
-  return (
-    <div
-      className="bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group"
-      style={{ borderColor: C.border }}
-    >
-      <div
-        className="h-2 w-full"
-        style={{ background: `linear-gradient(90deg, ${C.gold}, ${C.navy})` }}
-      />
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Query Reference
-              </span>
-              <span
-                className="text-[11px] font-black px-2 py-0.5 rounded-md border"
-                style={{
-                  color: C.navy,
-                  background: C.offWhite,
-                  borderColor: C.border,
-                }}
-              >
-                Q-
-                {String(query.queryId || query._id)
-                  .slice(-6)
-                  .toUpperCase()}
-              </span>
-            </div>
-            <h3
-              className="text-lg font-black tracking-tight line-clamp-1"
-              style={{ color: C.navy }}
-            >
-              {query.bookingReference || "Corporate Amendment"}
-            </h3>
-          </div>
-          <StatusBadge status={query.status} />
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-              style={{ background: `${C.navy}08`, color: C.navy }}
-            >
-              <FiCalendar size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                Request Date
-              </p>
-              <p className="text-sm font-black" style={{ color: C.navy }}>
-                {requestedAt}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-              style={{ background: `${C.gold}10`, color: C.gold }}
-            >
-              <FiUser size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                Requester
-              </p>
-              <p
-                className="text-sm font-black truncate max-w-[200px]"
-                style={{ color: C.navy }}
-              >
-                {query.corporate?.employeeName || "Unknown Staff"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-              style={{ background: `${C.navy}08`, color: C.navy }}
-            >
-              <FiTag size={18} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                Urgency
-              </p>
-              <PriorityBadge priority={query.priority} />
-            </div>
-          </div>
-        </div>
-
-        {query.remarks && (
-          <div
-            className="mt-6 p-4 rounded-xl border border-dashed text-[11px] font-medium italic"
-            style={{
-              background: C.offWhite,
-              borderColor: C.border,
-              color: C.muted,
-            }}
-          >
-            "{query.remarks}"
-          </div>
-        )}
-
-        <button
-          onClick={() => onViewDetails(query._id)}
-          className="w-full mt-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm border group-hover:shadow-md"
-          style={{ background: C.white, borderColor: C.border, color: C.navy }}
-        >
-          Process Query{" "}
-          <FiArrowRight className="transition-transform group-hover:translate-x-1" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*                                MAIN COMPONENT                              */
-/* ────────────────────────────────────────────────────────────────────────── */
-
-const OfflineCancellationQueries = () => {
+export default function OfflineCancellationQueries() {
   const dispatch = useDispatch();
-  const { queries, queriesLoading, queriesError } = useSelector(
-    (state) => state.amendment,
+  const navigate = useNavigate();
+  const { queries, queriesLoading, queriesError, allEmployees } = useSelector(
+    (state) => state.adminBooking,
   );
   const { user: currentUser } = useSelector((state) => state.auth);
 
   const userRole = currentUser?.role || "employee";
-  const [activeTab, setActiveTab] = useState("my");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [employeeFilter, setEmployeeFilter] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedQueryId, setSelectedQueryId] = useState(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const { exportExcel, isExporting } = useExcelExporter();
 
   useEffect(() => {
-    dispatch(fetchCancellationQueries());
-  }, [dispatch]);
+    dispatch(fetchCorporateCancellationQueries());
+    if (!allEmployees || allEmployees.length === 0) {
+      dispatch(getAllEmployeesAdmin());
+    }
+  }, [dispatch, allEmployees?.length]);
 
   const stats = useMemo(() => {
     const list = queries || [];
@@ -254,17 +88,60 @@ const OfflineCancellationQueries = () => {
     };
   }, [queries]);
 
-  const filteredQueries = useMemo(() => {
-    let list = queries || [];
-    if (activeTab === "my") {
-      list = list.filter(
-        (q) =>
-          q.user?.id === currentUser?._id ||
-          q.user?.id === currentUser?.id ||
-          q.corporate?.employeeId === currentUser?._id ||
-          q.corporate?.employeeId === currentUser?.id,
-      );
+  const uniqueEmployees = useMemo(() => {
+    const list = ["All"];
+    if (allEmployees && allEmployees.length > 0) {
+      const emps = allEmployees.map(emp => emp.name ? `${emp.name.firstName} ${emp.name.lastName}` : null).filter(Boolean);
+      list.push(...new Set(emps));
+    } else if (queries) {
+      // Fallback if API hasn't loaded yet
+      const emps = queries.map(q => q.userId?.name ? `${q.userId.name.firstName} ${q.userId.name.lastName}` : q.corporate?.employeeName).filter(Boolean);
+      list.push(...new Set(emps));
     }
+    return list;
+  }, [queries, allEmployees]);
+
+  const filteredQueries = useMemo(() => {
+    let list = (queries || []).map(b => {
+      const segments = b.flightRequest?.segments || [];
+      const onwardSegments = segments.filter(s => s.journeyType === "onward" || s.segmentIndicator === 1 || !s.journeyType);
+      const returnSegments = segments.filter(s => s.journeyType === "return" || s.segmentIndicator === 2);
+      
+      const buildLeg = (segs) => {
+        if (!segs.length) return null;
+        const first = segs[0]; 
+        const last = segs[segs.length - 1];
+        return {
+          fromCode: (first?.origin?.code || first?.origin?.airportCode) || "N/A",
+          toCode: (last?.destination?.code || last?.destination?.airportCode) || "N/A",
+          fromCity: first?.origin?.city || "Unknown",
+          toCity: last?.destination?.city || "Unknown"
+        };
+      };
+
+      const routes = [];
+      if (onwardSegments.length > 0 || returnSegments.length > 0) {
+        const onwardLeg = buildLeg(onwardSegments);
+        const returnLeg = buildLeg(returnSegments);
+        if (onwardLeg) routes.push(onwardLeg);
+        if (returnLeg) routes.push(returnLeg);
+      } else if (segments.length > 0) {
+        const leg = buildLeg(segments);
+        if (leg) routes.push(leg);
+      }
+      
+      const airline = segments[0] ? { 
+        airlineCode: segments[0].airlineCode || segments[0].airline?.airlineCode, 
+        airlineName: segments[0].airlineName || segments[0].airline?.airlineName 
+      } : null;
+
+      return { ...b, routesData: routes, airlineData: airline };
+    });
+    
+    if (statusFilter !== "All") {
+      list = list.filter((q) => (q.status || "OPEN").toUpperCase() === statusFilter);
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -275,366 +152,217 @@ const OfflineCancellationQueries = () => {
           item.corporate?.employeeEmail?.toLowerCase().includes(q),
       );
     }
-    return list;
-  }, [queries, activeTab, search, currentUser]);
+    if (employeeFilter !== "All") {
+      list = list.filter((q) => {
+        const empName = q.userId?.name ? `${q.userId.name.firstName} ${q.userId.name.lastName}` : q.corporate?.employeeName;
+        return empName === employeeFilter;
+      });
+    }
 
-  if (selectedQueryId) {
+    if (startDate) {
+      list = list.filter((q) => new Date(q.requestedAt) >= new Date(startDate));
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      list = list.filter((q) => new Date(q.requestedAt) <= end);
+    }
+
+    return list;
+  }, [queries, search, statusFilter, employeeFilter, startDate, endDate, currentUser]);
+
+  const paginated = useMemo(() => filteredQueries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filteredQueries, currentPage]);
+
+
+
+  const handleRefresh = async () => {
+    dispatch(fetchCorporateCancellationQueries());
+  };
+
+  if (queriesError) {
     return (
-      <CancellationQueryDetailsPage
-        queryId={selectedQueryId}
-        onBack={() => setSelectedQueryId(null)}
-      />
+      <div className="bg-white border rounded-3xl p-16 text-center shadow-sm" style={{ borderColor: C.border }}>
+        <FiAlertCircle size={48} className="mx-auto mb-4 text-red-500" />
+        <h3 className="text-xl font-black mb-2" style={{ color: C.navy }}>Sync Protocol Interrupted</h3>
+        <p className="text-slate-400 mb-8 max-w-md mx-auto font-medium">{queriesError}</p>
+        <button onClick={handleRefresh} className="px-10 py-4 bg-navy rounded-2xl text-white font-black text-xs uppercase tracking-widest shadow-lg" style={{ background: C.navy }}>
+          Retry Connection
+        </button>
+      </div>
     );
   }
 
   return (
-    <div
-      className="min-h-screen font-sans pb-20 px-6 pt-8"
-      style={{ background: C.offWhite }}
-    >
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div
-          className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-2xl border shadow-sm"
-          style={{ borderColor: C.border }}
-        >
-          <div className="flex items-center gap-6">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg text-white"
-              style={{
-                background: `linear-gradient(135deg, ${C.navy}, ${C.gold})`,
-              }}
-            >
-              <FiInbox size={32} />
-            </div>
-            <div>
-              <h1
-                className="text-3xl font-black tracking-tight"
-                style={{ color: C.navy }}
-              >
-                Cancellation Queries
-              </h1>
-              <p
-                className="text-xs mt-1 font-bold uppercase tracking-widest"
-                style={{ color: C.muted }}
-              >
-                Manage Offline Amendments & Ticketing Inquiries
-              </p>
-            </div>
+    <div className="min-h-screen font-sans pb-20 -mt-6 -mx-4 md:-mx-6" style={{ background: C.offWhite }}>
+      <div className="w-full bg-gradient-to-br from-[#003399] to-[#000d26] text-white pt-8 pb-20 px-6 md:px-10">
+        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+             <div className="flex items-center gap-3">
+               <button 
+                  onClick={() => navigate(-1)} 
+                  className="p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/10"
+               >
+                 <FiArrowRight className="rotate-180" size={20} />
+               </button>
+               <button 
+                  onClick={handleRefresh} 
+                  className={`p-3 rounded-xl bg-white/10 transition-all border border-white/10 ${queriesLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-white/20"}`}
+                  disabled={queriesLoading}
+               >
+                 <div className={queriesLoading ? "animate-spin" : ""}>
+                   <FiRefreshCw size={20} />
+                 </div>
+               </button>
+             </div>
+             
+             <div className="h-12 w-[1px] bg-white/10 mx-2 hidden md:block" />
+
+             <div className="flex items-center md:items-center gap-4 md:gap-5">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex shrink-0 items-center justify-center shadow-xl text-white border border-white/10 bg-white/10" >
+                 <FiInbox size={24} className="md:w-7 md:h-7" />
+               </div>
+               <div>
+                 <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-none">Cancellation Queries</h1>
+                 <p className="text-[9px] md:text-[10px] mt-2 md:mt-3 font-bold uppercase tracking-[2px] opacity-60">
+                   Manage Offline Amendments & Ticketing Inquiries
+                 </p>
+               </div>
+             </div>
           </div>
-          <button
-            onClick={() => dispatch(fetchCancellationQueries())}
-            disabled={queriesLoading}
-            className="px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all shadow-sm"
-            style={{
-              background: C.white,
-              borderColor: C.border,
-              color: C.navy,
-            }}
-          >
-            <FiRefreshCw className={queriesLoading ? "animate-spin" : ""} />
-            {queriesLoading ? "Syncing..." : "Sync Records"}
-          </button>
         </div>
+      </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            label="Total Submissions"
-            value={stats.total}
-            Icon={FiInbox}
-            iconBgCls="bg-[#000D26]10"
-            iconColorCls="text-[#000D26]"
-            borderCls="border-[#000D26]"
-          />
-          <StatCard
-            label="Pending Review"
-            value={stats.open}
-            Icon={FiClock}
-            iconBgCls="bg-blue-50"
-            iconColorCls="text-blue-600"
-            borderCls="border-blue-500"
-          />
-          <StatCard
-            label="Under Process"
-            value={stats.inProgress}
-            Icon={FiRefreshCw}
-            iconBgCls="bg-amber-50"
-            iconColorCls="text-amber-600"
-            borderCls="border-amber-500"
-          />
-          <StatCard
-            label="Closed Queries"
-            value={stats.resolved}
-            Icon={FiCheckCircle}
-            iconBgCls="bg-emerald-50"
-            iconColorCls="text-emerald-600"
-            borderCls="border-emerald-500"
-          />
-        </div>
+      <div className="w-full px-4 md:px-10 -mt-10 space-y-10">
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard label="Total Submissions" value={stats.total} Icon={FiInbox} borderCls="border-slate-800" iconBgCls="bg-slate-100" iconColorCls="text-slate-800" />
+            <StatCard label="Pending Review" value={stats.open} Icon={FiClock} borderCls="border-blue-500" iconBgCls="bg-blue-50" iconColorCls="text-blue-600" />
+            <StatCard label="Under Process" value={stats.inProgress} Icon={FiRefreshCw} borderCls="border-amber-500" iconBgCls="bg-amber-50" iconColorCls="text-amber-600" />
+            <StatCard label="Closed Queries" value={stats.resolved} Icon={FiCheckCircle} borderCls="border-emerald-500" iconBgCls="bg-emerald-50" iconColorCls="text-emerald-600" />
+          </div>
 
-        {/* Filters and Navigation */}
-        <div
-          className="bg-white rounded-2xl p-6 border shadow-sm"
-          style={{ borderColor: C.border }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-            <div className="md:col-span-5">
-              <div
-                className="flex p-1 bg-slate-100 rounded-xl border"
-                style={{ borderColor: C.border }}
-              >
-                <button
-                  onClick={() => setActiveTab("my")}
-                  className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "my" ? "bg-white shadow-sm" : "text-slate-400"}`}
-                  style={{ color: activeTab === "my" ? C.navy : "" }}
-                >
-                  {userRole === "employee"
-                    ? "My Submissions"
-                    : "Assigned Leads"}
-                </button>
-                {(userRole === "manager" || userRole === "travel-admin") && (
-                  <button
-                    onClick={() => setActiveTab("company")}
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeTab === "company" ? "bg-white shadow-sm" : "text-slate-400"}`}
-                    style={{ color: activeTab === "company" ? C.navy : "" }}
-                  >
-                    {userRole === "manager" ? "Team Ledger" : "Corporate Wide"}
-                  </button>
-                )}
+          <div className="bg-white rounded-2xl p-6 border shadow-sm" style={{ borderColor: C.border }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+              <LabeledField label={<><FiSearch size={10} /> Reference Search</>} className="lg:col-span-3">
+                <SearchBar value={search} onChange={setSearch} placeholder="PNR, Ref or Query Identifier..." />
+              </LabeledField>
+              <LabeledField label={<><FiUser size={10} /> Employee</>} className="lg:col-span-3">
+                <CustomDropdown value={employeeFilter} onChange={setEmployeeFilter} options={uniqueEmployees} />
+              </LabeledField>
+              <LabeledField label="Protocol Status" className="lg:col-span-2">
+                <CustomDropdown value={statusFilter} onChange={setStatusFilter} options={["All", "OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"]} />
+              </LabeledField>
+              <LabeledField label={<><FiCalendar size={10} /> From Date</>} className="lg:col-span-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-[11px] font-bold py-2.5 px-3 border border-gray-200 rounded-xl outline-none focus:border-navy text-gray-700 bg-white transition-all shadow-sm" />
+              </LabeledField>
+              <LabeledField label={<><FiCalendar size={10} /> To Date</>} className="lg:col-span-2">
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full text-[11px] font-bold py-2.5 px-3 border border-gray-200 rounded-xl outline-none focus:border-navy text-gray-700 bg-white transition-all shadow-sm" />
+              </LabeledField>
+              <div className="flex items-end lg:col-span-12">
+                 <button onClick={() => { setSearch(""); setStatusFilter("All"); setEmployeeFilter("All"); setStartDate(""); setEndDate(""); }} className="w-full lg:w-auto px-6 py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest" style={{ background: C.white, borderColor: C.border, color: C.muted }}><FiX /> Reset Filters</button>
               </div>
             </div>
+          </div>
 
-            <div className="md:col-span-5">
-              <LabeledField
-                label={
-                  <>
-                    <FiSearch size={10} /> Reference Search
-                  </>
-                }
-              >
-                <div className="relative group">
-                  <FiSearch
-                    className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
-                    style={{ color: C.muted }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="PNR, Ref or Query Identifier..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border rounded-xl text-sm font-bold outline-none transition-all shadow-sm focus:ring-2 focus:ring-[#B8860B]/20"
-                    style={{
-                      background: C.offWhite,
-                      borderColor: C.border,
-                      color: C.navy,
-                    }}
-                  />
-                </div>
-              </LabeledField>
-            </div>
-
-            <div className="md:col-span-2">
-              <button
-                onClick={() => {
-                  setSearch("");
-                  setActiveTab("my");
-                }}
-                className="w-full py-3 rounded-xl font-black text-[11px] flex items-center justify-center gap-2 border shadow-sm transition-all hover:bg-slate-50 uppercase tracking-widest"
-                style={{
-                  background: C.white,
-                  borderColor: C.border,
-                  color: C.muted,
-                }}
-              >
-                <FiX /> Reset
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        {queriesLoading ? (
-          <div
-            className="py-32 text-center bg-white rounded-3xl border shadow-sm"
-            style={{ borderColor: C.border }}
-          >
-            <FiRefreshCw
-              className="animate-spin mx-auto mb-4"
-              size={40}
-              style={{ color: C.gold }}
-            />
-            <p
-              className="font-black uppercase tracking-widest"
-              style={{ color: C.navy }}
-            >
-              Synchronizing Repository...
-            </p>
-          </div>
-        ) : queriesError ? (
-          <div
-            className="bg-white border rounded-3xl p-16 text-center shadow-sm"
-            style={{ borderColor: C.border }}
-          >
-            <FiAlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-            <h3 className="text-xl font-black mb-2" style={{ color: C.navy }}>
-              Sync Protocol Interrupted
-            </h3>
-            <p className="text-slate-400 mb-8 max-w-md mx-auto font-medium">
-              {queriesError}
-            </p>
-            <button
-              onClick={() => dispatch(fetchCancellationQueries())}
-              className="px-10 py-4 bg-navy rounded-2xl text-white font-black text-xs uppercase tracking-widest shadow-lg"
-              style={{ background: C.navy }}
-            >
-              Retry Connection
-            </button>
-          </div>
-        ) : filteredQueries.length === 0 ? (
-          <div
-            className="bg-white border-2 border-dashed rounded-3xl p-24 text-center"
-            style={{ borderColor: C.border }}
-          >
-            <FiInbox
-              size={64}
-              className="mx-auto mb-4 opacity-10"
-              style={{ color: C.navy }}
-            />
-            <h3 className="text-xl font-black uppercase tracking-widest text-slate-300">
-              No Queries in Pipeline
-            </h3>
-          </div>
-        ) : activeTab === "my" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {filteredQueries.map((query) => (
-              <QueryCard
-                key={query._id}
-                query={query}
-                onViewDetails={setSelectedQueryId}
-              />
-            ))}
-          </div>
-        ) : (
-          <ResponsiveDataTable
-            title="Governance Ledger"
-            subtitle={`${filteredQueries.length} active queries tracked`}
-            tableMinWidth="1000px"
+          <ResponsiveDataTable 
+            title="Governance Ledger" 
+            subtitle={`${filteredQueries.length} active queries tracked`} 
             exportLabel="Export Excel"
             exportLoading={isExporting}
             exportDisabled={isExporting}
-            onExport={() =>
-              exportExcel({
-                pageHeader: "Governance Ledger",
-                statCards: [
-                  { label: "Total Submissions", value: stats.total },
-                  { label: "Pending Review", value: stats.open },
-                  { label: "Under Process", value: stats.inProgress },
-                  { label: "Closed Queries", value: stats.resolved },
-                ],
-                appliedFilters: [
-                  { label: "Search", value: search || "None" },
-                  { label: "Tab Filter", value: activeTab },
-                ],
-                data: filteredQueries,
-                columns: adminOfflineCancellationQueriesExportTemplate,
-                filenamePrefix: "offline_cancellation_queries",
-              })
-            }
+            onExport={() => exportExcel({
+              pageHeader: "Governance Ledger",
+              statCards: [
+                { label: "Total Submissions", value: stats.total },
+                { label: "Pending Review", value: stats.open },
+                { label: "Under Process", value: stats.inProgress },
+                { label: "Closed Queries", value: stats.resolved }
+              ],
+              appliedFilters: [
+                { label: "Search", value: search || "None" },
+                { label: "Employee", value: employeeFilter },
+                { label: "Status", value: statusFilter },
+                { label: "From Date", value: startDate || "All" },
+                { label: "To Date", value: endDate || "All" }
+              ],
+              data: filteredQueries,
+              columns: adminOfflineCancellationQueriesExportTemplate,
+              filenamePrefix: "offline_cancellation_queries"
+            })}
+            wrapperClass="!border-none !shadow-none" 
+            pagination={<Pagination currentPage={currentPage} totalItems={filteredQueries.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />}
           >
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr style={{ background: C.navy, color: C.white }}>
-                  <Th className="px-6 py-5">Query ID</Th>
-                  <Th className="px-6 py-5">Travel Asset</Th>
-                  <Th className="px-6 py-5">Personnel</Th>
-                  <Th className="px-6 py-5">Email Identifier</Th>
-                  <Th className="px-6 py-5">Submission Time</Th>
-                  <Th className="px-6 py-5 text-center">Protocol Status</Th>
-                  <Th className="px-6 py-5 text-center">Governance</Th>
+                <tr className="bg-gradient-to-r from-[#003399] to-[#000d26] text-white">
+                  <Th className="!px-6 !py-5">Query ID</Th>
+                  <Th className="!px-6 !py-5">Order ID</Th>
+                  <Th className="!px-6 !py-5">Employee Info</Th>
+                  <Th className="!px-6 !py-5">Airline / Route</Th>
+                  <Th className="!px-6 !py-5">PNR</Th>
+                  <Th className="!px-6 !py-5">Travel Date & Time</Th>
+                  <Th className="!px-6 !py-5">Submitted At</Th>
+                  <Th className="!px-6 !py-5">Amount</Th>
+                  <Th className="!px-6 !py-5">Priority</Th>
+                  <Th className="!px-6 !py-5">Status</Th>
+                  <Th className="!px-6 !py-5 !text-left">Action</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y" style={{ borderColor: C.border }}>
-                {filteredQueries.map((query, i) => (
-                  <tr
-                    key={query._id}
-                    className="hover:bg-slate-50 transition-colors"
-                    style={{ background: i % 2 === 0 ? C.white : C.offWhite }}
-                  >
-                    <td className="px-6 py-5">
-                      <code
-                        className="text-[10px] font-black px-2 py-1 rounded border"
-                        style={{
-                          background: C.white,
-                          borderColor: C.border,
-                          color: C.muted,
-                        }}
-                      >
-                        Q-
-                        {String(query.queryId || query._id)
-                          .slice(-6)
-                          .toUpperCase()}
-                      </code>
+              <tbody>
+                {paginated.length > 0 ? paginated.map((query, i) => (
+                  <tr key={query._id} className="hover:bg-slate-100 transition-colors" style={{ background: i % 2 === 0 ? C.white : C.lightGray }}>
+                    <td className="!px-6 !py-5"><IdCell id={query.queryId || query._id} prefix="Q-" /></td>
+                    <td className="!px-6 !py-5"><IdCell id={query.bookingSnapshot?.orderId || query.orderId || query.bookingReference} /></td>
+                    <td className="!px-6 !py-5">
+                       <p className="text-xs font-black" style={{ color: C.navy }}>{query.corporate?.employeeName || query.userId?.name?.firstName || "Employee"}</p>
+                       <p className="text-[10px] font-bold text-slate-400 truncate max-w-[120px]">{query.corporate?.employeeEmail || query.userId?.email || "—"}</p>
                     </td>
-                    <td className="px-6 py-5">
-                      <p
-                        className="text-sm font-black"
-                        style={{ color: C.navy }}
-                      >
-                        {query.bookingReference}
-                      </p>
-                      <p className="text-[10px] font-bold text-gold uppercase tracking-tighter">
-                        {query.bookingSnapshot?.airline || "Offline Segment"}
-                      </p>
+                    <td className="!px-6 !py-5">
+                       <RouteCell routes={query.routesData} airline={query.airlineData} />
                     </td>
-                    <td className="px-6 py-5">
-                      <p
-                        className="text-xs font-black"
-                        style={{ color: C.navy }}
-                      >
-                        {query.corporate?.employeeName}
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">
-                        {query.reason || "AMENDMENT"}
-                      </p>
+                    <td className="!px-6 !py-5 font-black text-xs text-rose-500">{query.bookingResult?.pnr || query.bookingSnapshot?.pnr || query.bookingReference}</td>
+                    <td className="!px-6 !py-5">
+                       <p className="text-xs font-bold" style={{ color: C.navy }}>{query.bookingSnapshot?.travelDate ? new Date(query.bookingSnapshot.travelDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : "—"}</p>
+                       <p className="text-[10px] text-slate-400 font-medium">{query.bookingSnapshot?.travelDate ? new Date(query.bookingSnapshot.travelDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}</p>
                     </td>
-                    <td className="px-6 py-5">
-                      <span className="text-[11px] font-bold text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded">
-                        {query.corporate?.employeeEmail}
+                    <td className="!px-6 !py-5">
+                       <p className="text-xs font-bold" style={{ color: C.navy }}>{query.requestedAt ? new Date(query.requestedAt).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : "—"}</p>
+                       <p className="text-[10px] text-slate-400 font-medium">{query.requestedAt ? new Date(query.requestedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}</p>
+                    </td>
+                    <td className="!px-6 !py-5 font-black text-xs" style={{ color: C.navy }}>₹{(query.bookingSnapshot?.totalAmount || query.pricingSnapshot?.totalAmount || 0).toLocaleString()}</td>
+                    <td className="!px-6 !py-5">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${query.priority === "HIGH" ? "bg-rose-50 text-rose-600" : query.priority === "LOW" ? "bg-slate-50 text-slate-500" : "bg-amber-50 text-amber-600"}`}>
+                        {query.priority || "MEDIUM"}
                       </span>
                     </td>
-                    <td className="px-6 py-5">
-                      <p
-                        className="text-xs font-bold"
-                        style={{ color: C.navy }}
-                      >
-                        {new Date(query.requestedAt).toLocaleDateString()}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-medium">
-                        {new Date(query.requestedAt).toLocaleTimeString()}
-                      </p>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <StatusBadge status={query.status} />
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <button
-                        onClick={() => setSelectedQueryId(query._id)}
-                        className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md"
-                        style={{ background: `${C.navy}08`, color: C.navy }}
-                      >
-                        <FiArrowRight size={18} />
-                      </button>
+                    <td className="!px-6 !py-5"><StatusBadgeLocal status={query.status} /></td>
+                    <td className="!px-6 !py-5 !text-left">
+                       <button 
+                         onClick={() => navigate(`/employee-flight-booking/${query._id}?source=offline-cancellation`)} 
+                         className="p-3 rounded-xl transition-all shadow-sm hover:shadow-md bg-gradient-to-br from-[#003399] to-[#000d26] hover:bg-white hover:from-white hover:to-white group"
+                       >
+                         <FiArrowRight size={18} className="text-[#E7C695] group-hover:text-[#000d26] transition-colors" />
+                       </button>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={11} className="!px-6 !py-20 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                          <FiSearch size={32} />
+                        </div>
+                        <p className="text-sm font-bold text-slate-400">No active queries found for the selected criteria.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </ResponsiveDataTable>
-        )}
+        </div>
       </div>
     </div>
   );
-};
-
-export default OfflineCancellationQueries;
+}

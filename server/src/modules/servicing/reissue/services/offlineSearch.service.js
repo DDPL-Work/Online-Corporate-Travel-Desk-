@@ -38,6 +38,20 @@ const normalizeCabinClass = (value) => {
   return cabinClassMap[key] || 2;
 };
 
+const cabinClassStringMap = {
+  1: "All",
+  2: "Economy",
+  3: "Premium Economy",
+  4: "Business",
+  5: "Premium Business",
+  6: "First",
+};
+
+const getCabinClassName = (value) => {
+  const norm = normalizeCabinClass(value);
+  return cabinClassStringMap[norm] || "Economy";
+};
+
 const toArray = (value) => {
   if (!value) return [];
   return Array.isArray(value) ? value.filter(Boolean) : [value].filter(Boolean);
@@ -111,8 +125,11 @@ const extractResultSegments = (result) => {
   collectSegments(result?.Segments);
   collectSegments(result?.Segment);
 
+  const fareBreakdown = toArray(result?.FareBreakdown);
+  const segmentDetails = fareBreakdown[0]?.SegmentDetails || fareBreakdown[0]?.segmentDetails || [];
+
   return rawSegments
-    .map((segment) => {
+    .map((segment, index) => {
       const origin = extractAirportCode(segment?.Origin || segment?.origin || segment?.OriginAirport);
       const destination = extractAirportCode(segment?.Destination || segment?.destination || segment?.DestinationAirport);
       // TBO FlightSearch response stores timings inside the nested Origin/Destination objects:
@@ -179,6 +196,17 @@ const extractResultSegments = (result) => {
       const fareClass = segment?.Airline?.FareClass || segment?.FareClass || null;
       const supplierFareClass = segment?.SupplierFareClass || segment?.Airline?.SupplierFareClass || null;
 
+      const segDetail = segmentDetails[index] || {};
+      const baggageValue = segDetail?.CheckedInBaggage?.Value ? `${segDetail.CheckedInBaggage.Value} ${segDetail.CheckedInBaggage.Unit || "KG"}` : segDetail?.CheckedInBaggage?.FreeText;
+      const cabinBaggageValue = segDetail?.CabinBaggage?.Value ? `${segDetail.CabinBaggage.Value} ${segDetail.CabinBaggage.Unit || "KG"}` : segDetail?.CabinBaggage?.FreeText;
+
+      const baggage = segment?.Baggage || baggageValue || null;
+      const cabinBaggage = segment?.CabinBaggage || cabinBaggageValue || null;
+      const cabinClassRaw = segment?.CabinClass || segment?.CabinClassCode || null;
+      const cabinClass = cabinClassRaw ? getCabinClassName(cabinClassRaw) : null;
+      const craft = segment?.Craft || segment?.Equipment || null;
+      const isRefundable = segment?.IsRefundable ?? segment?.Refundable ?? null;
+
       if (!origin || !destination) return null;
       return {
         origin: originDetails,
@@ -193,6 +221,11 @@ const extractResultSegments = (result) => {
         availableSeats,
         stops,
         duration: Number.isFinite(duration) && duration > 0 ? duration : null,
+        baggage,
+        cabinBaggage,
+        cabinClass,
+        craft,
+        isRefundable,
       };
     })
     .filter(Boolean);

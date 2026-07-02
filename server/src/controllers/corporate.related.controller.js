@@ -3,7 +3,6 @@
 const Corporate = require("../models/Corporate");
 const User = require("../models/User");
 const BookingRequest = require("../models/BookingRequest");
-const CancellationQuery = require("../models/CancellationQuery");
 const HotelBookingRequest = require("../models/hotelBookingRequest.model");
 const Ledger = require("../models/Ledger");
 const ApiError = require("../utils/ApiError");
@@ -1512,65 +1511,73 @@ exports.fetchCancellationQueries = async (req, res) => {
     /* ─────────────────────────────
        🔥 ROLE-BASED FILTERING
     ───────────────────────────── */
+    const baseQuery = {
+      "amendment.type": "OFFLINE_CANCELLATION",
+      "amendment.changeRequestId": { $exists: true, $ne: null }
+    };
+
     if (userRole === "employee") {
       // Employee sees only their own requests
-      query["user.id"] = userId;
+      baseQuery.userId = userId;
     } else if (userRole === "manager") {
       // Manager sees their own + their team's requests
       const Employee = require("../models/Employee");
       const teamEmployees = await Employee.find({ managerId: userId }).select("userId").lean();
       const teamUserIds = teamEmployees.map(e => e.userId);
-      query["user.id"] = { $in: [...teamUserIds, userId] };
+      baseQuery.userId = { $in: [...teamUserIds, userId] };
     } else if (userRole === "travel-admin") {
       // Travel Admin sees all requests for their corporate
-      query["corporate.companyId"] = corporateId;
+      baseQuery.corporateId = corporateId;
     } else if (userRole === "super-admin" || userRole === "ops-member") {
       // Super Admin sees everything or filtered by query params
       if (req.query.corporateId) {
-        query["corporate.companyId"] = req.query.corporateId;
+        baseQuery.corporateId = req.query.corporateId;
       }
     } else {
       // Unauthorized or unknown role
       return res.status(403).json({ success: false, message: "Unauthorized role for this action" });
     }
 
-    if (status) query.status = status;
+    if (status) baseQuery["amendment.status"] = status;
 
     if (bookingReference) {
-      query.bookingReference = { $regex: bookingReference, $options: "i" };
+      baseQuery["bookingResult.pnr"] = { $regex: bookingReference, $options: "i" };
     }
 
     if (queryId) {
-      query.queryId = { $regex: queryId, $options: "i" };
+      baseQuery["amendment.changeRequestId"] = { $regex: queryId, $options: "i" };
     }
 
-    const [queries, total] = await Promise.all([
-      CancellationQuery.find(query)
-        .sort({ createdAt: -1 })
+    const [bookings, total] = await Promise.all([
+      BookingRequest.find(baseQuery)
+        .populate("corporateId", "corporateName")
+        .populate("userId", "employeeCode name email")
+        .sort({ updatedAt: -1 })
         .lean(),
-
-      CancellationQuery.countDocuments(query),
+      BookingRequest.countDocuments(baseQuery),
     ]);
-
-    /* ─────────────────────────────
-       🔥 FETCH BOOKINGS
-    ───────────────────────────── */
-    const bookingIds = queries.map((q) => q.bookingId).filter(Boolean);
-
-    const bookings = await BookingRequest.find({
-      _id: { $in: bookingIds },
-    }).lean();
-
-    const bookingMap = {};
-    bookings.forEach((b) => {
-      bookingMap[b._id.toString()] = b;
-    });
 
     /* ─────────────────────────────
        🔥 NORMALIZE DATA
     ───────────────────────────── */
-    const enrichedData = queries.map((q) => {
-      const b = bookingMap[q.bookingId?.toString()] || {};
+    const enrichedData = bookings.map((b) => {
+      const requestedAt = b?.amendmentHistory?.find(h => h.type === 'OFFLINE_CANCELLATION')?.createdAt || b.updatedAt;
+
+      const q = {
+        _id: b._id,
+        queryId: b.amendment?.changeRequestId,
+        orderId: b.orderId || "—",
+        bookingId: b._id,
+        bookingReference: b.bookingResult?.pnr,
+        user: { id: b.userId?._id || b.userId },
+        corporate: { companyId: b.corporateId?._id || b.corporateId },
+        status: b.amendment?.status || "OPEN",
+        priority: b.amendment?.priority || "HIGH",
+        remarks: b.amendment?.requesterComments,
+        createdAt: b.updatedAt,
+        requestedAt,
+        resolution: b.amendment?.response
+      };
 
       const itinerary =
         b?.bookingResult?.providerResponse?.Response?.Response
@@ -1641,13 +1648,11 @@ exports.fetchCancellationQueries = async (req, res) => {
 
         // 🔥 CORPORATE + USER
         corporate: {
-          companyName: b?.corporateId || "—",
+          companyName: b?.corporateId?.corporateName || b?.corporateId || "—",
           employeeName:
-            b?.travellers?.[0]?.firstName +
-              " " +
-              b?.travellers?.[0]?.lastName || "—",
-          employeeEmail: b?.travellers?.[0]?.email || "—",
-          employeeId: b?.userId || "—",
+            (b?.travellers?.[0]?.firstName ? b.travellers[0].firstName + " " + (b.travellers[0].lastName || "") : b?.userId?.name) || "—",
+          employeeEmail: b?.travellers?.[0]?.email || b?.userId?.email || "—",
+          employeeId: b?.userId?._id || b?.userId || "—",
         },
 
         passengers:
@@ -1667,12 +1672,6 @@ exports.fetchCancellationQueries = async (req, res) => {
       success: true,
       message: "Cancellation queries fetched successfully",
       data: enrichedData,
-      pagination: {
-        total,
-        // page: Number(page),
-        // limit: Number(limit),
-        // totalPages: Math.ceil(total / limit),
-      },
     });
   } catch (error) {
     console.error("❌ fetchCancellationQueries:", error);
@@ -1685,52 +1684,7 @@ exports.fetchCancellationQueries = async (req, res) => {
   }
 };
 
-// Get single cancellation query details with booking info
-exports.fetchCancellationQueryById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const query = await CancellationQuery.findById(id).lean();
 
-    if (!query) {
-      return res.status(404).json({ success: false, message: "Query not found" });
-    }
-
-    // Role-based access check
-    const userRole = req.user?.role;
-    const userId = req.user?._id?.toString();
-    const corporateId = req.user?.corporateId?.toString();
-
-    if (userRole === "employee" && query.user?.id?.toString() !== userId) {
-      return res.status(403).json({ success: false, message: "Unauthorized access to this query" });
-    }
-
-    if (userRole === "travel-admin" && query.corporate?.companyId?.toString() !== corporateId) {
-      return res.status(403).json({ success: false, message: "Unauthorized access to this company's query" });
-    }
-
-    let bookingData = null;
-    if (query.bookingId) {
-      // 1. Try Flight Booking Model
-      bookingData = await BookingRequest.findById(query.bookingId).lean();
-      
-      // 2. If not found, try Hotel Booking Model
-      if (!bookingData) {
-        bookingData = await HotelBookingRequest.findById(query.bookingId).lean();
-      }
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        ...query,
-        bookingDetails: bookingData
-      }
-    });
-  } catch (error) {
-    console.error("Fetch Query Details Error:", error.message);
-    return res.status(500).json({ success: false, message: "Failed to fetch query details" });
-  }
-};
 
 // PATCH /api/cancellation-queries/:id/status
 exports.updateCancellationQueryStatus = async (req, res) => {
@@ -1738,102 +1692,102 @@ exports.updateCancellationQueryStatus = async (req, res) => {
     const { id } = req.params;
     const { status, remarks, resolution } = req.body;
 
-    /* ─────────────────────────────
-       🔥 VALIDATION
-    ───────────────────────────── */
     const normalizedStatus = String(status || "").toUpperCase();
-    const allowedStatus = ["OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED"];
 
-    if (!normalizedStatus || !allowedStatus.includes(normalizedStatus)) {
+    if (!normalizedStatus) {
       return res.status(400).json({
         success: false,
-        message: `Invalid status. Allowed: ${allowedStatus.join(", ")}`,
+        message: "Invalid status.",
       });
     }
 
-    /* ─────────────────────────────
-       🔍 FIND QUERY
-    ───────────────────────────── */
-    const query = await CancellationQuery.findById(id);
+    let b = await BookingRequest.findById(id);
+    if (!b) {
+      b = await HotelBookingRequest.findById(id);
+    }
 
-    if (!query) {
+    if (!b || !b.amendment || b.amendment.type !== "OFFLINE_CANCELLATION") {
       return res.status(404).json({
         success: false,
         message: "Cancellation query not found",
       });
     }
 
-    const hasResolutionUpdate =
-      resolution &&
-      typeof resolution === "object" &&
-      Object.keys(resolution).some((key) => resolution[key] !== undefined);
-    const hasRemarksUpdate =
-      typeof remarks === "string" && remarks !== query.remarks;
-
-    /* ─────────────────────────────
-       🚫 PREVENT DUPLICATE UPDATE
-    ───────────────────────────── */
-    if (
-      query.status === normalizedStatus &&
-      !hasResolutionUpdate &&
-      !hasRemarksUpdate
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: `Query is already ${normalizedStatus}`,
-      });
-    }
-
-    /* ─────────────────────────────
-       ✏️ UPDATE STATUS
-    ───────────────────────────── */
-    const previousStatus = query.status;
-
-    query.status = normalizedStatus;
+    const previousStatus = b.amendment.status || "OPEN";
+    b.amendment.status = normalizedStatus;
 
     if (typeof remarks === "string") {
-      query.remarks = remarks;
+      b.amendment.requesterComments = remarks;
     }
 
-    if (hasResolutionUpdate) {
-      query.resolution = {
-        ...(query.resolution?.toObject?.() || query.resolution || {}),
+    if (resolution) {
+      b.amendment.response = {
+        ...(b.amendment.response || {}),
         ...resolution,
       };
+      if (normalizedStatus === "RESOLVED" && !b.amendment.response?.resolvedAt) {
+        b.amendment.response.resolvedAt = new Date();
+      }
     }
 
-    if (query.status === "RESOLVED" && !query.resolution?.resolvedAt) {
-      query.resolution = {
-        ...(query.resolution?.toObject?.() || query.resolution || {}),
-        resolvedAt: new Date(),
+    if (normalizedStatus === "RESOLVED") {
+      b.executionStatus = "cancelled";
+      const existingReason = b.cancellation?.reason || b.amendment?.remarks || b.amendment?.requesterComments || "Offline Cancellation";
+      b.cancellation = {
+        ...(b.cancellation?.toObject ? b.cancellation.toObject() : b.cancellation || {}),
+        cancelledAt: new Date(),
+        cancelledBy: req.user?._id,
+        reason: existingReason,
+        opsRemark: resolution?.message || remarks || "",
+        refundAmount: resolution?.refundAmount || 0,
+        refundStatus: "processed",
       };
     }
 
-    /* ─────────────────────────────
-       🧾 LOG ENTRY
-    ───────────────────────────── */
-    query.logs.push({
-      action: "STATUS_UPDATED",
-      by: req.user?.role === "admin" ? "ADMIN" : "USER",
-      message:
-        previousStatus === normalizedStatus
-          ? `Query details updated while status remained ${normalizedStatus}`
-          : `Status changed from ${previousStatus} to ${normalizedStatus}`,
+    b.amendmentHistory.push({
+      type: "OFFLINE_CANCELLATION",
+      changeRequestId: b.amendment.changeRequestId,
+      status: normalizedStatus,
+      response: {
+        action: "STATUS_UPDATED",
+        by: req.user?.role === "admin" ? "ADMIN" : "USER",
+        message: previousStatus === normalizedStatus
+          ? `Query details updated`
+          : `Status changed from ${previousStatus} to ${normalizedStatus}`
+      },
+      createdAt: new Date()
     });
 
-    await query.save();
+    // Mark the amendment field as modified so Mongoose knows to save it
+    b.markModified("amendment");
 
-    /* ─────────────────────────────
-       ✅ RESPONSE
-    ───────────────────────────── */
+    // Fix existing invalid priorities that might cause save to fail
+    if (b.amendment?.priority) {
+      b.amendment.priority = b.amendment.priority.toLowerCase();
+    }
+
+    await b.save();
+
+    const updatedQuery = {
+      _id: b._id,
+      queryId: b.amendment?.changeRequestId,
+      bookingId: b._id,
+      bookingReference: b.bookingResult?.pnr,
+      user: { id: b.userId },
+      corporate: { companyId: b.corporateId },
+      status: b.amendment?.status,
+      remarks: b.amendment?.requesterComments,
+      createdAt: b.updatedAt,
+      resolution: b.amendment?.response
+    };
+
     return res.status(200).json({
       success: true,
       message: "Cancellation query status updated successfully",
-      data: query,
+      data: updatedQuery,
     });
   } catch (error) {
     console.error("❌ updateCancellationQueryStatus:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to update status",
@@ -1930,3 +1884,244 @@ exports.getTboCommissionsAndTaxes = asyncHandler(async (req, res) => {
     });
   }
 });
+
+// Get single cancellation query details
+exports.fetchCancellationQueryById = async (req, res) => {
+  try {
+    const identifier = req.params.bookingId || req.params.id;
+
+    let b = await BookingRequest.findOne({
+      $or: [
+        { _id: identifier },
+        { orderId: identifier },
+        { bookingReference: identifier }
+      ]
+    })
+      .populate("corporateId", "corporateName")
+      .populate("userId", "employeeCode name email")
+      .lean();
+
+    if (!b) {
+      // Fallback to HotelBookingRequest
+      const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+      b = await HotelBookingRequest.findOne({
+        $or: [
+          { _id: identifier },
+          { orderId: identifier },
+          { bookingReference: identifier }
+        ]
+      })
+        .populate("corporateId", "corporateName")
+        .populate("userId", "employeeCode name email")
+        .lean();
+    }
+
+    if (!b) {
+      return res.status(404).json({ success: false, message: "Query not found" });
+    }
+
+    // Role-based access check
+    const userRole = req.user?.role;
+    const userId = req.user?._id?.toString();
+    const corporateId = req.user?.corporateId?.toString();
+
+    if (userRole === "employee" && b.userId?._id?.toString() !== userId) {
+      return res.status(403).json({ success: false, message: "Unauthorized access to this query" });
+    }
+
+    if (userRole === "travel-admin" && b.corporateId?._id?.toString() !== corporateId) {
+      return res.status(403).json({ success: false, message: "Unauthorized access to this company's query" });
+    }
+
+    const itinerary = b?.bookingResult?.providerResponse?.Response?.Response?.FlightItinerary || {};
+    const segments = itinerary?.Segments || b?.flightRequest?.segments || [];
+    const firstSegment = Array.isArray(segments) ? segments[0] : segments?.[0]?.[0] || {};
+    const fare = itinerary?.Fare || {};
+    const pricing = b?.pricingSnapshot || {};
+    
+    const requestedAt = b?.amendmentHistory?.find(h => h.type === 'OFFLINE_CANCELLATION')?.createdAt || b.updatedAt;
+
+    const enrichedData = {
+      ...b,
+      _id: b._id,
+      bookingId: b._id,
+      orderId: b.orderId || "—",
+      bookingReference: b.bookingReference,
+      queryId: b.amendment?.changeRequestId,
+      remarks: b.amendment?.requesterComments,
+      status: b.amendment?.overallStatus || b.amendment?.status,
+      requestedAt,
+      resolution: b.amendment?.resolution || {},
+      priority: b.amendment?.priority || "MEDIUM",
+
+      bookingSnapshot: {
+        hotelName: b?.hotelRequest?.selectedHotel?.hotelName || b?.bookingSnapshot?.hotelName,
+        roomType: b?.hotelRequest?.selectedRoom?.roomType || b?.bookingSnapshot?.roomType,
+        checkInDate: b?.hotelRequest?.checkInDate || b?.bookingSnapshot?.checkInDate,
+        checkOutDate: b?.hotelRequest?.checkOutDate || b?.bookingSnapshot?.checkOutDate,
+        airline: itinerary?.AirlineCode || firstSegment?.Airline?.AirlineName || b?.flightRequest?.segments?.[0]?.airlineName || "—",
+        airlineCode: itinerary?.AirlineCode || firstSegment?.Airline?.AirlineCode || b?.flightRequest?.segments?.[0]?.airlineCode || "—",
+        pnr: itinerary?.PNR || b?.bookingResult?.pnr || "—",
+        travelDate: firstSegment?.Origin?.DepTime || b?.flightRequest?.segments?.[0]?.departureDateTime || b?.bookingSnapshot?.travelDate,
+        returnDate: b?.bookingSnapshot?.returnDate || null,
+        journeyType: b?.flightRequest?.journeyType || b?.bookingSnapshot?.journeyType,
+        sectors: segments?.map((s) => {
+          const seg = s?.[0] || s;
+          return {
+            origin: seg?.Origin?.Airport?.AirportCode || seg?.origin?.airportCode || seg?.origin,
+            destination: seg?.Destination?.Airport?.AirportCode || seg?.destination?.airportCode || seg?.destination,
+            airline: seg?.Airline?.AirlineName || seg?.airlineName || seg?.airline,
+            flightNumber: seg?.Airline?.FlightNumber || seg?.flightNumber,
+            departureTime: seg?.Origin?.DepTime || seg?.departureDateTime || seg?.departureTime,
+          };
+        }) || [],
+        totalFare: pricing?.totalAmount || fare?.PublishedFare || b?.bookingSnapshot?.amount || b?.bookingSnapshot?.totalFare,
+        baseFare: fare?.BaseFare || b?.bookingSnapshot?.baseFare,
+        taxes: fare?.Tax || b?.bookingSnapshot?.taxes,
+        serviceFee: fare?.ServiceFee || 0,
+        city: b?.bookingSnapshot?.city,
+        cabinClass: b?.bookingSnapshot?.cabinClass,
+      },
+
+      corporate: {
+        companyName: b?.corporateId?.corporateName || b?.corporateId || "—",
+        employeeName: (b?.travellers?.[0]?.firstName ? b.travellers[0].firstName + " " + (b.travellers[0].lastName||"") : b?.userId?.name) || "—",
+        employeeEmail: b?.travellers?.[0]?.email || b?.userId?.email || "—",
+        employeeId: b?.userId?.employeeCode || (b?.userId?._id ? b.userId._id.toString() : b?.userId) || "—",
+      },
+
+      passengers: b?.amendment?.actionPayload?.passengers || b?.travellers?.map((t) => ({
+        name: `${t.firstName} ${t.lastName}`,
+        type: t.paxType,
+        ticketNumber: itinerary?.Passenger?.[0]?.Ticket?.TicketNumber || "—",
+      })) || [],
+
+      logs: b.amendmentHistory || [],
+      amendment: b.amendment,
+      amendmentHistory: b.amendmentHistory,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Cancellation query fetched successfully",
+      data: enrichedData,
+    });
+  } catch (error) {
+    console.error("fetchCancellationQueryById:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch cancellation query details",
+      error: error.message,
+    });
+  }
+};
+
+// Fetch eligible Ops members for cancellation queries
+exports.getEligibleOpsMembersForCancellations = async (req, res) => {
+  try {
+    const OpsMember = require("../models/OpsMember");
+    // We only fetch active Ops members who explicitly have the permission
+    const opsMembers = await OpsMember.find({
+      status: "Active",
+      permissions: { $in: ["Cancellation Management"] }
+    }).select("name email role designation").lean();
+
+    return res.status(200).json({
+      success: true,
+      message: "Eligible Ops members fetched successfully",
+      data: opsMembers,
+    });
+  } catch (error) {
+    console.error("getEligibleOpsMembersForCancellations error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch Ops members",
+      error: error.message,
+    });
+  }
+};
+
+// Assign a cancellation query to an Ops member
+exports.assignCancellationQuery = async (req, res) => {
+  try {
+    const identifier = req.params.bookingId || req.params.id;
+    const { opsMemberId } = req.body;
+    
+    if (!opsMemberId) {
+      return res.status(400).json({ success: false, message: "opsMemberId is required" });
+    }
+
+    const OpsMember = require("../models/OpsMember");
+    const opsMember = await OpsMember.findById(opsMemberId).lean();
+    if (!opsMember) {
+      return res.status(404).json({ success: false, message: "Ops member not found" });
+    }
+
+    let b = await BookingRequest.findOne({
+      $or: [
+        { _id: identifier },
+        { orderId: identifier },
+        { bookingReference: identifier }
+      ]
+    });
+
+    if (!b) {
+      const HotelBookingRequest = require("../models/hotelBookingRequest.model");
+      b = await HotelBookingRequest.findOne({
+        $or: [
+          { _id: identifier },
+          { orderId: identifier },
+          { bookingReference: identifier }
+        ]
+      });
+    }
+
+    if (!b) {
+      return res.status(404).json({ success: false, message: "Query not found" });
+    }
+
+    // Assign
+    if (!b.amendment) {
+      b.amendment = {};
+    }
+    b.amendment.assignedTo = opsMember._id;
+    b.amendment.assignedAt = new Date();
+
+    // Log the assignment
+    const logEntry = {
+      type: "ASSIGNMENT",
+      status: "ASSIGNED",
+      response: {
+        action: `Query Assigned to ${opsMember.name}`,
+        message: `Assigned to ${opsMember.name} (${opsMember.role})`,
+        by: req.user?.name || req.user?.firstName || "Admin",
+      },
+      createdAt: new Date(),
+    };
+    
+    if (!b.amendmentHistory) {
+      b.amendmentHistory = [];
+    }
+    b.amendmentHistory.push(logEntry);
+
+    // Save bypassing validations that might fail if not updating all required fields
+    await b.save({ validateBeforeSave: false });
+
+    return res.status(200).json({
+      success: true,
+      message: "Query assigned successfully",
+      data: {
+        assignedTo: opsMember,
+        log: logEntry
+      }
+    });
+
+  } catch (error) {
+    console.error("assignCancellationQuery error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to assign query",
+      error: error.message,
+    });
+  }
+};

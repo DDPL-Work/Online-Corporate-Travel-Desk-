@@ -151,8 +151,8 @@ const FlightFilterSidebar = ({
   setDurationValues,
   onClose,
 }) => {
-  const [priceRange, setPriceRange] = useState({ min: 1000, max: 15000 });
-  const [durationRange, setDurationRange] = useState({ min: 0, max: 1440 });
+  const [priceRange, setPriceRange] = useState({ min: 0, max:0 });
+  const [durationRange, setDurationRange] = useState({ min: 0, max: 0 });
   const [priceType, setPriceType] = useState("incv");
 
   // Expandable sections state

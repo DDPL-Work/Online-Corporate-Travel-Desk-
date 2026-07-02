@@ -131,7 +131,7 @@ export const reviewManagerRequest = createAsyncThunk(
       return { requestId, action, message: res.data.message };
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.message || "Failed to review request"
+        err.response?.data?.message || "Failed to update request"
       );
     }
   }
@@ -280,6 +280,20 @@ export const getFinanceTeamAdmin = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Failed to fetch finance team"
+      );
+    }
+  }
+);
+
+export const fetchCorporateCancellationQueries = createAsyncThunk(
+  "travelAdmin/fetchCorporateCancellationQueries",
+  async (params, { rejectWithValue }) => {
+    try {
+      const res = await api.get("/travel-admin/cancellation-queries", { params });
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch corporate queries"
       );
     }
   }
